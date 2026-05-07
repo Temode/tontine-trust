@@ -1,6 +1,8 @@
 export type GroupStatus = "active" | "your-turn" | "completed" | "pending";
 
-export type Frequency = "Hebdomadaire" | "Mensuelle" | "Quinzaine";
+export type Frequency = "Hebdomadaire" | "Quinzaine" | "Mensuelle";
+
+export type GroupRole = "organizer" | "participant";
 
 export interface TontineGroup {
   id: string;
@@ -9,12 +11,19 @@ export interface TontineGroup {
   contribution: number;
   frequency: Frequency;
   nextPaymentDate: string;
+  /** Days until next deadline. Negative for overdue, undefined for completed. */
+  daysToDeadline?: number;
   progress: number;
   currentTurn: string;
   yourTurn: number;
   status: GroupStatus;
   totalCollected: number;
   rules: string[];
+  role: GroupRole;
+  /** Average reliability score across members. */
+  averageScore: number;
+  /** Date the cycle started. */
+  startedOn: string;
 }
 
 export type MobileMoneyOperator = "orange" | "mtn";

@@ -17,6 +17,7 @@ export const groups: TontineGroup[] = [
     contribution: 1_000_000,
     frequency: "Hebdomadaire",
     nextPaymentDate: "5 Jan 2025",
+    daysToDeadline: 2,
     progress: 40,
     currentTurn: "Vous",
     yourTurn: 8,
@@ -27,6 +28,9 @@ export const groups: TontineGroup[] = [
       "Ordre de rotation : Fixe",
       "Échange de tours : Sur accord du groupe",
     ],
+    role: "participant",
+    averageScore: 93,
+    startedOn: "01 Sep 2024",
   },
   {
     id: "g-diallo",
@@ -35,6 +39,7 @@ export const groups: TontineGroup[] = [
     contribution: 500_000,
     frequency: "Mensuelle",
     nextPaymentDate: "15 Jan 2025",
+    daysToDeadline: 12,
     progress: 75,
     currentTurn: "Mamadou D.",
     yourTurn: 11,
@@ -45,6 +50,9 @@ export const groups: TontineGroup[] = [
       "Ordre de rotation : Aléatoire",
       "Échange de tours : Autorisé",
     ],
+    role: "organizer",
+    averageScore: 96,
+    startedOn: "01 Mars 2024",
   },
   {
     id: "g-bureau",
@@ -53,6 +61,7 @@ export const groups: TontineGroup[] = [
     contribution: 200_000,
     frequency: "Mensuelle",
     nextPaymentDate: "1 Fév 2025",
+    daysToDeadline: 29,
     progress: 37.5,
     currentTurn: "Aissatou C.",
     yourTurn: 5,
@@ -63,6 +72,95 @@ export const groups: TontineGroup[] = [
       "Ordre de rotation : Tirage au sort",
       "Échange de tours : Autorisé",
     ],
+    role: "participant",
+    averageScore: 91,
+    startedOn: "01 Oct 2024",
+  },
+  {
+    id: "g-donka",
+    name: "Pilotes Donka",
+    members: 15,
+    contribution: 750_000,
+    frequency: "Hebdomadaire",
+    nextPaymentDate: "8 Jan 2025",
+    daysToDeadline: 5,
+    progress: 60,
+    currentTurn: "Boubacar D.",
+    yourTurn: 12,
+    status: "active",
+    totalCollected: 11_250_000,
+    rules: [
+      "Pénalité de retard : 8% après 2 jours",
+      "Ordre de rotation : Fixe",
+      "Échange de tours : Refusé",
+    ],
+    role: "organizer",
+    averageScore: 89,
+    startedOn: "15 Sep 2024",
+  },
+  {
+    id: "g-kaloum",
+    name: "Investisseurs Kaloum",
+    members: 24,
+    contribution: 2_000_000,
+    frequency: "Mensuelle",
+    nextPaymentDate: "20 Jan 2025",
+    daysToDeadline: 17,
+    progress: 25,
+    currentTurn: "Mariama S.",
+    yourTurn: 18,
+    status: "active",
+    totalCollected: 12_000_000,
+    rules: [
+      "Pénalité de retard : 15% après 1 jour",
+      "Ordre de rotation : Enchères",
+      "Échange de tours : Sur accord notarié",
+    ],
+    role: "participant",
+    averageScore: 97,
+    startedOn: "01 Nov 2024",
+  },
+  {
+    id: "g-conakry",
+    name: "Entrepreneurs Conakry",
+    members: 10,
+    contribution: 350_000,
+    frequency: "Quinzaine",
+    nextPaymentDate: "—",
+    progress: 0,
+    currentTurn: "Inscription en cours",
+    yourTurn: 0,
+    status: "pending",
+    totalCollected: 0,
+    rules: [
+      "Pénalité de retard : 5% après 2 jours",
+      "Ordre de rotation : Tirage au sort",
+      "Échange de tours : Autorisé",
+    ],
+    role: "organizer",
+    averageScore: 0,
+    startedOn: "—",
+  },
+  {
+    id: "g-sandervalia",
+    name: "Artisans Sandervalia",
+    members: 6,
+    contribution: 100_000,
+    frequency: "Mensuelle",
+    nextPaymentDate: "Cycle terminé",
+    progress: 100,
+    currentTurn: "Cycle terminé",
+    yourTurn: 4,
+    status: "completed",
+    totalCollected: 600_000,
+    rules: [
+      "Pénalité de retard : 5% après 5 jours",
+      "Ordre de rotation : Aléatoire",
+      "Échange de tours : Autorisé",
+    ],
+    role: "participant",
+    averageScore: 88,
+    startedOn: "01 Mars 2024",
   },
 ];
 
@@ -213,7 +311,7 @@ export function getGroupById(id: string): TontineGroup | undefined {
 }
 
 export function getStats() {
-  const activeGroups = groups.filter((g) => g.status !== "completed").length;
+  const activeGroups = groups.filter((g) => g.status !== "completed" && g.status !== "pending").length;
   const contributionsCount = transactions.filter((t) => t.type === "out" && t.status === "success").length;
   const contributionsTotal = transactions
     .filter((t) => t.type === "out" && t.status === "success")
@@ -232,5 +330,53 @@ export function getStats() {
     reliabilityScore: currentUser.reliabilityScore,
     onTimePayments: { current: 12, total: 12 },
     lateCount: 0,
+  };
+}
+
+export function getPortfolioStats() {
+  const total = groups.length;
+  const active = groups.filter((g) => g.status === "active").length;
+  const yourTurn = groups.filter((g) => g.status === "your-turn").length;
+  const completed = groups.filter((g) => g.status === "completed").length;
+  const pending = groups.filter((g) => g.status === "pending").length;
+
+  // Capital engagé : somme des cotisations encore dues sur le cycle restant.
+  const capitalCommitted = groups
+    .filter((g) => g.status === "active" || g.status === "your-turn")
+    .reduce((sum, g) => {
+      const turnsRemaining = Math.max(0, g.members - Math.round((g.progress / 100) * g.members));
+      return sum + g.contribution * turnsRemaining;
+    }, 0);
+
+  const cagnotteCumulee = groups.reduce((sum, g) => sum + g.totalCollected, 0);
+
+  const scored = groups.filter((g) => g.averageScore > 0);
+  const avgScore = scored.length > 0
+    ? Math.round(scored.reduce((sum, g) => sum + g.averageScore, 0) / scored.length)
+    : 0;
+
+  // Prochaine cagnotte attendue (votre tour le plus proche en jours).
+  const upcomingTurn = groups
+    .filter((g) => g.status !== "completed" && g.status !== "pending")
+    .reduce<{ amount: number; days: number; groupName: string } | null>((best, g) => {
+      if (g.status === "your-turn") {
+        const amount = g.contribution * g.members;
+        if (!best || (g.daysToDeadline ?? 9999) < best.days) {
+          return { amount, days: g.daysToDeadline ?? 0, groupName: g.name };
+        }
+      }
+      return best;
+    }, null);
+
+  return {
+    total,
+    active,
+    yourTurn,
+    completed,
+    pending,
+    capitalCommitted,
+    cagnotteCumulee,
+    avgScore,
+    upcomingTurn,
   };
 }
