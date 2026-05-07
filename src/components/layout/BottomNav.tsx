@@ -23,7 +23,7 @@ export function BottomNav() {
   return (
     <nav
       aria-label="Navigation principale"
-      className="fixed inset-x-0 bottom-0 z-40 border-t border-border/60 bg-card/95 px-4 pb-[max(env(safe-area-inset-bottom),0.5rem)] pt-2 backdrop-blur md:hidden"
+      className="fixed inset-x-0 bottom-0 z-40 border-t border-hairline bg-card/95 px-3 pb-[max(env(safe-area-inset-bottom),0.5rem)] pt-2 backdrop-blur lg:hidden"
     >
       <ul className="mx-auto flex max-w-md items-end justify-around">
         {items.map((item) => {
@@ -36,9 +36,9 @@ export function BottomNav() {
                 <Link
                   to={item.to}
                   aria-label={item.label}
-                  className="-mt-6 flex h-12 w-12 items-center justify-center rounded-2xl gradient-primary text-white shadow-primary transition active:scale-95"
+                  className="-mt-5 flex h-11 w-11 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-primary transition active:scale-95"
                 >
-                  <Icon className="h-6 w-6" strokeWidth={2.5} />
+                  <Icon className="h-5 w-5" strokeWidth={2.25} />
                 </Link>
               </li>
             );
@@ -50,11 +50,11 @@ export function BottomNav() {
                 to={item.to}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "flex flex-col items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-medium transition",
+                  "flex flex-col items-center gap-0.5 rounded-md px-3 py-1.5 text-[10px] font-medium transition",
                   active ? "text-primary" : "text-muted-foreground hover:text-foreground",
                 )}
               >
-                <Icon className="h-5 w-5" />
+                <Icon className="h-[18px] w-[18px]" />
                 {item.label}
               </Link>
             </li>
