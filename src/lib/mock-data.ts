@@ -1,4 +1,4 @@
-import type { Member, PaymentMethod, TontineGroup, Transaction } from "./types";
+import type { Member, PaymentMethod, SwapProposal, TontineGroup, Transaction, Turn } from "./types";
 
 export const currentUser = {
   id: "user-1",
@@ -392,6 +392,181 @@ export function getUpcomingContributions(): UpcomingContribution[] {
     }))
     .sort((a, b) => a.daysAway - b.daysAway);
 }
+
+/**
+ * Cycle length per frequency (in days). Approximations are fine for visualisation.
+ */
+const FREQUENCY_DAYS: Record<TontineGroup["frequency"], number> = {
+  Hebdomadaire: 7,
+  Quinzaine: 14,
+  Mensuelle: 30,
+};
+
+/** Pseudo-random members used to populate beneficiaries when a group has no member roster yet. */
+const FALLBACK_BENEFICIARIES: Array<{ name: string; initials: string }> = [
+  { name: "Mamadou Diallo", initials: "MD" },
+  { name: "Fatoumata Barry", initials: "FB" },
+  { name: "Ibrahima Sow", initials: "IS" },
+  { name: "Aissatou Camara", initials: "AC" },
+  { name: "Ousmane Bah", initials: "OB" },
+  { name: "Mariama Touré", initials: "MT" },
+  { name: "Abdoulaye Keita", initials: "AK" },
+  { name: "Sekou Konaté", initials: "SK" },
+  { name: "Hadiatou Cissé", initials: "HC" },
+  { name: "Moussa Bangoura", initials: "MB" },
+  { name: "Kadiatou Sylla", initials: "KS" },
+  { name: "Lansana Camara", initials: "LC" },
+  { name: "Aminata Diaby", initials: "AD" },
+  { name: "Boubacar Doumbouya", initials: "BD" },
+  { name: "Néné Touré", initials: "NT" },
+  { name: "Salif Kaba", initials: "SK" },
+  { name: "Kankou Bah", initials: "KB" },
+  { name: "Thierno Diallo", initials: "TD" },
+  { name: "Mariama Souaré", initials: "MS" },
+  { name: "Alpha Conté", initials: "AC" },
+];
+
+function formatDateFr(d: Date): string {
+  const months = ["Jan", "Fév", "Mar", "Avr", "Mai", "Juin", "Juil", "Août", "Sep", "Oct", "Nov", "Déc"];
+  return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+}
+
+/**
+ * Generate the full rotation roster for a group: completed turns, the current turn,
+ * and the upcoming ones — using the deterministic order of FALLBACK_BENEFICIARIES so the
+ * output is stable across renders and the user lands at index = group.yourTurn.
+ */
+function generateTurnsForGroup(group: TontineGroup, today: Date): Turn[] {
+  if (group.status === "pending") return [];
+
+  const cycleDays = FREQUENCY_DAYS[group.frequency];
+  const turnsCompleted = Math.round((group.progress / 100) * group.members);
+  const nextDeadlineDays = group.daysToDeadline ?? cycleDays;
+
+  const turns: Turn[] = [];
+
+  for (let i = 1; i <= group.members; i++) {
+    // Day offset relative to the current "next deadline":
+    const offset = (i - turnsCompleted - 1) * cycleDays + nextDeadlineDays;
+    const date = new Date(today.getTime() + offset * 24 * 60 * 60 * 1000);
+    const status: Turn["status"] =
+      group.status === "completed"
+        ? "completed"
+        : i <= turnsCompleted
+        ? "completed"
+        : i === turnsCompleted + 1
+        ? "current"
+        : "upcoming";
+
+    const isYou = i === group.yourTurn && group.status !== "completed";
+    const fallback = FALLBACK_BENEFICIARIES[(i + group.id.length) % FALLBACK_BENEFICIARIES.length];
+
+    turns.push({
+      id: `${group.id}-t${i}`,
+      groupId: group.id,
+      groupName: group.name,
+      index: i,
+      total: group.members,
+      date: formatDateFr(date),
+      daysFromToday: Math.round(offset),
+      beneficiaryName: isYou ? "Vous" : fallback.name,
+      beneficiaryInitials: isYou ? "ED" : fallback.initials,
+      isYou,
+      amount: group.contribution * group.members,
+      contributorsPaid:
+        status === "current"
+          ? Math.round(group.members * 0.8)
+          : status === "completed"
+          ? group.members
+          : 0,
+      contributorsTotal: group.members,
+      status,
+    });
+  }
+
+  return turns;
+}
+
+const TODAY = new Date(2025, 0, 3); // Aligns with mock dates ("5 Jan 2025" ≈ today + 2j).
+
+export function getAllTurns(): Turn[] {
+  return groups.flatMap((g) => generateTurnsForGroup(g, TODAY));
+}
+
+export function getYourNextTurn(): Turn | null {
+  const all = getAllTurns().filter((t) => t.isYou && t.status !== "completed");
+  if (all.length === 0) return null;
+  return all.reduce((best, t) => (t.daysFromToday < best.daysFromToday ? t : best));
+}
+
+export function getRotationStats() {
+  const all = getAllTurns();
+  const yours = all.filter((t) => t.isYou);
+  const yoursUpcoming = yours.filter((t) => t.status !== "completed");
+  const yoursCompleted = yours.filter((t) => t.status === "completed");
+  const totalCycle = all.length;
+  const completedCycle = all.filter((t) => t.status === "completed").length;
+  const next90 = all.filter((t) => t.daysFromToday >= 0 && t.daysFromToday <= 90).length;
+
+  const expectedAmount = yoursUpcoming.reduce((s, t) => s + t.amount, 0);
+  const receivedAmount = yoursCompleted.reduce((s, t) => s + t.amount, 0);
+
+  return {
+    yourUpcomingCount: yoursUpcoming.length,
+    yourReceivedCount: yoursCompleted.length,
+    expectedAmount,
+    receivedAmount,
+    next90,
+    totalCycle,
+    completedCycle,
+    completionRate: totalCycle > 0 ? Math.round((completedCycle / totalCycle) * 100) : 0,
+  };
+}
+
+export const swapProposals: SwapProposal[] = [
+  {
+    id: "swap-1",
+    groupId: "g-madina",
+    groupName: "Commerçants Madina",
+    direction: "incoming",
+    counterparty: "Aissatou Camara",
+    counterpartyInitials: "AC",
+    yourTurn: 8,
+    theirTurn: 14,
+    proposedOn: "02 Jan 2025",
+    expiresIn: 3,
+    message: "Bonjour, j'ai un besoin urgent — pouvez-vous échanger votre tour avec le mien ?",
+    status: "pending",
+  },
+  {
+    id: "swap-2",
+    groupId: "g-donka",
+    groupName: "Pilotes Donka",
+    direction: "outgoing",
+    counterparty: "Boubacar Doumbouya",
+    counterpartyInitials: "BD",
+    yourTurn: 12,
+    theirTurn: 9,
+    proposedOn: "30 Déc 2024",
+    expiresIn: 5,
+    message: "Bonsoir, accepterais-tu de prendre mon tour ? Je peux te redonner le tien plus tard.",
+    status: "pending",
+  },
+  {
+    id: "swap-3",
+    groupId: "g-diallo",
+    groupName: "Tontine Famille Diallo",
+    direction: "outgoing",
+    counterparty: "Mariama Touré",
+    counterpartyInitials: "MT",
+    yourTurn: 11,
+    theirTurn: 6,
+    proposedOn: "15 Déc 2024",
+    expiresIn: 0,
+    message: "—",
+    status: "accepted",
+  },
+];
 
 export function getContributionsStats() {
   const upcoming = getUpcomingContributions();

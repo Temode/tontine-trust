@@ -9,6 +9,7 @@ import Dashboard from "@/pages/Dashboard";
 import GroupDetail from "@/pages/GroupDetail";
 import MyGroups from "@/pages/MyGroups";
 import NotFound from "@/pages/NotFound";
+import Rotations from "@/pages/Rotations";
 
 const queryClient = new QueryClient();
 
@@ -25,6 +26,7 @@ const App = () => (
             <Route path="/groupes" element={<MyGroups />} />
             <Route path="/groupes/:id" element={<GroupDetail />} />
             <Route path="/cotisations" element={<Contributions />} />
+            <Route path="/rotations" element={<Rotations />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AppShell>

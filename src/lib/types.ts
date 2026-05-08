@@ -71,3 +71,47 @@ export interface PaymentMethod {
   /** Approximate balance, optional. */
   balance?: number;
 }
+
+export type TurnStatus = "completed" | "current" | "upcoming";
+
+export interface Turn {
+  id: string;
+  groupId: string;
+  groupName: string;
+  /** 1-indexed turn number. */
+  index: number;
+  /** Total number of turns in the cycle (= members). */
+  total: number;
+  /** Display date, e.g. "15 Jan 2025". */
+  date: string;
+  /** Days from today; negative for past. */
+  daysFromToday: number;
+  beneficiaryName: string;
+  beneficiaryInitials: string;
+  /** True when the current user is the beneficiary of this turn. */
+  isYou: boolean;
+  amount: number;
+  /** Members who have paid for this turn at the time of viewing. */
+  contributorsPaid: number;
+  contributorsTotal: number;
+  status: TurnStatus;
+}
+
+export type SwapStatus = "pending" | "accepted" | "declined" | "expired";
+
+export type SwapDirection = "incoming" | "outgoing";
+
+export interface SwapProposal {
+  id: string;
+  groupId: string;
+  groupName: string;
+  direction: SwapDirection;
+  counterparty: string;
+  counterpartyInitials: string;
+  yourTurn: number;
+  theirTurn: number;
+  proposedOn: string;
+  expiresIn: number;
+  message?: string;
+  status: SwapStatus;
+}
