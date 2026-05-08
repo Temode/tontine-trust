@@ -1,4 +1,4 @@
-import type { Member, TontineGroup, Transaction } from "./types";
+import type { Member, PaymentMethod, TontineGroup, Transaction } from "./types";
 
 export const currentUser = {
   id: "user-1",
@@ -180,21 +180,27 @@ export const transactions: Transaction[] = [
     id: "tx-1",
     type: "in",
     groupId: "g-diallo",
-    groupName: "Famille Diallo",
+    groupName: "Tontine Famille Diallo",
     amount: 6_000_000,
     date: "25 Déc 2024",
+    daysFromToday: -10,
     status: "success",
     operator: "mtn",
+    turn: 7,
+    reference: "MTN-784512",
   },
   {
     id: "tx-2",
     type: "out",
     groupId: "g-diallo",
-    groupName: "Famille Diallo",
+    groupName: "Tontine Famille Diallo",
     amount: 500_000,
     date: "28 Déc 2024",
+    daysFromToday: -7,
     status: "success",
     operator: "orange",
+    turn: 8,
+    reference: "OM-892341",
   },
   {
     id: "tx-3",
@@ -203,8 +209,11 @@ export const transactions: Transaction[] = [
     groupName: "Commerçants Madina",
     amount: 1_000_000,
     date: "29 Déc 2024",
+    daysFromToday: -6,
     status: "success",
     operator: "orange",
+    turn: 7,
+    reference: "OM-892355",
   },
   {
     id: "tx-4",
@@ -213,10 +222,210 @@ export const transactions: Transaction[] = [
     groupName: "Collègues Bureau",
     amount: 200_000,
     date: "01 Jan 2025",
+    daysFromToday: -3,
     status: "success",
     operator: "mtn",
+    turn: 3,
+    reference: "MTN-784678",
+  },
+  {
+    id: "tx-5",
+    type: "out",
+    groupId: "g-donka",
+    groupName: "Pilotes Donka",
+    amount: 750_000,
+    date: "02 Jan 2025",
+    daysFromToday: -2,
+    status: "success",
+    operator: "orange",
+    turn: 9,
+    reference: "OM-892412",
+  },
+  {
+    id: "tx-6",
+    type: "out",
+    groupId: "g-kaloum",
+    groupName: "Investisseurs Kaloum",
+    amount: 2_000_000,
+    date: "03 Jan 2025",
+    daysFromToday: -1,
+    status: "success",
+    operator: "mtn",
+    turn: 6,
+    reference: "MTN-784721",
+  },
+  {
+    id: "tx-7",
+    type: "out",
+    groupId: "g-diallo",
+    groupName: "Tontine Famille Diallo",
+    amount: 525_000,
+    date: "28 Nov 2024",
+    daysFromToday: -37,
+    status: "success",
+    operator: "orange",
+    turn: 7,
+    penalty: 25_000,
+    reference: "OM-882104",
+  },
+  {
+    id: "tx-8",
+    type: "out",
+    groupId: "g-madina",
+    groupName: "Commerçants Madina",
+    amount: 1_000_000,
+    date: "22 Déc 2024",
+    daysFromToday: -13,
+    status: "success",
+    operator: "orange",
+    turn: 6,
+    reference: "OM-891422",
+  },
+  {
+    id: "tx-9",
+    type: "out",
+    groupId: "g-donka",
+    groupName: "Pilotes Donka",
+    amount: 750_000,
+    date: "26 Déc 2024",
+    daysFromToday: -9,
+    status: "success",
+    operator: "orange",
+    turn: 8,
+    reference: "OM-892121",
+  },
+  {
+    id: "tx-10",
+    type: "in",
+    groupId: "g-bureau",
+    groupName: "Collègues Bureau",
+    amount: 1_600_000,
+    date: "10 Déc 2024",
+    daysFromToday: -25,
+    status: "success",
+    operator: "mtn",
+    turn: 3,
+    reference: "MTN-783998",
+  },
+  {
+    id: "tx-11",
+    type: "out",
+    groupId: "g-kaloum",
+    groupName: "Investisseurs Kaloum",
+    amount: 2_000_000,
+    date: "20 Nov 2024",
+    daysFromToday: -45,
+    status: "failed",
+    operator: "mtn",
+    turn: 5,
+    reference: "MTN-781022",
+  },
+  {
+    id: "tx-12",
+    type: "out",
+    groupId: "g-bureau",
+    groupName: "Collègues Bureau",
+    amount: 200_000,
+    date: "15 Déc 2024",
+    daysFromToday: -20,
+    status: "success",
+    operator: "mtn",
+    turn: 2,
+    reference: "MTN-783542",
   },
 ];
+
+export const paymentMethods: PaymentMethod[] = [
+  {
+    id: "pm-orange",
+    operator: "orange",
+    label: "Orange Money",
+    msisdn: "+224 621 00 00 00",
+    primary: true,
+    verified: true,
+    balance: 4_250_000,
+  },
+  {
+    id: "pm-mtn",
+    operator: "mtn",
+    label: "MTN Mobile Money",
+    msisdn: "+224 661 00 00 00",
+    primary: false,
+    verified: true,
+    balance: 1_120_000,
+  },
+];
+
+export interface UpcomingContribution {
+  id: string;
+  groupId: string;
+  groupName: string;
+  amount: number;
+  date: string;
+  daysAway: number;
+  /** UI grouping. */
+  bucket: "overdue" | "this-week" | "this-month" | "later";
+  /** Whether the user can act now (vs. scheduled / awaiting cycle). */
+  payable: boolean;
+}
+
+function bucketFor(days: number): UpcomingContribution["bucket"] {
+  if (days < 0) return "overdue";
+  if (days <= 7) return "this-week";
+  if (days <= 30) return "this-month";
+  return "later";
+}
+
+/** Build the upcoming contribution schedule from group deadlines. */
+export function getUpcomingContributions(): UpcomingContribution[] {
+  return groups
+    .filter((g) => g.daysToDeadline !== undefined && g.status !== "completed" && g.status !== "pending")
+    .map((g): UpcomingContribution => ({
+      id: `up-${g.id}`,
+      groupId: g.id,
+      groupName: g.name,
+      amount: g.contribution,
+      date: g.nextPaymentDate,
+      daysAway: g.daysToDeadline ?? 0,
+      bucket: bucketFor(g.daysToDeadline ?? 0),
+      payable: (g.daysToDeadline ?? 0) <= 14,
+    }))
+    .sort((a, b) => a.daysAway - b.daysAway);
+}
+
+export function getContributionsStats() {
+  const upcoming = getUpcomingContributions();
+  const out30 = transactions.filter(
+    (t) => t.type === "out" && t.status === "success" && (t.daysFromToday ?? 0) >= -30,
+  );
+  const failed30 = transactions.filter(
+    (t) => t.type === "out" && t.status === "failed" && (t.daysFromToday ?? 0) >= -30,
+  );
+  const onTime = transactions.filter(
+    (t) => t.type === "out" && t.status === "success" && !t.penalty,
+  ).length;
+  const late = transactions.filter((t) => t.type === "out" && (t.penalty ?? 0) > 0).length;
+  const denominator = onTime + late || 1;
+  const onTimeRate = Math.round((onTime / denominator) * 100);
+
+  const dueSoon = upcoming.filter((u) => u.daysAway <= 7);
+  const overdue = upcoming.filter((u) => u.bucket === "overdue");
+
+  return {
+    upcomingCount: upcoming.length,
+    upcomingTotal: upcoming.reduce((s, u) => s + u.amount, 0),
+    dueSoonCount: dueSoon.length,
+    dueSoonTotal: dueSoon.reduce((s, u) => s + u.amount, 0),
+    paid30Count: out30.length,
+    paid30Total: out30.reduce((s, t) => s + t.amount, 0),
+    failed30Count: failed30.length,
+    overdueCount: overdue.length,
+    overdueTotal: overdue.reduce((s, u) => s + u.amount, 0),
+    onTimeRate,
+    onTimeCount: onTime,
+    lateCount: late,
+  };
+}
 
 export type DeadlineType = "due" | "receiving";
 

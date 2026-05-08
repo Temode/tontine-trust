@@ -40,6 +40,8 @@ export interface Member {
 
 export type TransactionType = "in" | "out";
 
+export type TransactionStatus = "success" | "pending" | "failed" | "scheduled" | "late";
+
 export interface Transaction {
   id: string;
   type: TransactionType;
@@ -47,6 +49,25 @@ export interface Transaction {
   groupName: string;
   amount: number;
   date: string;
-  status: "success" | "pending" | "failed";
+  /** Days from today; negative = past, used for sorting and period filtering. */
+  daysFromToday?: number;
+  status: TransactionStatus;
   operator?: MobileMoneyOperator;
+  /** Tour # in the group cycle. */
+  turn?: number;
+  /** Late penalty applied (already part of `amount`). */
+  penalty?: number;
+  /** Operator-side reference. */
+  reference?: string;
+}
+
+export interface PaymentMethod {
+  id: string;
+  operator: MobileMoneyOperator;
+  label: string;
+  msisdn: string;
+  primary: boolean;
+  verified: boolean;
+  /** Approximate balance, optional. */
+  balance?: number;
 }

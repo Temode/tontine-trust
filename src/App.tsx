@@ -4,6 +4,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppShell } from "@/components/layout/AppShell";
+import Contributions from "@/pages/Contributions";
 import Dashboard from "@/pages/Dashboard";
 import GroupDetail from "@/pages/GroupDetail";
 import MyGroups from "@/pages/MyGroups";
@@ -23,6 +24,7 @@ const App = () => (
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/groupes" element={<MyGroups />} />
             <Route path="/groupes/:id" element={<GroupDetail />} />
+            <Route path="/cotisations" element={<Contributions />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AppShell>
