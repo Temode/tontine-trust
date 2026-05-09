@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppShell } from "@/components/layout/AppShell";
 import Calendar from "@/pages/Calendar";
 import Contributions from "@/pages/Contributions";
+import CreateGroup from "@/pages/CreateGroup";
 import Dashboard from "@/pages/Dashboard";
 import GroupDetail from "@/pages/GroupDetail";
 import History from "@/pages/History";
@@ -31,6 +32,7 @@ const App = () => (
             <Route path="/rotations" element={<Rotations />} />
             <Route path="/historique" element={<History />} />
             <Route path="/calendrier" element={<Calendar />} />
+            <Route path="/nouveau" element={<CreateGroup />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AppShell>
