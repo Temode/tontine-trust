@@ -174,3 +174,34 @@ export interface CashflowPoint {
   /** Cumulative net since the beginning of the series. */
   cumulative: number;
 }
+
+export type CalendarEventType =
+  | "contribution"
+  | "your-turn"
+  | "turn"
+  | "meeting"
+  | "cycle-start"
+  | "cycle-end"
+  | "swap-deadline"
+  | "rule-vote"
+  | "reminder";
+
+export interface CalendarEvent {
+  id: string;
+  type: CalendarEventType;
+  title: string;
+  /** ISO date "YYYY-MM-DD". */
+  date: string;
+  /** Optional 24h time "HH:MM". */
+  time?: string;
+  endTime?: string;
+  daysFromToday: number;
+  groupId?: string;
+  groupName?: string;
+  amount?: number;
+  isYou?: boolean;
+  description?: string;
+  status?: "scheduled" | "completed" | "cancelled";
+}
+
+export type CalendarView = "month" | "agenda";

@@ -1,4 +1,15 @@
-import type { CashflowPoint, LedgerEvent, Member, MonthlyStatement, PaymentMethod, SwapProposal, TontineGroup, Transaction, Turn } from "./types";
+import type {
+  CalendarEvent,
+  CashflowPoint,
+  LedgerEvent,
+  Member,
+  MonthlyStatement,
+  PaymentMethod,
+  SwapProposal,
+  TontineGroup,
+  Transaction,
+  Turn,
+} from "./types";
 
 export const currentUser = {
   id: "user-1",
@@ -923,6 +934,246 @@ export function getStatements(): MonthlyStatement[] {
         status: isCurrentMonth ? "pending" : "ready",
       } satisfies MonthlyStatement;
     });
+}
+
+/** Reference "today" used across mocks so the calendar lines up with other pages. */
+export const TODAY_REFERENCE = new Date(2025, 0, 3);
+
+function isoDateFromOffset(daysFromToday: number): string {
+  const d = new Date(TODAY_REFERENCE.getTime() + daysFromToday * 86_400_000);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function offsetFromIso(iso: string): number {
+  const [y, m, d] = iso.split("-").map(Number);
+  const date = new Date(y, m - 1, d);
+  return Math.round((date.getTime() - TODAY_REFERENCE.getTime()) / 86_400_000);
+}
+
+/** Custom recurring meetings, votes and reminders not derived from groups. */
+const customCalendarEvents: Array<Omit<CalendarEvent, "daysFromToday">> = [
+  {
+    id: "ev-meeting-madina",
+    type: "meeting",
+    title: "Réunion mensuelle — Commerçants Madina",
+    date: "2025-01-12",
+    time: "18:00",
+    endTime: "19:30",
+    groupId: "g-madina",
+    groupName: "Commerçants Madina",
+    description: "Bilan du tour en cours, vote sur l'ajustement de la cotisation et débat sur l'extension du cycle.",
+  },
+  {
+    id: "ev-meeting-kaloum",
+    type: "meeting",
+    title: "Comité d'investisseurs — Kaloum",
+    date: "2025-01-25",
+    time: "10:00",
+    endTime: "12:00",
+    groupId: "g-kaloum",
+    groupName: "Investisseurs Kaloum",
+    description: "Revue trimestrielle, validation de la prochaine vague d'enchères pour le tour suivant.",
+  },
+  {
+    id: "ev-vote-donka",
+    type: "rule-vote",
+    title: "Vote — Pénalité de retard",
+    date: "2025-01-09",
+    time: "20:00",
+    groupId: "g-donka",
+    groupName: "Pilotes Donka",
+    description: "Vote pour ramener la pénalité de 8% à 5% à partir du tour #11.",
+  },
+  {
+    id: "ev-swap-deadline-1",
+    type: "swap-deadline",
+    title: "Expiration — Échange #SW-1",
+    date: "2025-01-05",
+    time: "23:59",
+    groupId: "g-madina",
+    groupName: "Commerçants Madina",
+    description: "Réponse attendue à la proposition d'échange de Aissatou Camara.",
+  },
+  {
+    id: "ev-reminder-kyc",
+    type: "reminder",
+    title: "Rappel — Mise à jour KYC",
+    date: "2025-01-15",
+    time: "09:00",
+    description: "Renouvellement annuel de la pièce d'identité auprès du service conformité.",
+  },
+  {
+    id: "ev-cycle-end-bureau",
+    type: "cycle-end",
+    title: "Clôture du cycle — Collègues Bureau",
+    date: "2025-08-01",
+    groupId: "g-bureau",
+    groupName: "Collègues Bureau",
+    description: "Le cycle de 8 mois se termine. Possibilité de relancer un nouveau cycle.",
+  },
+  {
+    id: "ev-meeting-diallo",
+    type: "meeting",
+    title: "Conseil de famille — Tontine Diallo",
+    date: "2025-02-08",
+    time: "16:00",
+    endTime: "18:00",
+    groupId: "g-diallo",
+    groupName: "Tontine Famille Diallo",
+    description: "Mise à jour des coordonnées Mobile Money et discussion du prochain cycle.",
+  },
+  {
+    id: "ev-cycle-start-conakry",
+    type: "cycle-start",
+    title: "Démarrage du cycle — Entrepreneurs Conakry",
+    date: "2025-02-15",
+    groupId: "g-conakry",
+    groupName: "Entrepreneurs Conakry",
+    description: "Premier prélèvement programmé une fois les 10 inscriptions confirmées.",
+  },
+  {
+    id: "ev-vote-kaloum",
+    type: "rule-vote",
+    title: "Vote — Plafond d'enchère",
+    date: "2025-02-20",
+    time: "19:00",
+    groupId: "g-kaloum",
+    groupName: "Investisseurs Kaloum",
+    description: "Plafonnement de l'enchère pour acheter un tour à 8% de la cagnotte.",
+  },
+  {
+    id: "ev-meeting-donka",
+    type: "meeting",
+    title: "Briefing hebdomadaire — Pilotes Donka",
+    date: "2025-01-22",
+    time: "07:30",
+    endTime: "08:00",
+    groupId: "g-donka",
+    groupName: "Pilotes Donka",
+  },
+];
+
+/** Build the unified calendar feed from groups, turns, transactions, swaps and custom events. */
+export function getCalendarEvents(): CalendarEvent[] {
+  const events: CalendarEvent[] = [];
+
+  // Contributions à venir (échéances)
+  for (const g of groups) {
+    if (g.status === "completed" || g.status === "pending") continue;
+    if (g.daysToDeadline === undefined) continue;
+    events.push({
+      id: `cal-contrib-${g.id}`,
+      type: "contribution",
+      title: `Cotisation — ${g.name}`,
+      date: isoDateFromOffset(g.daysToDeadline),
+      daysFromToday: g.daysToDeadline,
+      groupId: g.id,
+      groupName: g.name,
+      amount: g.contribution,
+      description: `Prélèvement de ${formatGNFMock(g.contribution)} GNF · ${g.frequency.toLowerCase()}.`,
+      status: "scheduled",
+    });
+  }
+
+  // Tours bénéficiaires (à partir du roster complet)
+  for (const t of getAllTurns()) {
+    if (t.daysFromToday < -7 || t.daysFromToday > 365) continue;
+    events.push({
+      id: `cal-turn-${t.id}`,
+      type: t.isYou ? "your-turn" : "turn",
+      title: t.isYou ? `Vous recevez la cagnotte — ${t.groupName}` : `Tour ${t.beneficiaryName} — ${t.groupName}`,
+      date: isoDateFromOffset(t.daysFromToday),
+      daysFromToday: t.daysFromToday,
+      groupId: t.groupId,
+      groupName: t.groupName,
+      amount: t.amount,
+      isYou: t.isYou,
+      description: `Tour #${t.index} sur ${t.total}. Versement automatique à l'encaissement complet.`,
+      status: t.status === "completed" ? "completed" : "scheduled",
+    });
+  }
+
+  // Transactions historiques importantes (entrées de cagnottes)
+  for (const tx of transactions) {
+    if (tx.status !== "success" || tx.type !== "in") continue;
+    const days = tx.daysFromToday ?? 0;
+    if (days < -90 || days > 0) continue;
+    events.push({
+      id: `cal-rx-${tx.id}`,
+      type: "your-turn",
+      title: `Cagnotte reçue — ${tx.groupName}`,
+      date: isoDateFromOffset(days),
+      daysFromToday: days,
+      groupId: tx.groupId,
+      groupName: tx.groupName,
+      amount: tx.amount,
+      isYou: true,
+      description: `Versement encaissé via ${tx.operator === "orange" ? "Orange Money" : "MTN Mobile Money"}. Référence ${tx.reference ?? "—"}.`,
+      status: "completed",
+    });
+  }
+
+  // Échéances d'expiration des swap proposals
+  for (const swap of swapProposals) {
+    if (swap.status !== "pending" || swap.expiresIn <= 0) continue;
+    events.push({
+      id: `cal-swap-${swap.id}`,
+      type: "swap-deadline",
+      title: `Échange à statuer — ${swap.groupName}`,
+      date: isoDateFromOffset(swap.expiresIn),
+      daysFromToday: swap.expiresIn,
+      groupId: swap.groupId,
+      groupName: swap.groupName,
+      description: `${swap.direction === "incoming" ? "Réponse attendue à" : "Échéance de"} la proposition de ${swap.counterparty}.`,
+      status: "scheduled",
+    });
+  }
+
+  // Événements personnalisés (réunions, votes, rappels)
+  for (const ev of customCalendarEvents) {
+    events.push({
+      ...ev,
+      daysFromToday: offsetFromIso(ev.date),
+    });
+  }
+
+  // Tri chronologique
+  events.sort((a, b) => a.daysFromToday - b.daysFromToday);
+
+  // Dé-doublonnage par id (sécurité au cas où)
+  const seen = new Set<string>();
+  return events.filter((e) => {
+    if (seen.has(e.id)) return false;
+    seen.add(e.id);
+    return true;
+  });
+}
+
+function formatGNFMock(value: number): string {
+  return new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 0 }).format(value);
+}
+
+export function getCalendarStats() {
+  const events = getCalendarEvents();
+  const now = TODAY_REFERENCE;
+  const isSameMonth = (e: CalendarEvent) => {
+    const [y, m] = e.date.split("-").map(Number);
+    return y === now.getFullYear() && m === now.getMonth() + 1;
+  };
+
+  const thisMonth = events.filter(isSameMonth);
+  const thisWeek = events.filter((e) => e.daysFromToday >= 0 && e.daysFromToday <= 7);
+  const urgent = events.filter((e) => e.daysFromToday >= 0 && e.daysFromToday <= 3);
+  const monthCapital = thisMonth
+    .filter((e) => e.amount && (e.type === "contribution" || e.type === "your-turn" || e.type === "turn"))
+    .reduce((s, e) => s + (e.amount ?? 0), 0);
+
+  return {
+    monthCount: thisMonth.length,
+    weekCount: thisWeek.length,
+    urgentCount: urgent.length,
+    monthCapital,
+  };
 }
 
 export function getHistoryStats() {
