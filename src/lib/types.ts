@@ -115,3 +115,62 @@ export interface SwapProposal {
   message?: string;
   status: SwapStatus;
 }
+
+export type LedgerEventType =
+  | "group_joined"
+  | "group_created"
+  | "rules_updated"
+  | "member_added"
+  | "member_removed"
+  | "swap_proposed"
+  | "swap_accepted"
+  | "swap_declined"
+  | "beneficiary_confirmed"
+  | "payment_made"
+  | "cagnotte_received"
+  | "penalty_applied"
+  | "cycle_started"
+  | "cycle_completed"
+  | "kyc_verified";
+
+export interface LedgerEvent {
+  id: string;
+  type: LedgerEventType;
+  /** ISO-like display timestamp, e.g. "28 Déc 2024 · 14:32". */
+  timestamp: string;
+  daysFromToday: number;
+  groupId?: string;
+  groupName?: string;
+  /** Headline displayed as the main label. */
+  title: string;
+  /** Optional secondary line for context. */
+  detail?: string;
+  /** Display the actor's name. "Vous" when self-issued. */
+  actor: string;
+  /** Hash-style audit signature, mocked. */
+  signature: string;
+}
+
+export interface MonthlyStatement {
+  id: string;
+  month: string;
+  range: string;
+  inflow: number;
+  outflow: number;
+  net: number;
+  operations: number;
+  status: "ready" | "pending";
+}
+
+export interface CashflowPoint {
+  /** Display month, e.g. "Avr". */
+  label: string;
+  /** Sortable month key, e.g. "2024-04". */
+  key: string;
+  /** Inflows (cagnottes received) — positive values. */
+  inflow: number;
+  /** Outflows (contributions paid) — stored positive but rendered as negative. */
+  outflow: number;
+  /** Cumulative net since the beginning of the series. */
+  cumulative: number;
+}

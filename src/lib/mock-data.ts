@@ -1,4 +1,4 @@
-import type { Member, PaymentMethod, SwapProposal, TontineGroup, Transaction, Turn } from "./types";
+import type { CashflowPoint, LedgerEvent, Member, MonthlyStatement, PaymentMethod, SwapProposal, TontineGroup, Transaction, Turn } from "./types";
 
 export const currentUser = {
   id: "user-1",
@@ -335,6 +335,153 @@ export const transactions: Transaction[] = [
   },
 ];
 
+// Operations stretching back ~12 months to give the registry real depth.
+transactions.push(
+  {
+    id: "tx-13",
+    type: "out",
+    groupId: "g-madina",
+    groupName: "Commerçants Madina",
+    amount: 1_000_000,
+    date: "15 Déc 2024",
+    daysFromToday: -19,
+    status: "success",
+    operator: "orange",
+    turn: 5,
+    reference: "OM-890211",
+  },
+  {
+    id: "tx-14",
+    type: "out",
+    groupId: "g-kaloum",
+    groupName: "Investisseurs Kaloum",
+    amount: 2_000_000,
+    date: "15 Nov 2024",
+    daysFromToday: -49,
+    status: "success",
+    operator: "mtn",
+    turn: 4,
+    reference: "MTN-779203",
+  },
+  {
+    id: "tx-15",
+    type: "in",
+    groupId: "g-bureau",
+    groupName: "Collègues Bureau",
+    amount: 1_600_000,
+    date: "10 Oct 2024",
+    daysFromToday: -85,
+    status: "success",
+    operator: "mtn",
+    turn: 4,
+    reference: "MTN-768004",
+  },
+  {
+    id: "tx-16",
+    type: "out",
+    groupId: "g-diallo",
+    groupName: "Tontine Famille Diallo",
+    amount: 500_000,
+    date: "28 Sep 2024",
+    daysFromToday: -97,
+    status: "success",
+    operator: "orange",
+    turn: 5,
+    reference: "OM-871022",
+  },
+  {
+    id: "tx-17",
+    type: "out",
+    groupId: "g-donka",
+    groupName: "Pilotes Donka",
+    amount: 750_000,
+    date: "12 Sep 2024",
+    daysFromToday: -113,
+    status: "success",
+    operator: "orange",
+    turn: 4,
+    reference: "OM-862415",
+  },
+  {
+    id: "tx-18",
+    type: "out",
+    groupId: "g-madina",
+    groupName: "Commerçants Madina",
+    amount: 1_000_000,
+    date: "20 Août 2024",
+    daysFromToday: -136,
+    status: "success",
+    operator: "orange",
+    turn: 2,
+    reference: "OM-844511",
+  },
+  {
+    id: "tx-19",
+    type: "out",
+    groupId: "g-kaloum",
+    groupName: "Investisseurs Kaloum",
+    amount: 2_000_000,
+    date: "15 Juil 2024",
+    daysFromToday: -172,
+    status: "success",
+    operator: "mtn",
+    turn: 1,
+    reference: "MTN-714008",
+  },
+  {
+    id: "tx-20",
+    type: "in",
+    groupId: "g-sandervalia",
+    groupName: "Artisans Sandervalia",
+    amount: 600_000,
+    date: "01 Juil 2024",
+    daysFromToday: -187,
+    status: "success",
+    operator: "orange",
+    turn: 4,
+    reference: "OM-705122",
+  },
+  {
+    id: "tx-21",
+    type: "out",
+    groupId: "g-bureau",
+    groupName: "Collègues Bureau",
+    amount: 200_000,
+    date: "01 Juin 2024",
+    daysFromToday: -217,
+    status: "success",
+    operator: "mtn",
+    turn: 1,
+    reference: "MTN-680110",
+  },
+  {
+    id: "tx-22",
+    type: "out",
+    groupId: "g-diallo",
+    groupName: "Tontine Famille Diallo",
+    amount: 500_000,
+    date: "10 Mai 2024",
+    daysFromToday: -239,
+    status: "success",
+    operator: "orange",
+    turn: 2,
+    reference: "OM-665902",
+  },
+  {
+    id: "tx-23",
+    type: "out",
+    groupId: "g-diallo",
+    groupName: "Tontine Famille Diallo",
+    amount: 500_000,
+    date: "10 Avr 2024",
+    daysFromToday: -270,
+    status: "success",
+    operator: "orange",
+    turn: 1,
+    reference: "OM-642115",
+  },
+);
+
 export const paymentMethods: PaymentMethod[] = [
   {
     id: "pm-orange",
@@ -567,6 +714,233 @@ export const swapProposals: SwapProposal[] = [
     status: "accepted",
   },
 ];
+
+export const ledgerEvents: LedgerEvent[] = [
+  {
+    id: "le-1",
+    type: "swap_proposed",
+    timestamp: "02 Jan 2025 · 09:14",
+    daysFromToday: -1,
+    groupId: "g-madina",
+    groupName: "Commerçants Madina",
+    title: "Proposition d'échange reçue",
+    detail: "Aissatou Camara propose d'échanger le tour #14 contre votre tour #8.",
+    actor: "Aissatou Camara",
+    signature: "0x4f9b…a128",
+  },
+  {
+    id: "le-2",
+    type: "payment_made",
+    timestamp: "01 Jan 2025 · 11:02",
+    daysFromToday: -3,
+    groupId: "g-bureau",
+    groupName: "Collègues Bureau",
+    title: "Cotisation enregistrée",
+    detail: "200 000 GNF prélevés sur MTN Mobile Money pour le tour #3.",
+    actor: "Vous",
+    signature: "0x6210…cf03",
+  },
+  {
+    id: "le-3",
+    type: "beneficiary_confirmed",
+    timestamp: "29 Déc 2024 · 18:45",
+    daysFromToday: -6,
+    groupId: "g-madina",
+    groupName: "Commerçants Madina",
+    title: "Bénéficiaire confirmé pour le tour #7",
+    detail: "Mamadou Diallo recevra la cagnotte (20 000 000 GNF) le 5 Jan.",
+    actor: "Système",
+    signature: "0x7301…29ef",
+  },
+  {
+    id: "le-4",
+    type: "rules_updated",
+    timestamp: "27 Déc 2024 · 16:20",
+    daysFromToday: -8,
+    groupId: "g-donka",
+    groupName: "Pilotes Donka",
+    title: "Règles du groupe ajustées",
+    detail: "Pénalité de retard portée à 8% après 2 jours (vote à 11/15).",
+    actor: "Boubacar Doumbouya",
+    signature: "0x9f02…b441",
+  },
+  {
+    id: "le-5",
+    type: "cagnotte_received",
+    timestamp: "25 Déc 2024 · 10:38",
+    daysFromToday: -10,
+    groupId: "g-diallo",
+    groupName: "Tontine Famille Diallo",
+    title: "Cagnotte versée — Tour #7",
+    detail: "6 000 000 GNF reçus sur MTN Mobile Money. Reçu généré.",
+    actor: "Système",
+    signature: "0xa12c…04dd",
+  },
+  {
+    id: "le-6",
+    type: "swap_accepted",
+    timestamp: "15 Déc 2024 · 09:05",
+    daysFromToday: -20,
+    groupId: "g-diallo",
+    groupName: "Tontine Famille Diallo",
+    title: "Échange accepté",
+    detail: "Mariama Touré a accepté de prendre votre tour #11 contre son tour #6.",
+    actor: "Mariama Touré",
+    signature: "0xb88f…1a07",
+  },
+  {
+    id: "le-7",
+    type: "member_added",
+    timestamp: "10 Nov 2024 · 14:22",
+    daysFromToday: -54,
+    groupId: "g-kaloum",
+    groupName: "Investisseurs Kaloum",
+    title: "Nouveau membre admis",
+    detail: "Néné Touré a rejoint le groupe (24/24 atteint).",
+    actor: "Mariama Sylla",
+    signature: "0xc014…78aa",
+  },
+  {
+    id: "le-8",
+    type: "cycle_started",
+    timestamp: "01 Nov 2024 · 08:00",
+    daysFromToday: -63,
+    groupId: "g-kaloum",
+    groupName: "Investisseurs Kaloum",
+    title: "Cycle démarré",
+    detail: "24 membres · 24 tours · cotisation mensuelle 2 000 000 GNF.",
+    actor: "Système",
+    signature: "0xd203…ee14",
+  },
+  {
+    id: "le-9",
+    type: "penalty_applied",
+    timestamp: "28 Nov 2024 · 23:01",
+    daysFromToday: -37,
+    groupId: "g-diallo",
+    groupName: "Tontine Famille Diallo",
+    title: "Pénalité appliquée",
+    detail: "Pénalité de 25 000 GNF (5%) appliquée pour 4 jours de retard.",
+    actor: "Système",
+    signature: "0xe9f1…b202",
+  },
+  {
+    id: "le-10",
+    type: "group_joined",
+    timestamp: "01 Sep 2024 · 10:15",
+    daysFromToday: -125,
+    groupId: "g-madina",
+    groupName: "Commerçants Madina",
+    title: "Vous avez rejoint le groupe",
+    detail: "Position d'entrée : tour #8 sur 20.",
+    actor: "Vous",
+    signature: "0xf201…9c44",
+  },
+  {
+    id: "le-11",
+    type: "kyc_verified",
+    timestamp: "20 Avr 2024 · 17:33",
+    daysFromToday: -260,
+    title: "Identité vérifiée",
+    detail: "Pièce d'identité contrôlée par le service conformité.",
+    actor: "Service Conformité",
+    signature: "0x0021…1f88",
+  },
+  {
+    id: "le-12",
+    type: "cycle_completed",
+    timestamp: "01 Sep 2024 · 12:00",
+    daysFromToday: -125,
+    groupId: "g-sandervalia",
+    groupName: "Artisans Sandervalia",
+    title: "Cycle clôturé",
+    detail: "6 tours bouclés · 600 000 GNF distribués · 0 pénalité.",
+    actor: "Système",
+    signature: "0x1145…6710",
+  },
+];
+
+export function getCashflowSeries(): CashflowPoint[] {
+  // Aggregate transactions by month over the last 12 months.
+  const now = new Date(2025, 0, 3);
+  const months: CashflowPoint[] = [];
+  const monthLabels = ["Jan", "Fév", "Mar", "Avr", "Mai", "Juin", "Juil", "Août", "Sep", "Oct", "Nov", "Déc"];
+
+  for (let i = 11; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    months.push({ label: monthLabels[d.getMonth()], key, inflow: 0, outflow: 0, cumulative: 0 });
+  }
+
+  const byKey = new Map(months.map((m) => [m.key, m]));
+  for (const tx of transactions) {
+    if (tx.status !== "success") continue;
+    const days = tx.daysFromToday ?? 0;
+    const date = new Date(now.getTime() + days * 86_400_000);
+    const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+    const slot = byKey.get(key);
+    if (!slot) continue;
+    if (tx.type === "in") slot.inflow += tx.amount;
+    else slot.outflow += tx.amount;
+  }
+
+  let running = 0;
+  for (const m of months) {
+    running += m.inflow - m.outflow;
+    m.cumulative = running;
+  }
+  return months;
+}
+
+export function getStatements(): MonthlyStatement[] {
+  const series = getCashflowSeries();
+  const now = new Date(2025, 0, 3);
+  const monthsLong = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"];
+
+  return series
+    .slice()
+    .reverse()
+    .slice(0, 6)
+    .map((point, i) => {
+      const monthDate = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const ops = transactions.filter((t) => {
+        if (t.status !== "success") return false;
+        const d = new Date(now.getTime() + (t.daysFromToday ?? 0) * 86_400_000);
+        return d.getFullYear() === monthDate.getFullYear() && d.getMonth() === monthDate.getMonth();
+      }).length;
+
+      const monthName = monthsLong[monthDate.getMonth()];
+      const isCurrentMonth = i === 0;
+
+      return {
+        id: `stmt-${point.key}`,
+        month: `${monthName} ${monthDate.getFullYear()}`,
+        range: isCurrentMonth ? "01 — en cours" : `01 — 31 ${point.label.toLowerCase()}.`,
+        inflow: point.inflow,
+        outflow: point.outflow,
+        net: point.inflow - point.outflow,
+        operations: ops,
+        status: isCurrentMonth ? "pending" : "ready",
+      } satisfies MonthlyStatement;
+    });
+}
+
+export function getHistoryStats() {
+  const successful = transactions.filter((t) => t.status === "success");
+  const inflow = successful.filter((t) => t.type === "in").reduce((s, t) => s + t.amount, 0);
+  const outflow = successful.filter((t) => t.type === "out").reduce((s, t) => s + t.amount, 0);
+  const failed = transactions.filter((t) => t.status === "failed").length;
+  const total = transactions.length;
+  const executionRate = total > 0 ? Math.round(((total - failed) / total) * 100) : 0;
+  return {
+    inflow,
+    outflow,
+    net: inflow - outflow,
+    operations: total,
+    executionRate,
+    failedCount: failed,
+  };
+}
 
 export function getContributionsStats() {
   const upcoming = getUpcomingContributions();

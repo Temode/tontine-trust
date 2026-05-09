@@ -7,6 +7,7 @@ import { AppShell } from "@/components/layout/AppShell";
 import Contributions from "@/pages/Contributions";
 import Dashboard from "@/pages/Dashboard";
 import GroupDetail from "@/pages/GroupDetail";
+import History from "@/pages/History";
 import MyGroups from "@/pages/MyGroups";
 import NotFound from "@/pages/NotFound";
 import Rotations from "@/pages/Rotations";
@@ -27,6 +28,7 @@ const App = () => (
             <Route path="/groupes/:id" element={<GroupDetail />} />
             <Route path="/cotisations" element={<Contributions />} />
             <Route path="/rotations" element={<Rotations />} />
+            <Route path="/historique" element={<History />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AppShell>
