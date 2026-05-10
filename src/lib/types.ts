@@ -245,7 +245,48 @@ export interface DirectoryGroup {
   tags: string[];
 }
 
-export type JoinApplicationStatus = "pending" | "accepted" | "declined" | "cancelled";
+export type InvitationChannel = "sms" | "link" | "email" | "qr" | "directory" | "manual";
+
+export type InvitationStatus = "sent" | "opened" | "joined" | "declined" | "expired" | "queued";
+
+export interface Invitation {
+  id: string;
+  groupId: string;
+  groupName: string;
+  /** Display name of the recipient (may be unknown for link/QR shares). */
+  recipientName?: string;
+  recipientInitials?: string;
+  recipientPhone?: string;
+  recipientEmail?: string;
+  channel: InvitationChannel;
+  sentOn: string;
+  /** Days from today; negative for past. */
+  daysFromToday: number;
+  status: InvitationStatus;
+  /** When the recipient opened the invitation (display string). */
+  openedOn?: string;
+  /** Personal message attached to the invitation. */
+  message?: string;
+}
+
+export type JoinRequestStatus = "pending" | "approved" | "rejected";
+
+export interface JoinRequest {
+  id: string;
+  groupId: string;
+  groupName: string;
+  applicantName: string;
+  applicantInitials: string;
+  applicantPhone: string;
+  applicantScore: number;
+  appliedOn: string;
+  daysFromToday: number;
+  status: JoinRequestStatus;
+  channel: InvitationChannel;
+  message?: string;
+  /** True when the applicant came in via a public-link / directory listing rather than a personal invitation. */
+  cold?: boolean;
+}
 
 export interface JoinApplication {
   id: string;
@@ -262,3 +303,5 @@ export interface JoinApplication {
   /** Position requested if rotation order is "choice". */
   requestedTurn?: number;
 }
+
+export type JoinApplicationStatus = "pending" | "accepted" | "declined" | "cancelled";

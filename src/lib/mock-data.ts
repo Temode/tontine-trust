@@ -2,7 +2,9 @@ import type {
   CalendarEvent,
   CashflowPoint,
   DirectoryGroup,
+  Invitation,
   JoinApplication,
+  JoinRequest,
   LedgerEvent,
   Member,
   MonthlyStatement,
@@ -1415,6 +1417,276 @@ export function getJoinStats() {
     medianContribution: median,
     pendingApplications: myPending,
     startingSoon,
+  };
+}
+
+/**
+ * Groups whose role is "organizer" — those for which the current user can
+ * issue invitations. Used by the InviteMembers page selector.
+ */
+export const myOrganizedGroups: TontineGroup[] = groups.filter((g) => g.role === "organizer");
+
+export const invitations: Invitation[] = [
+  // g-conakry (Entrepreneurs Conakry — pending, recruiting)
+  {
+    id: "inv-c1",
+    groupId: "g-conakry",
+    groupName: "Entrepreneurs Conakry",
+    recipientName: "Aïssatou Diallo",
+    recipientInitials: "AD",
+    recipientPhone: "+224 622 14 25 36",
+    channel: "sms",
+    sentOn: "02 Jan 2025",
+    daysFromToday: -1,
+    status: "joined",
+    openedOn: "02 Jan · 14:22",
+  },
+  {
+    id: "inv-c2",
+    groupId: "g-conakry",
+    groupName: "Entrepreneurs Conakry",
+    recipientName: "Mamadou Bah",
+    recipientInitials: "MB",
+    recipientPhone: "+224 661 02 84 19",
+    channel: "sms",
+    sentOn: "02 Jan 2025",
+    daysFromToday: -1,
+    status: "opened",
+    openedOn: "02 Jan · 18:04",
+  },
+  {
+    id: "inv-c3",
+    groupId: "g-conakry",
+    groupName: "Entrepreneurs Conakry",
+    recipientName: "Fatoumata Sow",
+    recipientInitials: "FS",
+    recipientPhone: "+224 628 47 11 92",
+    channel: "sms",
+    sentOn: "01 Jan 2025",
+    daysFromToday: -3,
+    status: "joined",
+    openedOn: "01 Jan · 09:11",
+  },
+  {
+    id: "inv-c4",
+    groupId: "g-conakry",
+    groupName: "Entrepreneurs Conakry",
+    recipientName: "Ousmane Camara",
+    recipientInitials: "OC",
+    recipientPhone: "+224 624 03 56 78",
+    channel: "sms",
+    sentOn: "01 Jan 2025",
+    daysFromToday: -3,
+    status: "sent",
+  },
+  {
+    id: "inv-c5",
+    groupId: "g-conakry",
+    groupName: "Entrepreneurs Conakry",
+    recipientEmail: "n.toure@kaloum-corp.gn",
+    recipientName: "Néné Touré",
+    recipientInitials: "NT",
+    channel: "email",
+    sentOn: "31 Déc 2024",
+    daysFromToday: -4,
+    status: "declined",
+    message: "Merci, mais je participe déjà à deux tontines en parallèle.",
+  },
+  {
+    id: "inv-c6",
+    groupId: "g-conakry",
+    groupName: "Entrepreneurs Conakry",
+    channel: "link",
+    recipientName: "Lien partagé",
+    recipientInitials: "LP",
+    sentOn: "30 Déc 2024",
+    daysFromToday: -5,
+    status: "opened",
+    openedOn: "31 Déc · 11:45",
+  },
+  {
+    id: "inv-c7",
+    groupId: "g-conakry",
+    groupName: "Entrepreneurs Conakry",
+    recipientName: "Boubacar Touré",
+    recipientInitials: "BT",
+    recipientPhone: "+224 666 91 28 03",
+    channel: "sms",
+    sentOn: "28 Déc 2024",
+    daysFromToday: -7,
+    status: "expired",
+  },
+  {
+    id: "inv-c8",
+    groupId: "g-conakry",
+    groupName: "Entrepreneurs Conakry",
+    recipientName: "Mariama Diaby",
+    recipientInitials: "MD",
+    recipientPhone: "+224 624 88 47 12",
+    channel: "qr",
+    sentOn: "27 Déc 2024",
+    daysFromToday: -8,
+    status: "joined",
+    openedOn: "27 Déc · 17:20",
+  },
+  // g-diallo (Tontine Famille Diallo)
+  {
+    id: "inv-d1",
+    groupId: "g-diallo",
+    groupName: "Tontine Famille Diallo",
+    recipientName: "Hadja Touré",
+    recipientInitials: "HT",
+    recipientPhone: "+224 621 33 78 02",
+    channel: "sms",
+    sentOn: "20 Déc 2024",
+    daysFromToday: -15,
+    status: "joined",
+    openedOn: "20 Déc · 16:42",
+  },
+  {
+    id: "inv-d2",
+    groupId: "g-diallo",
+    groupName: "Tontine Famille Diallo",
+    recipientName: "Alpha Conté",
+    recipientInitials: "AC",
+    recipientPhone: "+224 661 47 19 03",
+    channel: "sms",
+    sentOn: "18 Déc 2024",
+    daysFromToday: -17,
+    status: "joined",
+  },
+  // g-donka (Pilotes Donka)
+  {
+    id: "inv-do1",
+    groupId: "g-donka",
+    groupName: "Pilotes Donka",
+    recipientName: "Salif Kaba",
+    recipientInitials: "SK",
+    recipientPhone: "+224 628 11 47 92",
+    channel: "sms",
+    sentOn: "29 Déc 2024",
+    daysFromToday: -6,
+    status: "opened",
+    openedOn: "29 Déc · 22:01",
+  },
+  {
+    id: "inv-do2",
+    groupId: "g-donka",
+    groupName: "Pilotes Donka",
+    recipientName: "Lansana Camara",
+    recipientInitials: "LC",
+    recipientPhone: "+224 666 03 28 17",
+    channel: "sms",
+    sentOn: "28 Déc 2024",
+    daysFromToday: -7,
+    status: "joined",
+  },
+];
+
+export const joinRequests: JoinRequest[] = [
+  {
+    id: "jr-1",
+    groupId: "g-conakry",
+    groupName: "Entrepreneurs Conakry",
+    applicantName: "Kankou Bah",
+    applicantInitials: "KB",
+    applicantPhone: "+224 622 47 19 28",
+    applicantScore: 96,
+    appliedOn: "02 Jan 2025",
+    daysFromToday: -1,
+    status: "pending",
+    channel: "directory",
+    cold: true,
+    message:
+      "Bonjour, je gère deux boutiques à Madina depuis 2018. J'aimerais rejoindre votre cycle pour financer un nouveau local.",
+  },
+  {
+    id: "jr-2",
+    groupId: "g-conakry",
+    groupName: "Entrepreneurs Conakry",
+    applicantName: "Thierno Diallo",
+    applicantInitials: "TD",
+    applicantPhone: "+224 661 22 84 03",
+    applicantScore: 92,
+    appliedOn: "01 Jan 2025",
+    daysFromToday: -3,
+    status: "pending",
+    channel: "link",
+    message:
+      "J'ai obtenu votre lien via Mamadou. Score de 92% sur trois cycles. Disponible pour un appel.",
+  },
+  {
+    id: "jr-3",
+    groupId: "g-conakry",
+    groupName: "Entrepreneurs Conakry",
+    applicantName: "Aminata Diaby",
+    applicantInitials: "AD",
+    applicantPhone: "+224 624 03 87 14",
+    applicantScore: 88,
+    appliedOn: "31 Déc 2024",
+    daysFromToday: -4,
+    status: "pending",
+    channel: "directory",
+    cold: true,
+  },
+  {
+    id: "jr-4",
+    groupId: "g-conakry",
+    groupName: "Entrepreneurs Conakry",
+    applicantName: "Sekou Konaté",
+    applicantInitials: "SK",
+    applicantPhone: "+224 628 14 92 03",
+    applicantScore: 74,
+    appliedOn: "30 Déc 2024",
+    daysFromToday: -5,
+    status: "pending",
+    channel: "directory",
+    cold: true,
+    message: "Première participation à une tontine digitale. Solde Mobile Money disponible.",
+  },
+  {
+    id: "jr-5",
+    groupId: "g-donka",
+    groupName: "Pilotes Donka",
+    applicantName: "Moussa Bangoura",
+    applicantInitials: "MB",
+    applicantPhone: "+224 666 47 28 19",
+    applicantScore: 95,
+    appliedOn: "29 Déc 2024",
+    daysFromToday: -6,
+    status: "pending",
+    channel: "link",
+  },
+];
+
+/** Return the invite code for a given organized group. */
+export function getInviteCodeForGroup(groupId: string): string {
+  // Deterministic 8-char code based on the groupId. Same group always gets the same code.
+  const seed = groupId.replace(/[^a-z0-9]/gi, "").toUpperCase().padEnd(8, "X");
+  const a = seed.slice(0, 4);
+  const b = seed.slice(4, 8);
+  return `TD-${a}-${b}`;
+}
+
+export function getInviteStats(groupId: string) {
+  const group = groups.find((g) => g.id === groupId);
+  const inv = invitations.filter((i) => i.groupId === groupId);
+  const joined = inv.filter((i) => i.status === "joined").length;
+  const sent = inv.length;
+  const conversion = sent > 0 ? Math.round((joined / sent) * 100) : 0;
+  const opened = inv.filter((i) => i.status === "opened" || i.status === "joined" || i.status === "declined").length;
+  const slots = group ? Math.max(0, group.members - joined) : 0;
+  // Average response delay in hours, mocked.
+  const responded = inv.filter((i) => i.openedOn && i.daysFromToday !== undefined);
+  const avgHours = responded.length > 0 ? Math.round(((Math.abs(inv.reduce((s, i) => s + (i.daysFromToday ?? 0), 0)) / responded.length) * 24) / 6) : 0;
+  return {
+    slots,
+    sent,
+    joined,
+    opened,
+    conversion,
+    avgResponseHours: avgHours,
+    pendingRequests: joinRequests.filter((r) => r.groupId === groupId && r.status === "pending").length,
   };
 }
 
