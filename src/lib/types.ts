@@ -305,3 +305,86 @@ export interface JoinApplication {
 }
 
 export type JoinApplicationStatus = "pending" | "accepted" | "declined" | "cancelled";
+
+export type KycLevel = 1 | 2 | 3;
+
+export type KycDocumentType = "national_id" | "passport" | "selfie" | "utility_bill" | "tax_id";
+
+export type KycDocumentStatus = "verified" | "pending" | "rejected" | "expired";
+
+export interface KycDocument {
+  id: string;
+  type: KycDocumentType;
+  label: string;
+  reference?: string;
+  uploadedOn: string;
+  status: KycDocumentStatus;
+  expiresOn?: string;
+}
+
+export interface UserProfile {
+  id: string;
+  fullName: string;
+  initials: string;
+  phone: string;
+  email: string;
+  city: string;
+  country: string;
+  language: "fr" | "en";
+  occupation: string;
+  bio: string;
+  memberSince: string;
+  /** Number of months since joining the platform. */
+  tenureMonths: number;
+  reliabilityScore: number;
+  kycLevel: KycLevel;
+  kycVerifiedOn: string;
+  twoFactorEnabled: boolean;
+  biometricEnabled: boolean;
+  notificationChannels: {
+    sms: boolean;
+    push: boolean;
+    email: boolean;
+  };
+  notificationCadence: "real-time" | "daily" | "weekly";
+  currency: "GNF";
+  theme: "light" | "dark" | "system";
+  badges: string[];
+  /** Lifetime metrics. */
+  lifetimeContributions: number;
+  lifetimeCagnottes: number;
+  cyclesCompleted: number;
+  cyclesActive: number;
+  onTimeRate: number;
+}
+
+export interface SessionDevice {
+  id: string;
+  device: string;
+  os: string;
+  browser: string;
+  city: string;
+  ip: string;
+  lastActive: string;
+  daysFromToday: number;
+  current: boolean;
+}
+
+export type ProfileActivityType =
+  | "login"
+  | "kyc_update"
+  | "security_change"
+  | "payment_method"
+  | "preferences"
+  | "profile_edit"
+  | "data_export";
+
+export interface ProfileActivityEntry {
+  id: string;
+  type: ProfileActivityType;
+  title: string;
+  detail: string;
+  timestamp: string;
+  daysFromToday: number;
+  signature: string;
+}

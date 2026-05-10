@@ -14,6 +14,7 @@ import InviteMembers from "@/pages/InviteMembers";
 import JoinGroup from "@/pages/JoinGroup";
 import MyGroups from "@/pages/MyGroups";
 import NotFound from "@/pages/NotFound";
+import Profile from "@/pages/Profile";
 import Rotations from "@/pages/Rotations";
 
 const queryClient = new QueryClient();
@@ -37,6 +38,7 @@ const App = () => (
             <Route path="/nouveau" element={<CreateGroup />} />
             <Route path="/rejoindre" element={<JoinGroup />} />
             <Route path="/inviter" element={<InviteMembers />} />
+            <Route path="/profil" element={<Profile />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AppShell>

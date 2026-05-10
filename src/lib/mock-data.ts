@@ -5,14 +5,18 @@ import type {
   Invitation,
   JoinApplication,
   JoinRequest,
+  KycDocument,
   LedgerEvent,
   Member,
   MonthlyStatement,
   PaymentMethod,
+  ProfileActivityEntry,
+  SessionDevice,
   SwapProposal,
   TontineGroup,
   Transaction,
   Turn,
+  UserProfile,
 } from "./types";
 
 export const currentUser = {
@@ -1688,6 +1692,247 @@ export function getInviteStats(groupId: string) {
     avgResponseHours: avgHours,
     pendingRequests: joinRequests.filter((r) => r.groupId === groupId && r.status === "pending").length,
   };
+}
+
+export const userProfile: UserProfile = {
+  id: currentUser.id,
+  fullName: "Elhadj Mamadou Diallo",
+  initials: currentUser.initials,
+  phone: currentUser.phone,
+  email: "elhadj.diallo@kaloum-corp.gn",
+  city: "Conakry",
+  country: "Guinée",
+  language: "fr",
+  occupation: "Entrepreneur · co-fondateur Kaloum Corp",
+  bio: "Co-fondateur de Kaloum Corp · investisseur dans 5 tontines actives à travers le grand Conakry et la diaspora.",
+  memberSince: "01 Mars 2024",
+  tenureMonths: 10,
+  reliabilityScore: currentUser.reliabilityScore,
+  kycLevel: 2,
+  kycVerifiedOn: "20 Avr 2024",
+  twoFactorEnabled: true,
+  biometricEnabled: true,
+  notificationChannels: { sms: true, push: true, email: false },
+  notificationCadence: "real-time",
+  currency: "GNF",
+  theme: "system",
+  badges: ["bronze-payer", "early-adopter", "organizer-trusted"],
+  lifetimeContributions: 18_400_000,
+  lifetimeCagnottes: 27_600_000,
+  cyclesCompleted: 3,
+  cyclesActive: 5,
+  onTimeRate: 98,
+};
+
+export const kycDocuments: KycDocument[] = [
+  {
+    id: "kyc-cni",
+    type: "national_id",
+    label: "Carte nationale d'identité",
+    reference: "GN-CNI-784512903",
+    uploadedOn: "18 Avr 2024",
+    status: "verified",
+    expiresOn: "18 Avr 2029",
+  },
+  {
+    id: "kyc-selfie",
+    type: "selfie",
+    label: "Vérification biométrique",
+    uploadedOn: "20 Avr 2024",
+    status: "verified",
+  },
+  {
+    id: "kyc-utility",
+    type: "utility_bill",
+    label: "Justificatif de domicile",
+    reference: "EDG-#202403",
+    uploadedOn: "10 Mar 2024",
+    status: "verified",
+    expiresOn: "10 Mar 2025",
+  },
+  {
+    id: "kyc-tax",
+    type: "tax_id",
+    label: "NIF · Numéro fiscal",
+    reference: "NIF-GN-094218",
+    uploadedOn: "12 Mar 2024",
+    status: "pending",
+  },
+];
+
+export const sessionDevices: SessionDevice[] = [
+  {
+    id: "dev-1",
+    device: "iPhone 15 Pro",
+    os: "iOS 18.2",
+    browser: "Safari Mobile",
+    city: "Conakry · Kaloum",
+    ip: "41.218.92.114",
+    lastActive: "À l'instant",
+    daysFromToday: 0,
+    current: true,
+  },
+  {
+    id: "dev-2",
+    device: "MacBook Pro 14\"",
+    os: "macOS 15.1",
+    browser: "Chrome 131",
+    city: "Conakry · Ratoma",
+    ip: "41.218.92.114",
+    lastActive: "Il y a 2 heures",
+    daysFromToday: 0,
+    current: false,
+  },
+  {
+    id: "dev-3",
+    device: "Pixel 8",
+    os: "Android 15",
+    browser: "Chrome Mobile",
+    city: "Labé",
+    ip: "41.220.114.78",
+    lastActive: "Il y a 3 jours",
+    daysFromToday: -3,
+    current: false,
+  },
+];
+
+export const profileActivity: ProfileActivityEntry[] = [
+  {
+    id: "pa-1",
+    type: "login",
+    title: "Connexion réussie",
+    detail: "iPhone 15 Pro · Conakry · 41.218.92.114",
+    timestamp: "Aujourd'hui · 09:14",
+    daysFromToday: 0,
+    signature: "0x9c12…44ab",
+  },
+  {
+    id: "pa-2",
+    type: "security_change",
+    title: "Authentification biométrique activée",
+    detail: "Face ID enregistré sur iPhone 15 Pro.",
+    timestamp: "Hier · 21:08",
+    daysFromToday: -1,
+    signature: "0x44b1…0e2d",
+  },
+  {
+    id: "pa-3",
+    type: "payment_method",
+    title: "Méthode de paiement ajoutée",
+    detail: "MTN Mobile Money +224 661 00 00 00 vérifiée par OTP.",
+    timestamp: "28 Déc · 14:22",
+    daysFromToday: -7,
+    signature: "0x7140…d1cc",
+  },
+  {
+    id: "pa-4",
+    type: "kyc_update",
+    title: "Dépôt du NIF fiscal",
+    detail: "Document NIF-GN-094218 soumis pour passage en KYC niveau 3.",
+    timestamp: "12 Déc · 11:03",
+    daysFromToday: -23,
+    signature: "0xa044…9b71",
+  },
+  {
+    id: "pa-5",
+    type: "profile_edit",
+    title: "Mise à jour du profil",
+    detail: "Occupation passée à « Entrepreneur · co-fondateur Kaloum Corp ».",
+    timestamp: "01 Déc · 10:42",
+    daysFromToday: -34,
+    signature: "0xbb02…117f",
+  },
+  {
+    id: "pa-6",
+    type: "preferences",
+    title: "Canaux de notification ajustés",
+    detail: "E-mail désactivé · SMS et push conservés en temps réel.",
+    timestamp: "10 Nov · 18:55",
+    daysFromToday: -55,
+    signature: "0xc811…9203",
+  },
+  {
+    id: "pa-7",
+    type: "data_export",
+    title: "Export du registre demandé",
+    detail: "Pack CSV + PDF · 12 mois · délivré sous 72h.",
+    timestamp: "20 Oct · 09:30",
+    daysFromToday: -76,
+    signature: "0xd92f…7a14",
+  },
+];
+
+export interface ProfileBadgeDef {
+  id: string;
+  label: string;
+  description: string;
+}
+
+export const badgeDefinitions: Record<string, ProfileBadgeDef> = {
+  "bronze-payer": {
+    id: "bronze-payer",
+    label: "Payeur bronze",
+    description: "12 cotisations consécutives à temps.",
+  },
+  "early-adopter": {
+    id: "early-adopter",
+    label: "Pionnier",
+    description: "Inscrit dans les 1 000 premiers utilisateurs.",
+  },
+  "organizer-trusted": {
+    id: "organizer-trusted",
+    label: "Organisateur de confiance",
+    description: "3 groupes émis sans incident, score moyen ≥ 90%.",
+  },
+};
+
+/** Reliability score breakdown — weighted factors that aggregate into the global score. */
+export interface ReliabilityFactor {
+  id: string;
+  label: string;
+  hint: string;
+  value: number;
+  /** Display unit suffix. */
+  unit?: string;
+  /** Weighting in percent of the final score. */
+  weight: number;
+}
+
+export function getReliabilityBreakdown(): ReliabilityFactor[] {
+  return [
+    {
+      id: "ontime",
+      label: "Ponctualité des paiements",
+      hint: "Cotisations payées avant l'échéance sur 12 mois.",
+      value: userProfile.onTimeRate,
+      unit: "%",
+      weight: 45,
+    },
+    {
+      id: "tenure",
+      label: "Ancienneté",
+      hint: "Présence sur la plateforme.",
+      value: Math.min(100, Math.round((userProfile.tenureMonths / 24) * 100)),
+      unit: "/100",
+      weight: 15,
+    },
+    {
+      id: "volume",
+      label: "Volume cumulé",
+      hint: "Capital engagé sur l'ensemble des cycles.",
+      value: Math.min(100, Math.round((userProfile.lifetimeContributions / 25_000_000) * 100)),
+      unit: "/100",
+      weight: 25,
+    },
+    {
+      id: "completion",
+      label: "Cycles complétés",
+      hint: "Nombre de cycles achevés sans manquement.",
+      value: Math.min(100, userProfile.cyclesCompleted * 25),
+      unit: "/100",
+      weight: 15,
+    },
+  ];
 }
 
 export function getHistoryStats() {
