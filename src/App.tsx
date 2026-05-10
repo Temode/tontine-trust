@@ -10,6 +10,7 @@ import CreateGroup from "@/pages/CreateGroup";
 import Dashboard from "@/pages/Dashboard";
 import GroupDetail from "@/pages/GroupDetail";
 import History from "@/pages/History";
+import JoinGroup from "@/pages/JoinGroup";
 import MyGroups from "@/pages/MyGroups";
 import NotFound from "@/pages/NotFound";
 import Rotations from "@/pages/Rotations";
@@ -33,6 +34,7 @@ const App = () => (
             <Route path="/historique" element={<History />} />
             <Route path="/calendrier" element={<Calendar />} />
             <Route path="/nouveau" element={<CreateGroup />} />
+            <Route path="/rejoindre" element={<JoinGroup />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AppShell>

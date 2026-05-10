@@ -205,3 +205,60 @@ export interface CalendarEvent {
 }
 
 export type CalendarView = "month" | "agenda";
+
+export type DirectoryCategory = "family" | "professional" | "business" | "community";
+
+export type DirectoryRotation = "random" | "fixed" | "auction" | "choice";
+
+export type DirectorySwap = "open" | "consensus" | "closed";
+
+export type DirectoryVisibility = "public-link" | "directory";
+
+export interface DirectoryGroup {
+  id: string;
+  name: string;
+  category: DirectoryCategory;
+  description: string;
+  /** Display name + initials of the organizer. */
+  organizerName: string;
+  organizerInitials: string;
+  /** Reliability score of the organizer (0-100). */
+  organizerScore: number;
+  /** Total members at full capacity. */
+  members: number;
+  /** Already filled seats. */
+  filled: number;
+  contribution: number;
+  frequency: Frequency;
+  rotationOrder: DirectoryRotation;
+  swapPolicy: DirectorySwap;
+  latePenaltyPercent: number;
+  visibility: DirectoryVisibility;
+  inviteCode: string;
+  /** Days until the cycle starts (negative = already started). */
+  startsInDays: number;
+  /** Average reliability score of existing members. */
+  meanScore: number;
+  createdOn: string;
+  rules: string[];
+  /** Curated tags for filtering. */
+  tags: string[];
+}
+
+export type JoinApplicationStatus = "pending" | "accepted" | "declined" | "cancelled";
+
+export interface JoinApplication {
+  id: string;
+  groupId: string;
+  groupName: string;
+  organizerName: string;
+  organizerInitials: string;
+  contribution: number;
+  members: number;
+  appliedOn: string;
+  daysFromToday: number;
+  status: JoinApplicationStatus;
+  message?: string;
+  /** Position requested if rotation order is "choice". */
+  requestedTurn?: number;
+}

@@ -1,6 +1,8 @@
 import type {
   CalendarEvent,
   CashflowPoint,
+  DirectoryGroup,
+  JoinApplication,
   LedgerEvent,
   Member,
   MonthlyStatement,
@@ -1173,6 +1175,246 @@ export function getCalendarStats() {
     weekCount: thisWeek.length,
     urgentCount: urgent.length,
     monthCapital,
+  };
+}
+
+export const directoryGroups: DirectoryGroup[] = [
+  {
+    id: "dir-yelimane",
+    name: "Femmes Entrepreneures Kindia",
+    category: "business",
+    description:
+      "Tontine de marchandes et artisanes du marché de Kindia. Cotisations mensuelles dédiées au financement de stocks et d'équipements.",
+    organizerName: "Salimatou Bah",
+    organizerInitials: "SB",
+    organizerScore: 98,
+    members: 18,
+    filled: 14,
+    contribution: 750_000,
+    frequency: "Mensuelle",
+    rotationOrder: "fixed",
+    swapPolicy: "consensus",
+    latePenaltyPercent: 5,
+    visibility: "directory",
+    inviteCode: "TD-K3PY-7QM2",
+    startsInDays: 21,
+    meanScore: 94,
+    createdOn: "12 Déc 2024",
+    rules: [
+      "Pénalité de retard : 5% après 3 jours",
+      "Ordre de rotation : Fixe par ancienneté",
+      "Échange de tours : Sur consensus du groupe",
+    ],
+    tags: ["marché", "commerce", "femmes"],
+  },
+  {
+    id: "dir-conakry-tech",
+    name: "Conakry Tech Builders",
+    category: "professional",
+    description:
+      "Ingénieurs et opérateurs tech du grand Conakry. Cycle hebdomadaire pour soutenir équipements, certifications et amorçage de projets.",
+    organizerName: "Mohamed Camara",
+    organizerInitials: "MC",
+    organizerScore: 96,
+    members: 12,
+    filled: 9,
+    contribution: 500_000,
+    frequency: "Hebdomadaire",
+    rotationOrder: "auction",
+    swapPolicy: "open",
+    latePenaltyPercent: 10,
+    visibility: "directory",
+    inviteCode: "TD-NX5R-PB31",
+    startsInDays: 7,
+    meanScore: 95,
+    createdOn: "20 Déc 2024",
+    rules: [
+      "Pénalité de retard : 10% après 1 jour",
+      "Ordre de rotation : Enchères à chaque tour",
+      "Échange de tours : Libre",
+    ],
+    tags: ["tech", "ingénieurs", "professionnel"],
+  },
+  {
+    id: "dir-diaspora",
+    name: "Diaspora Guinée — Europe",
+    category: "community",
+    description:
+      "Guinéens d'Europe contribuant en Mobile Money pour des projets immobiliers à Conakry, Labé et Boké. Cycle bi-mensuel sur 24 mois.",
+    organizerName: "Aminata Sow",
+    organizerInitials: "AS",
+    organizerScore: 99,
+    members: 24,
+    filled: 22,
+    contribution: 1_500_000,
+    frequency: "Quinzaine",
+    rotationOrder: "random",
+    swapPolicy: "closed",
+    latePenaltyPercent: 8,
+    visibility: "directory",
+    inviteCode: "TD-D9TA-K2LM",
+    startsInDays: 3,
+    meanScore: 97,
+    createdOn: "01 Nov 2024",
+    rules: [
+      "Pénalité de retard : 8% après 2 jours",
+      "Ordre de rotation : Tirage au sort à l'émission",
+      "Échange de tours : Interdit",
+    ],
+    tags: ["diaspora", "immobilier", "long-terme"],
+  },
+  {
+    id: "dir-madina-marche",
+    name: "Vendeuses Madina — Bloc B",
+    category: "business",
+    description:
+      "Tontine de proximité du marché Madina, bloc B. Soutien rapide à la trésorerie quotidienne, démarrage immédiat dès complétion.",
+    organizerName: "Hadja Touré",
+    organizerInitials: "HT",
+    organizerScore: 92,
+    members: 10,
+    filled: 7,
+    contribution: 200_000,
+    frequency: "Hebdomadaire",
+    rotationOrder: "fixed",
+    swapPolicy: "open",
+    latePenaltyPercent: 5,
+    visibility: "public-link",
+    inviteCode: "TD-MN4Q-V8XK",
+    startsInDays: 14,
+    meanScore: 90,
+    createdOn: "28 Déc 2024",
+    rules: [
+      "Pénalité de retard : 5% après 2 jours",
+      "Ordre de rotation : Fixe",
+      "Échange de tours : Libre",
+    ],
+    tags: ["marché", "trésorerie", "rapide"],
+  },
+  {
+    id: "dir-ratoma-jeunesse",
+    name: "Jeunesse Ratoma — Solidarité",
+    category: "community",
+    description:
+      "Cycle solidaire pour jeunes diplômés en attente d'emploi. Cotisations modestes et flexibles, échanges de tours encouragés.",
+    organizerName: "Ibrahima Bah",
+    organizerInitials: "IB",
+    organizerScore: 88,
+    members: 15,
+    filled: 8,
+    contribution: 100_000,
+    frequency: "Mensuelle",
+    rotationOrder: "choice",
+    swapPolicy: "open",
+    latePenaltyPercent: 0,
+    visibility: "directory",
+    inviteCode: "TD-RJ8Y-3HFP",
+    startsInDays: 30,
+    meanScore: 86,
+    createdOn: "30 Déc 2024",
+    rules: [
+      "Pénalité de retard : Aucune",
+      "Ordre de rotation : Choix individuel",
+      "Échange de tours : Libre",
+    ],
+    tags: ["jeunesse", "solidaire", "flexible"],
+  },
+  {
+    id: "dir-export-coton",
+    name: "Coopérative Export Coton",
+    category: "business",
+    description:
+      "Réseau d'exportateurs de coton de Haute-Guinée. Cotisation élevée, cycle long, gouvernance stricte avec co-organisateurs notarisés.",
+    organizerName: "Kalil Sylla",
+    organizerInitials: "KS",
+    organizerScore: 99,
+    members: 20,
+    filled: 16,
+    contribution: 5_000_000,
+    frequency: "Mensuelle",
+    rotationOrder: "auction",
+    swapPolicy: "consensus",
+    latePenaltyPercent: 12,
+    visibility: "directory",
+    inviteCode: "TD-EC7B-8WJN",
+    startsInDays: 45,
+    meanScore: 96,
+    createdOn: "15 Nov 2024",
+    rules: [
+      "Pénalité de retard : 12% après 1 jour",
+      "Ordre de rotation : Enchères avec plafond",
+      "Échange de tours : Sur consensus notarié",
+    ],
+    tags: ["coopérative", "export", "haute-guinée"],
+  },
+];
+
+export const myApplications: JoinApplication[] = [
+  {
+    id: "app-1",
+    groupId: "dir-yelimane",
+    groupName: "Femmes Entrepreneures Kindia",
+    organizerName: "Salimatou Bah",
+    organizerInitials: "SB",
+    contribution: 750_000,
+    members: 18,
+    appliedOn: "31 Déc 2024",
+    daysFromToday: -3,
+    status: "pending",
+    message:
+      "Bonjour, je suis artisane à Kindia depuis 6 ans. Je souhaite rejoindre pour financer un nouveau lot de matières premières.",
+  },
+  {
+    id: "app-2",
+    groupId: "dir-conakry-tech",
+    groupName: "Conakry Tech Builders",
+    organizerName: "Mohamed Camara",
+    organizerInitials: "MC",
+    contribution: 500_000,
+    members: 12,
+    appliedOn: "28 Déc 2024",
+    daysFromToday: -6,
+    status: "accepted",
+    message: "Demande acceptée le 30 Déc. Premier prélèvement le 10 Jan.",
+  },
+  {
+    id: "app-3",
+    groupId: "dir-export-coton",
+    groupName: "Coopérative Export Coton",
+    organizerName: "Kalil Sylla",
+    organizerInitials: "KS",
+    contribution: 5_000_000,
+    members: 20,
+    appliedOn: "15 Déc 2024",
+    daysFromToday: -19,
+    status: "declined",
+    message:
+      "Demande refusée — cotisation au-delà du seuil de votre score actuel. Réessayez après votre 3e cycle réussi.",
+  },
+];
+
+export function findDirectoryGroupByCode(code: string): DirectoryGroup | null {
+  const normalized = code.trim().toUpperCase();
+  return directoryGroups.find((g) => g.inviteCode === normalized) ?? null;
+}
+
+export function getJoinStats() {
+  const open = directoryGroups.filter((g) => g.filled < g.members).length;
+  const startingSoon = directoryGroups.filter((g) => g.startsInDays >= 0 && g.startsInDays <= 14).length;
+  const contributions = directoryGroups.map((g) => g.contribution).sort((a, b) => a - b);
+  const median =
+    contributions.length === 0
+      ? 0
+      : contributions.length % 2 === 0
+      ? (contributions[contributions.length / 2 - 1] + contributions[contributions.length / 2]) / 2
+      : contributions[Math.floor(contributions.length / 2)];
+  const myPending = myApplications.filter((a) => a.status === "pending").length;
+
+  return {
+    openCount: open,
+    medianContribution: median,
+    pendingApplications: myPending,
+    startingSoon,
   };
 }
 
