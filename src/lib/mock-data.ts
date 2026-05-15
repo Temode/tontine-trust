@@ -1,4 +1,6 @@
 import type {
+  ApiKey,
+  BillingInvoice,
   CalendarEvent,
   CashflowPoint,
   DirectoryGroup,
@@ -7,16 +9,21 @@ import type {
   JoinRequest,
   KycDocument,
   LedgerEvent,
+  LegalDocument,
   Member,
+  MobileMoneyConnection,
   MonthlyStatement,
   PaymentMethod,
   ProfileActivityEntry,
   SessionDevice,
+  Subscription,
   SwapProposal,
   TontineGroup,
   Transaction,
   Turn,
+  UsageQuota,
   UserProfile,
+  WebhookEndpoint,
 } from "./types";
 
 export const currentUser = {
@@ -1934,6 +1941,196 @@ export function getReliabilityBreakdown(): ReliabilityFactor[] {
     },
   ];
 }
+
+export const subscription: Subscription = {
+  tier: "premium",
+  priceMonthly: 45_000,
+  renewalDate: "01 Fév 2025",
+  daysToRenewal: 28,
+  status: "active",
+  features: [
+    "Jusqu'à 10 groupes organisateur actifs",
+    "200 invitations / mois",
+    "Plafond mensuel 30 000 000 GNF",
+    "Export PDF + signature électronique",
+    "Support prioritaire 7j/7",
+  ],
+  usage: {
+    groupsCreated: { current: 3, cap: 10 },
+    membersInvited: { current: 47, cap: 200 },
+    monthlyVolume: { current: 8_200_000, cap: 30_000_000 },
+  },
+};
+
+export const billingInvoices: BillingInvoice[] = [
+  { id: "in-1", number: "TD-2501-018", date: "01 Jan 2025", amount: 45_000, status: "paid" },
+  { id: "in-2", number: "TD-2412-018", date: "01 Déc 2024", amount: 45_000, status: "paid" },
+  { id: "in-3", number: "TD-2411-018", date: "01 Nov 2024", amount: 45_000, status: "paid" },
+  { id: "in-4", number: "TD-2410-018", date: "01 Oct 2024", amount: 45_000, status: "paid" },
+  { id: "in-5", number: "TD-2409-018", date: "01 Sep 2024", amount: 45_000, status: "paid" },
+];
+
+export const usageQuotas: UsageQuota[] = [
+  {
+    id: "daily",
+    label: "Plafond de débit journalier",
+    hint: "Total cumulé débité Mobile Money sur les 24 dernières heures.",
+    current: 1_700_000,
+    cap: 5_000_000,
+    unit: "currency",
+    upgradeLevel: 3,
+  },
+  {
+    id: "monthly",
+    label: "Volume mensuel",
+    hint: "Cotisations + cagnottes du mois civil en cours.",
+    current: 8_200_000,
+    cap: 30_000_000,
+    unit: "currency",
+    upgradeLevel: 3,
+  },
+  {
+    id: "groups",
+    label: "Groupes concurrents",
+    hint: "Tous statuts confondus (organizer + participant).",
+    current: 7,
+    cap: 10,
+    unit: "count",
+  },
+  {
+    id: "invites",
+    label: "Invitations envoyées (30 j)",
+    hint: "Réinitialisé à chaque cycle de facturation.",
+    current: 47,
+    cap: 200,
+    unit: "count",
+  },
+];
+
+export const mobileMoneyConnections: MobileMoneyConnection[] = [
+  {
+    id: "mmc-om",
+    operator: "orange",
+    label: "Orange Money",
+    msisdn: "+224 621 00 00 00",
+    connectedOn: "01 Mars 2024",
+    lastSyncedOn: "À l'instant",
+    dailyCap: 5_000_000,
+    monthlyCap: 30_000_000,
+    autoDebit: true,
+    status: "active",
+  },
+  {
+    id: "mmc-mtn",
+    operator: "mtn",
+    label: "MTN Mobile Money",
+    msisdn: "+224 661 00 00 00",
+    connectedOn: "15 Avr 2024",
+    lastSyncedOn: "Il y a 4 minutes",
+    dailyCap: 3_000_000,
+    monthlyCap: 18_000_000,
+    autoDebit: false,
+    status: "needs_reauth",
+  },
+];
+
+export const apiKeys: ApiKey[] = [
+  {
+    id: "key-live-1",
+    label: "Production · Kaloum Corp",
+    prefix: "td_live_",
+    maskedSuffix: "9F2A",
+    environment: "live",
+    scopes: ["transactions:read", "groups:read", "webhooks:write"],
+    createdOn: "12 Oct 2024",
+    lastUsedOn: "Il y a 6 minutes",
+    status: "active",
+  },
+  {
+    id: "key-sandbox-1",
+    label: "Sandbox · Intégration",
+    prefix: "td_test_",
+    maskedSuffix: "B711",
+    environment: "sandbox",
+    scopes: ["transactions:read", "transactions:write", "groups:write"],
+    createdOn: "20 Nov 2024",
+    lastUsedOn: "Hier · 18:12",
+    status: "active",
+  },
+  {
+    id: "key-revoked",
+    label: "Pilote ERP (révoquée)",
+    prefix: "td_live_",
+    maskedSuffix: "44AB",
+    environment: "live",
+    scopes: ["transactions:read"],
+    createdOn: "01 Juil 2024",
+    lastUsedOn: "30 Sep 2024",
+    status: "revoked",
+  },
+];
+
+export const webhookEndpoints: WebhookEndpoint[] = [
+  {
+    id: "wh-1",
+    url: "https://erp.kaloum-corp.gn/webhooks/tontine",
+    events: ["payment.completed", "payment.failed", "cycle.completed"],
+    lastDeliveryOn: "À l'instant",
+    lastDeliveryStatus: "success",
+    enabled: true,
+  },
+  {
+    id: "wh-2",
+    url: "https://kaloum-analytics.gn/td-events",
+    events: ["group.created", "group.member_joined", "swap.accepted"],
+    lastDeliveryOn: "Il y a 2 jours",
+    lastDeliveryStatus: "retrying",
+    enabled: true,
+  },
+  {
+    id: "wh-3",
+    url: "https://staging.kaloum-corp.gn/td-events",
+    events: ["*"],
+    lastDeliveryOn: "Il y a 15 jours",
+    lastDeliveryStatus: "failed",
+    enabled: false,
+  },
+];
+
+export const legalDocuments: LegalDocument[] = [
+  {
+    id: "cgu",
+    title: "Conditions générales d'utilisation",
+    version: "v3.2",
+    acceptedOn: "20 Avr 2024",
+    href: "#",
+    required: true,
+  },
+  {
+    id: "confidentialite",
+    title: "Politique de confidentialité",
+    version: "v2.4",
+    acceptedOn: "20 Avr 2024",
+    href: "#",
+    required: true,
+  },
+  {
+    id: "amf",
+    title: "Mentions légales · Banque Centrale de Guinée",
+    version: "agrément BCG-2024-018",
+    acceptedOn: "01 Mars 2024",
+    href: "#",
+    required: true,
+  },
+  {
+    id: "litiges",
+    title: "Médiation et résolution amiable des litiges",
+    version: "v1.1",
+    acceptedOn: "20 Avr 2024",
+    href: "#",
+    required: false,
+  },
+];
 
 export function getHistoryStats() {
   const successful = transactions.filter((t) => t.status === "success");

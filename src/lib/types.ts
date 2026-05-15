@@ -304,6 +304,88 @@ export interface JoinApplication {
   requestedTurn?: number;
 }
 
+export type SubscriptionTier = "standard" | "premium" | "enterprise";
+
+export interface Subscription {
+  tier: SubscriptionTier;
+  priceMonthly: number;
+  renewalDate: string;
+  daysToRenewal: number;
+  status: "active" | "trialing" | "past_due" | "cancelled";
+  features: string[];
+  /** Feature usage out of the plan allowance. */
+  usage: {
+    groupsCreated: { current: number; cap: number };
+    membersInvited: { current: number; cap: number };
+    monthlyVolume: { current: number; cap: number };
+  };
+}
+
+export interface BillingInvoice {
+  id: string;
+  number: string;
+  date: string;
+  amount: number;
+  status: "paid" | "pending" | "failed";
+}
+
+export interface UsageQuota {
+  id: string;
+  label: string;
+  hint: string;
+  current: number;
+  cap: number;
+  unit: "currency" | "count";
+  /** KYC level required for next tier. */
+  upgradeLevel?: 2 | 3;
+}
+
+export interface MobileMoneyConnection {
+  id: string;
+  operator: MobileMoneyOperator;
+  label: string;
+  msisdn: string;
+  connectedOn: string;
+  lastSyncedOn: string;
+  dailyCap: number;
+  monthlyCap: number;
+  autoDebit: boolean;
+  status: "active" | "needs_reauth" | "suspended";
+}
+
+export type ApiKeyEnvironment = "live" | "sandbox";
+
+export interface ApiKey {
+  id: string;
+  label: string;
+  prefix: string;
+  /** Masked suffix shown in the UI. */
+  maskedSuffix: string;
+  environment: ApiKeyEnvironment;
+  scopes: string[];
+  createdOn: string;
+  lastUsedOn?: string;
+  status: "active" | "revoked";
+}
+
+export interface WebhookEndpoint {
+  id: string;
+  url: string;
+  events: string[];
+  lastDeliveryOn?: string;
+  lastDeliveryStatus?: "success" | "failed" | "retrying";
+  enabled: boolean;
+}
+
+export interface LegalDocument {
+  id: string;
+  title: string;
+  version: string;
+  acceptedOn: string;
+  href: string;
+  required: boolean;
+}
+
 export type JoinApplicationStatus = "pending" | "accepted" | "declined" | "cancelled";
 
 export type KycLevel = 1 | 2 | 3;
