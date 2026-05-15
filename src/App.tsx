@@ -14,6 +14,7 @@ import InviteMembers from "@/pages/InviteMembers";
 import JoinGroup from "@/pages/JoinGroup";
 import MyGroups from "@/pages/MyGroups";
 import NotFound from "@/pages/NotFound";
+import Notifications from "@/pages/Notifications";
 import Profile from "@/pages/Profile";
 import Rotations from "@/pages/Rotations";
 import Settings from "@/pages/Settings";
@@ -41,6 +42,7 @@ const App = () => (
             <Route path="/inviter" element={<InviteMembers />} />
             <Route path="/profil" element={<Profile />} />
             <Route path="/parametres" element={<Settings />} />
+            <Route path="/notifications" element={<Notifications />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AppShell>

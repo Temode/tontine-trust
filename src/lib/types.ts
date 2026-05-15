@@ -304,6 +304,40 @@ export interface JoinApplication {
   requestedTurn?: number;
 }
 
+export type NotificationCategory =
+  | "financial"
+  | "governance"
+  | "security"
+  | "system"
+  | "social";
+
+export type NotificationSeverity = "info" | "warning" | "critical" | "success";
+
+export type NotificationStatus = "unread" | "read" | "archived";
+
+export interface Notification {
+  id: string;
+  category: NotificationCategory;
+  severity: NotificationSeverity;
+  status: NotificationStatus;
+  title: string;
+  description: string;
+  /** Origin of the notification: group name, "Système", "Service conformité", etc. */
+  source: string;
+  groupId?: string;
+  timestamp: string;
+  /** Negative = past. */
+  daysFromToday: number;
+  signature: string;
+  /** Primary action callable from the row. */
+  actionUrl?: string;
+  actionLabel?: string;
+  secondaryActionUrl?: string;
+  secondaryActionLabel?: string;
+  /** True when the user must act for an operation to continue. */
+  requiresAction?: boolean;
+}
+
 export type SubscriptionTier = "standard" | "premium" | "enterprise";
 
 export interface Subscription {
