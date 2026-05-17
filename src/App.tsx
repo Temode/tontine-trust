@@ -1,21 +1,30 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import Index from "./pages/Index.tsx";
-import NotFound from "./pages/NotFound.tsx";
-import { Dashboard } from "./components/Dashboard/Dasboard.tsx";
-import MesGroupes from "./components/Dashboard/Mesgroupe.tsx";
-import Cotisations from "./components/Dashboard/Cotisations.tsx";
-
+import { AppShell } from "@/components/layout/AppShell";
+import Calendar from "@/pages/Calendar";
+import Contributions from "@/pages/Contributions";
+import CreateGroup from "@/pages/CreateGroup";
+import Dashboard from "@/pages/Dashboard";
+import GroupDetail from "@/pages/GroupDetail";
+import History from "@/pages/History";
+import InviteMembers from "@/pages/InviteMembers";
+import JoinGroup from "@/pages/JoinGroup";
+import MyGroups from "@/pages/MyGroups";
+import NotFound from "@/pages/NotFound";
+import Notifications from "@/pages/Notifications";
+import Profile from "@/pages/Profile";
+import Rotations from "@/pages/Rotations";
+import Settings from "@/pages/Settings";
 const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <Toaster />
-      <Sonner />
+      <Sonner position="top-center" />
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Index />} />
@@ -24,6 +33,25 @@ const App = () => (
           <Route path="/groups" element={<MesGroupes />} />
           <Route path="/cotisation" element={<Cotisations />} />
         </Routes>
+        <AppShell>
+          <Routes>
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/groupes" element={<MyGroups />} />
+            <Route path="/groupes/:id" element={<GroupDetail />} />
+            <Route path="/cotisations" element={<Contributions />} />
+            <Route path="/rotations" element={<Rotations />} />
+            <Route path="/historique" element={<History />} />
+            <Route path="/calendrier" element={<Calendar />} />
+            <Route path="/nouveau" element={<CreateGroup />} />
+            <Route path="/rejoindre" element={<JoinGroup />} />
+            <Route path="/inviter" element={<InviteMembers />} />
+            <Route path="/profil" element={<Profile />} />
+            <Route path="/parametres" element={<Settings />} />
+            <Route path="/notifications" element={<Notifications />} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </AppShell>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
