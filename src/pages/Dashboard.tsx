@@ -12,6 +12,7 @@ import { DistributionCard } from "@/components/dashboard/DistributionCard";
 import { MemberStatusGrid } from "@/components/dashboard/MemberStatusGrid";
 import { PayCard, QuickLinks } from "@/components/dashboard/QuickActions";
 import { PaymentModal } from "@/components/payment/PaymentModal";
+import { RoleGuard } from "@/components/RoleGuard";
 import {
   currentUser,
   getStats,
@@ -126,6 +127,20 @@ export default function Dashboard() {
 
         {/* Row 4 — Live members status + actions */}
         <div className="mt-6 grid grid-cols-1 gap-5 lg:grid-cols-3">
+          <RoleGuard
+            allowedRoles={["admin", "organisateur"]}
+            fallback={
+              <SectionCard
+                className="lg:col-span-2"
+                title="État des cotisations"
+                subtitle="Réservé aux organisateurs"
+              >
+                <p className="text-sm text-muted-foreground">
+                  Cette vue détaillée des cotisations est réservée aux administrateurs et organisateurs du groupe.
+                </p>
+              </SectionCard>
+            }
+          >
           <SectionCard
             className="lg:col-span-2"
             title="État des cotisations"
@@ -156,6 +171,7 @@ export default function Dashboard() {
             </div>
             <MemberStatusGrid entries={liveMembersStatus} />
           </SectionCard>
+          </RoleGuard>
 
           <div className="space-y-5">
             <PayCard onPay={() => setPaymentOpen(true)} />
