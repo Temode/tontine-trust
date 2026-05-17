@@ -1,104 +1,127 @@
+# Plan — Auth Supabase + Rôles + Protection des routes
 
-# Plan — Intégration Supabase + Authentification
+## 1. Schéma base de données (migration SQL)
 
-> **Prérequis** : tu merges d'abord la branche `claude/audit-design-mvp-dashboard-Zsszd` sur main. Une fois fait, j'exécute le plan ci-dessous.
-
-## 1. Connexion à ton projet Supabase
-
-Activation de l'intégration Supabase native de Lovable pour lier l'app à ton projet existant. Cela génère automatiquement :
-- Le client Supabase (`src/integrations/supabase/client.ts`)
-- Les types TypeScript de la base
-- Les variables `VITE_SUPABASE_URL` et `VITE_SUPABASE_PUBLISHABLE_KEY`
-
-## 2. Schéma base de données (via migration)
+### Enum `app_role`
+```sql
+create type public.app_role as enum ('admin', 'organisateur', 'participant');
+```
 
 ### Table `profiles`
-Liée à `auth.users` (suppression en cascade). Champs :
-- `id` (uuid, PK = auth.users.id)
-- `full_name`, `phone_number`, `avatar_url`
-- `reliability_score` (int, défaut 100) — score de fiabilité
-- `created_at`, `updated_at`
+- `id uuid PK` (= `auth.users.id`, `on delete cascade`)
+- `full_name text not null`
+- `phone_number text`
+- `avatar_url text`
+- `reliability_score int default 100`
+- `created_at`, `updated_at timestamptz`
 
-### Enum `app_role` + table `user_roles`
-Conforme aux bonnes pratiques de sécurité (rôles **jamais** stockés sur `profiles`).
-- Enum : `'admin' | 'organisateur' | 'participant'`
-- Table : `user_roles (id, user_id, role)` avec contrainte d'unicité
+### Table `user_roles`
+- `id uuid PK default gen_random_uuid()`
+- `user_id uuid not null references auth.users(id) on delete cascade`
+- `role app_role not null`
+- `unique (user_id, role)`
 
-### Fonction security definer `has_role(user_id, role)`
-Pour vérifier les rôles dans les RLS sans récursion.
+### Fonction `has_role(_user_id uuid, _role app_role) returns boolean`
+`SECURITY DEFINER`, `stable`, `set search_path = public` — pour éviter la récursion RLS.
 
 ### Trigger `handle_new_user`
-À l'inscription : crée automatiquement la ligne `profiles` et attribue le rôle `participant` par défaut.
+À chaque insert dans `auth.users` : crée la ligne `profiles` (nom récupéré depuis `raw_user_meta_data->>'full_name'`) et insère le rôle `participant` par défaut dans `user_roles`.
+
+### Trigger `handle_updated_at`
+Met à jour `updated_at` sur `profiles`.
 
 ### RLS Policies
-- `profiles` : lecture publique (pour voir les membres d'un groupe), modification réservée au propriétaire
-- `user_roles` : lecture par soi-même et admins, modification par admins uniquement
+- **profiles**
+  - SELECT : tous les utilisateurs authentifiés (pour afficher membres d'un groupe)
+  - UPDATE : `auth.uid() = id`
+  - INSERT : géré par le trigger uniquement
+- **user_roles**
+  - SELECT : `auth.uid() = user_id` OR `has_role(auth.uid(), 'admin')`
+  - INSERT/UPDATE/DELETE : `has_role(auth.uid(), 'admin')` uniquement
 
-## 3. Pages d'authentification
+## 2. Pages et composants Auth
 
-### `/auth` — Page combinée connexion / inscription
-- Onglets "Se connecter" / "S'inscrire"
-- Champs inscription : nom complet, téléphone, email, mot de passe
-- Champs connexion : email, mot de passe
-- Validation Zod
-- `emailRedirectTo: window.location.origin` sur signUp
-- Toast d'erreur clair (email déjà utilisé, mot de passe trop court, etc.)
-- Design conforme au design system (couleurs primary teal, gradient, logo)
+### `src/pages/Auth.tsx`
+- Onglets **Se connecter** / **S'inscrire** (composant `Tabs`)
+- Inscription : `full_name`, `phone_number`, `email`, `password` (min 8)
+- Connexion : `email`, `password`
+- Validation **Zod** + react-hook-form
+- `signUp` avec `emailRedirectTo: ${window.location.origin}/dashboard` et `data: { full_name, phone_number }`
+- Toast d'erreur clair (mapping des messages Supabase : `User already registered`, `Invalid login credentials`, etc.)
+- Redirige vers `/dashboard` si déjà connecté
+- Design system respecté (primary teal `#0D7377`, logo, gradient subtil)
 
-### Hook `useAuth`
-Centralise :
-- Listener `onAuthStateChange` configuré **avant** `getSession()` (évite deadlock)
-- État `user`, `session`, `loading`
-- Méthodes `signIn`, `signUp`, `signOut`
-- Provider à wrapper autour de l'app dans `App.tsx`
+### `src/hooks/useAuth.tsx`
+Provider + hook exposant `{ user, session, roles, loading, signIn, signUp, signOut }`.
+- Listener `onAuthStateChange` configuré **avant** `getSession()`
+- Charge les rôles depuis `user_roles` après login (via setTimeout 0 pour éviter deadlock)
+- `signOut` redirige vers `/auth`
 
-### Composant `ProtectedRoute`
-- Redirige vers `/auth` si non connecté
-- Affiche un loader pendant la vérification de session
-- Protège `/dashboard` et toutes les routes membres
+### `src/components/ProtectedRoute.tsx`
+- Si `loading` → loader plein écran
+- Si `!user` → `<Navigate to="/auth" replace />`
+- Sinon → `<Outlet />` (ou `children`)
 
-## 4. Mise à jour du Dashboard et navigation
+### `src/components/RoleGuard.tsx`
+- Props : `allowedRoles: AppRole[]`, `fallback?: ReactNode`
+- Si l'utilisateur ne possède aucun des rôles → fallback (ou null)
+- Utilisé pour cacher des sections du Dashboard
 
-- Ajout bouton "Se déconnecter" dans le header du dashboard
-- Affichage du nom de l'utilisateur connecté
-- Lien "Se connecter" sur la landing page (Header) → `/auth`
-- CTA "Commencer" → `/auth` au lieu de `/dashboard`
-- Redirection post-login vers `/dashboard`
+## 3. Mise à jour `App.tsx`
+
+```text
+<AuthProvider>
+  <Routes>
+    <Route path="/" element={<Index />} />
+    <Route path="/auth" element={<Auth />} />
+    <Route element={<ProtectedRoute />}>
+      <Route element={<AppShell><Outlet /></AppShell>}>
+        <Route path="/dashboard" ... />
+        ... (toutes les routes membres actuelles)
+      </Route>
+    </Route>
+    <Route path="*" element={<NotFound />} />
+  </Routes>
+</AuthProvider>
+```
+Nettoyage : suppression des routes dupliquées (`/groups`, `/cotisation` qui pointent vers d'anciens composants) et de la route `/` interne au shell.
+
+## 4. Rôles dans le Dashboard
+
+Sections gardées par rôle :
+- **admin** : voit tout + un encart "Administration" (KPIs globaux placeholder)
+- **organisateur** : voit la `MemberStatusGrid` (état des cotisations du groupe) et le bouton "Inviter / Nouvelle tontine"
+- **participant** : voit ses cotisations, sa fiabilité, ses prochaines échéances — masque `MemberStatusGrid` et actions d'organisation
+
+Implémentation : envelopper les blocs concernés du `Dashboard` avec `<RoleGuard allowedRoles={[...]}>`. Le `TopBar` affiche aussi un badge avec le rôle principal et un bouton **Se déconnecter**.
 
 ## 5. Détails techniques
 
 ```text
 src/
-├── integrations/supabase/      (auto-généré)
-│   ├── client.ts
-│   └── types.ts
-├── hooks/
-│   └── useAuth.tsx              (Provider + hook)
+├── integrations/supabase/        (déjà généré par la connexion)
+├── hooks/useAuth.tsx             (Provider + hook + rôles)
 ├── components/
-│   └── ProtectedRoute.tsx
-├── pages/
-│   └── Auth.tsx                 (login + signup)
-└── App.tsx                      (AuthProvider + routes protégées)
+│   ├── ProtectedRoute.tsx
+│   └── RoleGuard.tsx
+├── pages/Auth.tsx
+└── App.tsx                       (AuthProvider + routes protégées)
 
 supabase/migrations/
-└── <timestamp>_init_auth.sql    (profiles, user_roles, trigger, RLS)
+└── <timestamp>_init_auth_roles.sql
 ```
 
-**Points de sécurité respectés :**
-- Rôles dans table séparée (anti escalation)
-- Fonction `has_role` en SECURITY DEFINER
-- `emailRedirectTo` configuré pour éviter les erreurs de confirmation
-- Listener auth configuré avant `getSession`
-- Pas de stockage de rôles côté client
+**Sécurité respectée :**
+- Rôles dans table dédiée (anti-escalation)
+- `has_role` en `SECURITY DEFINER` avec `search_path` figé
+- `onAuthStateChange` avant `getSession`
+- Aucun rôle stocké côté client comme source de vérité (toujours revérifié via RLS côté DB)
+- `emailRedirectTo` configuré
 
-## 6. Hors scope (à faire plus tard)
+## 6. Hors scope
 
-- Réinitialisation de mot de passe (`/reset-password`) — à ajouter quand tu en auras besoin
-- 2FA, vérification SMS (OTP Twilio)
-- OAuth Google
-- Upload avatar (storage bucket)
-- CRUD groupes de tontine et cotisations
-
----
-
-**Dis-moi quand la branche est mergée** et je lance l'implémentation.
+- Réinitialisation mot de passe (`/reset-password`)
+- OAuth Google, SMS OTP
+- Upload avatar
+- CRUD groupes / cotisations
+- UI admin de gestion des rôles (assignation manuelle se fait via SQL pour le MVP)
