@@ -1,127 +1,65 @@
-# Plan — Auth Supabase + Rôles + Protection des routes
+# Diagnostic de l'inscription
 
-## 1. Schéma base de données (migration SQL)
+J'ai créé un compte test depuis `/auth`. La requête `POST /auth/v1/signup` renvoie :
 
-### Enum `app_role`
-```sql
-create type public.app_role as enum ('admin', 'organisateur', 'participant');
+```
+HTTP 429 — x-sb-error-code: over_email_send_rate_limit
+{"code":"over_email_send_rate_limit","message":"email rate limit exceeded"}
 ```
 
-### Table `profiles`
-- `id uuid PK` (= `auth.users.id`, `on delete cascade`)
-- `full_name text not null`
-- `phone_number text`
-- `avatar_url text`
-- `reliability_score int default 100`
-- `created_at`, `updated_at timestamptz`
+**Cause** : dans ton projet Supabase, "Confirm email" est activé mais aucun SMTP custom n'est configuré → le SMTP par défaut de Supabase est plafonné à ~3-4 emails/heure, et la limite est atteinte. Le code front fait son travail, le bloquant est la config Supabase + l'absence de gestion fine de ce cas.
 
-### Table `user_roles`
-- `id uuid PK default gen_random_uuid()`
-- `user_id uuid not null references auth.users(id) on delete cascade`
-- `role app_role not null`
-- `unique (user_id, role)`
+Un second risque latent : si la migration SQL `db/init_auth_roles.sql` n'a pas été exécutée, le trigger `handle_new_user` n'existe pas et chaque signup réussi renvoie `Database error saving new user`. À vérifier en parallèle.
 
-### Fonction `has_role(_user_id uuid, _role app_role) returns boolean`
-`SECURITY DEFINER`, `stable`, `set search_path = public` — pour éviter la récursion RLS.
+---
 
-### Trigger `handle_new_user`
-À chaque insert dans `auth.users` : crée la ligne `profiles` (nom récupéré depuis `raw_user_meta_data->>'full_name'`) et insère le rôle `participant` par défaut dans `user_roles`.
+# Plan d'action
 
-### Trigger `handle_updated_at`
-Met à jour `updated_at` sur `profiles`.
+## 1. Débloquer l'inscription côté Supabase (action utilisateur, 30 s)
 
-### RLS Policies
-- **profiles**
-  - SELECT : tous les utilisateurs authentifiés (pour afficher membres d'un groupe)
-  - UPDATE : `auth.uid() = id`
-  - INSERT : géré par le trigger uniquement
-- **user_roles**
-  - SELECT : `auth.uid() = user_id` OR `has_role(auth.uid(), 'admin')`
-  - INSERT/UPDATE/DELETE : `has_role(auth.uid(), 'admin')` uniquement
+Deux options au choix (je détaillerai dans le chat après approbation) :
 
-## 2. Pages et composants Auth
+- **Recommandé pour tester maintenant** : Supabase Dashboard → Authentication → Providers → Email → décocher **"Confirm email"**. Les nouveaux comptes seront actifs immédiatement.
+- **Pour la prod** : configurer un SMTP custom (Resend, Brevo, SendGrid) dans Authentication → Emails → SMTP Settings.
 
-### `src/pages/Auth.tsx`
-- Onglets **Se connecter** / **S'inscrire** (composant `Tabs`)
-- Inscription : `full_name`, `phone_number`, `email`, `password` (min 8)
-- Connexion : `email`, `password`
-- Validation **Zod** + react-hook-form
-- `signUp` avec `emailRedirectTo: ${window.location.origin}/dashboard` et `data: { full_name, phone_number }`
-- Toast d'erreur clair (mapping des messages Supabase : `User already registered`, `Invalid login credentials`, etc.)
-- Redirige vers `/dashboard` si déjà connecté
-- Design system respecté (primary teal `#0D7377`, logo, gradient subtil)
+Et vérifier que `db/init_auth_roles.sql` a bien été exécuté dans le SQL Editor (tables `profiles`, `user_roles`, fonction `has_role`, trigger `on_auth_user_created`).
 
-### `src/hooks/useAuth.tsx`
-Provider + hook exposant `{ user, session, roles, loading, signIn, signUp, signOut }`.
-- Listener `onAuthStateChange` configuré **avant** `getSession()`
-- Charge les rôles depuis `user_roles` après login (via setTimeout 0 pour éviter deadlock)
-- `signOut` redirige vers `/auth`
+## 2. Robustifier le flux d'auth (code)
 
-### `src/components/ProtectedRoute.tsx`
-- Si `loading` → loader plein écran
-- Si `!user` → `<Navigate to="/auth" replace />`
-- Sinon → `<Outlet />` (ou `children`)
+Fichier `src/hooks/useAuth.tsx` :
+- Étendre `mapAuthError` : gérer `over_email_send_rate_limit`, `email_address_invalid`, `weak_password`, `Database error saving new user`, `signups not allowed`.
+- `signUp` retourne aussi `needsEmailConfirmation: boolean` (true si `data.session === null && data.user !== null`) pour permettre un message UX adapté.
+- Auto-sign-in après `signUp` si une session est déjà fournie (cas "Confirm email" désactivé).
 
-### `src/components/RoleGuard.tsx`
-- Props : `allowedRoles: AppRole[]`, `fallback?: ReactNode`
-- Si l'utilisateur ne possède aucun des rôles → fallback (ou null)
-- Utilisé pour cacher des sections du Dashboard
+Fichier `src/pages/Auth.tsx` :
+- Après `signUp` réussi : si `needsEmailConfirmation`, afficher un message "Vérifie ta boîte mail pour confirmer" et basculer sur l'onglet Connexion ; sinon, rediriger directement vers `/dashboard`.
+- Désactiver le bouton pendant 30 s après une erreur de rate limit pour éviter la boucle.
 
-## 3. Mise à jour `App.tsx`
+## 3. Formulaire de mise à jour du profil (post-login, RLS-safe)
 
-```text
-<AuthProvider>
-  <Routes>
-    <Route path="/" element={<Index />} />
-    <Route path="/auth" element={<Auth />} />
-    <Route element={<ProtectedRoute />}>
-      <Route element={<AppShell><Outlet /></AppShell>}>
-        <Route path="/dashboard" ... />
-        ... (toutes les routes membres actuelles)
-      </Route>
-    </Route>
-    <Route path="*" element={<NotFound />} />
-  </Routes>
-</AuthProvider>
-```
-Nettoyage : suppression des routes dupliquées (`/groups`, `/cotisation` qui pointent vers d'anciens composants) et de la route `/` interne au shell.
+Nouveau composant `src/components/profile/ProfileUpdateForm.tsx` :
+- Champs : `full_name` (requis, 2-100, trim), `phone_number` (optionnel, regex E.164 souple `^\+?[0-9\s\-]{6,20}$`).
+- Validation Zod, messages d'erreur français, `toast` succès/erreur.
+- Chargement initial via `supabase.from('profiles').select('full_name, phone_number').eq('id', user.id).single()`.
+- Soumission via `supabase.from('profiles').update({ full_name, phone_number }).eq('id', user.id)` — autorisée par la policy `profiles_update_own` (`auth.uid() = id`), donc strictement RLS-safe.
+- État `loading` initial, `saving` à la soumission, bouton désactivé tant que pas modifié.
 
-## 4. Rôles dans le Dashboard
+Intégration : remplacer le bouton "Modifier le profil" de `src/pages/Profile.tsx` par l'ouverture d'un `Dialog` contenant `ProfileUpdateForm`, OU monter le formulaire directement dans l'onglet **Identité & KYC** (préférable, plus visible). Je choisirai la 2e option sauf indication contraire.
 
-Sections gardées par rôle :
-- **admin** : voit tout + un encart "Administration" (KPIs globaux placeholder)
-- **organisateur** : voit la `MemberStatusGrid` (état des cotisations du groupe) et le bouton "Inviter / Nouvelle tontine"
-- **participant** : voit ses cotisations, sa fiabilité, ses prochaines échéances — masque `MemberStatusGrid` et actions d'organisation
+La route `/profile` est déjà derrière `ProtectedRoute` → exigence "accessible après connexion" satisfaite.
 
-Implémentation : envelopper les blocs concernés du `Dashboard` avec `<RoleGuard allowedRoles={[...]}>`. Le `TopBar` affiche aussi un badge avec le rôle principal et un bouton **Se déconnecter**.
+## 4. Vérification finale
 
-## 5. Détails techniques
+Après les changements et la config Supabase :
+- Recréer un compte depuis `/auth` (email frais) → doit arriver sur `/dashboard`.
+- Aller sur `/profile`, modifier nom + téléphone, recharger → valeurs persistées.
+- Vérifier en SQL : `select id, full_name, phone_number from public.profiles where id = auth.uid();`
 
-```text
-src/
-├── integrations/supabase/        (déjà généré par la connexion)
-├── hooks/useAuth.tsx             (Provider + hook + rôles)
-├── components/
-│   ├── ProtectedRoute.tsx
-│   └── RoleGuard.tsx
-├── pages/Auth.tsx
-└── App.tsx                       (AuthProvider + routes protégées)
+---
 
-supabase/migrations/
-└── <timestamp>_init_auth_roles.sql
-```
+# Détails techniques
 
-**Sécurité respectée :**
-- Rôles dans table dédiée (anti-escalation)
-- `has_role` en `SECURITY DEFINER` avec `search_path` figé
-- `onAuthStateChange` avant `getSession`
-- Aucun rôle stocké côté client comme source de vérité (toujours revérifié via RLS côté DB)
-- `emailRedirectTo` configuré
-
-## 6. Hors scope
-
-- Réinitialisation mot de passe (`/reset-password`)
-- OAuth Google, SMS OTP
-- Upload avatar
-- CRUD groupes / cotisations
-- UI admin de gestion des rôles (assignation manuelle se fait via SQL pour le MVP)
+- Pas de changement de schéma DB nécessaire — la migration existante couvre tout.
+- Pas de nouvelles dépendances (Zod, supabase-js, shadcn Dialog déjà présents).
+- Aucune logique métier déplacée côté client sensible : la sécurité reste portée par les policies RLS (`profiles_update_own` filtre déjà par `auth.uid()`).
+- `useAuth` rafraîchira `roles` automatiquement après login via `onAuthStateChange` (déjà en place).

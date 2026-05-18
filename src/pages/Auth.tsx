@@ -91,7 +91,7 @@ export default function Auth() {
       return;
     }
     setSubmitting(true);
-    const { error } = await signUp({
+    const { error, needsEmailConfirmation } = await signUp({
       email: parsed.data.email,
       password: parsed.data.password,
       fullName: parsed.data.fullName,
@@ -102,9 +102,14 @@ export default function Auth() {
       toast.error(error);
       return;
     }
-    toast.success("Compte créé. Vérifie ton email si la confirmation est activée, puis connecte-toi.");
-    setTab("signin");
-    setSiEmail(parsed.data.email);
+    if (needsEmailConfirmation) {
+      toast.success("Compte créé. Vérifie ta boîte mail pour confirmer, puis connecte-toi.");
+      setTab("signin");
+      setSiEmail(parsed.data.email);
+      return;
+    }
+    toast.success("Compte créé. Bienvenue !");
+    navigate(redirectTo, { replace: true });
   };
 
   return (

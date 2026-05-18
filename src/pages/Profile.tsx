@@ -8,6 +8,7 @@ import { KycPanel } from "@/components/profile/KycPanel";
 import { MandatesPanel } from "@/components/profile/MandatesPanel";
 import { PreferencesPanel } from "@/components/profile/PreferencesPanel";
 import { ProfileActivity } from "@/components/profile/ProfileActivity";
+import { ProfileUpdateForm } from "@/components/profile/ProfileUpdateForm";
 import { ReliabilityBreakdown } from "@/components/profile/ReliabilityBreakdown";
 import { SecurityPanel } from "@/components/profile/SecurityPanel";
 import { TrackRecordStrip } from "@/components/profile/TrackRecordStrip";
@@ -95,7 +96,8 @@ export default function Profile() {
             <MandatesPanel groups={groups} />
           </TabsContent>
 
-          <TabsContent value="identity">
+          <TabsContent value="identity" className="space-y-6">
+            <ProfileUpdateForm />
             <KycPanel profile={userProfile} documents={kycDocuments} />
           </TabsContent>
 
