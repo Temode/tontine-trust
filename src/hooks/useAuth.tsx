@@ -13,7 +13,7 @@ interface AuthContextValue {
     password: string;
     fullName: string;
     phoneNumber?: string;
-  }) => Promise<{ error: string | null }>;
+  }) => Promise<{ error: string | null; needsEmailConfirmation: boolean }>;
   signOut: () => Promise<void>;
 }
 
@@ -24,9 +24,18 @@ function mapAuthError(message: string): string {
   if (m.includes("invalid login")) return "Email ou mot de passe incorrect.";
   if (m.includes("already registered") || m.includes("already been registered"))
     return "Cet email est déjà utilisé. Connecte-toi.";
-  if (m.includes("password")) return "Mot de passe invalide (au moins 8 caractères).";
-  if (m.includes("email")) return "Email invalide.";
+  if (m.includes("weak password") || m.includes("password should"))
+    return "Mot de passe trop faible (au moins 8 caractères).";
+  if (m.includes("email address") && m.includes("invalid")) return "Email invalide.";
+  if (m.includes("over_email_send_rate_limit") || m.includes("email rate limit"))
+    return "Trop d'emails envoyés. Patiente quelques minutes ou désactive la confirmation email dans Supabase pour tester.";
   if (m.includes("rate limit")) return "Trop de tentatives. Réessaie dans un instant.";
+  if (m.includes("database error saving new user"))
+    return "Erreur DB : la migration SQL (profiles/user_roles/trigger) n'a probablement pas été exécutée dans Supabase.";
+  if (m.includes("signups not allowed") || m.includes("signup is disabled"))
+    return "Les inscriptions sont désactivées dans la config Supabase.";
+  if (m.includes("email not confirmed"))
+    return "Email non confirmé. Vérifie ta boîte mail.";
   return message;
 }
 
@@ -70,7 +79,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signUp: AuthContextValue["signUp"] = async ({ email, password, fullName, phoneNumber }) => {
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -78,7 +87,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         data: { full_name: fullName, phone_number: phoneNumber ?? null },
       },
     });
-    return { error: error ? mapAuthError(error.message) : null };
+    if (error) return { error: mapAuthError(error.message), needsEmailConfirmation: false };
+    const needsEmailConfirmation = !data.session && !!data.user;
+    return { error: null, needsEmailConfirmation };
   };
 
   const signOut = async () => {
