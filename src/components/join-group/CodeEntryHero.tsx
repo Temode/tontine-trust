@@ -1,16 +1,12 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { ArrowRight, ClipboardPaste, Loader2, ShieldCheck, X } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { findDirectoryGroupByCode } from "@/lib/mock-data";
-import type { DirectoryGroup } from "@/lib/types";
+import { joinWithCode } from "@/lib/api/invitations";
 
-interface CodeEntryHeroProps {
-  onMatch: (group: DirectoryGroup) => void;
-  onClear: () => void;
-  matchedCode?: string;
-}
-
-type LookupState = "idle" | "checking" | "found" | "not-found";
+type LookupState = "idle" | "checking" | "error";
 
 /**
  * Auto-format an input string into the canonical TD-XXXX-XXXX shape.
@@ -31,33 +27,28 @@ function isComplete(code: string): boolean {
 }
 
 export function CodeEntryHero({ onMatch, onClear, matchedCode }: CodeEntryHeroProps) {
-  const [code, setCode] = useState(matchedCode ?? "");
-  const [state, setState] = useState<LookupState>(matchedCode ? "found" : "idle");
+  void matchedCode; void onMatch; void onClear;
+  const [code, setCode] = useState("");
+  const [state, setState] = useState<LookupState>("idle");
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const navigate = useNavigate();
+  const qc = useQueryClient();
 
-  useEffect(() => {
-    if (!isComplete(code)) {
-      if (state !== "idle") {
-        setState("idle");
-        onClear();
-      }
-      return;
-    }
-
+  const handleJoin = async () => {
+    if (!isComplete(code)) return;
     setState("checking");
-    const timer = window.setTimeout(() => {
-      const match = findDirectoryGroupByCode(code);
-      if (match) {
-        setState("found");
-        onMatch(match);
-      } else {
-        setState("not-found");
-        onClear();
-      }
-    }, 600);
-
-    return () => window.clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [code]);
+    setErrorMsg(null);
+    try {
+      const { groupId } = await joinWithCode(code);
+      toast.success("Adhésion confirmée", { description: "Vous avez rejoint le groupe." });
+      await qc.invalidateQueries({ queryKey: ["groups", "mine"] });
+      navigate(`/groupes/${groupId}`);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Erreur inconnue";
+      setErrorMsg(msg);
+      setState("error");
+    }
+  };
 
   const handlePaste = async () => {
     try {
@@ -71,7 +62,7 @@ export function CodeEntryHero({ onMatch, onClear, matchedCode }: CodeEntryHeroPr
   const handleClear = () => {
     setCode("");
     setState("idle");
-    onClear();
+    setErrorMsg(null);
   };
 
   return (
@@ -97,8 +88,7 @@ export function CodeEntryHero({ onMatch, onClear, matchedCode }: CodeEntryHeroPr
             <div
               className={cn(
                 "flex items-stretch rounded-lg border bg-card transition",
-                state === "found" && "border-success/40 ring-2 ring-success/20",
-                state === "not-found" && "border-destructive/40 ring-2 ring-destructive/15",
+                state === "error" && "border-destructive/40 ring-2 ring-destructive/15",
                 state === "idle" && "border-hairline focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/15",
                 state === "checking" && "border-primary/40",
               )}
@@ -112,6 +102,7 @@ export function CodeEntryHero({ onMatch, onClear, matchedCode }: CodeEntryHeroPr
                 placeholder="TD-XXXX-XXXX"
                 value={code}
                 onChange={(e) => setCode(autoFormat(e.target.value))}
+                onKeyDown={(e) => { if (e.key === "Enter") handleJoin(); }}
                 maxLength={11}
                 className="h-14 w-full bg-transparent px-4 font-mono text-xl font-bold tracking-[0.18em] text-foreground placeholder:text-muted-foreground/60 focus:outline-none num"
               />
@@ -135,10 +126,19 @@ export function CodeEntryHero({ onMatch, onClear, matchedCode }: CodeEntryHeroPr
                   <ClipboardPaste className="h-3.5 w-3.5" />
                   Coller
                 </button>
+                <button
+                  type="button"
+                  onClick={handleJoin}
+                  disabled={!isComplete(code) || state === "checking"}
+                  className="ml-1 inline-flex h-9 items-center gap-1.5 rounded-md bg-primary px-3 text-xs font-semibold text-primary-foreground transition hover:bg-primary-700 disabled:opacity-50"
+                >
+                  {state === "checking" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ArrowRight className="h-3.5 w-3.5" />}
+                  Rejoindre
+                </button>
               </div>
             </div>
 
-            <StateLine state={state} />
+            <StateLine state={state} errorMsg={errorMsg} />
           </div>
         </div>
 
@@ -162,7 +162,7 @@ export function CodeEntryHero({ onMatch, onClear, matchedCode }: CodeEntryHeroPr
   );
 }
 
-function StateLine({ state }: { state: LookupState }) {
+function StateLine({ state, errorMsg }: { state: LookupState; errorMsg: string | null }) {
   if (state === "idle") {
     return (
       <p className="mt-2 text-[11px] text-muted-foreground">
@@ -176,25 +176,15 @@ function StateLine({ state }: { state: LookupState }) {
     return (
       <p className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-primary">
         <Loader2 className="h-3.5 w-3.5 animate-spin" />
-        Vérification auprès du registre Tontine Digital…
-      </p>
-    );
-  }
-
-  if (state === "not-found") {
-    return (
-      <p className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-destructive">
-        <X className="h-3.5 w-3.5" />
-        Aucun groupe trouvé. Le code peut être révoqué, expiré ou mal saisi.
+        Adhésion en cours…
       </p>
     );
   }
 
   return (
-    <p className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-success">
-      <ShieldCheck className="h-3.5 w-3.5" />
-      Code valide · prospectus chargé ci-dessous.
-      <ArrowRight className="h-3.5 w-3.5" />
+    <p className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-destructive">
+      <X className="h-3.5 w-3.5" />
+      {errorMsg ?? "Erreur."}
     </p>
   );
 }
