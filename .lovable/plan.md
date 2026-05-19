@@ -1,65 +1,120 @@
-# Diagnostic de l'inscription
+## 1. Audit de l'existant
 
-J'ai créé un compte test depuis `/auth`. La requête `POST /auth/v1/signup` renvoie :
+### Ce qui est réellement fonctionnel (branché à la BDD)
+- **Authentification** : signup / login / logout via Lovable Cloud, `mapAuthError` FR, redirection `/dashboard`.
+- **Schéma DB** : `profiles`, `user_roles` (enum `admin | organisateur | participant`), fonction `has_role` SECURITY DEFINER, trigger `handle_new_user` qui crée profil + rôle `participant` par défaut, RLS activée.
+- **Garde de routes** : `ProtectedRoute` + `RoleGuard` (utilisé sur le bloc "État des cotisations" du dashboard).
+- **Formulaire profil** : `ProfileUpdateForm` (full_name + phone_number) RLS-safe.
 
+### Ce qui est UI seulement (mock-data, non persistant)
+Toutes les pages métier lisent `src/lib/mock-data.ts` :
+- `Dashboard` (KPIs, transactions, échéances, statut membres temps réel)
+- `MyGroups`, `GroupDetail`, `CreateGroup` (wizard 5 étapes), `JoinGroup`, `InviteMembers`
+- `Contributions`, `Rotations`, `History`, `Calendar`, `Notifications`, `Settings`
+- `PaymentModal` (simulation Orange/MTN, aucun appel réseau)
+
+### Lacunes critiques pour un produit utilisable
+1. Aucune table métier (groupes, membres, cotisations, tours, transactions, notifications).
+2. Création de groupe non persistée → boutons "Créer" sans effet réel.
+3. Aucun système d'invitation réel (code/lien non vérifié serveur).
+4. Aucune intégration paiement, même en mode "simulation traçable".
+5. Aucune logique de rotation automatique ni de calcul du score de fiabilité.
+6. Pas de notifications (ni in-app ni email/SMS).
+7. Page d'accueil `/` publique = mock — pas de landing claire pour visiteurs non connectés.
+8. Aucun rôle attribué à l'organisateur lorsqu'il crée un groupe (tout le monde reste `participant`).
+
+## 2. Définition du MVP
+
+Objectif MVP : **un organisateur peut créer un groupe, inviter des membres, recevoir leurs cotisations (mode simulation traçable) et déclencher la rotation, avec preuve complète côté BDD.**
+
+### Périmètre inclus dans le MVP
+
+**MVP-1 — Comptes & profils** (déjà ~80% fait)
+- Auth email/mot de passe ✓
+- Profil éditable (nom, téléphone) ✓
+- Score de fiabilité (lecture seule, calculé serveur)
+
+**MVP-2 — Groupes**
+- Créer un groupe (nom, description, montant, fréquence, nb membres, ordre de rotation)
+- Devenir automatiquement `organisateur` sur ce groupe (rôle scoped au groupe, pas global)
+- Lister mes groupes (en tant que membre ou organisateur)
+- Page détail d'un groupe : membres, paramètres, tour en cours
+
+**MVP-3 — Invitations**
+- Générer un code d'invitation unique côté serveur
+- Rejoindre un groupe via le code (vérification serveur)
+- L'organisateur voit / révoque les invitations en attente
+
+**MVP-4 — Cycle & rotation**
+- Démarrer un cycle quand le groupe est plein
+- Génération automatique de l'ordre (aléatoire ou manuel)
+- Tour courant visible, prochain bénéficiaire identifié
+
+**MVP-5 — Cotisations (mode simulation, traçable)**
+- Échéances générées automatiquement à chaque période
+- Un membre marque sa cotisation comme payée (référence transaction Mobile Money saisie manuellement OU bouton "Simuler paiement")
+- L'organisateur confirme la réception
+- Historique des transactions par membre et par groupe
+- Note : intégration API Orange/MTN repoussée en post-MVP, mais le modèle de données est prêt à l'accueillir
+
+**MVP-6 — Versement de la cagnotte**
+- Quand toutes les cotisations du tour sont confirmées, marquer le tour comme "versé" au bénéficiaire (référence de versement)
+- Passage automatique au tour suivant
+
+**MVP-7 — Notifications in-app**
+- Échéance à venir, cotisation reçue, tour versé, invitation reçue
+- Inbox `/notifications` alimentée par la BDD
+
+**MVP-8 — Landing publique**
+- `/` devient une vraie landing (proposition de valeur, CTA → `/auth`) pour visiteurs non connectés
+
+### Hors MVP (post-V1)
+- Intégration réelle API Orange Money / MTN Mobile Money
+- Notifications SMS / Email / Push
+- App mobile native (React Native) — le web responsive suffit pour le MVP
+- Enchères, swaps de tour, KYC avancé, pénalités automatiques
+- Tableau d'administration plateforme
+- Annuaire public de groupes
+- Multi-cycles / re-démarrage automatique
+
+## 3. Plan d'avancement proposé
+
+```text
+Phase A — Fondations data (1 étape)
+  A1. Schéma BDD complet : groups, group_members, invitations,
+      cycles, turns, contributions, transactions, notifications
+      + RLS par groupe (helper is_group_member, is_group_organizer)
+  A2. Brancher useAuth → rôles scoped par groupe (pas seulement global)
+
+Phase B — Création & adhésion (MVP-2, MVP-3)
+  B1. CreateGroup → vraie insertion + redirection /groupes/:id
+  B2. MyGroups → query réelle
+  B3. GroupDetail → query réelle (membres, paramètres)
+  B4. Invitations : génération code, page JoinGroup fonctionnelle
+
+Phase C — Cycle & cotisations (MVP-4, MVP-5, MVP-6)
+  C1. Démarrage cycle + génération ordre rotation
+  C2. Génération des échéances par tour
+  C3. PaymentModal → enregistre une contribution (mode simulation)
+  C4. Confirmation organisateur + passage tour suivant
+
+Phase D — Surface utilisateur (MVP-7, MVP-8)
+  D1. Notifications branchées sur BDD
+  D2. Dashboard / Contributions / History / Calendar : remplacer
+      mock-data par queries réelles
+  D3. Landing publique sur /
+
+Phase E — Qualité
+  E1. Score de fiabilité (fonction SQL recalculée à chaque cotisation)
+  E2. Audit RLS complet + tests de privilege escalation
+  E3. États vides, erreurs réseau, loading skeletons partout
 ```
-HTTP 429 — x-sb-error-code: over_email_send_rate_limit
-{"code":"over_email_send_rate_limit","message":"email rate limit exceeded"}
-```
 
-**Cause** : dans ton projet Supabase, "Confirm email" est activé mais aucun SMTP custom n'est configuré → le SMTP par défaut de Supabase est plafonné à ~3-4 emails/heure, et la limite est atteinte. Le code front fait son travail, le bloquant est la config Supabase + l'absence de gestion fine de ce cas.
+## 4. Décisions à valider avant de coder
 
-Un second risque latent : si la migration SQL `db/init_auth_roles.sql` n'a pas été exécutée, le trigger `handle_new_user` n'existe pas et chaque signup réussi renvoie `Database error saving new user`. À vérifier en parallèle.
+1. **Rôles** : on garde `admin | organisateur | participant` **global**, et on ajoute un rôle **par groupe** dans `group_members.role` (organisateur/membre). OK ?
+2. **Paiements MVP** : on part bien sur **mode simulation traçable** (saisie référence Mobile Money + bouton "simuler") pour la soutenance, et l'intégration API Orange/MTN est planifiée séparément ?
+3. **Notifications MVP** : in-app uniquement (pas de SMS/email pour la V1) ?
+4. **Landing** `/` : on remplace la page actuelle par une vraie landing publique avec CTA `/auth`, ou on garde l'accès direct dashboard si connecté ?
 
----
-
-# Plan d'action
-
-## 1. Débloquer l'inscription côté Supabase (action utilisateur, 30 s)
-
-Deux options au choix (je détaillerai dans le chat après approbation) :
-
-- **Recommandé pour tester maintenant** : Supabase Dashboard → Authentication → Providers → Email → décocher **"Confirm email"**. Les nouveaux comptes seront actifs immédiatement.
-- **Pour la prod** : configurer un SMTP custom (Resend, Brevo, SendGrid) dans Authentication → Emails → SMTP Settings.
-
-Et vérifier que `db/init_auth_roles.sql` a bien été exécuté dans le SQL Editor (tables `profiles`, `user_roles`, fonction `has_role`, trigger `on_auth_user_created`).
-
-## 2. Robustifier le flux d'auth (code)
-
-Fichier `src/hooks/useAuth.tsx` :
-- Étendre `mapAuthError` : gérer `over_email_send_rate_limit`, `email_address_invalid`, `weak_password`, `Database error saving new user`, `signups not allowed`.
-- `signUp` retourne aussi `needsEmailConfirmation: boolean` (true si `data.session === null && data.user !== null`) pour permettre un message UX adapté.
-- Auto-sign-in après `signUp` si une session est déjà fournie (cas "Confirm email" désactivé).
-
-Fichier `src/pages/Auth.tsx` :
-- Après `signUp` réussi : si `needsEmailConfirmation`, afficher un message "Vérifie ta boîte mail pour confirmer" et basculer sur l'onglet Connexion ; sinon, rediriger directement vers `/dashboard`.
-- Désactiver le bouton pendant 30 s après une erreur de rate limit pour éviter la boucle.
-
-## 3. Formulaire de mise à jour du profil (post-login, RLS-safe)
-
-Nouveau composant `src/components/profile/ProfileUpdateForm.tsx` :
-- Champs : `full_name` (requis, 2-100, trim), `phone_number` (optionnel, regex E.164 souple `^\+?[0-9\s\-]{6,20}$`).
-- Validation Zod, messages d'erreur français, `toast` succès/erreur.
-- Chargement initial via `supabase.from('profiles').select('full_name, phone_number').eq('id', user.id).single()`.
-- Soumission via `supabase.from('profiles').update({ full_name, phone_number }).eq('id', user.id)` — autorisée par la policy `profiles_update_own` (`auth.uid() = id`), donc strictement RLS-safe.
-- État `loading` initial, `saving` à la soumission, bouton désactivé tant que pas modifié.
-
-Intégration : remplacer le bouton "Modifier le profil" de `src/pages/Profile.tsx` par l'ouverture d'un `Dialog` contenant `ProfileUpdateForm`, OU monter le formulaire directement dans l'onglet **Identité & KYC** (préférable, plus visible). Je choisirai la 2e option sauf indication contraire.
-
-La route `/profile` est déjà derrière `ProtectedRoute` → exigence "accessible après connexion" satisfaite.
-
-## 4. Vérification finale
-
-Après les changements et la config Supabase :
-- Recréer un compte depuis `/auth` (email frais) → doit arriver sur `/dashboard`.
-- Aller sur `/profile`, modifier nom + téléphone, recharger → valeurs persistées.
-- Vérifier en SQL : `select id, full_name, phone_number from public.profiles where id = auth.uid();`
-
----
-
-# Détails techniques
-
-- Pas de changement de schéma DB nécessaire — la migration existante couvre tout.
-- Pas de nouvelles dépendances (Zod, supabase-js, shadcn Dialog déjà présents).
-- Aucune logique métier déplacée côté client sensible : la sécurité reste portée par les policies RLS (`profiles_update_own` filtre déjà par `auth.uid()`).
-- `useAuth` rafraîchira `roles` automatiquement après login via `onAuthStateChange` (déjà en place).
+Dès que tu valides ces 4 points (ou que tu m'indiques tes préférences), je passe en mode build et j'attaque la **Phase A** (schéma BDD + RLS) en premier.
