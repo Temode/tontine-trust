@@ -8,6 +8,12 @@ import { joinWithCode } from "@/lib/api/invitations";
 
 type LookupState = "idle" | "checking" | "error";
 
+interface CodeEntryHeroProps {
+  onMatch?: (group: unknown) => void;
+  onClear?: () => void;
+  matchedCode?: string;
+}
+
 /**
  * Auto-format an input string into the canonical TD-XXXX-XXXX shape.
  * Strips anything outside [A-Z0-9] and reinjects the prefix + dashes.
