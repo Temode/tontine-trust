@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { ArrowRight, CheckCircle2, Copy, ShieldCheck } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { createGroup } from "@/lib/api/groups";
 import { createInvitation } from "@/lib/api/invitations";
@@ -28,7 +28,6 @@ export default function CreateGroup() {
   const [consent, setConsent] = useState(false);
   const [state, setState] = useState<WizardState>("drafting");
   const [createdGroupId, setCreatedGroupId] = useState<string | null>(null);
-  const navigate = useNavigate();
 
   const totalSteps = STEPS.length;
   const derived = useMemo(() => deriveFromDraft(draft), [draft]);
