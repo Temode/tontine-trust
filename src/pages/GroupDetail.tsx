@@ -1,12 +1,18 @@
 import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Calendar, CheckCircle2, MoreVertical, Star, Wallet, X } from "lucide-react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { formatGNF, formatRelativeDays } from "@/lib/format";
-import { getGroupById, members, transactions } from "@/lib/mock-data";
+import { transactions } from "@/lib/mock-data";
+import { getGroup } from "@/lib/api/groups";
+import { listGroupMembers } from "@/lib/api/members";
+import { FREQ_TO_DB } from "@/lib/api/types";
+import type { DbGroup, DbGroupMember } from "@/lib/api/types";
 import { PaymentModal } from "@/components/payment/PaymentModal";
 import { SectionCard } from "@/components/dashboard/SectionCard";
-import type { Member, TontineGroup } from "@/lib/types";
+import type { TontineGroup } from "@/lib/types";
+import { getInitials } from "@/lib/format";
 
 type Section = "overview" | "members" | "history";
 
@@ -16,28 +22,72 @@ const tabs: Array<{ id: Section; label: string }> = [
   { id: "history", label: "Historique" },
 ];
 
+const FREQ_FROM_DB: Record<string, "Mensuelle" | "Hebdomadaire" | "Quinzaine"> = {
+  mensuelle: "Mensuelle",
+  hebdomadaire: "Hebdomadaire",
+  quinzaine: "Quinzaine",
+};
+
+function dbToTontine(g: DbGroup, membersCount: number): TontineGroup {
+  return {
+    id: g.id,
+    name: g.name,
+    members: g.max_members,
+    contribution: g.contribution_amount,
+    frequency: FREQ_FROM_DB[g.frequency] ?? "Mensuelle",
+    nextPaymentDate: "—",
+    progress: 0,
+    currentTurn: "—",
+    yourTurn: 0,
+    status: g.status === "completed" ? "completed" : g.status === "active" ? "active" : "pending",
+    totalCollected: g.contribution_amount * membersCount,
+    rules: [],
+    role: "participant",
+    averageScore: 0,
+    startedOn: new Date(g.created_at).toLocaleDateString("fr-FR"),
+  };
+}
+
 export default function GroupDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const group = id ? getGroupById(id) : undefined;
   const [section, setSection] = useState<Section>("overview");
   const [paymentOpen, setPaymentOpen] = useState(false);
 
-  if (!group) {
+  const groupQ = useQuery({
+    queryKey: ["group", id],
+    queryFn: () => getGroup(id as string),
+    enabled: !!id,
+  });
+  const membersQ = useQuery({
+    queryKey: ["group", id, "members"],
+    queryFn: () => listGroupMembers(id as string),
+    enabled: !!id,
+  });
+
+  void FREQ_TO_DB;
+
+  if (groupQ.isLoading) {
+    return <div className="px-6 py-12 text-sm text-muted-foreground">Chargement…</div>;
+  }
+
+  if (!groupQ.data) {
     return (
       <div className="flex min-h-[60vh] flex-col items-center justify-center px-6 text-center">
         <h2 className="font-display text-lg font-bold text-foreground">Groupe introuvable</h2>
         <p className="mt-1 text-sm text-muted-foreground">Ce groupe n'existe pas ou a été supprimé.</p>
         <Link
-          to="/dashboard"
+          to="/groupes"
           className="mt-6 rounded-md bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground"
         >
-          Retour au tableau de bord
+          Retour à mes groupes
         </Link>
       </div>
     );
   }
 
+  const dbMembers = membersQ.data ?? [];
+  const group = dbToTontine(groupQ.data, dbMembers.length);
   const turnsCompleted = Math.round((group.progress / 100) * group.members);
   const turnPayout = group.contribution * group.members;
   const daysToPayment = 5;
@@ -149,7 +199,7 @@ export default function GroupDetail() {
               onPay={() => setPaymentOpen(true)}
             />
           )}
-          {section === "members" && <MembersTab members={members} />}
+          {section === "members" && <MembersTab members={dbMembers} />}
           {section === "history" && <HistoryTab groupId={group.id} />}
         </div>
       </div>
@@ -242,55 +292,46 @@ function OverviewTab({ group, currentTurnIndex, turnPayout, daysToPayment, onPay
   );
 }
 
-function MembersTab({ members }: { members: Member[] }) {
+function MembersTab({ members }: { members: DbGroupMember[] }) {
   return (
     <SectionCard title="Membres du groupe" subtitle={`${members.length} participants`} bare>
       <ul className="divide-y divide-border/60">
-        {members.map((member) => (
-          <li
-            key={member.id}
-            className={cn(
-              "flex items-center gap-3 px-5 py-3.5 lg:px-6",
-              member.isYou && "bg-primary-50/40",
-            )}
-          >
-            <div
-              className={cn(
-                "flex h-10 w-10 items-center justify-center rounded-lg text-sm font-bold",
-                member.isYou ? "bg-primary text-primary-foreground" : "bg-secondary text-foreground",
-              )}
-            >
-              {member.initials}
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <p className="truncate text-sm font-semibold text-foreground">{member.name}</p>
-                {member.isYou && (
-                  <span className="rounded-full bg-primary-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-primary">
-                    Vous
-                  </span>
-                )}
+        {members.map((m) => {
+          const name = m.profile?.full_name?.trim() || "Membre";
+          const initials = getInitials(name) || "··";
+          return (
+            <li key={m.id} className="flex items-center gap-3 px-5 py-3.5 lg:px-6">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-secondary text-sm font-bold text-foreground">
+                {initials}
               </div>
-              <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
-                <span>Tour #{member.turn}</span>
-                <span>·</span>
-                <span className="inline-flex items-center gap-1">
-                  <Star className="h-3 w-3 fill-accent-500 text-accent-500" />
-                  <span className="num">{member.reliabilityScore}%</span>
-                </span>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <p className="truncate text-sm font-semibold text-foreground">{name}</p>
+                  {m.role === "organisateur" && (
+                    <span className="rounded-full bg-accent-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-accent-700">
+                      Organisateur
+                    </span>
+                  )}
+                </div>
+                <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
+                  {m.position != null && <span>Position #{m.position}</span>}
+                  {m.profile?.phone_number && (
+                    <>
+                      <span>·</span>
+                      <span className="num">{m.profile.phone_number}</span>
+                    </>
+                  )}
+                </div>
               </div>
-            </div>
-            <span
-              aria-label={member.paid ? "Cotisation payée" : "En attente de paiement"}
-              className={cn(
-                "flex h-7 w-7 items-center justify-center rounded-full",
-                member.paid ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive",
-              )}
-            >
-              {member.paid ? <CheckCircle2 className="h-4 w-4" /> : <X className="h-4 w-4" />}
-            </span>
+              <Star className="h-4 w-4 text-muted-foreground/40" />
+            </li>
+          );
+        })}
+        {members.length === 0 && (
+          <li className="px-5 py-6 text-sm text-muted-foreground lg:px-6">
+            Aucun membre pour le moment.
           </li>
-        ))}
+        )}
       </ul>
     </SectionCard>
   );
