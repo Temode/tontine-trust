@@ -1,13 +1,12 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Calendar, CheckCircle2, MoreVertical, Star, Wallet, X } from "lucide-react";
+import { ArrowLeft, Calendar, CheckCircle2, MoreVertical, Star, Wallet } from "lucide-react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { formatGNF, formatRelativeDays } from "@/lib/format";
 import { transactions } from "@/lib/mock-data";
 import { getGroup } from "@/lib/api/groups";
 import { listGroupMembers } from "@/lib/api/members";
-import { FREQ_TO_DB } from "@/lib/api/types";
 import type { DbGroup, DbGroupMember } from "@/lib/api/types";
 import { PaymentModal } from "@/components/payment/PaymentModal";
 import { SectionCard } from "@/components/dashboard/SectionCard";
@@ -64,8 +63,6 @@ export default function GroupDetail() {
     queryFn: () => listGroupMembers(id as string),
     enabled: !!id,
   });
-
-  void FREQ_TO_DB;
 
   if (groupQ.isLoading) {
     return <div className="px-6 py-12 text-sm text-muted-foreground">Chargement…</div>;
