@@ -2,6 +2,8 @@ import { useMemo, useState } from "react";
 import { ArrowRight, CheckCircle2, Copy, ShieldCheck } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
+import { createGroup } from "@/lib/api/groups";
+import { createInvitation } from "@/lib/api/invitations";
 import { TopBar } from "@/components/layout/TopBar";
 import { StepIdentity } from "@/components/create-group/StepIdentity";
 import { StepFinancials } from "@/components/create-group/StepFinancials";
@@ -25,6 +27,7 @@ export default function CreateGroup() {
   const [completed, setCompleted] = useState<number[]>([]);
   const [consent, setConsent] = useState(false);
   const [state, setState] = useState<WizardState>("drafting");
+  const [createdGroupId, setCreatedGroupId] = useState<string | null>(null);
 
   const totalSteps = STEPS.length;
   const derived = useMemo(() => deriveFromDraft(draft), [draft]);
@@ -41,16 +44,29 @@ export default function CreateGroup() {
     if (target <= step || completed.includes(target)) setStep(target);
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (state !== "drafting") return;
     setState("submitting");
     setCompleted((prev) => Array.from(new Set([...prev, ...STEPS.map((s) => s.id)])));
-    window.setTimeout(() => {
+    try {
+      const { group } = await createGroup(draft);
+      // Crée l'invitation initiale avec le code généré dans le wizard.
+      try {
+        await createInvitation({ groupId: group.id, code: draft.inviteCode });
+      } catch {
+        // si collision sur le code, en génère un nouveau côté serveur
+        await createInvitation({ groupId: group.id });
+      }
+      setCreatedGroupId(group.id);
       setState("issued");
       toast.success("Groupe émis", {
         description: `${draft.name} a été créé. Le code d'invitation est actif.`,
       });
-    }, 1400);
+    } catch (e) {
+      setState("drafting");
+      const msg = e instanceof Error ? e.message : "Erreur inconnue";
+      toast.error("Création impossible", { description: msg });
+    }
   };
 
   const handleCopyCode = () => {
@@ -71,7 +87,12 @@ export default function CreateGroup() {
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_360px]">
           <div>
             {state === "issued" ? (
-              <IssuedConfirmation draft={draft} cagnotte={derived.cagnotte} onCopyCode={handleCopyCode} />
+              <IssuedConfirmation
+                draft={draft}
+                cagnotte={derived.cagnotte}
+                onCopyCode={handleCopyCode}
+                groupId={createdGroupId}
+              />
             ) : (
               <>
                 {step === 1 && (
@@ -148,9 +169,10 @@ interface IssuedConfirmationProps {
   draft: GroupDraft;
   cagnotte: number;
   onCopyCode: () => void;
+  groupId: string | null;
 }
 
-function IssuedConfirmation({ draft, cagnotte, onCopyCode }: IssuedConfirmationProps) {
+function IssuedConfirmation({ draft, cagnotte, onCopyCode, groupId }: IssuedConfirmationProps) {
   return (
     <article className="rounded-xl border border-hairline bg-card">
       <header className="flex items-start gap-4 border-b border-hairline bg-success/5 px-5 py-6 lg:px-7">
@@ -205,10 +227,10 @@ function IssuedConfirmation({ draft, cagnotte, onCopyCode }: IssuedConfirmationP
 
       <footer className="flex flex-wrap items-center justify-end gap-2 border-t border-hairline bg-secondary/30 px-5 py-4 lg:px-7">
         <Link
-          to="/groupes"
+          to={groupId ? `/groupes/${groupId}` : "/groupes"}
           className="inline-flex h-10 items-center gap-1.5 rounded-md border border-hairline px-4 text-sm font-medium text-foreground transition hover:bg-secondary"
         >
-          Voir mes groupes
+          Voir le groupe
         </Link>
         <Link
           to="/inviter"
