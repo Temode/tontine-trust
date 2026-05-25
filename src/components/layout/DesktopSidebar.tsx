@@ -6,6 +6,7 @@ import {
   User,
   UserPlus,
   Users,
+  Wallet,
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { Logo } from "@/components/brand/Logo";
@@ -31,6 +32,7 @@ const sections: NavSection[] = [
     items: [
       { to: "/dashboard", label: "Tableau de bord", icon: LayoutDashboard },
       { to: "/groupes", label: "Mes groupes", icon: Users },
+      { to: "/cotisations", label: "Mes cotisations", icon: Wallet },
       { to: "/profil", label: "Mon profil", icon: User },
     ],
   },
