@@ -16,6 +16,7 @@ import JoinGroup from "@/pages/JoinGroup";
 import MyGroups from "@/pages/MyGroups";
 import MyContributions from "@/pages/MyContributions";
 import Receipts from "@/pages/Receipts";
+import Notifications from "@/pages/Notifications";
 import NotFound from "@/pages/NotFound";
 import Profile from "@/pages/Profile";
 const queryClient = new QueryClient();
@@ -44,6 +45,7 @@ const App = () => (
                 <Route path="/cotisations" element={<MyContributions />} />
                 <Route path="/recus" element={<Receipts />} />
                 <Route path="/recus/:id" element={<Receipts />} />
+                <Route path="/notifications" element={<Notifications />} />
                 <Route path="/nouveau" element={<CreateGroup />} />
                 <Route path="/rejoindre" element={<JoinGroup />} />
                 <Route path="/inviter" element={<InviteMembers />} />
