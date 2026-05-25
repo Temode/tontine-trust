@@ -155,8 +155,8 @@ begin
     where cycle_id = v_turn.cycle_id and status <> 'paid';
 
   if v_remaining_turns = 0 then
-    update public.cycles set status = 'completed', ended_at = now()
-      where id = v_turn.cycle_id and status <> 'completed';
+    update public.cycles set ended_at = now()
+      where id = v_turn.cycle_id and ended_at is null;
     -- on ne ferme pas automatiquement le groupe (relance possible nouveau cycle)
   end if;
 
