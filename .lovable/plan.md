@@ -1,73 +1,124 @@
-# Audit du menu et des pages — préparation au lancement MVP
+# Parcours utilisateur Tontine Digital — découpage par phases
 
-## Constat
+Contexte clé : usage réel, vrai argent. Donc chaque étape doit être robuste, traçable, auditable. Pas de mock dans les flux financiers. On avance phase par phase, on ne passe à la suivante que quand la précédente est solide.
 
-Le menu (`DesktopSidebar` + `BottomNav`) expose **13 routes**, dont **10 pages encore alimentées à 100 % par `mock-data`**. Pour un MVP centré sur **création de groupe + invitation + rotation auto + traçabilité + score de fiabilité**, c'est trop. L'utilisateur clique partout et tombe sur des écrans factices → confusion, non livrable.
+---
 
-Pilier déjà connecté à la BDD (Phase B) : `Dashboard`, `MyGroups`, `GroupDetail`, `CreateGroup`, `JoinGroup`, `InviteMembers`.
-
-## Audit page par page
-
-| Route | Fichier | État | Décision MVP |
-|---|---|---|---|
-| `/dashboard` | Dashboard.tsx | Réel (Phase B) | **Garder** |
-| `/groupes` | MyGroups.tsx | Réel | **Garder** |
-| `/groupes/:id` | GroupDetail.tsx | Partiel réel | **Garder** |
-| `/nouveau` | CreateGroup.tsx | Réel | **Garder** |
-| `/rejoindre` | JoinGroup.tsx | Réel (RPC) | **Garder** |
-| `/inviter` | InviteMembers.tsx | Réel | **Fusionner dans `/groupes/:id`** (déjà accessible via le détail) → retirer du menu |
-| `/profil` | Profile.tsx | Mock (KYC, mandats, sécurité…) | **Garder en version minimale** (nom, téléphone, déconnexion, score). Retirer KycPanel, MandatesPanel, DangerZone, ReliabilityBreakdown, TrackRecordStrip, ProfileActivity. |
-| `/cotisations` | Contributions.tsx | 100 % mock | **Retirer** (Phase D — paiements) |
-| `/rotations` | Rotations.tsx | 100 % mock | **Retirer** (Phase C — données pas prêtes) |
-| `/historique` | History.tsx | 100 % mock | **Retirer** (Phase D) |
-| `/calendrier` | Calendar.tsx | 100 % mock | **Retirer** (post-MVP) |
-| `/notifications` | Notifications.tsx | 100 % mock | **Retirer** (notifications in-app pas encore branchées) |
-| `/parametres` | Settings.tsx | 100 % mock (abonnement, API, conformité…) | **Retirer** (hors MVP) |
-
-## Menu cible (MVP)
+## Parcours utilisateur complet (de l'inscription au cycle terminé)
 
 ```text
-Menu principal
-  • Tableau de bord     /dashboard
-  • Mes groupes         /groupes
-  • Mon profil          /profil
+1.  Découverte         → page d'accueil publique, explication, CTA "S'inscrire"
+2.  Inscription        → numéro de téléphone + OTP SMS, nom, PIN
+3.  Profil             → photo, vérification d'identité (optionnelle MVP)
+4.  Onboarding         → 2 choix : "Créer un groupe" ou "Rejoindre avec un code"
 
-Actions rapides
-  • Créer un groupe     /nouveau
-  • Rejoindre un groupe /rejoindre
+— Branche A : Organisateur —
+5A. Création groupe    → nom, montant, fréquence, nb membres, règles rotation/pénalités
+6A. Code d'invitation  → généré, partageable (SMS, WhatsApp, lien)
+7A. Attente quorum     → suivi des inscriptions, relance, validation/refus des candidats
+8A. Démarrage cycle    → tirage de l'ordre de rotation, planification du 1er tour
+
+— Branche B : Participant —
+5B. Saisie code        → prospectus du groupe (règles, organisateur, score)
+6B. Candidature        → demande d'adhésion, attente validation
+7B. Confirmation       → notification, accès au groupe
+
+— Tronc commun (cycle actif) —
+9.  Notification J-2   → "votre cotisation est due le ..."
+10. Paiement           → Orange Money / MTN Money via redirection ou USSD
+11. Confirmation paiement → reçu numérique horodaté, mise à jour du tableau de bord
+12. Collecte complète  → toutes les cotisations reçues → cagnotte constituée
+13. Versement bénéficiaire → transfert Mobile Money automatique vers le bénéficiaire du tour
+14. Reçu de versement  → preuve cryptographique, journal d'audit
+15. Tour suivant       → boucle 9-14 jusqu'à ce que tous les membres aient reçu
+16. Fin de cycle       → bilan, score de fiabilité mis à jour, option "relancer un cycle"
+
+— Transverse —
+*   Profil & score de fiabilité (ponctualité, ancienneté)
+*   Historique / registre immuable
+*   Notifications (push, SMS)
+*   Litiges & support
 ```
 
-`BottomNav` mobile aligné : Accueil · Groupes · Créer (FAB) · Profil (4 entrées au lieu de 5 ; retrait d'Historique).
+---
 
-Les routes retirées du menu **restent dans `App.tsx`** pour ne rien casser, mais ne sont plus accessibles via la navigation. On les supprimera réellement plus tard quand on saura quoi en faire — ou on peut les supprimer maintenant si tu préfères un nettoyage radical (voir Question).
+## Découpage en phases (ce qu'on va construire)
 
-## Travaux concrets
+### Phase 1 — Comptes & identité (socle)
+Ce qui existe déjà : email/password via Lovable Cloud. À remplacer/compléter pour usage réel.
+- Inscription par **numéro de téléphone + OTP SMS** (vrai SMS, pas mock)
+- PIN à 4-6 chiffres pour reconnexion rapide
+- Profil minimal : nom, téléphone, photo
+- Page `/profil` : afficher info réelles + déconnexion (déjà MVP)
+- **Score de fiabilité** : table dédiée, calcul automatique (départ 100%, ajusté à chaque cycle)
 
-1. **`DesktopSidebar.tsx`** — réduire `sections` aux 5 entrées ci-dessus. Retirer badge mock `3`, dot notifications, `currentUser` mock du bas (utiliser `useAuth` réel).
-2. **`BottomNav.tsx`** — remplacer Historique par Profil ; garder 5 slots (Accueil, Groupes, Créer FAB, Profil … 4e ?). À trancher : 4 entrées suffisent (Accueil, Groupes, Créer, Profil).
-3. **`Profile.tsx`** — réécriture light : carte identité (nom, téléphone, email depuis `useAuth`), score fiabilité (mock 100 %), bouton « Se déconnecter ». Supprimer imports KYC/mandats/danger/activity.
-4. **`App.tsx`** — option A : garder toutes les routes (sécurité) ; option B : supprimer les routes retirées + supprimer les fichiers `Calendar.tsx`, `Contributions.tsx`, `Rotations.tsx`, `History.tsx`, `Notifications.tsx`, `Settings.tsx`, `InviteMembers.tsx`. Recommandé : **option B** pour livrer propre.
-5. **`InviteMembers`** — reste accessible depuis `GroupDetail` (bouton « Inviter ») via une modale ou redirection ; à confirmer.
+### Phase 2 — Groupes (déjà en place, à durcir)
+État : création, invitation par code, adhésion fonctionnent (Phase B livrée).
+À compléter :
+- Validation/refus des candidatures par l'organisateur (workflow complet)
+- Quorum atteint → bouton "Démarrer le cycle" → tirage rotation persisté en base
+- Affichage clair de l'ordre des bénéficiaires dans `/groupes/:id`
 
-## Détails techniques
+### Phase 3 — Rotation & calendrier (cœur métier)
+- Génération automatique du calendrier des tours à partir de la fréquence
+- Table `rounds` : un enregistrement par tour, avec bénéficiaire, date prévue, statut
+- Vue "Prochain tour" sur le dashboard (remplacer le placeholder actuel)
+- Possibilité d'**échange de tours** entre membres avec accord (politique du groupe)
 
-- Pas de migration BDD nécessaire.
-- Pas de nouveau composant à créer.
-- Suppressions de fichiers en option B :
-  - `src/pages/{Calendar,Contributions,Rotations,History,Notifications,Settings,InviteMembers}.tsx`
-  - Dossiers `src/components/{calendar,contributions,rotations,history,notifications,settings,invite-members}/` (sauf si réutilisés ailleurs — à vérifier)
-- `mock-data.ts` allégé en conséquence (à faire en dernier).
+### Phase 4 — Paiements Mobile Money (le vrai sujet vrai argent)
+**Le plus critique. À traiter avec le plus grand soin.**
+- Intégration **Orange Money Guinée** (API officielle ou agrégateur type CinetPay, PayDunya, FedaPay)
+- Intégration **MTN MoMo Guinée**
+- Flux : déclencher une demande de paiement → l'utilisateur valide sur son téléphone → webhook de confirmation → enregistrement transaction
+- Table `contributions` : statut (pending/paid/failed/refunded), référence opérateur, horodatage
+- **Idempotence** obligatoire (pas de double prélèvement)
+- Mode sandbox d'abord, puis bascule live après validation
 
-## Validation
+### Phase 5 — Versement bénéficiaire (payout)
+- Une fois toutes les cotisations d'un tour reçues → déclenchement automatique du payout via API Mobile Money
+- Reçu numérique signé (PDF + entrée registre)
+- Cas d'erreur : retry, escalade à l'organisateur, journal complet
 
-1. Le menu n'expose que des pages réelles et fonctionnelles.
-2. Aucun clic ne mène à un écran 100 % mock.
-3. Build vert, aucune route cassée.
-4. App prête à être présentée comme MVP.
+### Phase 6 — Traçabilité & registre
+- Journal d'audit immuable de chaque action sensible (création, paiement, versement, échange)
+- Export CSV/PDF des relevés pour chaque membre et chaque groupe
+- Vue "Historique" par groupe (uniquement quand il y a de vraies données — pas avant)
 
-## Questions avant build
+### Phase 7 — Notifications réelles
+- SMS via le même provider que l'OTP : rappels J-2, confirmation paiement, notification versement
+- Push web (optionnel) si on garde le web
 
-- **Option A (sûr) ou B (radical)** pour les pages retirées ? Je recommande **B**.
-- `InviteMembers` : transformer en modale dans `GroupDetail`, ou laisser une route `/groupes/:id/inviter` non listée au menu ?
+### Phase 8 — Score de fiabilité (recalcul live)
+- Algorithme basé sur : % de paiements à temps, ancienneté, nombre de cycles complétés
+- Affichage sur le profil et visible par les organisateurs lors de la validation d'une candidature
 
-Dis « go B + modale » (ou ta variante) pour que je passe en build.
+### Phase 9 — Conformité & sécurité avant lancement
+- KYC léger (au moins vérification identité pour l'organisateur de gros groupes)
+- Limites de montants
+- Conditions générales, mentions légales
+- Audit de sécurité de la base, des RLS, des edge functions de paiement
+
+---
+
+## Questions à trancher avant de commencer la Phase 1
+
+1. **OTP SMS** : quel provider ? Twilio (cher, fiable, international) ou un agrégateur local Guinée moins cher ?
+2. **Mobile Money** : on attaque en direct Orange/MTN (long, contrats à signer) ou via un agrégateur (CinetPay, FedaPay, PayDunya) plus rapide à intégrer ? Recommandation forte : **agrégateur** pour démarrer.
+3. **Périmètre du MVP de lancement** : on lance avec quoi exactement ? Ma proposition :
+   - **MVP v1 (lançable)** : Phases 1, 2, 3, 4, 5, 6 minimum + 7 (SMS) + 9 (légal).
+   - Score de fiabilité (Phase 8) en post-lancement (départ à 100% pour tout le monde).
+   - Échange de tours en post-lancement.
+4. **Web seulement** ou **+ app mobile React Native** au lancement ? La présentation parle des deux mais on a actuellement du web. Recommandation : **lancer en web responsive** (PWA), mobile native plus tard.
+
+---
+
+## Ce que je propose comme prochaine étape concrète
+
+Commencer la **Phase 1 — Comptes & identité** : remplacer l'auth email/password par une auth par téléphone + OTP SMS, avec la table `profiles` enrichie (téléphone vérifié) et la table `reliability_scores`.
+
+Avant que je touche au code, dis-moi :
+- **Quel provider SMS** tu veux qu'on utilise (ou si tu veux que je te fasse une comparaison rapide Twilio vs agrégateur local) ?
+- **OK pour démarrer par la Phase 1** ou tu préfères qu'on attaque autre chose en premier (ex : commencer par sécuriser Phase 2/3 sur l'existant avant de toucher à l'auth) ?
+- **Agrégateur Mobile Money** : je creuse CinetPay / FedaPay / PayDunya pour te faire une reco ?
+
+Une fois ces 3 réponses, je rentre en mode build et on enchaîne phase par phase, chaque phase étant elle-même découpée en sous-étapes vérifiables.
