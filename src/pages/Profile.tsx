@@ -1,125 +1,66 @@
-import { Pencil } from "lucide-react";
+import { LogOut } from "lucide-react";
 import { toast } from "sonner";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useNavigate } from "react-router-dom";
 import { TopBar } from "@/components/layout/TopBar";
-import { DangerZone } from "@/components/profile/DangerZone";
-import { IdentityCard } from "@/components/profile/IdentityCard";
-import { KycPanel } from "@/components/profile/KycPanel";
-import { MandatesPanel } from "@/components/profile/MandatesPanel";
-import { PreferencesPanel } from "@/components/profile/PreferencesPanel";
-import { ProfileActivity } from "@/components/profile/ProfileActivity";
-import { ProfileUpdateForm } from "@/components/profile/ProfileUpdateForm";
-import { ReliabilityBreakdown } from "@/components/profile/ReliabilityBreakdown";
-import { SecurityPanel } from "@/components/profile/SecurityPanel";
-import { TrackRecordStrip } from "@/components/profile/TrackRecordStrip";
-import {
-  getReliabilityBreakdown,
-  groups,
-  kycDocuments,
-  profileActivity,
-  sessionDevices,
-  userProfile,
-} from "@/lib/mock-data";
+import { ReliabilityCard } from "@/components/dashboard/ReliabilityCard";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function Profile() {
-  const factors = getReliabilityBreakdown();
-  const organized = groups.filter((g) => g.role === "organizer").length;
-  const participated = groups.filter((g) => g.role === "participant").length;
+  const { user, signOut } = useAuth();
+  const navigate = useNavigate();
+
+  const fullName =
+    (user?.user_metadata?.full_name as string | undefined) ?? user?.email ?? "Utilisateur";
+  const phone = (user?.user_metadata?.phone_number as string | undefined) ?? "—";
+  const email = user?.email ?? "—";
+  const initials = fullName
+    .split(" ")
+    .map((s) => s[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+
+  const handleSignOut = async () => {
+    await signOut();
+    toast.success("Vous êtes déconnecté.");
+    navigate("/auth", { replace: true });
+  };
 
   return (
     <div className="animate-fade-in">
       <TopBar
         title="Mon profil"
-        subtitle="Identité, conformité, sécurité et préférences sur l'infrastructure Tontine Digital."
-        primaryAction={{
-          label: "Modifier le profil",
-          onClick: () =>
-            toast("Édition rapide", {
-              description: "Utilisez l'onglet Identité & KYC pour des modifications complètes.",
-            }),
-          icon: <Pencil className="h-4 w-4" />,
-        }}
+        subtitle="Vos informations personnelles et votre fiabilité."
       />
 
       <div className="space-y-6 px-5 py-6 lg:px-8 lg:py-8">
-        <IdentityCard
-          profile={userProfile}
-          organizedCount={organized}
-          participantCount={participated}
-          onEdit={() =>
-            toast("Édition rapide", {
-              description: "L'édition complète est dans l'onglet Identité & KYC.",
-            })
-          }
+        <article className="flex items-center gap-4 rounded-xl border border-hairline bg-card p-5">
+          <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-primary text-base font-bold text-primary-foreground">
+            {initials || "?"}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="truncate font-display text-lg font-bold text-foreground">{fullName}</p>
+            <p className="truncate text-sm text-muted-foreground">{email}</p>
+            <p className="truncate text-xs text-muted-foreground">{phone}</p>
+          </div>
+        </article>
+
+        <ReliabilityCard
+          score={100}
+          onTime={{ current: 0, total: 0 }}
+          late={0}
+          memberSince="—"
         />
 
-        <TrackRecordStrip profile={userProfile} />
-
-        <Tabs defaultValue="overview" className="space-y-6">
-          <div className="-mx-5 overflow-x-auto px-5 lg:-mx-8 lg:px-8">
-            <TabsList className="inline-flex h-auto min-w-full justify-start gap-1 rounded-xl border border-hairline bg-card p-1 lg:min-w-0">
-              <TabsTrigger
-                value="overview"
-                className="rounded-lg px-4 py-2 text-sm font-medium data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-soft"
-              >
-                Vue d'ensemble
-              </TabsTrigger>
-              <TabsTrigger
-                value="identity"
-                className="rounded-lg px-4 py-2 text-sm font-medium data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-soft"
-              >
-                Identité & KYC
-              </TabsTrigger>
-              <TabsTrigger
-                value="security"
-                className="rounded-lg px-4 py-2 text-sm font-medium data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-soft"
-              >
-                Sécurité
-              </TabsTrigger>
-              <TabsTrigger
-                value="preferences"
-                className="rounded-lg px-4 py-2 text-sm font-medium data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-soft"
-              >
-                Préférences
-              </TabsTrigger>
-              <TabsTrigger
-                value="activity"
-                className="rounded-lg px-4 py-2 text-sm font-medium data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-soft"
-              >
-                Activité
-              </TabsTrigger>
-            </TabsList>
-          </div>
-
-          <TabsContent value="overview" className="space-y-6">
-            <ReliabilityBreakdown score={userProfile.reliabilityScore} factors={factors} />
-            <MandatesPanel groups={groups} />
-          </TabsContent>
-
-          <TabsContent value="identity" className="space-y-6">
-            <ProfileUpdateForm />
-            <KycPanel profile={userProfile} documents={kycDocuments} />
-          </TabsContent>
-
-          <TabsContent value="security">
-            <SecurityPanel profile={userProfile} devices={sessionDevices} />
-          </TabsContent>
-
-          <TabsContent value="preferences">
-            <PreferencesPanel profile={userProfile} />
-          </TabsContent>
-
-          <TabsContent value="activity" className="space-y-6">
-            <ProfileActivity events={profileActivity} />
-            <DangerZone />
-          </TabsContent>
-        </Tabs>
-
-        <p className="text-[11px] text-muted-foreground">
-          Tontine Digital horodate chaque mise à jour de profil et chaque événement de sécurité sur un
-          registre immuable. Les documents KYC sont chiffrés AES-256 et accessibles uniquement par le
-          service conformité.
-        </p>
+        <button
+          type="button"
+          onClick={handleSignOut}
+          className="inline-flex h-10 items-center gap-2 rounded-md border border-hairline bg-card px-4 text-sm font-semibold text-foreground transition hover:bg-secondary"
+        >
+          <LogOut className="h-4 w-4" />
+          Se déconnecter
+        </button>
       </div>
     </div>
   );

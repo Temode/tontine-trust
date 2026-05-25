@@ -8,20 +8,14 @@ import { AuthProvider } from "@/hooks/useAuth";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Auth from "@/pages/Auth";
 import Index from "@/pages/Index";
-import Calendar from "@/pages/Calendar";
-import Contributions from "@/pages/Contributions";
 import CreateGroup from "@/pages/CreateGroup";
 import Dashboard from "@/pages/Dashboard";
 import GroupDetail from "@/pages/GroupDetail";
-import History from "@/pages/History";
 import InviteMembers from "@/pages/InviteMembers";
 import JoinGroup from "@/pages/JoinGroup";
 import MyGroups from "@/pages/MyGroups";
 import NotFound from "@/pages/NotFound";
-import Notifications from "@/pages/Notifications";
 import Profile from "@/pages/Profile";
-import Rotations from "@/pages/Rotations";
-import Settings from "@/pages/Settings";
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -45,16 +39,10 @@ const App = () => (
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/groupes" element={<MyGroups />} />
                 <Route path="/groupes/:id" element={<GroupDetail />} />
-                <Route path="/cotisations" element={<Contributions />} />
-                <Route path="/rotations" element={<Rotations />} />
-                <Route path="/historique" element={<History />} />
-                <Route path="/calendrier" element={<Calendar />} />
                 <Route path="/nouveau" element={<CreateGroup />} />
                 <Route path="/rejoindre" element={<JoinGroup />} />
                 <Route path="/inviter" element={<InviteMembers />} />
                 <Route path="/profil" element={<Profile />} />
-                <Route path="/parametres" element={<Settings />} />
-                <Route path="/notifications" element={<Notifications />} />
               </Route>
             </Route>
             <Route path="*" element={<NotFound />} />
