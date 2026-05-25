@@ -1,13 +1,13 @@
-import { Bell, LogOut, Plus, Search } from "lucide-react";
+import { LogOut, Plus, Search } from "lucide-react";
 import type { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
+import { NotificationBell } from "@/components/notifications/NotificationBell";
 
 interface TopBarProps {
   title: string;
   subtitle?: string;
-  notifications?: number;
   primaryAction?: { label: string; onClick?: () => void; icon?: ReactNode };
   searchPlaceholder?: string;
 }
@@ -15,7 +15,6 @@ interface TopBarProps {
 export function TopBar({
   title,
   subtitle,
-  notifications = 3,
   primaryAction,
   searchPlaceholder = "Rechercher un groupe, un membre, une transaction...",
 }: TopBarProps) {
@@ -48,18 +47,7 @@ export function TopBar({
             />
           </div>
 
-          <button
-            type="button"
-            aria-label={`${notifications} notifications`}
-            className="relative flex h-10 w-10 items-center justify-center rounded-lg border border-hairline bg-card text-muted-foreground transition hover:text-foreground"
-          >
-            <Bell className="h-[18px] w-[18px]" />
-            {notifications > 0 && (
-              <span className="absolute -right-1 -top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-destructive-foreground">
-                {notifications}
-              </span>
-            )}
-          </button>
+          <NotificationBell />
 
           {primaryAction && (
             <button
