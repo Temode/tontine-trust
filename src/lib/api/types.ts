@@ -3,8 +3,9 @@ import type { Frequency, TontineGroup } from "@/lib/types";
 export type DbFrequency = "hebdomadaire" | "quinzaine" | "mensuelle";
 export type DbGroupStatus = "draft" | "open" | "active" | "completed" | "cancelled";
 export type DbMemberRole = "organisateur" | "membre";
-export type DbMemberStatus = "active" | "invited" | "removed" | "left";
+export type DbMemberStatus = "active" | "invited" | "removed" | "left" | "pending";
 export type DbInvitationStatus = "pending" | "accepted" | "revoked" | "expired";
+export type DbTurnStatus = "upcoming" | "collecting" | "paid" | "skipped";
 
 export interface DbGroupOverview {
   id: string;
@@ -57,6 +58,18 @@ export interface DbInvitation {
   status: DbInvitationStatus;
   expires_at: string | null;
   created_at: string;
+}
+
+export interface DbNextTurn {
+  group_id: string;
+  turn_id: string;
+  cycle_id: string;
+  turn_number: number;
+  due_date: string;
+  payout_amount: number;
+  status: DbTurnStatus;
+  beneficiary_user_id: string;
+  beneficiary_name: string | null;
 }
 
 const FREQ_TO_UI: Record<DbFrequency, Frequency> = {
