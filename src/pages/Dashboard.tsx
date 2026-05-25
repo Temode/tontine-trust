@@ -1,186 +1,141 @@
-import { useState } from "react";
+import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { Plus, UserPlus, Users, Calendar as CalendarIcon, Sparkles } from "lucide-react";
 import { TopBar } from "@/components/layout/TopBar";
 import { SectionCard } from "@/components/dashboard/SectionCard";
 import { GroupRow } from "@/components/dashboard/GroupRow";
-import { DeadlinesList } from "@/components/dashboard/DeadlinesList";
-import { PrimaryBalanceCard, StatTile } from "@/components/dashboard/StatCards";
-import { TransactionFilters, TransactionsTable, type Filter } from "@/components/dashboard/TransactionsTable";
 import { ReliabilityCard } from "@/components/dashboard/ReliabilityCard";
-import { DistributionCard } from "@/components/dashboard/DistributionCard";
-import { MemberStatusGrid } from "@/components/dashboard/MemberStatusGrid";
-import { PayCard, QuickLinks } from "@/components/dashboard/QuickActions";
-import { PaymentModal } from "@/components/payment/PaymentModal";
-import { RoleGuard } from "@/components/RoleGuard";
-import {
-  currentUser,
-  getStats,
-  groupDistribution,
-  groups,
-  liveMembersStatus,
-  transactions,
-  upcomingDeadlines,
-} from "@/lib/mock-data";
-import { formatGNF } from "@/lib/format";
+import { useAuth } from "@/hooks/useAuth";
+import { listMyGroups } from "@/lib/api/groups";
+import { overviewToTontine } from "@/lib/api/types";
+
+function KpiTile({
+  icon: Icon,
+  label,
+  value,
+  hint,
+}: {
+  icon: typeof Users;
+  label: string;
+  value: string;
+  hint?: string;
+}) {
+  return (
+    <article className="rounded-xl border border-hairline bg-card p-5">
+      <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-md bg-primary-50 text-primary">
+        <Icon className="h-[18px] w-[18px]" strokeWidth={1.75} />
+      </div>
+      <p className="text-[11px] uppercase tracking-wider text-muted-foreground">{label}</p>
+      <p className="mt-1 font-display text-2xl font-bold text-foreground num">{value}</p>
+      {hint && <p className="mt-0.5 text-xs text-muted-foreground">{hint}</p>}
+    </article>
+  );
+}
 
 export default function Dashboard() {
-  const stats = getStats();
   const navigate = useNavigate();
-  const [paymentOpen, setPaymentOpen] = useState(false);
-  const [filter, setFilter] = useState<Filter>("all");
-  const upcomingGroup = groups.find((g) => g.status === "your-turn") ?? groups[0];
+  const { user } = useAuth();
+
+  const { data: rows = [], isLoading } = useQuery({
+    queryKey: ["groups", "mine"],
+    queryFn: listMyGroups,
+  });
+
+  const groups = useMemo(() => rows.map(overviewToTontine), [rows]);
+  const activeCount = groups.filter((g) => g.status !== "completed").length;
+  const preview = groups.slice(0, 5);
+
+  const firstName =
+    (user?.user_metadata?.full_name as string | undefined)?.split(" ")[0] ??
+    user?.email?.split("@")[0] ??
+    "";
 
   return (
     <div className="animate-fade-in">
       <TopBar
-        title="Tableau de bord"
-        subtitle={`Bienvenue, ${currentUser.name.split(" ")[0]}. Voici un aperçu de vos tontines.`}
+        title={firstName ? `Bonjour, ${firstName}` : "Tableau de bord"}
+        subtitle="Suivez vos tontines et organisez vos cotisations en toute simplicité."
         primaryAction={{
-          label: "Nouvelle cotisation",
-          onClick: () => setPaymentOpen(true),
+          label: "Créer un groupe",
+          onClick: () => navigate("/nouveau"),
           icon: <Plus className="h-4 w-4" />,
         }}
       />
 
-      <div className="px-5 py-6 lg:px-8 lg:py-8">
-        {/* Row 1 — Headline KPIs */}
-        <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-4">
-          <PrimaryBalanceCard
-            amount={stats.totalBalance}
-            monthlyChange={stats.monthlyChange}
-            monthlyTrend={stats.monthlyTrend}
+      <div className="space-y-6 px-5 py-6 lg:px-8 lg:py-8">
+        {/* KPI strip */}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <KpiTile
+            icon={Users}
+            label="Groupes actifs"
+            value={String(activeCount)}
+            hint={`${groups.length} au total`}
           />
-          <StatTile
-            variant="out"
-            label="Cotisations effectuées"
-            primary={String(stats.contributionsCount)}
-            secondary={`Total : ${formatGNF(stats.contributionsTotal, { withCurrency: true })}`}
-            badge={`+${stats.contributionsCount > 0 ? 3 : 0} ce mois`}
+          <KpiTile
+            icon={CalendarIcon}
+            label="Prochain tour"
+            value="—"
+            hint="Disponible bientôt"
           />
-          <StatTile
-            variant="in"
-            label="Cagnottes reçues"
-            primary={`${formatGNF(stats.cagnottesReceived)} GNF`}
-            secondary="Prochain tour : 5 Jan"
-            badge="2 tours"
+          <KpiTile
+            icon={Sparkles}
+            label="Score de fiabilité"
+            value="100%"
+            hint="Aucun retard"
           />
         </div>
 
-        {/* Row 2 — Groups + Deadlines */}
-        <div className="mt-6 grid grid-cols-1 gap-5 lg:grid-cols-3">
+        {/* Main grid */}
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
           <SectionCard
             className="lg:col-span-2"
-            title="Mes groupes de tontine"
-            subtitle={`${stats.activeGroups} groupes actifs`}
-            action={{ label: "Voir tout", onClick: () => navigate("/groupes") }}
+            title="Mes groupes"
+            subtitle={isLoading ? "Chargement…" : `${groups.length} groupe${groups.length > 1 ? "s" : ""}`}
+            action={groups.length > 0 ? { label: "Voir tout", onClick: () => navigate("/groupes") } : undefined}
             bare
           >
-            <ul className="divide-y divide-border/60">
-              {groups.map((g) => (
-                <li key={g.id}>
-                  <GroupRow group={g} />
-                </li>
-              ))}
-            </ul>
-          </SectionCard>
-
-          <SectionCard
-            title="Prochaines échéances"
-            action={{ label: "Calendrier", onClick: () => navigate("/calendrier") }}
-          >
-            <DeadlinesList deadlines={upcomingDeadlines} />
-          </SectionCard>
-        </div>
-
-        {/* Row 3 — Transactions + Statistics */}
-        <div className="mt-6 grid grid-cols-1 gap-5 lg:grid-cols-3">
-          <SectionCard
-            className="lg:col-span-2"
-            title="Transactions récentes"
-            subtitle="Cotisations et versements"
-            rightSlot={<TransactionFilters value={filter} onChange={setFilter} />}
-            bare
-          >
-            <TransactionsTable transactions={transactions} filter={filter} />
-            <div className="border-t border-hairline px-5 py-3 text-center lg:px-6">
-              <button
-                type="button"
-                onClick={() => navigate("/historique")}
-                className="text-sm font-medium text-primary transition hover:text-primary-700"
-              >
-                Voir toutes les transactions →
-              </button>
-            </div>
-          </SectionCard>
-
-          <div className="space-y-5">
-            <ReliabilityCard
-              score={stats.reliabilityScore}
-              onTime={stats.onTimePayments}
-              late={stats.lateCount}
-              memberSince={currentUser.memberSince}
-            />
-            <DistributionCard items={groupDistribution} />
-          </div>
-        </div>
-
-        {/* Row 4 — Live members status + actions */}
-        <div className="mt-6 grid grid-cols-1 gap-5 lg:grid-cols-3">
-          <RoleGuard
-            allowedRoles={["admin", "organisateur"]}
-            fallback={
-              <SectionCard
-                className="lg:col-span-2"
-                title="État des cotisations"
-                subtitle="Réservé aux organisateurs"
-              >
-                <p className="text-sm text-muted-foreground">
-                  Cette vue détaillée des cotisations est réservée aux administrateurs et organisateurs du groupe.
-                </p>
-              </SectionCard>
-            }
-          >
-          <SectionCard
-            className="lg:col-span-2"
-            title="État des cotisations"
-            rightSlot={
-              <span className="hidden items-center gap-1.5 rounded-full bg-success/10 px-2 py-1 text-[11px] font-medium text-success sm:inline-flex">
-                <span className="h-1.5 w-1.5 animate-pulse-dot rounded-full bg-success" />
-                En temps réel
-              </span>
-            }
-            action={{ label: "Détails", onClick: () => navigate(`/groupes/${upcomingGroup.id}`) }}
-          >
-            <div className="mb-5 flex flex-col gap-3 rounded-lg border border-hairline bg-secondary/40 p-4 sm:flex-row sm:items-center sm:gap-6">
-              <div className="flex-1">
-                <div className="mb-1.5 flex items-center justify-between text-xs">
-                  <span className="text-muted-foreground">Cotisations reçues ce tour</span>
-                  <span className="font-medium text-foreground num">16/20 membres</span>
-                </div>
-                <div className="h-2 overflow-hidden rounded-full bg-card">
-                  <div className="h-full rounded-full bg-success" style={{ width: "80%" }} />
+            {isLoading ? (
+              <p className="px-5 py-6 text-sm text-muted-foreground lg:px-6">Chargement…</p>
+            ) : preview.length === 0 ? (
+              <div className="px-5 py-10 text-center lg:px-6">
+                <p className="text-sm text-muted-foreground">Vous n'avez encore aucun groupe.</p>
+                <div className="mt-4 flex flex-wrap justify-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => navigate("/nouveau")}
+                    className="inline-flex h-9 items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-semibold text-primary-foreground transition hover:bg-primary-700"
+                  >
+                    <Plus className="h-4 w-4" /> Créer un groupe
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => navigate("/rejoindre")}
+                    className="inline-flex h-9 items-center gap-1.5 rounded-md border border-hairline bg-card px-3 text-sm font-semibold text-foreground transition hover:bg-secondary"
+                  >
+                    <UserPlus className="h-4 w-4" /> Rejoindre avec un code
+                  </button>
                 </div>
               </div>
-              <div className="text-right">
-                <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Collecté</p>
-                <p className="font-display text-lg font-bold text-foreground num">
-                  {formatGNF(16_000_000, { withCurrency: true })}
-                </p>
-              </div>
-            </div>
-            <MemberStatusGrid entries={liveMembersStatus} />
+            ) : (
+              <ul className="divide-y divide-border/60">
+                {preview.map((g) => (
+                  <li key={g.id}>
+                    <GroupRow group={g} />
+                  </li>
+                ))}
+              </ul>
+            )}
           </SectionCard>
-          </RoleGuard>
 
-          <div className="space-y-5">
-            <PayCard onPay={() => setPaymentOpen(true)} />
-            <QuickLinks />
-          </div>
+          <ReliabilityCard
+            score={100}
+            onTime={{ current: 0, total: 0 }}
+            late={0}
+            memberSince="—"
+          />
         </div>
       </div>
-
-      <PaymentModal group={upcomingGroup} open={paymentOpen} onOpenChange={setPaymentOpen} />
     </div>
   );
 }
