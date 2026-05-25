@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Plus, UserPlus, Users, Calendar as CalendarIcon, Sparkles } from "lucide-react";
+import { Plus, UserPlus, Users, Calendar as CalendarIcon, Wallet } from "lucide-react";
 import { TopBar } from "@/components/layout/TopBar";
 import { SectionCard } from "@/components/dashboard/SectionCard";
 import { GroupRow } from "@/components/dashboard/GroupRow";
@@ -10,6 +10,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { listMyGroups } from "@/lib/api/groups";
 import { overviewToTontine } from "@/lib/api/types";
 import { listMyNextTurns } from "@/lib/api/turns";
+import { listMyContributionsDue } from "@/lib/api/contributions";
+import { formatGNF } from "@/lib/format";
 
 function KpiTile({
   icon: Icon,
@@ -46,6 +48,10 @@ export default function Dashboard() {
     queryKey: ["turns", "mine", "next"],
     queryFn: listMyNextTurns,
   });
+  const { data: dues = [] } = useQuery({
+    queryKey: ["contributions", "due"],
+    queryFn: listMyContributionsDue,
+  });
 
   const groups = useMemo(() => rows.map(overviewToTontine), [rows]);
   const activeCount = groups.filter((g) => g.status !== "completed").length;
@@ -58,6 +64,8 @@ export default function Dashboard() {
   const nextTurnHint = upcoming
     ? `${upcoming.beneficiary_name ?? "Membre"} · tour #${upcoming.turn_number}`
     : "Aucun cycle actif";
+
+  const totalDue = dues.reduce((s, d) => s + d.amount, 0);
 
   const firstName =
     (user?.user_metadata?.full_name as string | undefined)?.split(" ")[0] ??
@@ -92,10 +100,10 @@ export default function Dashboard() {
             hint={nextTurnHint}
           />
           <KpiTile
-            icon={Sparkles}
-            label="Score de fiabilité"
-            value="100%"
-            hint="Aucun retard"
+            icon={Wallet}
+            label="À payer"
+            value={totalDue > 0 ? `${formatGNF(totalDue)} GNF` : "—"}
+            hint={dues.length > 0 ? `${dues.length} cotisation${dues.length > 1 ? "s" : ""}` : "Vous êtes à jour"}
           />
         </div>
 
