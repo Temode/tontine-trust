@@ -25,6 +25,8 @@ import {
 } from "@/lib/api/members";
 import { listGroupTurns } from "@/lib/api/turns";
 import { releasePayout, listGroupLedger } from "@/lib/api/payouts";
+import { getGroupReliability, type DbGroupReliabilityRow } from "@/lib/api/reliability";
+import { ReliabilityBadge } from "@/components/reliability/ReliabilityBadge";
 import { useAuth } from "@/hooks/useAuth";
 import type { DbGroup, DbGroupMember, DbNextTurn } from "@/lib/api/types";
 import { SectionCard } from "@/components/dashboard/SectionCard";
@@ -124,6 +126,12 @@ export default function GroupDetail() {
   const ledgerQ = useQuery({
     queryKey: ["group", id, "ledger"],
     queryFn: () => listGroupLedger(id as string, 5),
+    enabled: !!id,
+  });
+
+  const reliabilityQ = useQuery({
+    queryKey: ["group", id, "reliability"],
+    queryFn: () => getGroupReliability(id as string),
     enabled: !!id,
   });
 
@@ -322,7 +330,9 @@ export default function GroupDetail() {
 
         <div className="mt-5">
           {section === "overview" && <OverviewTab nextTurn={nextTurn} payout={totalPayout} />}
-          {section === "members" && <MembersTab members={activeMembers} />}
+          {section === "members" && (
+            <MembersTab members={activeMembers} reliability={reliabilityQ.data ?? []} />
+          )}
           {section === "rotation" && (
             <RotationTab
               turns={turns}
@@ -390,13 +400,21 @@ function OverviewTab({ nextTurn, payout }: { nextTurn: DbNextTurn | null; payout
   );
 }
 
-function MembersTab({ members }: { members: DbGroupMember[] }) {
+function MembersTab({
+  members,
+  reliability,
+}: {
+  members: DbGroupMember[];
+  reliability: DbGroupReliabilityRow[];
+}) {
+  const scoreMap = new Map(reliability.map((r) => [r.user_id, r]));
   return (
     <SectionCard title="Membres actifs" subtitle={`${members.length} participants`} bare>
       <ul className="divide-y divide-border/60">
         {members.map((m) => {
           const name = m.profile?.full_name?.trim() || "Membre";
           const initials = getInitials(name) || "··";
+          const rel = scoreMap.get(m.user_id);
           return (
             <li key={m.id} className="flex items-center gap-3 px-5 py-3.5 lg:px-6">
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-secondary text-sm font-bold text-foreground">
@@ -421,7 +439,11 @@ function MembersTab({ members }: { members: DbGroupMember[] }) {
                   )}
                 </div>
               </div>
-              <Star className="h-4 w-4 text-muted-foreground/40" />
+              {rel ? (
+                <ReliabilityBadge score={rel.score} tier={rel.tier} />
+              ) : (
+                <Star className="h-4 w-4 text-muted-foreground/40" />
+              )}
             </li>
           );
         })}
