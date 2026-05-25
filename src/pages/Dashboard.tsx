@@ -9,6 +9,7 @@ import { ReliabilityCard } from "@/components/dashboard/ReliabilityCard";
 import { useAuth } from "@/hooks/useAuth";
 import { listMyGroups } from "@/lib/api/groups";
 import { overviewToTontine } from "@/lib/api/types";
+import { listMyNextTurns } from "@/lib/api/turns";
 
 function KpiTile({
   icon: Icon,
@@ -41,10 +42,22 @@ export default function Dashboard() {
     queryKey: ["groups", "mine"],
     queryFn: listMyGroups,
   });
+  const { data: nextTurns = [] } = useQuery({
+    queryKey: ["turns", "mine", "next"],
+    queryFn: listMyNextTurns,
+  });
 
   const groups = useMemo(() => rows.map(overviewToTontine), [rows]);
   const activeCount = groups.filter((g) => g.status !== "completed").length;
   const preview = groups.slice(0, 5);
+
+  const upcoming = nextTurns[0];
+  const nextTurnLabel = upcoming
+    ? new Date(upcoming.due_date).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" })
+    : "—";
+  const nextTurnHint = upcoming
+    ? `${upcoming.beneficiary_name ?? "Membre"} · tour #${upcoming.turn_number}`
+    : "Aucun cycle actif";
 
   const firstName =
     (user?.user_metadata?.full_name as string | undefined)?.split(" ")[0] ??
@@ -75,8 +88,8 @@ export default function Dashboard() {
           <KpiTile
             icon={CalendarIcon}
             label="Prochain tour"
-            value="—"
-            hint="Disponible bientôt"
+            value={nextTurnLabel}
+            hint={nextTurnHint}
           />
           <KpiTile
             icon={Sparkles}
