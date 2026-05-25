@@ -435,7 +435,21 @@ function MembersTab({ members }: { members: DbGroupMember[] }) {
   );
 }
 
-function RotationTab({ turns, userId }: { turns: DbNextTurn[]; userId: string | null }) {
+function RotationTab({
+  turns,
+  userId,
+  isOrganizer,
+  onPayout,
+  payingTurnId,
+  ledger,
+}: {
+  turns: DbNextTurn[];
+  userId: string | null;
+  isOrganizer: boolean;
+  onPayout: (turnId: string) => void;
+  payingTurnId: string | null;
+  ledger: import("@/lib/api/payouts").DbLedgerRow[];
+}) {
   if (turns.length === 0) {
     return (
       <SectionCard title="Calendrier de rotation" subtitle="Aucun tour planifié">
@@ -446,6 +460,7 @@ function RotationTab({ turns, userId }: { turns: DbNextTurn[]; userId: string | 
     );
   }
   return (
+    <div className="space-y-5">
     <SectionCard title="Calendrier de rotation" subtitle={`${turns.length} tours planifiés`} bare>
       <ul className="divide-y divide-border/60">
         {turns.map((t) => {
@@ -453,8 +468,10 @@ function RotationTab({ turns, userId }: { turns: DbNextTurn[]; userId: string | 
             day: "2-digit", month: "short",
           });
           const isYou = t.beneficiary_user_id === userId;
+          const canPay = isOrganizer && t.status === "collecting";
+          const paying = payingTurnId === t.turn_id;
           return (
-            <li key={t.turn_id} className="flex items-center gap-3 px-5 py-3.5 lg:px-6">
+            <li key={t.turn_id} className="flex flex-wrap items-center gap-3 px-5 py-3.5 lg:px-6">
               <span
                 className={cn(
                   "flex h-9 w-9 items-center justify-center rounded-md text-xs font-bold num",
@@ -479,10 +496,62 @@ function RotationTab({ turns, userId }: { turns: DbNextTurn[]; userId: string | 
               <p className="font-display text-sm font-semibold text-foreground num">
                 {formatGNF(t.payout_amount, { withCurrency: true })}
               </p>
+              {canPay && (
+                <button
+                  type="button"
+                  disabled={paying}
+                  onClick={() => {
+                    if (window.confirm(`Verser ${formatGNF(t.payout_amount, { withCurrency: true })} GNF à ${t.beneficiary_name ?? "le bénéficiaire"} ?`)) {
+                      onPayout(t.turn_id);
+                    }
+                  }}
+                  className="inline-flex h-9 items-center gap-1.5 rounded-md bg-accent-600 px-3 text-xs font-semibold text-accent-foreground transition hover:bg-accent-700 disabled:opacity-60"
+                >
+                  <HandCoins className="h-3.5 w-3.5" />
+                  {paying ? "Versement…" : "Verser"}
+                </button>
+              )}
+              {t.status === "paid" && isYou && (
+                <Link
+                  to="/recus"
+                  className="inline-flex h-9 items-center gap-1.5 rounded-md border border-hairline px-3 text-xs font-medium text-foreground transition hover:bg-secondary"
+                >
+                  <FileCheck2 className="h-3.5 w-3.5" />
+                  Reçu
+                </Link>
+              )}
             </li>
           );
         })}
       </ul>
     </SectionCard>
+
+    {ledger.length > 0 && (
+      <SectionCard title="Registre du groupe" subtitle="Dernières opérations" bare>
+        <ul className="divide-y divide-border/60">
+          {ledger.map((e) => (
+            <li key={e.id} className="flex items-center gap-3 px-5 py-3 lg:px-6">
+              <span className={cn(
+                "flex h-8 w-8 items-center justify-center rounded-md text-[10px] font-bold uppercase",
+                e.amount >= 0 ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive",
+              )}>
+                {e.amount >= 0 ? "+" : "−"}
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium text-foreground">{e.memo ?? e.entry_type}</p>
+                <p className="text-xs text-muted-foreground">
+                  {new Date(e.created_at).toLocaleString("fr-FR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                  {e.user_name ? ` · ${e.user_name}` : ""}
+                </p>
+              </div>
+              <p className="font-display text-sm font-semibold num text-foreground">
+                {formatGNF(Math.abs(e.amount))} GNF
+              </p>
+            </li>
+          ))}
+        </ul>
+      </SectionCard>
+    )}
+    </div>
   );
 }
