@@ -1,44 +1,55 @@
-## Phase E — Score de fiabilité
+## Phase F — Centre de notifications
 
-Migration D appliquée. Place à Phase E : calculer et afficher un score de fiabilité par utilisateur basé sur l'historique réel des cotisations.
+Migration Phase E appliquée. Phase E déjà implémentée côté code (scores, badges, vue profil). On passe à la Phase F : notifications in-app pour tenir les membres informés des événements clés.
 
-### 1. Migration SQL — `db/06_phase_e_reliability.sql`
+### Objectif
+Donner à chaque utilisateur un flux de notifications consultable (cloche dans la TopBar + page dédiée), alimenté automatiquement par les événements métier déjà en place (cotisations, versements, rotation, fiabilité).
 
-- **Table `user_reliability_scores`** (snapshot par user) :
-  - `user_id` (PK), `score` (0–100), `tier` enum (`excellent`, `bon`, `moyen`, `risque`, `nouveau`)
-  - Compteurs : `total_due`, `total_paid`, `total_on_time`, `total_late`, `avg_delay_days`, `cycles_completed`
-  - `last_computed_at`
-- **RPC `recompute_reliability(_user_id uuid default auth.uid())`** :
-  - Agrège `contributions` confirmées vs attendues, calcule délai (`confirmed_at - turn.due_date`)
-  - Formule : `score = round(85 * taux_paiement + 15 * taux_a_temps)` puis `-` pénalité pour retards moyens > 3 j (max −10)
-  - Tier dérivé : `>=85 excellent`, `>=70 bon`, `>=50 moyen`, `>=1 risque`, `0 paiement nouveau`
-  - Upsert dans `user_reliability_scores`
-- **Trigger `after update on contributions when status -> confirmed`** → appelle `recompute_reliability(payer_user_id)` (asynchrone via NOTIFY n'est pas dispo simplement, on l'appelle direct, SECURITY DEFINER)
-- **VIEW `group_reliability`** : pour chaque groupe → `avg_score`, liste membres avec leur score (lecture par membres du groupe)
-- **VIEW `my_reliability`** : `select * from user_reliability_scores where user_id = auth.uid()` + détail des 5 derniers retards
-- RLS : `user_reliability_scores` lecture par user lui-même OU membres d'un groupe partagé (helper `shares_group_with`) ; pas d'écriture directe
+### Migration SQL — `db/07_phase_f_notifications.sql`
 
-### 2. Couche API — `src/lib/api/reliability.ts`
-- `getMyReliability()` → score + détails
-- `getGroupReliability(groupId)` → liste membres + scores
-- `recomputeMyReliability()` → RPC (bouton manuel "Recalculer" sur Profile)
+- **ENUM `notification_kind`** : `contribution_due`, `contribution_confirmed`, `payout_released`, `receipt_ready`, `turn_started`, `reliability_changed`, `member_joined`, `invitation_received`.
+- **Table `notifications`** :
+  - `id`, `user_id`, `kind`, `title`, `body`, `group_id?`, `turn_id?`, `link?`, `payload jsonb`, `read_at?`, `created_at`.
+  - Index `(user_id, created_at desc)` et `(user_id) where read_at is null`.
+- **RLS** : lecture/maj limitées à `user_id = auth.uid()`. Insertion réservée aux fonctions `security definer`.
+- **Helper** `notify(_user_id, _kind, _title, _body, _group_id, _turn_id, _link, _payload)`.
+- **Triggers** :
+  - `contributions.status = confirmed` → notif au payeur + à l'organisateur.
+  - `turns.status` passe à `collecting` → notif aux membres actifs du groupe.
+  - `turns.status` passe à `paid` → notif au bénéficiaire (+ "reçu prêt").
+  - `user_reliability_scores` : changement de `tier` → notif à l'utilisateur.
+  - `group_members` insert (`status = active`) → notif à l'organisateur.
+- **RPC** :
+  - `mark_notification_read(_id uuid)`
+  - `mark_all_notifications_read()`
+- **Vue** `my_notifications` (50 plus récentes, `security_invoker`).
 
-### 3. UI
+### Couche API — `src/lib/api/notifications.ts`
+- `listMyNotifications(limit?)`
+- `countUnread()`
+- `markRead(id)` / `markAllRead()`
+- `subscribeToMyNotifications(cb)` via Supabase Realtime (channel sur `notifications` filtré `user_id=eq.<uid>`).
 
-- **Composant `ReliabilityBadge`** (réutilisable) : pastille colorée par tier + score numérique
-- **`ReliabilityCard`** (existant) : remplacer le mock par `getMyReliability()` + breakdown (cotisations payées / à temps / retard moyen)
-- **Dashboard** : la `ReliabilityCard` affiche les vraies données
-- **Profile** :
-  - Bloc "Mon score de fiabilité" avec gauge + statistiques + bouton "Recalculer"
-  - Historique des retards (5 dernières contributions hors délai)
-- **GroupDetail — onglet Membres** : afficher `ReliabilityBadge` à droite de chaque membre (au lieu de l'icône Star statique)
-- **JoinGroup / Directory** : afficher score moyen du groupe si > 0
+### UI
 
-### 4. Hors scope (phases suivantes)
-- Notifications complètes (Phase F)
-- Audit & KYC (Phase G)
-- PDF reçus serveur, onboarding (Phase H)
-- Djomy (Phase I)
+- **`NotificationBell`** (nouveau, dans `TopBar`) :
+  - Icône cloche avec pastille count non lus.
+  - Popover avec 10 dernières notifs, bouton "Tout marquer lu", lien "Voir tout".
+- **Page `/notifications`** (nouvelle `src/pages/Notifications.tsx`) :
+  - Liste complète groupée par jour, filtres "Toutes / Non lues".
+  - Click sur une notif → marque lue + navigue vers `link` (groupe, reçu, cotisation).
+- **Mise à jour** :
+  - `TopBar.tsx` : intègre `NotificationBell`.
+  - `DesktopSidebar.tsx` + `BottomNav.tsx` : entrée "Notifications".
+  - `App.tsx` : route `/notifications`.
+- **Realtime** : hook `useNotifications()` qui s'abonne au montage de l'AppShell, invalide les queries `["notifications"]` et joue un toast léger pour les nouveaux événements.
 
-### Action utilisateur après mes changements
-Exécuter `db/06_phase_e_reliability.sql` dans le SQL Editor Supabase, puis confirmer pour enchaîner Phase F (notifications).
+### Design tokens
+- Réutiliser `TIER_CLASSES` / variantes existantes. Pastille non-lue = `bg-primary text-primary-foreground`. Item non lu = fond `bg-primary/5`, liseré gauche `border-l-2 border-primary`.
+
+### Action requise après génération
+Exécuter `db/07_phase_f_notifications.sql` dans Supabase, puis confirmer. **Phase G** (paiements réels Djomy) restera la dernière, en attente de l'API.
+
+### Fichiers
+- **Créés** : `db/07_phase_f_notifications.sql`, `src/lib/api/notifications.ts`, `src/components/notifications/NotificationBell.tsx`, `src/components/notifications/NotificationItem.tsx`, `src/hooks/useNotifications.ts`, `src/pages/Notifications.tsx`.
+- **Édités** : `src/App.tsx`, `src/components/layout/TopBar.tsx`, `src/components/layout/DesktopSidebar.tsx`, `src/components/layout/BottomNav.tsx`, `src/components/layout/AppShell.tsx`.
