@@ -1,5 +1,6 @@
 import {
   ChevronDown,
+  FileCheck2,
   LayoutDashboard,
   type LucideIcon,
   PlusCircle,
@@ -33,6 +34,7 @@ const sections: NavSection[] = [
       { to: "/dashboard", label: "Tableau de bord", icon: LayoutDashboard },
       { to: "/groupes", label: "Mes groupes", icon: Users },
       { to: "/cotisations", label: "Mes cotisations", icon: Wallet },
+      { to: "/recus", label: "Mes reçus", icon: FileCheck2 },
       { to: "/profil", label: "Mon profil", icon: User },
     ],
   },
