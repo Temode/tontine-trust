@@ -58,7 +58,7 @@ export async function listMyLateContributions(): Promise<DbLateContribution[]> {
 }
 
 export async function recomputeMyReliability(): Promise<DbReliability> {
-  const { data, error } = await supabase.rpc("recompute_reliability", { _user_id: undefined });
+  const { data, error } = await supabase.rpc("recompute_reliability", {});
   if (error) throw error;
   return data as DbReliability;
 }
