@@ -1,124 +1,88 @@
-# Parcours utilisateur Tontine Digital — découpage par phases
+## Objectif
 
-Contexte clé : usage réel, vrai argent. Donc chaque étape doit être robuste, traçable, auditable. Pas de mock dans les flux financiers. On avance phase par phase, on ne passe à la suivante que quand la précédente est solide.
+Reporter l'intégration **Djomy** à la toute fin (en attendant les credentials API du PDG) et terminer **tout le reste** de l'application. Quand Djomy sera prêt, il ne restera qu'à brancher l'API de paiement réelle dans des points d'intégration déjà préparés ("payment adapter" mocké en attendant).
 
 ---
 
-## Parcours utilisateur complet (de l'inscription au cycle terminé)
+## Stratégie : Payment Adapter
+
+Créer une **interface d'abstraction** `PaymentProvider` côté backend (edge function) et UI. Aujourd'hui : implémentation `MockProvider` (simulation + écriture en DB). Demain : on remplace par `DjomyProvider` sans toucher au reste du code.
 
 ```text
-1.  Découverte         → page d'accueil publique, explication, CTA "S'inscrire"
-2.  Inscription        → numéro de téléphone + OTP SMS, nom, PIN
-3.  Profil             → photo, vérification d'identité (optionnelle MVP)
-4.  Onboarding         → 2 choix : "Créer un groupe" ou "Rejoindre avec un code"
-
-— Branche A : Organisateur —
-5A. Création groupe    → nom, montant, fréquence, nb membres, règles rotation/pénalités
-6A. Code d'invitation  → généré, partageable (SMS, WhatsApp, lien)
-7A. Attente quorum     → suivi des inscriptions, relance, validation/refus des candidats
-8A. Démarrage cycle    → tirage de l'ordre de rotation, planification du 1er tour
-
-— Branche B : Participant —
-5B. Saisie code        → prospectus du groupe (règles, organisateur, score)
-6B. Candidature        → demande d'adhésion, attente validation
-7B. Confirmation       → notification, accès au groupe
-
-— Tronc commun (cycle actif) —
-9.  Notification J-2   → "votre cotisation est due le ..."
-10. Paiement           → Orange Money / MTN Money via redirection ou USSD
-11. Confirmation paiement → reçu numérique horodaté, mise à jour du tableau de bord
-12. Collecte complète  → toutes les cotisations reçues → cagnotte constituée
-13. Versement bénéficiaire → transfert Mobile Money automatique vers le bénéficiaire du tour
-14. Reçu de versement  → preuve cryptographique, journal d'audit
-15. Tour suivant       → boucle 9-14 jusqu'à ce que tous les membres aient reçu
-16. Fin de cycle       → bilan, score de fiabilité mis à jour, option "relancer un cycle"
-
-— Transverse —
-*   Profil & score de fiabilité (ponctualité, ancienneté)
-*   Historique / registre immuable
-*   Notifications (push, SMS)
-*   Litiges & support
+UI → useInitiatePayment() → edge function `initiate-payment`
+                                    ├── MockProvider (now)
+                                    └── DjomyProvider (later, drop-in)
+                            → webhook `payment-webhook` → update contributions/turns
 ```
 
 ---
 
-## Découpage en phases (ce qu'on va construire)
+## Phases restantes (ordre d'exécution)
 
-### Phase 1 — Comptes & identité (socle)
-Ce qui existe déjà : email/password via Lovable Cloud. À remplacer/compléter pour usage réel.
-- Inscription par **numéro de téléphone + OTP SMS** (vrai SMS, pas mock)
-- PIN à 4-6 chiffres pour reconnexion rapide
-- Profil minimal : nom, téléphone, photo
-- Page `/profil` : afficher info réelles + déconnexion (déjà MVP)
-- **Score de fiabilité** : table dédiée, calcul automatique (départ 100%, ajusté à chaque cycle)
+### Phase C — Cotisations & Ledger (cœur métier sans Djomy)
+1. **Migration SQL `04_phase_c_ledger.sql`** :
+   - Table `payments` (id, contribution_id, user_id, amount, operator, status, provider_ref, created_at)
+   - Table `ledger_entries` (immutable, double entrée : débit/crédit, type, ref, hash chaîné)
+   - RPC `record_mock_payment(contribution_id)` qui : crée payment `succeeded`, marque `contribution.status=paid`, écrit 2 lignes ledger, et si toutes contributions d'un turn = paid → `turn.status=collecting → paid` + crédit bénéficiaire
+   - View `my_contributions_due` (cotisations à payer pour user courant)
+2. **API layer** : `src/lib/api/payments.ts`, `contributions.ts`
+3. **UI** :
+   - Remplacer `PaymentModal` mock par un vrai flow connecté à `record_mock_payment`
+   - Page **Mes cotisations** (liste due/payées, statut, reçu)
+   - Dashboard : KPI "À payer cette semaine" depuis vraies données
+   - GroupDetail tab "Rotation" : afficher progression cotisations par turn
 
-### Phase 2 — Groupes (déjà en place, à durcir)
-État : création, invitation par code, adhésion fonctionnent (Phase B livrée).
-À compléter :
-- Validation/refus des candidatures par l'organisateur (workflow complet)
-- Quorum atteint → bouton "Démarrer le cycle" → tirage rotation persisté en base
-- Affichage clair de l'ordre des bénéficiaires dans `/groupes/:id`
+### Phase D — Versement (payout) & Reçus
+1. RPC `release_payout(turn_id)` (organisateur) : marque turn `paid`, écrit ledger payout, génère un **reçu** (table `receipts` avec n° séquentiel + hash)
+2. UI organisateur : bouton "Verser au bénéficiaire" sur un turn en `collecting` complet
+3. Composant `ReceiptCard` (téléchargeable plus tard en PDF)
 
-### Phase 3 — Rotation & calendrier (cœur métier)
-- Génération automatique du calendrier des tours à partir de la fréquence
-- Table `rounds` : un enregistrement par tour, avec bénéficiaire, date prévue, statut
-- Vue "Prochain tour" sur le dashboard (remplacer le placeholder actuel)
-- Possibilité d'**échange de tours** entre membres avec accord (politique du groupe)
+### Phase E — Score de fiabilité
+1. Vue `user_reliability_score` calculée depuis : ratio paiements à temps, retards moyens, défauts
+2. RPC `recompute_reliability(user_id)` déclenchée après chaque paiement
+3. Affichage : Profile + ReliabilityCard dashboard + badge sur membres dans GroupDetail
 
-### Phase 4 — Paiements Mobile Money (le vrai sujet vrai argent)
-**Le plus critique. À traiter avec le plus grand soin.**
-- Intégration **Orange Money Guinée** (API officielle ou agrégateur type CinetPay, PayDunya, FedaPay)
-- Intégration **MTN MoMo Guinée**
-- Flux : déclencher une demande de paiement → l'utilisateur valide sur son téléphone → webhook de confirmation → enregistrement transaction
-- Table `contributions` : statut (pending/paid/failed/refunded), référence opérateur, horodatage
-- **Idempotence** obligatoire (pas de double prélèvement)
-- Mode sandbox d'abord, puis bascule live après validation
+### Phase F — Notifications & Rappels (in-app d'abord)
+1. Table `notifications` (user_id, type, payload, read_at)
+2. Triggers : nouvelle cotisation due (J-3, J-1, J0), turn assigné, paiement reçu, demande d'adhésion
+3. UI : centre de notifications dans TopBar (cloche + dropdown)
+4. *(SMS reporté — décision provider plus tard, comme convenu)*
 
-### Phase 5 — Versement bénéficiaire (payout)
-- Une fois toutes les cotisations d'un tour reçues → déclenchement automatique du payout via API Mobile Money
-- Reçu numérique signé (PDF + entrée registre)
-- Cas d'erreur : retry, escalade à l'organisateur, journal complet
+### Phase G — Conformité & Sécurité
+1. **Audit log** table `audit_events` (qui a fait quoi, IP, user_agent)
+2. Revue **RLS** sur toutes les tables sensibles (payments, ledger, receipts)
+3. Page **Profile** : KYC light (nom complet, pièce d'identité optionnelle stockée dans storage privé)
+4. Conditions d'utilisation + acceptation versionnée
 
-### Phase 6 — Traçabilité & registre
-- Journal d'audit immuable de chaque action sensible (création, paiement, versement, échange)
-- Export CSV/PDF des relevés pour chaque membre et chaque groupe
-- Vue "Historique" par groupe (uniquement quand il y a de vraies données — pas avant)
+### Phase H — Polish & Onboarding
+1. Onboarding 3 écrans pour nouveau user (concept tontine, sécurité, premier groupe)
+2. États vides illustrés sur toutes les pages
+3. Mode hors-ligne basique (cache react-query + bannière)
+4. Tests E2E Playwright sur parcours critiques
 
-### Phase 7 — Notifications réelles
-- SMS via le même provider que l'OTP : rappels J-2, confirmation paiement, notification versement
-- Push web (optionnel) si on garde le web
-
-### Phase 8 — Score de fiabilité (recalcul live)
-- Algorithme basé sur : % de paiements à temps, ancienneté, nombre de cycles complétés
-- Affichage sur le profil et visible par les organisateurs lors de la validation d'une candidature
-
-### Phase 9 — Conformité & sécurité avant lancement
-- KYC léger (au moins vérification identité pour l'organisateur de gros groupes)
-- Limites de montants
-- Conditions générales, mentions légales
-- Audit de sécurité de la base, des RLS, des edge functions de paiement
+### Phase I — DJOMY (dernière étape, quand credentials reçus)
+1. `add_secret` : `DJOMY_CLIENT_ID`, `DJOMY_CLIENT_SECRET`
+2. Edge function `djomy-auth` (OAuth client credentials + cache token)
+3. Edge function `initiate-payment` : remplace `MockProvider` par appel `create_payment_gateway` Djomy
+4. Edge function `djomy-webhook` : reçoit confirmation → appelle même logique qu'aujourd'hui `record_mock_payment` (déjà testée) mais avec `provider_ref` réel
+5. Feature flag `PAYMENT_PROVIDER=mock|djomy` pour bascule progressive
+6. Tests sandbox avec vrais numéros Orange/MTN
 
 ---
 
-## Questions à trancher avant de commencer la Phase 1
+## Ce qui change *minimum* quand Djomy arrive
 
-1. **OTP SMS** : quel provider ? Twilio (cher, fiable, international) ou un agrégateur local Guinée moins cher ?
-2. **Mobile Money** : on attaque en direct Orange/MTN (long, contrats à signer) ou via un agrégateur (CinetPay, FedaPay, PayDunya) plus rapide à intégrer ? Recommandation forte : **agrégateur** pour démarrer.
-3. **Périmètre du MVP de lancement** : on lance avec quoi exactement ? Ma proposition :
-   - **MVP v1 (lançable)** : Phases 1, 2, 3, 4, 5, 6 minimum + 7 (SMS) + 9 (légal).
-   - Score de fiabilité (Phase 8) en post-lancement (départ à 100% pour tout le monde).
-   - Échange de tours en post-lancement.
-4. **Web seulement** ou **+ app mobile React Native** au lancement ? La présentation parle des deux mais on a actuellement du web. Recommandation : **lancer en web responsive** (PWA), mobile native plus tard.
+Grâce à l'adapter, seulement **3 fichiers** :
+- `supabase/functions/initiate-payment/index.ts` (swap provider)
+- `supabase/functions/djomy-webhook/index.ts` (nouveau, branche logique existante)
+- Secrets ajoutés
+
+Tout le reste (UI, DB, ledger, scores, notifications) sera déjà en place et testé.
 
 ---
 
-## Ce que je propose comme prochaine étape concrète
+## Ordre de validation proposé
 
-Commencer la **Phase 1 — Comptes & identité** : remplacer l'auth email/password par une auth par téléphone + OTP SMS, avec la table `profiles` enrichie (téléphone vérifié) et la table `reliability_scores`.
+On commence par **Phase C (Cotisations & Ledger)** car c'est le cœur métier et ça débloque D, E, F. Tu valides après chaque phase, je passe à la suivante.
 
-Avant que je touche au code, dis-moi :
-- **Quel provider SMS** tu veux qu'on utilise (ou si tu veux que je te fasse une comparaison rapide Twilio vs agrégateur local) ?
-- **OK pour démarrer par la Phase 1** ou tu préfères qu'on attaque autre chose en premier (ex : commencer par sécuriser Phase 2/3 sur l'existant avant de toucher à l'auth) ?
-- **Agrégateur Mobile Money** : je creuse CinetPay / FedaPay / PayDunya pour te faire une reco ?
-
-Une fois ces 3 réponses, je rentre en mode build et on enchaîne phase par phase, chaque phase étant elle-même découpée en sous-étapes vérifiables.
+OK pour démarrer Phase C ?
