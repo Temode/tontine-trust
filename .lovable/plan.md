@@ -1,79 +1,73 @@
-# Audit Dashboard & refonte MVP
+# Audit du menu et des pages — préparation au lancement MVP
 
-## Audit du dashboard actuel
+## Constat
 
-Le dashboard actuel (`src/pages/Dashboard.tsx`) affiche **12 composants** alimentés à 100% par `mock-data`. Pour un MVP centré sur **tontine digitale automatisée + traçabilité + score de fiabilité**, c'est largement surdimensionné.
+Le menu (`DesktopSidebar` + `BottomNav`) expose **13 routes**, dont **10 pages encore alimentées à 100 % par `mock-data`**. Pour un MVP centré sur **création de groupe + invitation + rotation auto + traçabilité + score de fiabilité**, c'est trop. L'utilisateur clique partout et tombe sur des écrans factices → confusion, non livrable.
 
-### Ce qui est inutile pour le MVP
+Pilier déjà connecté à la BDD (Phase B) : `Dashboard`, `MyGroups`, `GroupDetail`, `CreateGroup`, `JoinGroup`, `InviteMembers`.
 
-| Bloc | Composant | Raison du retrait |
-|---|---|---|
-| Solde total tontines | `PrimaryBalanceCard` | Pas de wallet/solde en MVP (paiements simulés) |
-| Cotisations effectuées (KPI) | `StatTile` out | Doublon avec « État cotisations » |
-| Cagnottes reçues (KPI) | `StatTile` in | Pas de versements réels en V1 |
-| Transactions récentes + filtres | `TransactionsTable` | Phase D (paiements) — pas encore de vraies tx |
-| Distribution par groupe | `DistributionCard` | Analytique avancée, hors MVP |
-| État cotisations live (organisateur) | `MemberStatusGrid` | Doit vivre dans `/groupes/:id`, pas le dashboard |
-| Pay card + Quick links | `PayCard`, `QuickLinks` | Redondant avec sidebar + bouton créer |
-| Échéances (mock) | `DeadlinesList` | Garder mais brancher sur vraies données quand cycles seront prêts |
+## Audit page par page
 
-### Ce qu'on garde (utile MVP)
+| Route | Fichier | État | Décision MVP |
+|---|---|---|---|
+| `/dashboard` | Dashboard.tsx | Réel (Phase B) | **Garder** |
+| `/groupes` | MyGroups.tsx | Réel | **Garder** |
+| `/groupes/:id` | GroupDetail.tsx | Partiel réel | **Garder** |
+| `/nouveau` | CreateGroup.tsx | Réel | **Garder** |
+| `/rejoindre` | JoinGroup.tsx | Réel (RPC) | **Garder** |
+| `/inviter` | InviteMembers.tsx | Réel | **Fusionner dans `/groupes/:id`** (déjà accessible via le détail) → retirer du menu |
+| `/profil` | Profile.tsx | Mock (KYC, mandats, sécurité…) | **Garder en version minimale** (nom, téléphone, déconnexion, score). Retirer KycPanel, MandatesPanel, DangerZone, ReliabilityBreakdown, TrackRecordStrip, ProfileActivity. |
+| `/cotisations` | Contributions.tsx | 100 % mock | **Retirer** (Phase D — paiements) |
+| `/rotations` | Rotations.tsx | 100 % mock | **Retirer** (Phase C — données pas prêtes) |
+| `/historique` | History.tsx | 100 % mock | **Retirer** (Phase D) |
+| `/calendrier` | Calendar.tsx | 100 % mock | **Retirer** (post-MVP) |
+| `/notifications` | Notifications.tsx | 100 % mock | **Retirer** (notifications in-app pas encore branchées) |
+| `/parametres` | Settings.tsx | 100 % mock (abonnement, API, conformité…) | **Retirer** (hors MVP) |
 
-- **Salutation + CTA principal** (créer / rejoindre un groupe)
-- **Mes groupes actifs** — liste compacte branchée sur `listMyGroups()` (déjà fait Phase B)
-- **Score de fiabilité** — pilier du concept (mock acceptable, sera calculé Phase D)
-- **Prochaines échéances** — placeholder « Aucune échéance » jusqu'à Phase C
-
-## Nouvelle structure proposée (MVP)
+## Menu cible (MVP)
 
 ```text
-┌─────────────────────────────────────────────┐
-│ TopBar : "Bonjour {prenom}"                 │
-│ Actions : [Créer un groupe] [Rejoindre]     │
-├─────────────────────────────────────────────┤
-│ 3 KPI simples (données réelles)             │
-│  • Groupes actifs    • Tour à venir         │
-│  • Score fiabilité                          │
-├──────────────────────────┬──────────────────┤
-│ Mes groupes (réel)       │ Score fiabilité  │
-│ liste 5 derniers + CTA   │ (carte simple)   │
-│ "Voir tout"              │                  │
-│                          │ Prochaines       │
-│                          │ échéances (vide) │
-└──────────────────────────┴──────────────────┘
+Menu principal
+  • Tableau de bord     /dashboard
+  • Mes groupes         /groupes
+  • Mon profil          /profil
+
+Actions rapides
+  • Créer un groupe     /nouveau
+  • Rejoindre un groupe /rejoindre
 ```
 
-3 KPI réels :
-- **Groupes actifs** = `listMyGroups()` count
-- **Prochain tour** = placeholder « À venir » (Phase C)
-- **Score fiabilité** = mock 100% jusqu'à Phase D
+`BottomNav` mobile aligné : Accueil · Groupes · Créer (FAB) · Profil (4 entrées au lieu de 5 ; retrait d'Historique).
+
+Les routes retirées du menu **restent dans `App.tsx`** pour ne rien casser, mais ne sont plus accessibles via la navigation. On les supprimera réellement plus tard quand on saura quoi en faire — ou on peut les supprimer maintenant si tu préfères un nettoyage radical (voir Question).
+
+## Travaux concrets
+
+1. **`DesktopSidebar.tsx`** — réduire `sections` aux 5 entrées ci-dessus. Retirer badge mock `3`, dot notifications, `currentUser` mock du bas (utiliser `useAuth` réel).
+2. **`BottomNav.tsx`** — remplacer Historique par Profil ; garder 5 slots (Accueil, Groupes, Créer FAB, Profil … 4e ?). À trancher : 4 entrées suffisent (Accueil, Groupes, Créer, Profil).
+3. **`Profile.tsx`** — réécriture light : carte identité (nom, téléphone, email depuis `useAuth`), score fiabilité (mock 100 %), bouton « Se déconnecter ». Supprimer imports KYC/mandats/danger/activity.
+4. **`App.tsx`** — option A : garder toutes les routes (sécurité) ; option B : supprimer les routes retirées + supprimer les fichiers `Calendar.tsx`, `Contributions.tsx`, `Rotations.tsx`, `History.tsx`, `Notifications.tsx`, `Settings.tsx`, `InviteMembers.tsx`. Recommandé : **option B** pour livrer propre.
+5. **`InviteMembers`** — reste accessible depuis `GroupDetail` (bouton « Inviter ») via une modale ou redirection ; à confirmer.
 
 ## Détails techniques
 
-### Fichiers modifiés
-- `src/pages/Dashboard.tsx` → réécriture, ~80 lignes au lieu de 186
-- Suppression des imports : `PrimaryBalanceCard`, `StatTile`, `TransactionsTable`, `TransactionFilters`, `DistributionCard`, `MemberStatusGrid`, `PayCard`, `QuickLinks`, `RoleGuard`, `PaymentModal`, mock `transactions`, `groupDistribution`, `liveMembersStatus`, `upcomingDeadlines`, `getStats`.
-- Plus de `RoleGuard` dans dashboard (la vue organisateur déménage dans `/groupes/:id`)
-
-### Fichiers conservés intacts
-- `SectionCard`, `GroupRow`, `DeadlinesList`, `ReliabilityCard` réutilisés
-- Composants supprimés du dashboard restent disponibles ailleurs (Cotisations, Historique, GroupDetail)
-
-### Données
-- `useQuery(['groups','mine'], listMyGroups)` déjà branché Phase B → réutilisé
-- KPI "Groupes actifs" calculé à partir du même `data`
-- Score fiabilité : mock `92%` en attendant Phase D
-
-### Hors périmètre de ce plan
-- Brancher échéances sur vrais cycles → Phase C
-- Brancher score sur vraies cotisations → Phase D
-- Page `/cotisations`, `/rotations`, `/historique` inchangées
+- Pas de migration BDD nécessaire.
+- Pas de nouveau composant à créer.
+- Suppressions de fichiers en option B :
+  - `src/pages/{Calendar,Contributions,Rotations,History,Notifications,Settings,InviteMembers}.tsx`
+  - Dossiers `src/components/{calendar,contributions,rotations,history,notifications,settings,invite-members}/` (sauf si réutilisés ailleurs — à vérifier)
+- `mock-data.ts` allégé en conséquence (à faire en dernier).
 
 ## Validation
 
-1. Dashboard se charge sans aucune référence aux mocks `transactions`, `liveMembersStatus`, etc.
-2. Compteur "Groupes actifs" reflète la BDD réelle
-3. Liste "Mes groupes" affiche les vrais groupes (ou état vide CTA)
-4. Aucune régression sur les autres pages
+1. Le menu n'expose que des pages réelles et fonctionnelles.
+2. Aucun clic ne mène à un écran 100 % mock.
+3. Build vert, aucune route cassée.
+4. App prête à être présentée comme MVP.
 
-Dis « go » pour que je passe en build mode et réécrive le dashboard.
+## Questions avant build
+
+- **Option A (sûr) ou B (radical)** pour les pages retirées ? Je recommande **B**.
+- `InviteMembers` : transformer en modale dans `GroupDetail`, ou laisser une route `/groupes/:id/inviter` non listée au menu ?
+
+Dis « go B + modale » (ou ta variante) pour que je passe en build.
