@@ -5,6 +5,8 @@ import {
   ArrowLeft,
   Calendar,
   CheckCircle2,
+  HandCoins,
+  FileCheck2,
   MoreVertical,
   Play,
   Star,
@@ -22,6 +24,7 @@ import {
   startCycle,
 } from "@/lib/api/members";
 import { listGroupTurns } from "@/lib/api/turns";
+import { releasePayout, listGroupLedger } from "@/lib/api/payouts";
 import { useAuth } from "@/hooks/useAuth";
 import type { DbGroup, DbGroupMember, DbNextTurn } from "@/lib/api/types";
 import { SectionCard } from "@/components/dashboard/SectionCard";
@@ -105,6 +108,23 @@ export default function GroupDetail() {
       invalidate();
     },
     onError: (e: Error) => toast.error("Démarrage impossible", { description: e.message }),
+  });
+
+  const payoutM = useMutation({
+    mutationFn: (turnId: string) => releasePayout(turnId),
+    onSuccess: () => {
+      toast.success("Versement effectué", { description: "Le reçu numérique a été généré." });
+      invalidate();
+      queryClient.invalidateQueries({ queryKey: ["receipts"] });
+      queryClient.invalidateQueries({ queryKey: ["group", id, "ledger"] });
+    },
+    onError: (e: Error) => toast.error("Versement impossible", { description: e.message }),
+  });
+
+  const ledgerQ = useQuery({
+    queryKey: ["group", id, "ledger"],
+    queryFn: () => listGroupLedger(id as string, 5),
+    enabled: !!id,
   });
 
   if (groupQ.isLoading) {
@@ -303,7 +323,16 @@ export default function GroupDetail() {
         <div className="mt-5">
           {section === "overview" && <OverviewTab nextTurn={nextTurn} payout={totalPayout} />}
           {section === "members" && <MembersTab members={activeMembers} />}
-          {section === "rotation" && <RotationTab turns={turns} userId={user?.id ?? null} />}
+          {section === "rotation" && (
+            <RotationTab
+              turns={turns}
+              userId={user?.id ?? null}
+              isOrganizer={isOrganizer}
+              onPayout={(turnId) => payoutM.mutate(turnId)}
+              payingTurnId={payoutM.isPending ? (payoutM.variables as string | undefined) ?? null : null}
+              ledger={ledgerQ.data ?? []}
+            />
+          )}
         </div>
       </div>
     </div>
