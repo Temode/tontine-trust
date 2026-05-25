@@ -1,48 +1,44 @@
-## Phase D — Versements & Reçus
+## Phase E — Score de fiabilité
 
-Migration C confirmée. Place à Phase D : verser la cagnotte au bénéficiaire du tour et générer un reçu numérique.
+Migration D appliquée. Place à Phase E : calculer et afficher un score de fiabilité par utilisateur basé sur l'historique réel des cotisations.
 
-### 1. Migration SQL — `db/05_phase_d_payout.sql`
+### 1. Migration SQL — `db/06_phase_e_reliability.sql`
 
-- **Table `receipts`** : `id`, `turn_id`, `group_id`, `beneficiary_user_id`, `amount`, `receipt_number` (unique, format `TD-YYYY-NNNNNN`), `payment_id`, `issued_at`, `hash` (chaîné au ledger).
-- **RPC `release_payout(_turn_id uuid, _provider payment_provider default 'simulation')`** :
-  - Vérifie : caller = admin/owner du groupe (via `has_group_role`), tour en `collecting`, somme cotisations = `expected_amount`, pas déjà versé.
-  - Crée `payments` (sortant, `user_id = beneficiary`, `amount` négatif logiquement mais stocké positif avec type), status `succeeded`.
-  - Appelle `append_ledger` avec `entry_type = 'payout_out'`, montant négatif.
-  - Crée `receipts` avec numéro séquentiel + hash.
-  - Update `turns.status = 'paid'`, `paid_at = now()`.
-  - Insère notification au bénéficiaire (`kind = 'payout_released'`).
-  - Si dernier tour du cycle → `cycles.status = 'completed'`.
-- **View `group_ledger_view`** : ledger lisible (entrées + libellés humains) pour membres du groupe.
-- **View `my_receipts`** : reçus du user courant (en tant que bénéficiaire).
-- RLS : `receipts` lecture par membre du groupe ; pas d'écriture directe.
+- **Table `user_reliability_scores`** (snapshot par user) :
+  - `user_id` (PK), `score` (0–100), `tier` enum (`excellent`, `bon`, `moyen`, `risque`, `nouveau`)
+  - Compteurs : `total_due`, `total_paid`, `total_on_time`, `total_late`, `avg_delay_days`, `cycles_completed`
+  - `last_computed_at`
+- **RPC `recompute_reliability(_user_id uuid default auth.uid())`** :
+  - Agrège `contributions` confirmées vs attendues, calcule délai (`confirmed_at - turn.due_date`)
+  - Formule : `score = round(85 * taux_paiement + 15 * taux_a_temps)` puis `-` pénalité pour retards moyens > 3 j (max −10)
+  - Tier dérivé : `>=85 excellent`, `>=70 bon`, `>=50 moyen`, `>=1 risque`, `0 paiement nouveau`
+  - Upsert dans `user_reliability_scores`
+- **Trigger `after update on contributions when status -> confirmed`** → appelle `recompute_reliability(payer_user_id)` (asynchrone via NOTIFY n'est pas dispo simplement, on l'appelle direct, SECURITY DEFINER)
+- **VIEW `group_reliability`** : pour chaque groupe → `avg_score`, liste membres avec leur score (lecture par membres du groupe)
+- **VIEW `my_reliability`** : `select * from user_reliability_scores where user_id = auth.uid()` + détail des 5 derniers retards
+- RLS : `user_reliability_scores` lecture par user lui-même OU membres d'un groupe partagé (helper `shares_group_with`) ; pas d'écriture directe
 
-### 2. Couche API — `src/lib/api/payouts.ts`
-
-- `releasePayout(turnId, provider?)` → RPC.
-- `listGroupLedger(groupId)` → view.
-- `listMyReceipts()` → view.
-- `getTurnSettlement(turnId)` → cotisations confirmées + total + statut versement.
+### 2. Couche API — `src/lib/api/reliability.ts`
+- `getMyReliability()` → score + détails
+- `getGroupReliability(groupId)` → liste membres + scores
+- `recomputeMyReliability()` → RPC (bouton manuel "Recalculer" sur Profile)
 
 ### 3. UI
 
-- **GroupDetail — onglet Rotation** :
-  - Sur tour en `collecting` et user = owner/admin → bouton **« Verser au bénéficiaire »** (montant + bénéficiaire affichés, confirmation modale).
-  - Sur tour `paid` → badge « Versé » + lien « Voir le reçu ».
-  - Mini-tableau ledger du groupe (5 dernières entrées, lien « Voir tout »).
-- **Nouvelle page `src/pages/Receipts.tsx`** (`/receipts`) : liste de mes reçus (numéro, groupe, montant, date, bouton télécharger PDF V2 → pour l'instant impression navigateur via `window.print` + vue dédiée).
-- **Composant `ReceiptCard`** : aperçu reçu (logo, n°, montant en lettres, parties, hash de vérif).
-- **Dashboard** : KPI « Reçu ce mois » remplace un KPI mock si pertinent.
-- **Sidebar + BottomNav** : entrée « Reçus ».
-- **Notifications** : la notif `payout_released` ouvre la page Receipts.
+- **Composant `ReliabilityBadge`** (réutilisable) : pastille colorée par tier + score numérique
+- **`ReliabilityCard`** (existant) : remplacer le mock par `getMyReliability()` + breakdown (cotisations payées / à temps / retard moyen)
+- **Dashboard** : la `ReliabilityCard` affiche les vraies données
+- **Profile** :
+  - Bloc "Mon score de fiabilité" avec gauge + statistiques + bouton "Recalculer"
+  - Historique des retards (5 dernières contributions hors délai)
+- **GroupDetail — onglet Membres** : afficher `ReliabilityBadge` à droite de chaque membre (au lieu de l'icône Star statique)
+- **JoinGroup / Directory** : afficher score moyen du groupe si > 0
 
 ### 4. Hors scope (phases suivantes)
-
-- Score fiabilité (Phase E)
-- Centre de notifications complet (Phase F)
-- Génération PDF serveur (sera ajoutée en Phase H ou avec Djomy)
-- Intégration Djomy réelle (Phase I — swap `simulation` → `djomy` dans `release_payout`)
+- Notifications complètes (Phase F)
+- Audit & KYC (Phase G)
+- PDF reçus serveur, onboarding (Phase H)
+- Djomy (Phase I)
 
 ### Action utilisateur après mes changements
-
-Exécuter `db/05_phase_d_payout.sql` dans le SQL Editor Supabase, puis confirmer pour enchaîner Phase E (score de fiabilité).
+Exécuter `db/06_phase_e_reliability.sql` dans le SQL Editor Supabase, puis confirmer pour enchaîner Phase F (notifications).

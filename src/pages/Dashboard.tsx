@@ -11,6 +11,7 @@ import { listMyGroups } from "@/lib/api/groups";
 import { overviewToTontine } from "@/lib/api/types";
 import { listMyNextTurns } from "@/lib/api/turns";
 import { listMyContributionsDue } from "@/lib/api/contributions";
+import { getMyReliability } from "@/lib/api/reliability";
 import { formatGNF } from "@/lib/format";
 
 function KpiTile({
@@ -51,6 +52,10 @@ export default function Dashboard() {
   const { data: dues = [] } = useQuery({
     queryKey: ["contributions", "due"],
     queryFn: listMyContributionsDue,
+  });
+  const { data: reliability } = useQuery({
+    queryKey: ["reliability", "mine"],
+    queryFn: getMyReliability,
   });
 
   const groups = useMemo(() => rows.map(overviewToTontine), [rows]);
@@ -150,10 +155,19 @@ export default function Dashboard() {
           </SectionCard>
 
           <ReliabilityCard
-            score={100}
-            onTime={{ current: 0, total: 0 }}
-            late={0}
-            memberSince="—"
+            score={reliability?.score ?? 0}
+            tier={reliability?.tier ?? "nouveau"}
+            onTime={{
+              current: reliability?.total_on_time ?? 0,
+              total: reliability?.total_paid ?? 0,
+            }}
+            late={reliability?.total_late ?? 0}
+            avgDelay={reliability?.avg_delay_days ?? 0}
+            memberSince={
+              user?.created_at
+                ? new Date(user.created_at).toLocaleDateString("fr-FR", { month: "short", year: "numeric" })
+                : "—"
+            }
           />
         </div>
       </div>
