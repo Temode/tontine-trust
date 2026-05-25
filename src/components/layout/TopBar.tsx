@@ -1,10 +1,13 @@
-import { Bell, Plus, Search } from "lucide-react";
+import { LogOut, Plus, Search } from "lucide-react";
 import type { ReactNode } from "react";
+import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
+import { useAuth } from "@/hooks/useAuth";
+import { NotificationBell } from "@/components/notifications/NotificationBell";
 
 interface TopBarProps {
   title: string;
   subtitle?: string;
-  notifications?: number;
   primaryAction?: { label: string; onClick?: () => void; icon?: ReactNode };
   searchPlaceholder?: string;
 }
@@ -12,10 +15,19 @@ interface TopBarProps {
 export function TopBar({
   title,
   subtitle,
-  notifications = 3,
   primaryAction,
   searchPlaceholder = "Rechercher un groupe, un membre, une transaction...",
 }: TopBarProps) {
+  const { user, roles, signOut } = useAuth();
+  const navigate = useNavigate();
+  const primaryRole = roles[0];
+
+  const handleSignOut = async () => {
+    await signOut();
+    toast.success("Déconnexion réussie");
+    navigate("/auth", { replace: true });
+  };
+
   return (
     <header className="sticky top-0 z-30 border-b border-hairline bg-card/85 backdrop-blur">
       <div className="flex items-center justify-between gap-6 px-6 py-4 lg:px-8">
@@ -35,18 +47,7 @@ export function TopBar({
             />
           </div>
 
-          <button
-            type="button"
-            aria-label={`${notifications} notifications`}
-            className="relative flex h-10 w-10 items-center justify-center rounded-lg border border-hairline bg-card text-muted-foreground transition hover:text-foreground"
-          >
-            <Bell className="h-[18px] w-[18px]" />
-            {notifications > 0 && (
-              <span className="absolute -right-1 -top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-destructive-foreground">
-                {notifications}
-              </span>
-            )}
-          </button>
+          <NotificationBell />
 
           {primaryAction && (
             <button
@@ -57,6 +58,25 @@ export function TopBar({
               {primaryAction.icon ?? <Plus className="h-4 w-4" />}
               {primaryAction.label}
             </button>
+          )}
+
+          {user && (
+            <div className="flex items-center gap-2">
+              {primaryRole && (
+                <span className="hidden rounded-full border border-hairline bg-secondary/60 px-2.5 py-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground md:inline-flex">
+                  {primaryRole}
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={handleSignOut}
+                aria-label="Se déconnecter"
+                title="Se déconnecter"
+                className="flex h-10 w-10 items-center justify-center rounded-lg border border-hairline bg-card text-muted-foreground transition hover:text-foreground"
+              >
+                <LogOut className="h-[18px] w-[18px]" />
+              </button>
+            </div>
           )}
         </div>
       </div>

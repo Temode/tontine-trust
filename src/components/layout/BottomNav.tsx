@@ -1,4 +1,4 @@
-import { Clock, Home, Plus, User, Users } from "lucide-react";
+import { Home, Plus, User, Users } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 
@@ -13,7 +13,6 @@ const items: NavItem[] = [
   { to: "/dashboard", label: "Accueil", icon: Home },
   { to: "/groupes", label: "Groupes", icon: Users },
   { to: "/nouveau", label: "Créer", icon: Plus, isMain: true },
-  { to: "/historique", label: "Historique", icon: Clock },
   { to: "/profil", label: "Profil", icon: User },
 ];
 

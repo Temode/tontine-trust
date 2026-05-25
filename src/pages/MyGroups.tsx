@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { Plus } from "lucide-react";
 import { TopBar } from "@/components/layout/TopBar";
@@ -8,7 +9,9 @@ import { GroupsKpiStrip } from "@/components/groups/GroupsKpiStrip";
 import { GroupsTable } from "@/components/groups/GroupsTable";
 import { GroupsToolbar } from "@/components/groups/GroupsToolbar";
 import type { GroupsFilter, SortDir, SortKey, ViewMode } from "@/components/groups/types";
-import { getPortfolioStats, groups as allGroups } from "@/lib/mock-data";
+import { getPortfolioStats } from "@/lib/mock-data";
+import { listMyGroups } from "@/lib/api/groups";
+import { overviewToTontine } from "@/lib/api/types";
 import type { TontineGroup } from "@/lib/types";
 import { toast } from "sonner";
 
@@ -91,6 +94,13 @@ export default function MyGroups() {
   const [sortDir, setSortDir] = useState<SortDir>(STATUS_DEFAULT_DIRS.deadline);
   const [view, setView] = useState<ViewMode>("table");
 
+  const { data: rows = [], isLoading } = useQuery({
+    queryKey: ["groups", "mine"],
+    queryFn: listMyGroups,
+  });
+
+  const allGroups = useMemo<TontineGroup[]>(() => rows.map(overviewToTontine), [rows]);
+
   const counts = useMemo<Record<GroupsFilter, number>>(() => {
     const base: Record<GroupsFilter, number> = {
       all: allGroups.length,
@@ -101,7 +111,7 @@ export default function MyGroups() {
     };
     for (const g of allGroups) base[g.status]++;
     return base;
-  }, []);
+  }, [allGroups]);
 
   const filteredGroups = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -115,7 +125,7 @@ export default function MyGroups() {
       );
     });
     return [...result].sort((a, b) => compareGroups(a, b, sort, sortDir));
-  }, [query, filter, sort, sortDir]);
+  }, [allGroups, query, filter, sort, sortDir]);
 
   const handleSortChange = (key: SortKey) => {
     if (key === sort) {
@@ -173,7 +183,9 @@ export default function MyGroups() {
           onExport={handleExport}
         />
 
-        {filteredGroups.length === 0 ? (
+        {isLoading ? (
+          <p className="text-sm text-muted-foreground">Chargement…</p>
+        ) : filteredGroups.length === 0 ? (
           <EmptyState
             filtered={isFiltered}
             onClearFilters={() => {
@@ -188,8 +200,7 @@ export default function MyGroups() {
         )}
 
         <p className="text-[11px] text-muted-foreground">
-          {filteredGroups.length} {filteredGroups.length > 1 ? "groupes" : "groupe"} affichés ·
-          Données mises à jour en temps réel via les webhooks Mobile Money
+          {filteredGroups.length} {filteredGroups.length > 1 ? "groupes" : "groupe"} affichés · Données en direct depuis votre registre Tontine Digital.
         </p>
       </div>
     </div>

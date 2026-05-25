@@ -2,14 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-/*
- * Tontine Digital — Design tokens (Institutional)
- *
- * Direction: financial infrastructure — not a consumer toy.
- * Deep teal anchored on warm ivory. Champagne gold as a single, restrained
- * accent. Information density over decoration. Numbers in tabular figures.
- */
-
 @layer base {
   :root {
     /* Surfaces */

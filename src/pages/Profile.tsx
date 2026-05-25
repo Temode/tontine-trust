@@ -1,123 +1,135 @@
-import { Pencil } from "lucide-react";
+import { LogOut, RefreshCw, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useNavigate } from "react-router-dom";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { TopBar } from "@/components/layout/TopBar";
-import { DangerZone } from "@/components/profile/DangerZone";
-import { IdentityCard } from "@/components/profile/IdentityCard";
-import { KycPanel } from "@/components/profile/KycPanel";
-import { MandatesPanel } from "@/components/profile/MandatesPanel";
-import { PreferencesPanel } from "@/components/profile/PreferencesPanel";
-import { ProfileActivity } from "@/components/profile/ProfileActivity";
-import { ReliabilityBreakdown } from "@/components/profile/ReliabilityBreakdown";
-import { SecurityPanel } from "@/components/profile/SecurityPanel";
-import { TrackRecordStrip } from "@/components/profile/TrackRecordStrip";
+import { ReliabilityCard } from "@/components/dashboard/ReliabilityCard";
+import { SectionCard } from "@/components/dashboard/SectionCard";
+import { useAuth } from "@/hooks/useAuth";
 import {
-  getReliabilityBreakdown,
-  groups,
-  kycDocuments,
-  profileActivity,
-  sessionDevices,
-  userProfile,
-} from "@/lib/mock-data";
+  getMyReliability,
+  listMyLateContributions,
+  recomputeMyReliability,
+} from "@/lib/api/reliability";
+import { formatGNF } from "@/lib/format";
 
 export default function Profile() {
-  const factors = getReliabilityBreakdown();
-  const organized = groups.filter((g) => g.role === "organizer").length;
-  const participated = groups.filter((g) => g.role === "participant").length;
+  const { user, signOut } = useAuth();
+  const navigate = useNavigate();
+  const qc = useQueryClient();
+
+  const { data: reliability } = useQuery({
+    queryKey: ["reliability", "mine"],
+    queryFn: getMyReliability,
+  });
+  const { data: lates = [] } = useQuery({
+    queryKey: ["reliability", "lates"],
+    queryFn: listMyLateContributions,
+  });
+  const recompute = useMutation({
+    mutationFn: recomputeMyReliability,
+    onSuccess: () => {
+      toast.success("Score mis à jour");
+      qc.invalidateQueries({ queryKey: ["reliability"] });
+    },
+    onError: (e: Error) => toast.error("Recalcul impossible", { description: e.message }),
+  });
+
+  const fullName =
+    (user?.user_metadata?.full_name as string | undefined) ?? user?.email ?? "Utilisateur";
+  const phone = (user?.user_metadata?.phone_number as string | undefined) ?? "—";
+  const email = user?.email ?? "—";
+  const initials = fullName
+    .split(" ")
+    .map((s) => s[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+
+  const handleSignOut = async () => {
+    await signOut();
+    toast.success("Vous êtes déconnecté.");
+    navigate("/auth", { replace: true });
+  };
 
   return (
     <div className="animate-fade-in">
       <TopBar
         title="Mon profil"
-        subtitle="Identité, conformité, sécurité et préférences sur l'infrastructure Tontine Digital."
-        primaryAction={{
-          label: "Modifier le profil",
-          onClick: () =>
-            toast("Édition rapide", {
-              description: "Utilisez l'onglet Identité & KYC pour des modifications complètes.",
-            }),
-          icon: <Pencil className="h-4 w-4" />,
-        }}
+        subtitle="Vos informations personnelles et votre fiabilité."
       />
 
       <div className="space-y-6 px-5 py-6 lg:px-8 lg:py-8">
-        <IdentityCard
-          profile={userProfile}
-          organizedCount={organized}
-          participantCount={participated}
-          onEdit={() =>
-            toast("Édition rapide", {
-              description: "L'édition complète est dans l'onglet Identité & KYC.",
-            })
+        <article className="flex items-center gap-4 rounded-xl border border-hairline bg-card p-5">
+          <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-primary text-base font-bold text-primary-foreground">
+            {initials || "?"}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="truncate font-display text-lg font-bold text-foreground">{fullName}</p>
+            <p className="truncate text-sm text-muted-foreground">{email}</p>
+            <p className="truncate text-xs text-muted-foreground">{phone}</p>
+          </div>
+        </article>
+
+        <ReliabilityCard
+          score={reliability?.score ?? 0}
+          tier={reliability?.tier ?? "nouveau"}
+          onTime={{
+            current: reliability?.total_on_time ?? 0,
+            total: reliability?.total_paid ?? 0,
+          }}
+          late={reliability?.total_late ?? 0}
+          avgDelay={reliability?.avg_delay_days ?? 0}
+          memberSince={
+            user?.created_at
+              ? new Date(user.created_at).toLocaleDateString("fr-FR", { month: "short", year: "numeric" })
+              : "—"
           }
         />
 
-        <TrackRecordStrip profile={userProfile} />
+        <button
+          type="button"
+          onClick={() => recompute.mutate()}
+          disabled={recompute.isPending}
+          className="inline-flex h-9 items-center gap-2 rounded-md border border-hairline bg-card px-3 text-xs font-semibold text-foreground transition hover:bg-secondary disabled:opacity-60"
+        >
+          <RefreshCw className={`h-3.5 w-3.5 ${recompute.isPending ? "animate-spin" : ""}`} />
+          {recompute.isPending ? "Recalcul…" : "Recalculer mon score"}
+        </button>
 
-        <Tabs defaultValue="overview" className="space-y-6">
-          <div className="-mx-5 overflow-x-auto px-5 lg:-mx-8 lg:px-8">
-            <TabsList className="inline-flex h-auto min-w-full justify-start gap-1 rounded-xl border border-hairline bg-card p-1 lg:min-w-0">
-              <TabsTrigger
-                value="overview"
-                className="rounded-lg px-4 py-2 text-sm font-medium data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-soft"
-              >
-                Vue d'ensemble
-              </TabsTrigger>
-              <TabsTrigger
-                value="identity"
-                className="rounded-lg px-4 py-2 text-sm font-medium data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-soft"
-              >
-                Identité & KYC
-              </TabsTrigger>
-              <TabsTrigger
-                value="security"
-                className="rounded-lg px-4 py-2 text-sm font-medium data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-soft"
-              >
-                Sécurité
-              </TabsTrigger>
-              <TabsTrigger
-                value="preferences"
-                className="rounded-lg px-4 py-2 text-sm font-medium data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-soft"
-              >
-                Préférences
-              </TabsTrigger>
-              <TabsTrigger
-                value="activity"
-                className="rounded-lg px-4 py-2 text-sm font-medium data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-soft"
-              >
-                Activité
-              </TabsTrigger>
-            </TabsList>
-          </div>
+        {lates.length > 0 && (
+          <SectionCard title="Historique des retards" subtitle={`${lates.length} cotisation${lates.length > 1 ? "s" : ""} en retard`} bare>
+            <ul className="divide-y divide-border/60">
+              {lates.map((l) => (
+                <li key={l.contribution_id} className="flex items-center gap-3 px-5 py-3 lg:px-6">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-md bg-destructive/10 text-destructive">
+                    <AlertTriangle className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold text-foreground">{l.group_name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      Tour #{l.turn_number} · échéance {new Date(l.due_date).toLocaleDateString("fr-FR")} ·{" "}
+                      <span className="font-semibold text-destructive">+{l.delay_days} j</span>
+                    </p>
+                  </div>
+                  <p className="font-display text-sm font-semibold text-foreground num">
+                    {formatGNF(l.amount)} GNF
+                  </p>
+                </li>
+              ))}
+            </ul>
+          </SectionCard>
+        )}
 
-          <TabsContent value="overview" className="space-y-6">
-            <ReliabilityBreakdown score={userProfile.reliabilityScore} factors={factors} />
-            <MandatesPanel groups={groups} />
-          </TabsContent>
-
-          <TabsContent value="identity">
-            <KycPanel profile={userProfile} documents={kycDocuments} />
-          </TabsContent>
-
-          <TabsContent value="security">
-            <SecurityPanel profile={userProfile} devices={sessionDevices} />
-          </TabsContent>
-
-          <TabsContent value="preferences">
-            <PreferencesPanel profile={userProfile} />
-          </TabsContent>
-
-          <TabsContent value="activity" className="space-y-6">
-            <ProfileActivity events={profileActivity} />
-            <DangerZone />
-          </TabsContent>
-        </Tabs>
-
-        <p className="text-[11px] text-muted-foreground">
-          Tontine Digital horodate chaque mise à jour de profil et chaque événement de sécurité sur un
-          registre immuable. Les documents KYC sont chiffrés AES-256 et accessibles uniquement par le
-          service conformité.
-        </p>
+        <button
+          type="button"
+          onClick={handleSignOut}
+          className="inline-flex h-10 items-center gap-2 rounded-md border border-hairline bg-card px-4 text-sm font-semibold text-foreground transition hover:bg-secondary"
+        >
+          <LogOut className="h-4 w-4" />
+          Se déconnecter
+        </button>
       </div>
     </div>
   );
