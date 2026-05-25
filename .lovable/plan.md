@@ -1,89 +1,79 @@
-# Phase B — Persistance groupes, membres & invitations
+# Audit Dashboard & refonte MVP
 
-Objectif : connecter le wizard de création, la liste « Mes groupes », le détail groupe et l'écran « Rejoindre » à la vraie BDD (tables créées en Phase A). Aucune donnée mock ne subsiste pour ces écrans.
+## Audit du dashboard actuel
 
-## Périmètre
+Le dashboard actuel (`src/pages/Dashboard.tsx`) affiche **12 composants** alimentés à 100% par `mock-data`. Pour un MVP centré sur **tontine digitale automatisée + traçabilité + score de fiabilité**, c'est largement surdimensionné.
 
-1. **Création de groupe** (`/creer-groupe`)
-2. **Mes groupes** (`/groupes`)
-3. **Détail groupe** (`/groupes/:id`) — onglet membres + invitations
-4. **Rejoindre un groupe** (`/rejoindre`) via code
+### Ce qui est inutile pour le MVP
 
-Les paiements, cycles, rotations, notifications, dashboard KPIs restent en mock (phases C–F).
+| Bloc | Composant | Raison du retrait |
+|---|---|---|
+| Solde total tontines | `PrimaryBalanceCard` | Pas de wallet/solde en MVP (paiements simulés) |
+| Cotisations effectuées (KPI) | `StatTile` out | Doublon avec « État cotisations » |
+| Cagnottes reçues (KPI) | `StatTile` in | Pas de versements réels en V1 |
+| Transactions récentes + filtres | `TransactionsTable` | Phase D (paiements) — pas encore de vraies tx |
+| Distribution par groupe | `DistributionCard` | Analytique avancée, hors MVP |
+| État cotisations live (organisateur) | `MemberStatusGrid` | Doit vivre dans `/groupes/:id`, pas le dashboard |
+| Pay card + Quick links | `PayCard`, `QuickLinks` | Redondant avec sidebar + bouton créer |
+| Échéances (mock) | `DeadlinesList` | Garder mais brancher sur vraies données quand cycles seront prêts |
 
-## 1. Couche d'accès données
+### Ce qu'on garde (utile MVP)
 
-Nouveau dossier `src/lib/api/` :
+- **Salutation + CTA principal** (créer / rejoindre un groupe)
+- **Mes groupes actifs** — liste compacte branchée sur `listMyGroups()` (déjà fait Phase B)
+- **Score de fiabilité** — pilier du concept (mock acceptable, sera calculé Phase D)
+- **Prochaines échéances** — placeholder « Aucune échéance » jusqu'à Phase C
 
-- `groups.ts`
-  - `listMyGroups()` → `from('my_groups_overview').select('*')`
-  - `getGroup(id)` → groupe + rôle courant + compte membres
-  - `createGroup(draft)` → insert dans `groups` (mapping `GroupDraft` → colonnes BDD : `name`, `description`, `category`, `contribution_amount`, `frequency`, `max_members`, `rotation_order_kind`, `late_penalty_percent`, `late_penalty_after_days`, `created_by = auth.uid()`). Le trigger `on_group_created` insère automatiquement l'organisateur dans `group_members`.
-- `members.ts`
-  - `listGroupMembers(groupId)` join `group_members` + `profiles`
-- `invitations.ts`
-  - `createInvitation(groupId, { maxUses, expiresAt })` → insert `invitations` (code généré côté SQL via default, ou côté JS si la colonne l'exige)
-  - `listGroupInvitations(groupId)`
-  - `revokeInvitation(id)`
-  - `joinWithCode(code)` → `rpc('join_group_with_code', { _code: code })`
+## Nouvelle structure proposée (MVP)
 
-Toutes les fonctions retournent `{ data, error }` et laissent l'UI gérer les toasts.
+```text
+┌─────────────────────────────────────────────┐
+│ TopBar : "Bonjour {prenom}"                 │
+│ Actions : [Créer un groupe] [Rejoindre]     │
+├─────────────────────────────────────────────┤
+│ 3 KPI simples (données réelles)             │
+│  • Groupes actifs    • Tour à venir         │
+│  • Score fiabilité                          │
+├──────────────────────────┬──────────────────┤
+│ Mes groupes (réel)       │ Score fiabilité  │
+│ liste 5 derniers + CTA   │ (carte simple)   │
+│ "Voir tout"              │                  │
+│                          │ Prochaines       │
+│                          │ échéances (vide) │
+└──────────────────────────┴──────────────────┘
+```
 
-## 2. React Query
+3 KPI réels :
+- **Groupes actifs** = `listMyGroups()` count
+- **Prochain tour** = placeholder « À venir » (Phase C)
+- **Score fiabilité** = mock 100% jusqu'à Phase D
 
-- Installer/utiliser `@tanstack/react-query` (déjà présent via shadcn template normalement — à vérifier, sinon ajouter).
-- Clés : `['groups','mine']`, `['group', id]`, `['group', id, 'members']`, `['group', id, 'invitations']`.
-- Invalidation après création/join/revocation.
+## Détails techniques
 
-## 3. UI — modifications
+### Fichiers modifiés
+- `src/pages/Dashboard.tsx` → réécriture, ~80 lignes au lieu de 186
+- Suppression des imports : `PrimaryBalanceCard`, `StatTile`, `TransactionsTable`, `TransactionFilters`, `DistributionCard`, `MemberStatusGrid`, `PayCard`, `QuickLinks`, `RoleGuard`, `PaymentModal`, mock `transactions`, `groupDistribution`, `liveMembersStatus`, `upcomingDeadlines`, `getStats`.
+- Plus de `RoleGuard` dans dashboard (la vue organisateur déménage dans `/groupes/:id`)
 
-### CreateGroup (`src/pages/CreateGroup.tsx`)
-- Remplacer le `setTimeout` mock par `await createGroup(draft)`.
-- En succès : récupérer l'`id` du groupe, créer une première invitation avec le `inviteCode` saisi (ou code généré par la BDD), naviguer vers `/groupes/:id` ou afficher l'écran `IssuedConfirmation` avec le vrai code.
-- Gérer erreurs (toast destructive).
+### Fichiers conservés intacts
+- `SectionCard`, `GroupRow`, `DeadlinesList`, `ReliabilityCard` réutilisés
+- Composants supprimés du dashboard restent disponibles ailleurs (Cotisations, Historique, GroupDetail)
 
-### MyGroups (`src/pages/MyGroups.tsx`)
-- Remplacer `mock-data` par `useQuery(['groups','mine'], listMyGroups)`.
-- Adapter `GroupsTable`/`GroupsGrid` aux nouveaux champs (mapping vers le type UI existant `Group`). Conserver les KPI strip en mock pour cette phase (libellé « démo »).
-- État vide → CTA « Créer un groupe » / « Rejoindre ».
+### Données
+- `useQuery(['groups','mine'], listMyGroups)` déjà branché Phase B → réutilisé
+- KPI "Groupes actifs" calculé à partir du même `data`
+- Score fiabilité : mock `92%` en attendant Phase D
 
-### GroupDetail (`src/pages/GroupDetail.tsx`)
-- Charger `getGroup(id)` + `listGroupMembers(id)`.
-- Si l'utilisateur est organisateur : afficher panneau invitations (liste + bouton « Nouveau code »).
-- Sinon : masquer.
+### Hors périmètre de ce plan
+- Brancher échéances sur vrais cycles → Phase C
+- Brancher score sur vraies cotisations → Phase D
+- Page `/cotisations`, `/rotations`, `/historique` inchangées
 
-### JoinGroup (`src/pages/JoinGroup.tsx`) + `CodeEntryHero`
-- Brancher le champ code sur `joinWithCode(code)`. En succès → toast + navigation vers `/groupes/:groupId`.
-- Mapper les erreurs RPC : `invalid_code`, `expired`, `full`, `already_member`.
+## Validation
 
-### InviteMembers (`src/pages/InviteMembers.tsx`)
-- Sélecteur de groupe alimenté par `listMyGroups()` filtré sur `is_organizer = true`.
-- Tableau invitations = `listGroupInvitations(groupId)`. Bouton « Nouveau code » → `createInvitation`. Bouton « Révoquer » → `revokeInvitation`.
+1. Dashboard se charge sans aucune référence aux mocks `transactions`, `liveMembersStatus`, etc.
+2. Compteur "Groupes actifs" reflète la BDD réelle
+3. Liste "Mes groupes" affiche les vrais groupes (ou état vide CTA)
+4. Aucune régression sur les autres pages
 
-## 4. Types
-
-Ajouter `src/lib/api/types.ts` avec les interfaces DB (snake_case) et un adapter vers les types UI (`src/lib/types.ts`) pour ne pas casser les composants existants.
-
-## 5. Garde-fous
-
-- `ProtectedRoute` déjà en place sur ces routes — RAS.
-- RLS Phase A garantit l'isolation : pas de logique d'autorisation côté client.
-- Les erreurs Supabase remontent en toasts ; pas de `console.log` laissé.
-
-## 6. Hors périmètre (phases suivantes)
-
-- C : cycles + rotation auto
-- D : contributions + paiements simulés
-- E : versement et clôture de tour
-- F : notifications BDD
-- G : landing publique
-
-## Validation attendue
-
-Après merge :
-1. Créer un groupe via le wizard → apparaît dans `/groupes`.
-2. Copier le code → autre compte → `/rejoindre` → succès, le groupe apparaît pour les deux.
-3. Organisateur voit la liste membres + invitations ; membre simple ne voit que les membres.
-4. Aucune erreur 401/403 dans le réseau.
-
-Dis « go phase B » pour que je lance l'implémentation.
+Dis « go » pour que je passe en build mode et réécrive le dashboard.
