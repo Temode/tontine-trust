@@ -1,55 +1,76 @@
-## Phase F — Centre de notifications
+# Inviter & partager depuis le détail d'un groupe
 
-Migration Phase E appliquée. Phase E déjà implémentée côté code (scores, badges, vue profil). On passe à la Phase F : notifications in-app pour tenir les membres informés des événements clés.
+## Objectif
+Permettre à l'organisateur, depuis `/groupes/:id`, de :
+1. Copier le **code d'invitation** et le **lien partageable** du groupe.
+2. **Inviter par e‑mail** (ouvre le client mail pré‑rempli + lien `mailto:` / `wa.me`).
+3. Voir et gérer les **codes existants** (révoquer, générer un nouveau).
 
-### Objectif
-Donner à chaque utilisateur un flux de notifications consultable (cloche dans la TopBar + page dédiée), alimenté automatiquement par les événements métier déjà en place (cotisations, versements, rotation, fiabilité).
+Et corriger l'incohérence affichée « 0 membres actifs » alors que le créateur doit déjà être membre actif (organisateur).
 
-### Migration SQL — `db/07_phase_f_notifications.sql`
+## UX sur `GroupDetail.tsx`
 
-- **ENUM `notification_kind`** : `contribution_due`, `contribution_confirmed`, `payout_released`, `receipt_ready`, `turn_started`, `reliability_changed`, `member_joined`, `invitation_received`.
-- **Table `notifications`** :
-  - `id`, `user_id`, `kind`, `title`, `body`, `group_id?`, `turn_id?`, `link?`, `payload jsonb`, `read_at?`, `created_at`.
-  - Index `(user_id, created_at desc)` et `(user_id) where read_at is null`.
-- **RLS** : lecture/maj limitées à `user_id = auth.uid()`. Insertion réservée aux fonctions `security definer`.
-- **Helper** `notify(_user_id, _kind, _title, _body, _group_id, _turn_id, _link, _payload)`.
-- **Triggers** :
-  - `contributions.status = confirmed` → notif au payeur + à l'organisateur.
-  - `turns.status` passe à `collecting` → notif aux membres actifs du groupe.
-  - `turns.status` passe à `paid` → notif au bénéficiaire (+ "reçu prêt").
-  - `user_reliability_scores` : changement de `tier` → notif à l'utilisateur.
-  - `group_members` insert (`status = active`) → notif à l'organisateur.
-- **RPC** :
-  - `mark_notification_read(_id uuid)`
-  - `mark_all_notifications_read()`
-- **Vue** `my_notifications` (50 plus récentes, `security_invoker`).
+Ajouter, juste sous l'en‑tête (et visible **uniquement pour l'organisateur**), une nouvelle section `SectionCard` « Inviter des membres » contenant :
 
-### Couche API — `src/lib/api/notifications.ts`
-- `listMyNotifications(limit?)`
-- `countUnread()`
-- `markRead(id)` / `markAllRead()`
-- `subscribeToMyNotifications(cb)` via Supabase Realtime (channel sur `notifications` filtré `user_id=eq.<uid>`).
+- **Bloc code** : code en grand (`font-mono tracking-wide`), bouton « Copier le code ».
+- **Bloc lien** : input lecture seule `https://tontine.digital/join/<code>` + bouton « Copier le lien ».
+- **Boutons rapides** : 
+  - « Partager par e‑mail » → ouvre `mailto:?subject=...&body=...` pré‑rempli (nom du groupe, montant, fréquence, code, lien).
+  - « WhatsApp » → ouvre `https://wa.me/?text=...` pré‑rempli.
+  - « Nouveau code » → génère via `createInvitation(groupId)`.
+- **Liste compacte des codes** (max 3 récents) avec statut + bouton « Révoquer ».
 
-### UI
+Ajouter aussi dans l'en‑tête sticky un bouton secondaire « Inviter » (icône `UserPlus`) qui scrolle vers la section, pour la rendre découvrable immédiatement.
 
-- **`NotificationBell`** (nouveau, dans `TopBar`) :
-  - Icône cloche avec pastille count non lus.
-  - Popover avec 10 dernières notifs, bouton "Tout marquer lu", lien "Voir tout".
-- **Page `/notifications`** (nouvelle `src/pages/Notifications.tsx`) :
-  - Liste complète groupée par jour, filtres "Toutes / Non lues".
-  - Click sur une notif → marque lue + navigue vers `link` (groupe, reçu, cotisation).
-- **Mise à jour** :
-  - `TopBar.tsx` : intègre `NotificationBell`.
-  - `DesktopSidebar.tsx` + `BottomNav.tsx` : entrée "Notifications".
-  - `App.tsx` : route `/notifications`.
-- **Realtime** : hook `useNotifications()` qui s'abonne au montage de l'AppShell, invalide les queries `["notifications"]` et joue un toast léger pour les nouveaux événements.
+Aucun changement de logique métier — réutilise `listGroupInvitations`, `createInvitation`, `revokeInvitation` déjà présents dans `src/lib/api/invitations.ts`.
 
-### Design tokens
-- Réutiliser `TIER_CLASSES` / variantes existantes. Pastille non-lue = `bg-primary text-primary-foreground`. Item non lu = fond `bg-primary/5`, liseré gauche `border-l-2 border-primary`.
+## Invitation par e‑mail
 
-### Action requise après génération
-Exécuter `db/07_phase_f_notifications.sql` dans Supabase, puis confirmer. **Phase G** (paiements réels Djomy) restera la dernière, en attente de l'API.
+Pas d'envoi serveur dans cette itération (pas d'infra email configurée). On utilise un `mailto:` riche :
 
-### Fichiers
-- **Créés** : `db/07_phase_f_notifications.sql`, `src/lib/api/notifications.ts`, `src/components/notifications/NotificationBell.tsx`, `src/components/notifications/NotificationItem.tsx`, `src/hooks/useNotifications.ts`, `src/pages/Notifications.tsx`.
-- **Édités** : `src/App.tsx`, `src/components/layout/TopBar.tsx`, `src/components/layout/DesktopSidebar.tsx`, `src/components/layout/BottomNav.tsx`, `src/components/layout/AppShell.tsx`.
+```text
+Sujet : Rejoignez la tontine "<nom>"
+Corps : 
+  Bonjour,
+  Je vous invite à rejoindre notre tontine "<nom>".
+  • Cotisation : <montant> GNF (<fréquence>)
+  • Code : <CODE>
+  • Lien : <url>
+```
+
+Une note discrète indique : « L'envoi automatique d'e‑mails sera activé prochainement. »
+
+## Correction « 0 membres actifs »
+
+Cause probable : pour les groupes créés avant la mise en place du trigger `on_group_created`, le créateur n'a pas de ligne dans `group_members`. Le trigger existe (`db/02_tontine_schema.sql`), mais les anciens groupes ne sont pas rattrapés.
+
+Ajouter un script SQL `db/08_backfill_organizer_membership.sql` (idempotent) :
+
+```sql
+insert into public.group_members (group_id, user_id, role, status, position)
+select g.id, g.created_by, 'organisateur', 'active', 1
+from public.groups g
+where not exists (
+  select 1 from public.group_members gm
+  where gm.group_id = g.id and gm.user_id = g.created_by
+)
+on conflict (group_id, user_id) do nothing;
+```
+
+À exécuter manuellement dans Supabase SQL Editor. Aucun changement de schéma — uniquement un rattrapage de données.
+
+## Détails techniques
+
+**Fichiers créés**
+- `src/components/groups/InvitePanel.tsx` — section autonome (code + lien + actions de partage + liste codes).
+- `db/08_backfill_organizer_membership.sql` — rattrapage organisateur.
+
+**Fichiers modifiés**
+- `src/pages/GroupDetail.tsx` — montage de `<InvitePanel groupId={grp.id} groupName={grp.name} contribution={grp.contribution_amount} frequency={frequency} />` sous l'en‑tête si `isOrganizer`, et ajout du bouton « Inviter » dans la barre sticky.
+
+**Hors scope**
+- Envoi d'e‑mails transactionnels via edge function (à proposer ensuite via Lovable Cloud Emails).
+- Génération de QR code (déjà présent dans `InviteMembers`, peut être réutilisé plus tard si besoin).
+
+## Action utilisateur requise
+Exécuter `db/08_backfill_organizer_membership.sql` dans le SQL Editor Supabase pour corriger les anciens groupes affichant « 0 membres actifs ».
