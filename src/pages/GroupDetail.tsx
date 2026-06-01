@@ -323,6 +323,15 @@ export default function GroupDetail() {
           </div>
         )}
 
+        {isOrganizer && (
+          <InvitePanel
+            groupId={grp.id}
+            groupName={grp.name}
+            contribution={grp.contribution_amount}
+            frequency={frequency}
+          />
+        )}
+
         <div className="mt-6 inline-flex items-center gap-1 rounded-lg border border-hairline bg-card p-1" role="tablist" aria-label="Sections du groupe">
           {tabs.map((tab) => (
             <button
