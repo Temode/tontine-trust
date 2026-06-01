@@ -10,6 +10,7 @@ import {
   MoreVertical,
   Play,
   Star,
+  UserPlus,
   Wallet,
   X,
 } from "lucide-react";
@@ -30,6 +31,7 @@ import { ReliabilityBadge } from "@/components/reliability/ReliabilityBadge";
 import { useAuth } from "@/hooks/useAuth";
 import type { DbGroup, DbGroupMember, DbNextTurn } from "@/lib/api/types";
 import { SectionCard } from "@/components/dashboard/SectionCard";
+import { InvitePanel, INVITE_PANEL_ID } from "@/components/groups/InvitePanel";
 
 type Section = "overview" | "members" | "rotation";
 
@@ -181,6 +183,19 @@ export default function GroupDetail() {
             <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Groupe de tontine</p>
             <h1 className="truncate font-display text-xl font-bold text-foreground lg:text-2xl">{grp.name}</h1>
           </div>
+          {isOrganizer && (
+            <button
+              type="button"
+              onClick={() => {
+                const el = document.getElementById(INVITE_PANEL_ID);
+                el?.scrollIntoView({ behavior: "smooth", block: "start" });
+              }}
+              className="hidden h-10 items-center gap-1.5 rounded-lg border border-hairline px-3 text-xs font-medium text-foreground transition hover:bg-secondary sm:inline-flex"
+            >
+              <UserPlus className="h-4 w-4" />
+              Inviter
+            </button>
+          )}
           <button
             type="button"
             aria-label="Plus d'options"
