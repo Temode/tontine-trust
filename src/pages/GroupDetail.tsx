@@ -157,7 +157,9 @@ export default function GroupDetail() {
   const activeMembers = allMembers.filter((m) => m.status === "active");
   const pendingMembers = allMembers.filter((m) => m.status === "pending");
   const turns = turnsQ.data ?? [];
-  const isOrganizer = activeMembers.some((m) => m.user_id === user?.id && m.role === "organisateur");
+  const isOrganizer =
+    (!!user?.id && grp.created_by === user.id) ||
+    activeMembers.some((m) => m.user_id === user?.id && m.role === "organisateur");
   const frequency = FREQ_LABEL[grp.frequency] ?? "Mensuelle";
   const totalPayout = grp.contribution_amount * activeMembers.length;
   const canStart =
