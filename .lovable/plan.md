@@ -1,39 +1,36 @@
-# Plan — Re-test du flux invitation/adhésion
+# Plan — Reprise du test bout en bout (après migration 10)
 
-La migration `db/09_fix_membership_and_invitations.sql` est confirmée exécutée. Je vais relancer un audit bout en bout dans le navigateur avec deux comptes pour vérifier que les correctifs (Phase G) fonctionnent.
+Migration `db/10_pending_members_visibility.sql` confirmée exécutée. Reprise du test E2E avec les comptes déjà créés.
 
 ## Étapes
 
-1. **Vérification BDD rapide** (`psql`)
-   - Confirmer que `'pending'` existe dans l'enum `member_status`.
-   - Confirmer que tout groupe a au moins une ligne `group_members` (organisateur, active).
-   - Vérifier la policy `inv_select_organizer` sur `invitations`.
+1. **Compte B (Bob)** — toujours connecté
+   - Recharger `/groupes` → vérifier que le groupe "Tontine Test G" apparaît en **statut pending**.
+   - Ouvrir le groupe → vérifier qu'il s'affiche (au lieu de "Groupe introuvable"), avec un indicateur d'attente d'approbation.
 
-2. **Compte A — Organisateur**
-   - Création compte test A (email jetable + mot de passe).
-   - Création d'un nouveau groupe de tontine (montant, fréquence, taille).
-   - Ouvrir le groupe : vérifier compteur membres = 1, pot cohérent.
-   - Générer une invitation via `InvitePanel` : copier le **code** + le **lien** (`/rejoindre?code=…`).
+2. **Re-test du flux code manuel**
+   - (Optionnel) Revoir l'auto-format + le toast "Demande envoyée" si on rejoue un code.
 
-3. **Compte B — Invité**
-   - Déconnexion, création compte test B.
-   - **Scénario 1 (code)** : aller sur `/rejoindre`, coller le code, vérifier longueur 12 acceptée, rejoindre.
-   - **Scénario 2 (lien)** : ouvrir `/rejoindre?code=…`, vérifier auto‑remplissage + auto‑join.
-   - Vérifier le statut résultant (`active` ou `pending` selon `require_manual_approval`).
+3. **Compte A (Alice — organisatrice)**
+   - Se reconnecter (alice.tontine.test+a@example.com).
+   - Vérifier le compteur "membres actifs" du header (point d'audit incohérence 0 vs 1).
+   - Onglet **Membres** → voir Bob en `pending` + boutons Approuver/Rejeter.
+   - Approuver Bob → vérifier passage à `active` + notification générée.
 
-4. **Retour compte A**
-   - Si `pending` : approuver via UI, vérifier passage à `active` + notification.
-   - Vérifier compteur membres = 2.
+4. **Retour Bob**
+   - Recharger → statut passe à `active`, accès complet au groupe.
+   - Vérifier la notification "candidature acceptée".
 
 5. **Cas d'erreur**
-   - Code invalide → message clair.
-   - Code révoqué → message clair.
-   - Accès direct à un groupe non-membre → erreur 403/404 explicite (pas de chargement infini).
+   - Saisir un code invalide → message d'erreur explicite.
 
 ## Livrable
 
-Rapport synthétique : ce qui marche, ce qui reste cassé, captures à l'appui. Si bugs résiduels → correctifs ciblés (sans élargir le périmètre).
+Rapport synthétique avec captures :
+- ce qui fonctionne après migration 10,
+- bugs résiduels (si l'incohérence "0 membres actifs" persiste, plan de correctif ciblé),
+- recommandations restantes (KPI mock-data sur Mes groupes).
 
 ## Hors scope
 
-Paiements Orange/MTN, refonte annuaire public.
+Paiements Orange/MTN, refonte annuaire, performance.
