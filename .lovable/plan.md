@@ -1,53 +1,39 @@
-# Plan de correctifs — Invitation & adhésion aux groupes
+# Plan — Re-test du flux invitation/adhésion
 
-Objectif : rendre opérationnel le flux d'invitation/adhésion identifié par l'audit, dans l'ordre de sévérité.
+La migration `db/09_fix_membership_and_invitations.sql` est confirmée exécutée. Je vais relancer un audit bout en bout dans le navigateur avec deux comptes pour vérifier que les correctifs (Phase G) fonctionnent.
 
-## 1. Bloquants saisie & lien (frontend)
+## Étapes
 
-**`src/components/join-group/CodeEntryHero.tsx`**
-- Corriger `maxLength={11}` → `maxLength={12}` (format `TD-XXXX-XXXX` = 12 caractères).
-- Lire `?code=` via `useSearchParams` au montage, auto‑formater et pré‑remplir l'input. Si le code est complet, déclencher automatiquement `handleJoin()`.
+1. **Vérification BDD rapide** (`psql`)
+   - Confirmer que `'pending'` existe dans l'enum `member_status`.
+   - Confirmer que tout groupe a au moins une ligne `group_members` (organisateur, active).
+   - Vérifier la policy `inv_select_organizer` sur `invitations`.
 
-**`src/components/groups/InvitePanel.tsx`**
-- Remplacer le lien `https://tontine.digital/join/<code>` par `${window.location.origin}/rejoindre?code=<code>` (route réelle, déjà routée dans `App.tsx`).
+2. **Compte A — Organisateur**
+   - Création compte test A (email jetable + mot de passe).
+   - Création d'un nouveau groupe de tontine (montant, fréquence, taille).
+   - Ouvrir le groupe : vérifier compteur membres = 1, pot cohérent.
+   - Générer une invitation via `InvitePanel` : copier le **code** + le **lien** (`/rejoindre?code=…`).
 
-## 2. Bloquant base de données (membres & pot à 0)
+3. **Compte B — Invité**
+   - Déconnexion, création compte test B.
+   - **Scénario 1 (code)** : aller sur `/rejoindre`, coller le code, vérifier longueur 12 acceptée, rejoindre.
+   - **Scénario 2 (lien)** : ouvrir `/rejoindre?code=…`, vérifier auto‑remplissage + auto‑join.
+   - Vérifier le statut résultant (`active` ou `pending` selon `require_manual_approval`).
 
-**Nouveau `db/09_fix_membership_trigger.sql`** (migration) :
-- Aligner l'enum `member_status` avec le frontend : ajouter la valeur `'pending'` si absente.
-- Recréer le trigger `on_group_created` (idempotent : `drop` + `create`) qui insère le créateur dans `group_members` avec `role='organisateur'`, `status='active'`, `position=1`.
-- Réexécuter le backfill de `db/08_backfill_organizer_membership.sql` pour les groupes existants.
+4. **Retour compte A**
+   - Si `pending` : approuver via UI, vérifier passage à `active` + notification.
+   - Vérifier compteur membres = 2.
 
-## 3. Workflow d'approbation
+5. **Cas d'erreur**
+   - Code invalide → message clair.
+   - Code révoqué → message clair.
+   - Accès direct à un groupe non-membre → erreur 403/404 explicite (pas de chargement infini).
 
-**`join_group_with_code` RPC** (migration SQL) :
-- Lire `groups.require_manual_approval` (ou règle équivalente déjà présente dans le schéma). Si vrai → insérer le nouveau membre avec `status='pending'` au lieu de `'active'`.
-- Créer une notification pour l'organisateur (`type='member_request'`).
-- À l'`approve_member`, créer une notification pour le demandeur (`type='member_approved'`).
+## Livrable
 
-## 4. Sécurité RLS sur `invitations`
-
-Migration SQL :
-- Restreindre `select` sur `invitations` aux organisateurs du groupe uniquement (pas les autres membres).
-- La validation d'un code par un invité non‑membre passe exclusivement par la RPC `security definer` `join_group_with_code` (pas de `select` direct côté client).
-- Vérifier : `insert` réservé aux organisateurs, `update status='revoked'` réservé aux organisateurs.
-
-## 5. Robustesse UI
-
-**`src/pages/GroupDetail.tsx`** : si la requête groupe renvoie vide (RLS), afficher un écran d'erreur 403/404 explicite avec retour, au lieu d'un « Chargement… » infini.
-
-**`src/pages/JoinGroup.tsx`** : retirer les blocs basés sur `mock-data` (`directoryGroups`, `myApplications`, `getJoinStats`) ou les remplacer par un état vide honnête (« Annuaire en cours d'ouverture »). Ne laisser que `CodeEntryHero` actif.
-
-## 6. Vérification
-
-Après application :
-- `psql` : vérifier qu'un nouveau groupe insère bien 1 ligne `group_members` (organisateur, active).
-- Browser : test bout en bout avec deux comptes — code + lien — observer notifications + compteur membres + flux approbation.
+Rapport synthétique : ce qui marche, ce qui reste cassé, captures à l'appui. Si bugs résiduels → correctifs ciblés (sans élargir le périmètre).
 
 ## Hors scope
 
-Paiements Orange/MTN, performance, refonte annuaire public (Phase ultérieure).
-
-## Action requise
-
-Passer en **mode Build** pour exécuter les migrations SQL et appliquer les patchs.
+Paiements Orange/MTN, refonte annuaire public.
