@@ -65,4 +65,23 @@ export async function joinWithCode(code: string): Promise<{ groupId: string }> {
   return { groupId: data as string };
 }
 
+export type JoinStatus = "active" | "pending";
+
+export async function joinWithCodeAndStatus(
+  code: string,
+): Promise<{ groupId: string; status: JoinStatus }> {
+  const { groupId } = await joinWithCode(code);
+  const { data: userRes } = await supabase.auth.getUser();
+  const uid = userRes.user?.id;
+  if (!uid) return { groupId, status: "active" };
+  const { data } = await supabase
+    .from("group_members")
+    .select("status")
+    .eq("group_id", groupId)
+    .eq("user_id", uid)
+    .maybeSingle();
+  const status = (data?.status as JoinStatus | undefined) ?? "pending";
+  return { groupId, status };
+}
+
 export { generateInviteCode };
