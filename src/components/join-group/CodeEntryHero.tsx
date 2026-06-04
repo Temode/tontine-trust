@@ -4,7 +4,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { joinWithCode } from "@/lib/api/invitations";
+import { joinWithCodeAndStatus } from "@/lib/api/invitations";
 
 type LookupState = "idle" | "checking" | "error";
 
@@ -47,10 +47,18 @@ export function CodeEntryHero({ onMatch, onClear, matchedCode }: CodeEntryHeroPr
     setState("checking");
     setErrorMsg(null);
     try {
-      const { groupId } = await joinWithCode(code);
-      toast.success("Adhésion confirmée", { description: "Vous avez rejoint le groupe." });
+      const { groupId, status } = await joinWithCodeAndStatus(code);
       await qc.invalidateQueries({ queryKey: ["groups", "mine"] });
-      navigate(`/groupes/${groupId}`);
+      await qc.invalidateQueries({ queryKey: ["my-groups"] });
+      if (status === "pending") {
+        toast.success("Demande envoyée", {
+          description: "L'organisateur doit valider votre adhésion. Vous serez notifié.",
+        });
+        navigate("/groupes");
+      } else {
+        toast.success("Adhésion confirmée", { description: "Vous avez rejoint le groupe." });
+        navigate(`/groupes/${groupId}`);
+      }
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Erreur inconnue";
       setErrorMsg(msg);
