@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowRight, ClipboardPaste, Loader2, ShieldCheck, X } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -39,6 +39,8 @@ export function CodeEntryHero({ onMatch, onClear, matchedCode }: CodeEntryHeroPr
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [autoJoinTried, setAutoJoinTried] = useState(false);
 
   const handleJoin = async () => {
     if (!isComplete(code)) return;
@@ -55,6 +57,27 @@ export function CodeEntryHero({ onMatch, onClear, matchedCode }: CodeEntryHeroPr
       setState("error");
     }
   };
+
+  // Pré‑remplissage depuis l'URL (?code=TD-XXXX-XXXX)
+  useEffect(() => {
+    const raw = searchParams.get("code");
+    if (!raw || code) return;
+    const formatted = autoFormat(raw);
+    setCode(formatted);
+    // Retire le paramètre de l'URL après lecture
+    const next = new URLSearchParams(searchParams);
+    next.delete("code");
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams, code]);
+
+  // Auto‑join si code complet pré‑rempli
+  useEffect(() => {
+    if (!autoJoinTried && isComplete(code) && state === "idle") {
+      setAutoJoinTried(true);
+      void handleJoin();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [code]);
 
   const handlePaste = async () => {
     try {
@@ -109,7 +132,7 @@ export function CodeEntryHero({ onMatch, onClear, matchedCode }: CodeEntryHeroPr
                 value={code}
                 onChange={(e) => setCode(autoFormat(e.target.value))}
                 onKeyDown={(e) => { if (e.key === "Enter") handleJoin(); }}
-                maxLength={11}
+                maxLength={12}
                 className="h-14 w-full bg-transparent px-4 font-mono text-xl font-bold tracking-[0.18em] text-foreground placeholder:text-muted-foreground/60 focus:outline-none num"
               />
 
