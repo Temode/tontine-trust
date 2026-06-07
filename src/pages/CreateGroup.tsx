@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { createGroup } from "@/lib/api/groups";
 import { createInvitation } from "@/lib/api/invitations";
 import { TopBar } from "@/components/layout/TopBar";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { StepIdentity } from "@/components/create-group/StepIdentity";
 import { StepFinancials } from "@/components/create-group/StepFinancials";
 import { StepRules } from "@/components/create-group/StepRules";
@@ -82,6 +83,7 @@ export default function CreateGroup() {
       />
 
       <div className="space-y-6 px-5 py-6 lg:px-8 lg:py-8">
+        <ErrorBoundary fallbackTitle="L'assistant de création a rencontré une erreur">
         <Stepper current={step} onJump={handleJump} completed={completed} />
 
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_360px]">
@@ -152,9 +154,12 @@ export default function CreateGroup() {
           </div>
 
           <aside className="xl:sticky xl:top-20 xl:self-start">
-            <TermSheet draft={draft} issued={state === "issued"} />
+            <ErrorBoundary fallbackTitle="Aperçu indisponible">
+              <TermSheet draft={draft} issued={state === "issued"} />
+            </ErrorBoundary>
           </aside>
         </div>
+        </ErrorBoundary>
 
         <p className="text-[11px] text-muted-foreground">
           Tontine Digital horodate chaque émission sur un registre immuable. La modification des termes
