@@ -87,7 +87,6 @@ export default function CreateGroup() {
         <Stepper current={step} onJump={handleJump} completed={completed} />
 
         <div className="grid grid-cols-1 gap-8 xl:grid-cols-12">
-          <div>
           <div className="xl:col-span-7">
             {state === "issued" ? (
               <IssuedConfirmation
@@ -154,7 +153,7 @@ export default function CreateGroup() {
             )}
           </div>
 
-          <aside className="xl:sticky xl:top-20 xl:self-start">
+          <aside className="xl:col-span-5 xl:sticky xl:top-20 xl:self-start">
             <ErrorBoundary fallbackTitle="Aperçu indisponible">
               <TermSheet draft={draft} issued={state === "issued"} />
             </ErrorBoundary>
