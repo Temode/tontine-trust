@@ -1,10 +1,13 @@
 import { Component, type ReactNode } from "react";
 import { AlertTriangle, RefreshCcw, RotateCw } from "lucide-react";
+import { Copy } from "lucide-react";
+import { formatCrashForClipboard, getLastCrash, logCrash } from "@/lib/diagnostics/crashLogger";
 
 interface Props {
   children: ReactNode;
   fallbackTitle?: string;
   resetKey?: string | number;
+  boundaryName?: string;
 }
 
 interface State {
@@ -19,9 +22,16 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: unknown) {
-    // Surfaces le crash dans la console pour debug.
-    // eslint-disable-next-line no-console
-    console.error("[ErrorBoundary]", error, error.stack, info);
+    const componentStack =
+      info && typeof info === "object" && "componentStack" in info
+        ? String((info as { componentStack?: string }).componentStack ?? "")
+        : undefined;
+    logCrash({
+      source: "ErrorBoundary",
+      error,
+      componentStack,
+      extra: { boundary: this.props.boundaryName ?? this.props.fallbackTitle ?? "anonymous" },
+    });
   }
 
   componentDidUpdate(prevProps: Props) {
@@ -32,6 +42,15 @@ export class ErrorBoundary extends Component<Props, State> {
 
   handleReset = () => this.setState({ error: null });
   handleReload = () => window.location.reload();
+  handleCopyReport = async () => {
+    const last = getLastCrash();
+    if (!last) return;
+    try {
+      await navigator.clipboard.writeText(formatCrashForClipboard(last));
+    } catch {
+      /* clipboard refusé : on ignore */
+    }
+  };
 
   render() {
     if (this.state.error) {
@@ -65,6 +84,14 @@ export class ErrorBoundary extends Component<Props, State> {
                 >
                   <RotateCw className="h-3.5 w-3.5" />
                   Recharger la page
+                </button>
+                <button
+                  type="button"
+                  onClick={this.handleCopyReport}
+                  className="inline-flex h-9 items-center gap-1.5 rounded-md border border-hairline bg-card px-3 text-xs font-medium text-foreground transition hover:bg-secondary"
+                >
+                  <Copy className="h-3.5 w-3.5" />
+                  Copier le rapport
                 </button>
               </div>
             </div>

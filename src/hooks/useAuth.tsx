@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase, type AppRole } from "@/integrations/supabase/client";
+import { setAuthSnapshot } from "@/lib/diagnostics/crashLogger";
 
 interface AuthContextValue {
   user: User | null;
@@ -56,7 +57,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .eq("user_id", uid)
         .then(({ data }) => {
           if (!mounted) return;
-          setRoles((data ?? []).map((r: { role: AppRole }) => r.role));
+          const next = (data ?? []).map((r: { role: AppRole }) => r.role);
+          setRoles(next);
+          setAuthSnapshot({ userId: uid, roles: next });
         });
     };
 
@@ -66,6 +69,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(newSession?.user ?? null);
       setLoading(false);
       const uid = newSession?.user?.id ?? null;
+      setAuthSnapshot({ userId: uid, roles: [] });
       if (uid && uid !== lastUserId) {
         lastUserId = uid;
         setTimeout(() => loadRoles(uid), 0);
