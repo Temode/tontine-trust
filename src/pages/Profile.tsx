@@ -1,4 +1,4 @@
-import { LogOut, RefreshCw, AlertTriangle } from "lucide-react";
+import { LogOut, RefreshCw, AlertTriangle, Camera, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -11,12 +11,26 @@ import {
   listMyLateContributions,
   recomputeMyReliability,
 } from "@/lib/api/reliability";
+import { getMyProfile, uploadAvatar } from "@/lib/api/profile";
+import { useRef } from "react";
 import { formatGNF } from "@/lib/format";
 
 export default function Profile() {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const profileQ = useQuery({ queryKey: ["profile", "mine"], queryFn: getMyProfile });
+
+  const uploadM = useMutation({
+    mutationFn: (file: File) => uploadAvatar(file),
+    onSuccess: () => {
+      toast.success("Photo de profil mise à jour");
+      qc.invalidateQueries({ queryKey: ["profile", "mine"] });
+    },
+    onError: (e: Error) => toast.error("Upload impossible", { description: e.message }),
+  });
 
   const { data: reliability } = useQuery({
     queryKey: ["reliability", "mine"],
@@ -36,9 +50,11 @@ export default function Profile() {
   });
 
   const fullName =
+    profileQ.data?.full_name ??
     (user?.user_metadata?.full_name as string | undefined) ?? user?.email ?? "Utilisateur";
-  const phone = (user?.user_metadata?.phone_number as string | undefined) ?? "—";
+  const phone = profileQ.data?.phone_number ?? (user?.user_metadata?.phone_number as string | undefined) ?? "—";
   const email = user?.email ?? "—";
+  const avatarUrl = profileQ.data?.avatar_url ?? null;
   const initials = fullName
     .split(" ")
     .map((s) => s[0])
@@ -62,9 +78,37 @@ export default function Profile() {
 
       <div className="space-y-6 px-5 py-6 lg:px-8 lg:py-8">
         <article className="flex items-center gap-4 rounded-xl border border-hairline bg-card p-5">
-          <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-primary text-base font-bold text-primary-foreground">
-            {initials || "?"}
-          </div>
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploadM.isPending}
+            className="group relative h-16 w-16 overflow-hidden rounded-xl bg-primary text-base font-bold text-primary-foreground transition focus:outline-none focus:ring-2 focus:ring-primary"
+            aria-label="Changer la photo de profil"
+          >
+            {avatarUrl ? (
+              <img src={avatarUrl} alt={fullName} className="h-full w-full object-cover" />
+            ) : (
+              <span className="flex h-full w-full items-center justify-center">{initials || "?"}</span>
+            )}
+            <span className="pointer-events-none absolute inset-0 flex items-center justify-center bg-foreground/50 opacity-0 transition group-hover:opacity-100">
+              {uploadM.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin text-primary-foreground" />
+              ) : (
+                <Camera className="h-4 w-4 text-primary-foreground" />
+              )}
+            </span>
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) uploadM.mutate(f);
+              if (fileInputRef.current) fileInputRef.current.value = "";
+            }}
+          />
           <div className="min-w-0 flex-1">
             <p className="truncate font-display text-lg font-bold text-foreground">{fullName}</p>
             <p className="truncate text-sm text-muted-foreground">{email}</p>

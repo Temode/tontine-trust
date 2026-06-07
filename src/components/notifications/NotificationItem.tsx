@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import {
-  Bell, CheckCircle2, Coins, FileCheck2, Mail, RefreshCw, Sparkles, UserPlus, Wallet,
+  Bell, CheckCircle2, Coins, FileCheck2, Mail, Megaphone, RefreshCw, Sparkles, UserPlus, Wallet,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -20,6 +20,7 @@ const KIND_ICON: Record<NotificationKind, LucideIcon> = {
   reliability_changed: RefreshCw,
   member_joined: UserPlus,
   group_completed: CheckCircle2,
+  announcement: Megaphone,
   system: Bell,
 };
 

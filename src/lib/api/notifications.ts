@@ -15,6 +15,7 @@ export type NotificationKind =
   | "reliability_changed"
   | "member_joined"
   | "group_completed"
+  | "announcement"
   | "system";
 
 export interface DbNotification {
@@ -90,5 +91,6 @@ export const KIND_LABEL: Record<NotificationKind, string> = {
   reliability_changed: "Score mis à jour",
   member_joined: "Nouveau membre",
   group_completed: "Groupe terminé",
+  announcement: "Annonce",
   system: "Système",
 };

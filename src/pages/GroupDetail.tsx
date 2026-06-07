@@ -32,14 +32,11 @@ import { useAuth } from "@/hooks/useAuth";
 import type { DbGroup, DbGroupMember, DbNextTurn } from "@/lib/api/types";
 import { SectionCard } from "@/components/dashboard/SectionCard";
 import { InvitePanel, INVITE_PANEL_ID } from "@/components/groups/InvitePanel";
+import { GroupChat } from "@/components/group/GroupChat";
+import { AnnouncementsPanel } from "@/components/group/AnnouncementsPanel";
+import { AuditLog } from "@/components/group/AuditLog";
 
-type Section = "overview" | "members" | "rotation";
-
-const tabs: Array<{ id: Section; label: string }> = [
-  { id: "overview", label: "Aperçu" },
-  { id: "members", label: "Membres" },
-  { id: "rotation", label: "Rotation" },
-];
+type Section = "overview" | "members" | "rotation" | "chat" | "audit";
 
 const FREQ_LABEL: Record<string, string> = {
   mensuelle: "Mensuelle",
@@ -168,6 +165,14 @@ export default function GroupDetail() {
     turns.find((t) => t.status === "collecting") ?? turns.find((t) => t.status === "upcoming") ?? null;
   const completedTurns = turns.filter((t) => t.status === "paid").length;
   const progress = turns.length > 0 ? Math.round((completedTurns / turns.length) * 100) : 0;
+
+  const tabs: Array<{ id: Section; label: string }> = [
+    { id: "overview", label: "Aperçu" },
+    { id: "members", label: "Membres" },
+    { id: "rotation", label: "Rotation" },
+    { id: "chat", label: "Discussion" },
+    ...(isOrganizer ? [{ id: "audit" as Section, label: "Audit" }] : []),
+  ];
 
   return (
     <div className="animate-fade-in">
@@ -334,6 +339,8 @@ export default function GroupDetail() {
           />
         )}
 
+        <AnnouncementsPanel groupId={grp.id} isOrganizer={isOrganizer} />
+
         <div className="mt-6 inline-flex items-center gap-1 rounded-lg border border-hairline bg-card p-1" role="tablist" aria-label="Sections du groupe">
           {tabs.map((tab) => (
             <button
@@ -369,6 +376,8 @@ export default function GroupDetail() {
               ledger={ledgerQ.data ?? []}
             />
           )}
+          {section === "chat" && <GroupChat groupId={grp.id} />}
+          {section === "audit" && isOrganizer && <AuditLog groupId={grp.id} />}
         </div>
       </div>
     </div>
