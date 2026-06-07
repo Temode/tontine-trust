@@ -1,10 +1,7 @@
 -- P1.2 — Annonces organisateur
 -- Idempotent.
 
-do $$ begin
-  alter type public.notification_kind add value if not exists 'announcement';
-exception when duplicate_object then null;
-end $$;
+alter type public.notification_kind add value if not exists 'announcement';
 
 create table if not exists public.group_announcements (
   id uuid primary key default gen_random_uuid(),
