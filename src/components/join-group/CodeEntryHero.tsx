@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 import { ArrowRight, ClipboardPaste, Loader2, ShieldCheck, X } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { joinWithCodeAndStatus } from "@/lib/api/invitations";
-import { JoinFlow, type JoinFlowResult } from "@/components/join-group/JoinFlow";
+import { joinWithCodeAndStatus, previewByCode } from "@/lib/api/invitations";
+import { JoinFlow, type JoinFlowResult, type JoinGroupSummary } from "@/components/join-group/JoinFlow";
 
 type LookupState = "idle" | "checking" | "error";
 
@@ -42,6 +42,31 @@ export function CodeEntryHero({ onMatch, onClear, matchedCode }: CodeEntryHeroPr
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
+
+  // Aperçu du groupe ouvert seulement quand le dialog est affiché et le code complet.
+  const { data: preview, isLoading: previewLoading, error: previewError } = useQuery({
+    queryKey: ["invitation-preview", code],
+    queryFn: () => previewByCode(code),
+    enabled: confirmOpen && isComplete(code),
+    retry: false,
+    staleTime: 30_000,
+  });
+
+  const FREQ_FR: Record<string, string> = {
+    hebdomadaire: "Hebdomadaire",
+    quinzaine: "Quinzaine",
+    mensuelle: "Mensuelle",
+  };
+  const summary: JoinGroupSummary | undefined = preview
+    ? {
+        name: preview.name,
+        contribution: preview.contribution_amount,
+        frequency: FREQ_FR[preview.frequency] ?? preview.frequency,
+        organizerName: preview.organizer_name,
+        filled: preview.members_count,
+        members: preview.max_members,
+      }
+    : undefined;
 
   /** Opens the consent gate. Actual network call happens in performJoin. */
   const handleJoin = () => {
@@ -211,6 +236,9 @@ export function CodeEntryHero({ onMatch, onClear, matchedCode }: CodeEntryHeroPr
           if (!o && state === "checking") setState("idle");
         }}
         code={code}
+        summary={summary}
+        loadingSummary={previewLoading}
+        summaryError={previewError instanceof Error ? previewError.message : null}
         submitting={state === "checking"}
         onConfirm={performJoin}
       />

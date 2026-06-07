@@ -9,7 +9,6 @@ import { GroupsKpiStrip } from "@/components/groups/GroupsKpiStrip";
 import { GroupsTable } from "@/components/groups/GroupsTable";
 import { GroupsToolbar } from "@/components/groups/GroupsToolbar";
 import type { GroupsFilter, SortDir, SortKey, ViewMode } from "@/components/groups/types";
-import { getPortfolioStats } from "@/lib/mock-data";
 import { listMyGroups } from "@/lib/api/groups";
 import { listMyApplications, cancelMyApplication } from "@/lib/api/groups";
 import { overviewToTontine } from "@/lib/api/types";
@@ -89,7 +88,6 @@ function toCsv(groups: TontineGroup[]): string {
 
 export default function MyGroups() {
   const navigate = useNavigate();
-  const portfolio = getPortfolioStats();
 
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<GroupsFilter>("all");
@@ -123,6 +121,8 @@ export default function MyGroups() {
   };
 
   const allGroups = useMemo<TontineGroup[]>(() => rows.map(overviewToTontine), [rows]);
+
+  const portfolio = useMemo(() => computePortfolio(allGroups), [allGroups]);
 
   const counts = useMemo<Record<GroupsFilter, number>>(() => {
     const base: Record<GroupsFilter, number> = {
@@ -232,4 +232,50 @@ export default function MyGroups() {
       </div>
     </div>
   );
+}
+
+/** Dérive les KPIs portefeuille depuis la liste réelle de groupes. */
+function computePortfolio(groups: TontineGroup[]) {
+  const total = groups.length;
+  const active = groups.filter((g) => g.status === "active").length;
+  const yourTurn = groups.filter((g) => g.status === "your-turn").length;
+  const completed = groups.filter((g) => g.status === "completed").length;
+  const pending = groups.filter((g) => g.status === "pending").length;
+
+  const capitalCommitted = groups
+    .filter((g) => g.status === "active" || g.status === "your-turn")
+    .reduce((sum, g) => {
+      const remaining = Math.max(0, g.members - Math.round((g.progress / 100) * g.members));
+      return sum + g.contribution * remaining;
+    }, 0);
+
+  const cagnotteCumulee = groups
+    .filter((g) => g.status === "active" || g.status === "your-turn")
+    .reduce((sum, g) => sum + g.contribution * g.members, 0);
+
+  const scored = groups.filter((g) => g.averageScore > 0);
+  const avgScore = scored.length > 0
+    ? Math.round(scored.reduce((sum, g) => sum + g.averageScore, 0) / scored.length)
+    : 0;
+
+  const upcomingTurn = groups
+    .filter((g) => g.status === "your-turn" && typeof g.daysToDeadline === "number")
+    .reduce<{ amount: number; days: number; groupName: string } | null>((best, g) => {
+      const amount = g.contribution * g.members;
+      const days = g.daysToDeadline ?? 9999;
+      if (!best || days < best.days) return { amount, days, groupName: g.name };
+      return best;
+    }, null);
+
+  return {
+    total,
+    active,
+    yourTurn,
+    completed,
+    pending,
+    capitalCommitted,
+    cagnotteCumulee,
+    avgScore,
+    upcomingTurn,
+  };
 }
