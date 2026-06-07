@@ -144,7 +144,7 @@ export default function GroupSettings() {
                 value={form.name ?? ""}
                 disabled={locked}
                 onChange={(e) => update("name", e.target.value)}
-                className="input"
+                className={INPUT_CLASS}
                 maxLength={120}
               />
             </Field>
@@ -153,7 +153,7 @@ export default function GroupSettings() {
                 value={form.description ?? ""}
                 disabled={locked}
                 onChange={(e) => update("description", e.target.value)}
-                className="input min-h-[80px] resize-y"
+                className={`${INPUT_CLASS} min-h-[80px] resize-y`}
               />
             </Field>
           </div>
@@ -172,7 +172,7 @@ export default function GroupSettings() {
                 value={form.contribution_amount ?? 0}
                 disabled={locked}
                 onChange={(e) => update("contribution_amount", Number(e.target.value))}
-                className="input num"
+                className={`${INPUT_CLASS} num`}
               />
             </Field>
             <Field label="Nombre de membres">
@@ -183,7 +183,7 @@ export default function GroupSettings() {
                 value={form.max_members ?? 0}
                 disabled={locked}
                 onChange={(e) => update("max_members", Number(e.target.value))}
-                className="input num"
+                className={`${INPUT_CLASS} num`}
               />
             </Field>
             <Field label="Fréquence">
@@ -191,7 +191,7 @@ export default function GroupSettings() {
                 value={form.frequency ?? "mensuelle"}
                 disabled={locked}
                 onChange={(e) => update("frequency", e.target.value as UpdateGroupSettingsPayload["frequency"])}
-                className="input"
+                className={INPUT_CLASS}
               >
                 {FREQ_OPTIONS.map((o) => (
                   <option key={o.value} value={o.value}>{o.label}</option>
@@ -203,7 +203,7 @@ export default function GroupSettings() {
                 value={form.rotation_order_kind ?? "random"}
                 disabled={locked}
                 onChange={(e) => update("rotation_order_kind", e.target.value as UpdateGroupSettingsPayload["rotation_order_kind"])}
-                className="input"
+                className={INPUT_CLASS}
               >
                 {ROTATION_OPTIONS.map((o) => (
                   <option key={o.value} value={o.value}>{o.label}</option>
@@ -223,7 +223,7 @@ export default function GroupSettings() {
                 value={form.late_penalty_percent ?? 0}
                 disabled={locked}
                 onChange={(e) => update("late_penalty_percent", Number(e.target.value))}
-                className="input num"
+                className={`${INPUT_CLASS} num`}
               />
             </Field>
             <Field label="Délai de grâce (jours)">
@@ -233,7 +233,7 @@ export default function GroupSettings() {
                 value={form.late_penalty_after_days ?? 0}
                 disabled={locked}
                 onChange={(e) => update("late_penalty_after_days", Number(e.target.value))}
-                className="input num"
+                className={`${INPUT_CLASS} num`}
               />
             </Field>
           </div>
