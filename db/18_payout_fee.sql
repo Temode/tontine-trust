@@ -136,7 +136,8 @@ end; $$;
 grant execute on function public.release_payout(uuid, public.payment_provider) to authenticated;
 
 -- Vue : reçus dont je suis bénéficiaire, avec commission et montant net.
-create or replace view public.my_receipts
+drop view if exists public.my_receipts;
+create view public.my_receipts
 with (security_invoker = true) as
 select
   r.id,
