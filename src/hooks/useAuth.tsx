@@ -75,17 +75,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     });
 
-    supabase.auth.getSession().then(({ data }) => {
-      if (!mounted) return;
-      setSession(data.session);
-      setUser(data.session?.user ?? null);
-      const uid = data.session?.user?.id ?? null;
-      if (uid && uid !== lastUserId) {
-        lastUserId = uid;
-        loadRoles(uid);
-      }
-      setLoading(false);
-    });
+    supabase.auth
+      .getSession()
+      .then(({ data, error }) => {
+        if (!mounted) return;
+        if (error) {
+          const msg = (error.message || "").toLowerCase();
+          if (msg.includes("refresh token")) {
+            // Session locale invalide : on nettoie pour revenir à /auth proprement.
+            supabase.auth.signOut().catch(() => undefined);
+          }
+          setSession(null);
+          setUser(null);
+          setLoading(false);
+          return;
+        }
+        setSession(data.session);
+        setUser(data.session?.user ?? null);
+        const uid = data.session?.user?.id ?? null;
+        if (uid && uid !== lastUserId) {
+          lastUserId = uid;
+          loadRoles(uid);
+        }
+        setLoading(false);
+      })
+      .catch(() => {
+        if (!mounted) return;
+        setSession(null);
+        setUser(null);
+        setLoading(false);
+      });
 
     return () => {
       mounted = false;

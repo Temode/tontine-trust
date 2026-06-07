@@ -1,84 +1,51 @@
-## Audit final — pourquoi l'app devient blanche
+Constat principal
 
-### Cause racine identifiée (grâce à votre console)
+L’erreur qui provoque l’écran blanc n’est plus le paquet `qrcode`. Le crash actuel est :
+
+```text
+NotFoundError: Failed to execute 'insertBefore' on 'Node'
+The above error occurred in the <LoaderCircle> component
 ```
-[vite] Internal Server Error
-Failed to resolve import "qrcode" from "src/components/invite/ShareSheet.tsx"
-```
 
-- `qrcode` **est déclaré dans `package.json`** et installé dans la sandbox Lovable, mais **n'est pas installé sur votre machine locale** (`C:\Users\HP\…`, `localhost:8080`). Vous avez probablement `git pull` sans relancer `npm install` (ou `bun install`) après l'ajout de la dépendance lors du flux d'invitations.
-- Quand Vite échoue à résoudre un import, il renvoie **HTTP 500 sur tout le module graph**. React ne peut plus monter → page blanche totale. C'est exactement ce que vous voyez sur `/groupes` et au retour d'onglet (HMR retente, échoue à nouveau).
+Ce pattern est typique quand Chrome/Google Translate ou une extension modifie le DOM que React contrôle. On voit justement l’icône/traduction Chrome active dans la capture. React essaie ensuite d’insérer le spinner `Loader2` avant un texte de bouton qui n’est plus le même nœud DOM, donc il crashe.
 
-### Action immédiate côté utilisateur
-Dans le terminal du projet local :
-```bash
-npm install        # ou: bun install
-```
-puis redémarrer `npm run dev`. La page reviendra instantanément.
+Le `POST /auth/v1/token ... Invalid Refresh Token` est un second problème : une ancienne session locale invalide est restée dans le navigateur. Ce n’est pas la cause directe du crash `LoaderCircle`, mais il faut le gérer proprement.
 
----
+Plan de correction
 
-## Audit de robustesse (pour que ça ne ternisse plus jamais Tontine Digital)
+1. Stabiliser les boutons de connexion
+   - Dans `src/pages/Auth.tsx`, remplacer les rendus conditionnels du spinner :
+     ```tsx
+     {submitting && <Loader2 />}
+     Se connecter
+     ```
+     par une structure DOM stable :
+     ```tsx
+     <span className="...">{submitting ? <Loader2 /> : null}</span>
+     <span>Se connecter</span>
+     ```
+   - Même correction pour “Créer mon compte”.
+   - Objectif : React ne doit plus insérer/supprimer un SVG directement avant un nœud texte traduisible.
 
-Même une fois `qrcode` installé, l'app reste **fragile** : un seul import cassé ou une seule exception au rendu efface tout. Les correctifs suivants garantissent qu'**on ne reverra plus jamais une page 100% blanche**.
+2. Étendre ce durcissement aux autres boutons à risque
+   - Rechercher les patterns `condition && <Loader2 ... />` dans les boutons.
+   - Corriger les cas critiques déjà visibles : `Auth`, `JoinFlow`, `SubscriptionDialog`, `PaymentModal`, `InvitePanel`, `MyContributions`, `InviteMembers`.
+   - Principe : garder un conteneur `<span>` fixe pour les icônes/spinners et envelopper le texte du bouton dans un `<span>`.
 
-### 1. ErrorBoundary global + boundary par route
-- Envelopper `<Routes>` dans `App.tsx` avec un `ErrorBoundary` qui propose **Recharger l'application**.
-- Envelopper l'`<Outlet />` dans `AppShell` avec un second boundary : la **sidebar et la nav restent visibles** même si la page courante crashe, et l'utilisateur peut naviguer ailleurs.
-- Améliorer `ErrorBoundary.tsx` : bouton "Recharger la page" + reset automatique au changement de `location.pathname`.
+3. Protéger `/auth` avec une frontière d’erreur dédiée
+   - Ajouter un `ErrorBoundary` autour de la route `/auth`, pas seulement autour des pages protégées.
+   - Le fallback doit afficher un message propre Tontine Digital + bouton “Recharger la page”, au lieu d’un écran blanc.
 
-### 2. Lazy-load des écrans + Suspense
-- Convertir les imports de pages en `lazy(() => import(...))` dans `App.tsx` avec un `<Suspense fallback={spinner}>`.
-- **Bénéfice clé** : un import cassé dans `ShareSheet` (ou n'importe quel sous-composant) n'affectera que la route qui l'utilise (`/inviter`), pas le dashboard ni `/groupes`.
+4. Gérer les refresh tokens invalides
+   - Dans `useAuth.tsx`, si `getSession()` ou l’initialisation auth rencontre `Invalid Refresh Token` / `Refresh Token Not Found`, nettoyer la session locale via `supabase.auth.signOut()` ou équivalent contrôlé, puis remettre `loading=false`.
+   - Objectif : l’utilisateur revient simplement à l’écran de connexion, sans boucle ni écran vide.
 
-### 3. QueryClient durci
-```ts
-new QueryClient({
-  defaultOptions: {
-    queries: {
-      refetchOnWindowFocus: false,  // stop la tempête de refetch au retour d'onglet
-      retry: 1,
-      staleTime: 30_000,
-    },
-    mutations: { retry: 0 },
-  },
-})
-```
-Garder `refetchOnWindowFocus: true` uniquement sur la cloche de notifications.
+5. Réduire l’impact de Google Translate sur l’app
+   - Ajouter au démarrage une protection légère : définir `document.documentElement.setAttribute("translate", "no")` et `document.body.classList.add("notranslate")`.
+   - Comme l’app est déjà en français, cela limite les mutations DOM automatiques de Chrome Translate.
+   - Garder le code côté React plutôt que modifier `index.html` inutilement.
 
-### 4. AuthProvider robuste
-- Flag `mounted` pour éviter `setState` après démontage.
-- `setLoading(false)` aussi sur le premier `onAuthStateChange` (pas seulement `getSession`).
-- Re-fetch `user_roles` uniquement si `user.id` change (évite spam au `TOKEN_REFRESHED` qui survient au retour d'onglet).
-
-### 5. Hygiène realtime
-- `supabase.removeChannel(channel)` au cleanup de `useNotificationsRealtime` (plus fiable que `unsubscribe()` seul).
-
-### 6. Observabilité
-- Dans `main.tsx`, brancher `window.addEventListener("error", ...)` et `"unhandledrejection"` → `console.error("[GlobalError]", ...)`.
-- `ErrorBoundary.componentDidCatch` logge déjà ; ajouter la stack complète.
-
-### 7. Filets de sécurité MyGroups
-- `try/catch` autour de `computePortfolio` (fallback zéros).
-- Afficher un encart d'erreur si `useQuery({ queryKey: ["groups","mine"] })` est en `isError` (au lieu d'un "Chargement…" infini).
-
----
-
-## Fichiers touchés
-- `src/App.tsx` — QueryClient configuré, ErrorBoundary global, lazy() + Suspense
-- `src/components/layout/AppShell.tsx` — ErrorBoundary autour de l'Outlet
-- `src/components/ErrorBoundary.tsx` — bouton recharger + reset sur changement de route
-- `src/hooks/useAuth.tsx` — mounted flag, loading sur auth event, refetch roles conditionnel
-- `src/hooks/useNotifications.ts` — cleanup via removeChannel
-- `src/main.tsx` — handlers globaux error / unhandledrejection
-- `src/pages/MyGroups.tsx` — état isError + computePortfolio défensif
-
-## Non-objectifs
-- Aucun changement métier, schéma DB, RPC ou visuel des KPIs/tableaux.
-- Aucun ajout de dépendance.
-
-## Résultat attendu
-- Plus jamais d'écran 100% blanc : on aura au pire un encart d'erreur avec sidebar visible et bouton "Recharger".
-- Le retour sur l'onglet ne déclenche plus de cascade de refetch (fin du blanc sur `/groupes`).
-- Un import cassé n'impacte qu'une seule route, pas toute l'app.
-- Diagnostic futur facilité par les logs globaux `[ErrorBoundary]` / `[GlobalError]`.
+6. Vérification
+   - Tester `/auth` : chargement, connexion en échec, connexion en succès, changement d’onglet, retour sur `/groupes`.
+   - Vérifier que la console ne contient plus de crash `insertBefore` / `LoaderCircle`.
+   - Vérifier que les warnings React Router restent seulement des avertissements non bloquants.
