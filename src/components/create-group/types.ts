@@ -72,18 +72,20 @@ export interface DraftDerived {
 }
 
 export function deriveFromDraft(draft: GroupDraft): DraftDerived {
-  const cagnotte = draft.contribution * draft.members;
-  const cycleDays = draft.members * FREQUENCY_DAYS[draft.frequency];
+  const safeContribution = Number.isFinite(draft.contribution) ? Math.max(0, draft.contribution) : 0;
+  const safeMembers = Number.isFinite(draft.members) ? Math.max(1, Math.min(50, draft.members)) : 1;
+  const cagnotte = safeContribution * safeMembers;
+  const cycleDays = safeMembers * FREQUENCY_DAYS[draft.frequency];
   const cycleLabel =
     cycleDays >= 365
       ? `${(cycleDays / 365).toFixed(1)} an${cycleDays >= 365 * 2 ? "s" : ""}`
       : cycleDays >= 30
       ? `${Math.round(cycleDays / 30)} mois`
       : `${cycleDays} jours`;
-  const cyclesPerYear = +(365 / cycleDays).toFixed(2);
+  const cyclesPerYear = cycleDays > 0 ? +(365 / cycleDays).toFixed(2) : 0;
 
   const earliestDays = FREQUENCY_DAYS[draft.frequency];
-  const latestDays = (draft.members - 1) * FREQUENCY_DAYS[draft.frequency];
+  const latestDays = Math.max(0, safeMembers - 1) * FREQUENCY_DAYS[draft.frequency];
 
   return {
     cagnotte,
