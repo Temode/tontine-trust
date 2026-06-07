@@ -131,8 +131,8 @@ export function TermSheet({ draft, issued = false }: TermSheetProps) {
         <p className="flex items-start gap-2 text-[11px] italic leading-relaxed text-muted-foreground">
           <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
           {issued
-            ? "Mandat opposable, notarisé sur le registre Tontine Digital."
-            : "Ce document constitue une intention de constitution. La valeur juridique est acquise dès l'émission finale sur le registre."}
+            ? "Mandat opposable aux membres, horodaté dans le registre Tontine Digital."
+            : "Ce document constitue une intention de constitution. Il devient opposable dès l'émission finale."}
         </p>
       </div>
     </article>
