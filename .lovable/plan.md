@@ -1,57 +1,41 @@
-# P1 — Tontine Digital : Engagement & Confiance
+# Instrumentation du journal d'audit
 
-Périmètre confirmé d'après l'audit (post-P0). Objectif : transformer l'app fonctionnelle en plateforme vivante et fiable, à la hauteur de Tontine Digital.
+Objectif : que toutes les actions sensibles atterrissent dans `audit_log` automatiquement, sans modifier le code front.
 
-## 1. Chat de groupe
-- Migration `db/19_group_chat.sql` :
-  - Table `group_messages` (id, group_id, author_user_id, body, created_at, edited_at, deleted_at).
-  - RLS : SELECT/INSERT réservés aux membres `approved` du groupe ; UPDATE/DELETE soft réservés à l'auteur.
-  - GRANTs explicites `authenticated` + `service_role`, séquence sur `created_at` indexée.
-  - Realtime activé via `alter publication supabase_realtime add table group_messages`.
-- `src/lib/api/chat.ts` : `listGroupMessages`, `sendGroupMessage`, `subscribeGroupMessages`.
-- Nouvel onglet "Discussion" dans `GroupDetail` → composant `src/components/group/GroupChat.tsx` (liste virtualisée, avatar + nom, horodatage, scroll auto, indicateur "nouveau message").
+## Approche
 
-## 2. Annonces organisateur
-- Migration `db/20_group_announcements.sql` :
-  - Table `group_announcements` (id, group_id, author_user_id, title, body, pinned, created_at).
-  - RLS : INSERT/UPDATE/DELETE réservés aux organisateurs/co-organisateurs ; SELECT pour tous les membres.
-  - Trigger : à l'insertion, crée une `notification` `kind='announcement'` pour chaque membre approuvé.
-- `src/lib/api/announcements.ts`.
-- Section "Annonces" en haut de `GroupDetail` (épinglées en surbrillance avec accent) + dialog "Nouvelle annonce" pour organisateur.
+Une seule migration `db/25_audit_instrumentation.sql` qui **redéfinit (CREATE OR REPLACE)** les 5 RPC concernées en repartant de leur dernière version (db/15 → db/18) et en injectant un appel `perform public.log_audit(...)` au bon endroit. Aucune logique métier modifiée — uniquement des appends.
 
-## 3. Rappels automatiques (CRON)
-- Migration `db/21_payment_reminders.sql` :
-  - Fonction `enqueue_payment_reminders()` (SECURITY DEFINER) : pour chaque contribution `pending` dont `due_date ∈ [J+2, J+1, J0, J-1, J-3 retard]`, insère une notification `kind='payment_reminder'` si pas déjà envoyée le jour même (table `reminder_log` pour idempotence).
-  - pg_cron : job quotidien à 08:00 UTC qui appelle la fonction.
-- Aucun changement front (les notifs apparaissent dans `Notifications.tsx` et `NotificationBell`).
+## Évènements enregistrés
 
-## 4. Photos de profil
-- Création bucket Storage `avatars` (public, max 2 Mo, MIME image/*) via migration `db/22_avatars_bucket.sql` + policies (upload/update/delete par owner, read public).
-- `src/lib/api/profile.ts` : `uploadAvatar(file)` (compression côté client via canvas, redim 512px) → met à jour `profiles.avatar_url`.
-- `Profile.tsx` : zone d'upload avec preview + recadrage simple.
-- Affichage : `Avatar` shadcn avec `avatar_url` dans header, chat, listes de membres, timeline des tours.
+| Action                  | Acteur          | entity_type   | entity_id        | Metadata                                           |
+| ----------------------- | --------------- | ------------- | ---------------- | -------------------------------------------------- |
+| `start_cycle`           | organisateur    | `cycle`       | `cycle_id`       | `{ members_count, total_turns }`                   |
+| `release_payout`        | organisateur    | `turn`        | `turn_id`        | `{ turn_number, gross, fee, net, receipt_id }`     |
+| `update_group_settings` | organisateur    | `group`       | `group_id`       | `{ changed_fields: [...] }`                        |
+| `approve_member`        | organisateur    | `group_member`| `member_id`      | `{ user_id, full_name }`                           |
+| `reject_member`         | organisateur    | `group_member`| `member_id`      | `{ user_id }`                                      |
+| `record_payment`        | payeur          | `contribution`| `contribution_id`| `{ amount, penalty_amount, provider, turn_id }`    |
 
-## 5. Badges de fiabilité enrichis
-- Le composant `ReliabilityBadge` existe déjà. Étendre :
-  - Migration `db/23_reliability_view.sql` : vue `member_reliability` (user_id, group_id, total_due, paid_on_time, paid_late, missed, score, tier ∈ {bronze, argent, or, platine}).
-  - Affichage des badges (avec tier coloré : muted, accent, primary, gradient or) dans :
-    - Listes de membres (`GroupDetail` onglet Membres).
-    - Cartes bénéficiaires de `TurnsTimeline`.
-    - En-tête `Profile`.
-  - Tooltip détaillant le calcul.
+Insertion via `public.log_audit(_group_id, _action, _entity_type, _entity_id, _metadata)` (déjà SECURITY DEFINER, créé en db/24).
 
-## 6. Journal d'audit
-- Migration `db/24_audit_log.sql` :
-  - Table `audit_log` (id, actor_user_id, group_id, action text, entity_type, entity_id, metadata jsonb, created_at).
-  - RLS : SELECT réservé aux organisateurs du groupe ; INSERT via SECURITY DEFINER uniquement.
-  - Helper `log_audit(_group_id, _action, _entity_type, _entity_id, _metadata)`.
-  - Instrumentation des RPC existantes : `start_cycle`, `release_payout`, `update_group_settings`, `approve_member`, `record_mock_payment` (succès/échec).
-- Nouvel onglet "Audit" dans `GroupDetail` visible pour organisateur uniquement → composant `src/components/group/AuditLog.tsx` (liste filtrable par action et acteur, badges colorés par sévérité).
+## Détails techniques
 
-## Notes
-- Toutes les migrations dans `db/` à exécuter manuellement dans le SQL editor (ordre 19 → 24).
-- Realtime Supabase doit être activé sur le projet (à vérifier au moment du chat).
-- Respect strict des tokens design system (aucune couleur hardcodée), composants accessibles (aria-labels, focus visible).
-- Pas de régression sur P0 : on additionne uniquement.
+- Pour chaque RPC : copier l'intégralité du corps de la dernière migration (db/15, db/16, db/17, db/18), insérer `perform public.log_audit(...)` **après succès** (juste avant le `return`).
+- `record_mock_payment` log uniquement à la confirmation (status devient `confirmed`), pas pour un paiement encore `pending`.
+- `update_group_settings` calcule `changed_fields` en comparant l'ancien et le nouveau JSON.
+- Garder `security definer set search_path = public` partout (déjà le cas).
+- Pas de changement de signature → aucun impact sur le front.
 
-Confirme ce périmètre (ou indique les chantiers à retirer/réordonner) et je passe en build.
+## Vérification
+
+Après exécution de la migration :
+1. Recharger la fiche d'un groupe en tant qu'organisateur, ouvrir l'onglet **Audit** — vide.
+2. Faire une action (modifier un paramètre, approuver un membre, etc.) — l'évènement doit apparaître.
+
+## Livrable
+
+- `db/25_audit_instrumentation.sql` (idempotent, à exécuter manuellement dans le SQL Editor).
+- Aucune modification front nécessaire.
+
+Confirme et je passe en build.
