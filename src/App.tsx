@@ -25,6 +25,7 @@ const Receipts = lazy(() => import("@/pages/Receipts"));
 const Notifications = lazy(() => import("@/pages/Notifications"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
 const Profile = lazy(() => import("@/pages/Profile"));
+const GroupSettings = lazy(() => import("@/pages/GroupSettings"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -95,6 +96,7 @@ const App = () => (
                     <Route path="/dashboard" element={<RouteBoundary name="Tableau de bord"><Dashboard /></RouteBoundary>} />
                     <Route path="/groupes" element={<RouteBoundary name="Mes groupes"><MyGroups /></RouteBoundary>} />
                     <Route path="/groupes/:id" element={<RouteBoundary name="Détail du groupe"><GroupDetail /></RouteBoundary>} />
+                    <Route path="/groupes/:id/parametres" element={<RouteBoundary name="Paramètres du groupe"><GroupSettings /></RouteBoundary>} />
                     <Route path="/cotisations" element={<RouteBoundary name="Mes cotisations"><MyContributions /></RouteBoundary>} />
                     <Route path="/recus" element={<RouteBoundary name="Reçus"><Receipts /></RouteBoundary>} />
                     <Route path="/recus/:id" element={<RouteBoundary name="Reçu"><Receipts /></RouteBoundary>} />
