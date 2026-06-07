@@ -26,6 +26,9 @@ const VISIBILITY_OPTIONS = [
   { value: "directory", label: "Annuaire public" },
 ] as const;
 
+const INPUT_CLASS =
+  "w-full rounded-md border border-hairline bg-card px-3 py-2 text-sm text-foreground transition focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60";
+
 export default function GroupSettings() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
