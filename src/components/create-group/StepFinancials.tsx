@@ -22,6 +22,14 @@ const FREQUENCIES: Array<{ id: Frequency; label: string; cadence: string }> = [
   { id: "Mensuelle", label: "Mensuelle", cadence: "Tous les 30 jours" },
 ];
 
+function parseNonNegativeInt(raw: string, max = 1_000_000_000): number {
+  if (!raw) return 0;
+  const cleaned = raw.replace(/[^\d]/g, "").slice(0, 12);
+  const n = parseInt(cleaned, 10);
+  if (!Number.isFinite(n) || n < 0) return 0;
+  return Math.min(max, n);
+}
+
 export function StepFinancials({ draft, onChange, onBack, onContinue, index, total }: StepFinancialsProps) {
   const derived = deriveFromDraft(draft);
   const canContinue = draft.contribution >= 10_000 && draft.members >= 3 && draft.members <= 50;
@@ -50,11 +58,11 @@ export function StepFinancials({ draft, onChange, onBack, onContinue, index, tot
             <div className="relative flex-1">
               <input
                 aria-label="Montant de la cotisation"
-                type="number"
-                min={10_000}
-                step={10_000}
-                value={draft.contribution || ""}
-                onChange={(e) => onChange({ contribution: Number(e.target.value) })}
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                value={draft.contribution ? draft.contribution.toLocaleString("fr-FR") : ""}
+                onChange={(e) => onChange({ contribution: parseNonNegativeInt(e.target.value) })}
                 className="h-12 w-full rounded-md border border-hairline bg-card px-3 pr-16 font-display text-xl font-bold text-foreground num focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15"
               />
               <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-muted-foreground">
@@ -124,11 +132,18 @@ export function StepFinancials({ draft, onChange, onBack, onContinue, index, tot
             </button>
             <input
               aria-label="Nombre de membres"
-              type="number"
-              min={3}
-              max={50}
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
               value={draft.members || ""}
-              onChange={(e) => onChange({ members: Math.max(3, Math.min(50, Number(e.target.value))) })}
+              onChange={(e) => {
+                const n = parseNonNegativeInt(e.target.value, 50);
+                onChange({ members: n });
+              }}
+              onBlur={(e) => {
+                const n = parseNonNegativeInt(e.target.value, 50);
+                onChange({ members: Math.max(3, Math.min(50, n || 3)) });
+              }}
               className="h-11 w-24 rounded-md border border-hairline bg-card px-3 text-center font-display text-lg font-bold text-foreground num focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15"
             />
             <button
