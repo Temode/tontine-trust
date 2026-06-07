@@ -55,7 +55,14 @@ const App = () => (
             <Suspense fallback={<AppSuspense />}>
               <Routes>
                 <Route path="/" element={<Index />} />
-                <Route path="/auth" element={<Auth />} />
+                <Route
+                  path="/auth"
+                  element={
+                    <ErrorBoundary fallbackTitle="L'écran de connexion a rencontré un problème">
+                      <Auth />
+                    </ErrorBoundary>
+                  }
+                />
                 <Route element={<ProtectedRoute />}>
                   <Route
                     element={

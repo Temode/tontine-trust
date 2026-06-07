@@ -156,8 +156,10 @@ export default function Auth() {
                   />
                 </div>
                 <Button type="submit" className="w-full" disabled={submitting}>
-                  {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Se connecter
+                  <span className="inline-flex h-4 w-4 items-center justify-center">
+                    {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                  </span>
+                  <span>Se connecter</span>
                 </Button>
               </form>
             </TabsContent>
@@ -210,8 +212,10 @@ export default function Auth() {
                   <p className="text-xs text-muted-foreground">Au moins 8 caractères.</p>
                 </div>
                 <Button type="submit" className="w-full" disabled={submitting}>
-                  {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Créer mon compte
+                  <span className="inline-flex h-4 w-4 items-center justify-center">
+                    {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                  </span>
+                  <span>Créer mon compte</span>
                 </Button>
               </form>
             </TabsContent>
