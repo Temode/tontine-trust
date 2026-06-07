@@ -1,8 +1,9 @@
 /** Format an amount as Guinean Franc with thin spaces as thousand separators. */
 export function formatGNF(value: number, options: { withCurrency?: boolean; compact?: boolean } = {}): string {
   const { withCurrency = false, compact = false } = options;
+  const safe = Number.isFinite(value) ? value : 0;
 
-  if (compact && Math.abs(value) >= 1_000_000) {
+  if (compact && Math.abs(safe) >= 1_000_000) {
     const millions = value / 1_000_000;
     const formatted = new Intl.NumberFormat("fr-FR", {
       maximumFractionDigits: millions >= 10 ? 0 : 1,
