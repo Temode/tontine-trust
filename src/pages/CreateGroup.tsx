@@ -1,10 +1,8 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowRight, CheckCircle2, ShieldCheck } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
 import { createGroup } from "@/lib/api/groups";
-import { createInvitation } from "@/lib/api/invitations";
 import { TopBar } from "@/components/layout/TopBar";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ShareSheet } from "@/components/invite/ShareSheet";
@@ -33,6 +31,13 @@ export default function CreateGroup() {
   const [consent, setConsent] = useState(false);
   const [state, setState] = useState<WizardState>("drafting");
   const [createdGroupId, setCreatedGroupId] = useState<string | null>(null);
+  const [issuedCode, setIssuedCode] = useState<string | null>(null);
+  const stepTitleRef = useRef<HTMLDivElement | null>(null);
+
+  // Focus la zone d'étape à chaque changement pour les lecteurs d'écran.
+  useEffect(() => {
+    stepTitleRef.current?.focus();
+  }, [step]);
 
   const totalSteps = STEPS.length;
   const derived = useMemo(() => deriveFromDraft(draft), [draft]);
@@ -62,26 +67,9 @@ export default function CreateGroup() {
     setState("submitting");
     setCompleted((prev) => Array.from(new Set([...prev, ...STEPS.map((s) => s.id)])));
     try {
-      const { group } = await createGroup(draft);
-      // Crée l'invitation initiale avec le code généré dans le wizard.
-      // En cas de collision unique sur le code, on retombe sur un code serveur.
-      // Toute autre erreur déclenche le rollback du groupe pour ne pas laisser
-      // un groupe orphelin sans aucun code d'invitation.
-      try {
-        try {
-          await createInvitation({ groupId: group.id, code: draft.inviteCode });
-        } catch (firstErr) {
-          const msg = firstErr instanceof Error ? firstErr.message : "";
-          const isUniqueViolation = /unique|duplicate|23505/i.test(msg);
-          if (!isUniqueViolation) throw firstErr;
-          await createInvitation({ groupId: group.id });
-        }
-      } catch (invErr) {
-        // Rollback : on supprime le groupe pour conserver une création atomique.
-        await supabase.from("groups").delete().eq("id", group.id);
-        throw invErr;
-      }
+      const { group, inviteCode } = await createGroup(draft);
       setCreatedGroupId(group.id);
+      setIssuedCode(inviteCode);
       setState("issued");
       toast.success("Groupe émis", {
         description: `${draft.name} a été créé. Le code d'invitation est actif.`,
@@ -105,12 +93,13 @@ export default function CreateGroup() {
         <Stepper current={step} onJump={handleJump} completed={completed} />
 
         <div className="grid grid-cols-1 gap-8 xl:grid-cols-12">
-          <div className="xl:col-span-7">
+          <div className="xl:col-span-7" ref={stepTitleRef} tabIndex={-1} aria-live="polite">
             {state === "issued" ? (
               <IssuedConfirmation
                 draft={draft}
                 cagnotte={derived.cagnotte}
                 groupId={createdGroupId}
+                inviteCode={issuedCode ?? draft.inviteCode}
               />
             ) : (
               <>
