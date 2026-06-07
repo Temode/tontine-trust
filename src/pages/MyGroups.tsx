@@ -95,7 +95,7 @@ export default function MyGroups() {
   const [sortDir, setSortDir] = useState<SortDir>(STATUS_DEFAULT_DIRS.deadline);
   const [view, setView] = useState<ViewMode>("table");
 
-  const { data: rows = [], isLoading } = useQuery({
+  const { data: rows = [], isLoading, isError, error, refetch } = useQuery({
     queryKey: ["groups", "mine"],
     queryFn: listMyGroups,
   });
@@ -120,9 +120,28 @@ export default function MyGroups() {
     }
   };
 
-  const allGroups = useMemo<TontineGroup[]>(() => rows.map(overviewToTontine), [rows]);
+  const allGroups = useMemo<TontineGroup[]>(() => {
+    try {
+      return rows.map(overviewToTontine);
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.error("[MyGroups] overviewToTontine mapping failed", e);
+      return [];
+    }
+  }, [rows]);
 
-  const portfolio = useMemo(() => computePortfolio(allGroups), [allGroups]);
+  const portfolio = useMemo(() => {
+    try {
+      return computePortfolio(allGroups);
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.error("[MyGroups] computePortfolio failed", e);
+      return {
+        total: 0, active: 0, yourTurn: 0, completed: 0, pending: 0,
+        capitalCommitted: 0, cagnotteCumulee: 0, avgScore: 0, upcomingTurn: null as null | { amount: number; days: number; groupName: string },
+      };
+    }
+  }, [allGroups]);
 
   const counts = useMemo<Record<GroupsFilter, number>>(() => {
     const base: Record<GroupsFilter, number> = {
@@ -212,6 +231,20 @@ export default function MyGroups() {
 
         {isLoading ? (
           <p className="text-sm text-muted-foreground">Chargement…</p>
+        ) : isError ? (
+          <div className="rounded-xl border border-destructive/40 bg-destructive/5 p-5 text-sm">
+            <p className="font-display text-base font-bold text-foreground">Impossible de charger vos groupes</p>
+            <p className="mt-1 text-muted-foreground">
+              {error instanceof Error ? error.message : "Erreur réseau inattendue."}
+            </p>
+            <button
+              type="button"
+              onClick={() => refetch()}
+              className="mt-3 inline-flex h-9 items-center rounded-md bg-primary px-3 text-xs font-semibold text-primary-foreground transition hover:bg-primary/90"
+            >
+              Réessayer
+            </button>
+          </div>
         ) : filteredGroups.length === 0 ? (
           <EmptyState
             filtered={isFiltered}
