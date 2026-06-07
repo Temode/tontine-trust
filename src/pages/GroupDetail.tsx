@@ -339,6 +339,8 @@ export default function GroupDetail() {
           />
         )}
 
+        <AnnouncementsPanel groupId={grp.id} isOrganizer={isOrganizer} />
+
         <div className="mt-6 inline-flex items-center gap-1 rounded-lg border border-hairline bg-card p-1" role="tablist" aria-label="Sections du groupe">
           {tabs.map((tab) => (
             <button
@@ -374,6 +376,8 @@ export default function GroupDetail() {
               ledger={ledgerQ.data ?? []}
             />
           )}
+          {section === "chat" && <GroupChat groupId={grp.id} />}
+          {section === "audit" && isOrganizer && <AuditLog groupId={grp.id} />}
         </div>
       </div>
     </div>
