@@ -64,13 +64,12 @@ export async function getGroup(id: string): Promise<DbGroup> {
 
 export interface CreateGroupResult {
   group: DbGroup;
+  inviteCode: string;
 }
 
 export async function createGroup(draft: GroupDraft): Promise<CreateGroupResult> {
-  const { data: userRes } = await supabase.auth.getUser();
-  const uid = userRes.user?.id;
-  if (!uid) throw new Error("AUTH_REQUIRED");
-
+  // Création transactionnelle via RPC : group + organisateur + invitation initiale.
+  // Cf. db/13_phase_i_finalisation.sql.
   const rotation =
     draft.rotationOrder === "auction" ? "choice" : draft.rotationOrder; // DB n'a pas 'auction'
 
@@ -89,13 +88,37 @@ export async function createGroup(draft: GroupDraft): Promise<CreateGroupResult>
     rotation_order_kind: rotation,
     late_penalty_percent: draft.latePenaltyPercent,
     late_penalty_after_days: draft.latePenaltyAfterDays,
-    status: "open" as const,
     visibility: draft.visibility,
     co_organizers: coOrganizers,
-    created_by: uid,
+    invite_code: draft.inviteCode,
   };
 
-  const { data, error } = await supabase.from("groups").insert(payload).select("*").single();
-  if (error) throw error;
-  return { group: data as DbGroup };
+  const { data: rpcData, error: rpcError } = await supabase.rpc(
+    "create_group_with_invitation",
+    { _payload: payload },
+  );
+  if (rpcError) throw new Error(translateCreateGroupError(rpcError.message));
+  const result = rpcData as { group_id: string; invite_code: string } | null;
+  if (!result?.group_id) throw new Error("Réponse serveur invalide.");
+
+  const { data: group, error: getErr } = await supabase
+    .from("groups")
+    .select("*")
+    .eq("id", result.group_id)
+    .single();
+  if (getErr) throw getErr;
+  return { group: group as DbGroup, inviteCode: result.invite_code };
+}
+
+const CREATE_ERROR_LABELS: Record<string, string> = {
+  AUTH_REQUIRED: "Vous devez être connecté.",
+  NAME_REQUIRED: "Le nom du groupe est requis.",
+  INVALID_CONTRIBUTION: "La cotisation doit être supérieure à zéro.",
+  INVALID_MAX_MEMBERS: "Le nombre de membres est invalide.",
+  INVITATION_CODE_COLLISION: "Impossible de générer un code unique. Réessayez.",
+};
+
+function translateCreateGroupError(message: string): string {
+  const key = Object.keys(CREATE_ERROR_LABELS).find((k) => message.includes(k));
+  return key ? CREATE_ERROR_LABELS[key] : message;
 }
