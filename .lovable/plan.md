@@ -1,70 +1,72 @@
-# Plan — Persistance wizard, Mes candidatures réelles, et suite du durcissement
+## Finalisation du parcours adhésion — qualité Tontine Digitale
 
-## Objectifs
-1. Persister en base les champs `visibility` et `co_organizers` (perdus actuellement à la création).
-2. Brancher `ApplicationsList` sur les vraies candidatures (vue `my_groups_overview` enrichie).
-3. Ajouter une section « Mes candidatures » dans `MyGroups` pour suivre le statut jusqu'à l'adhésion.
-4. Poursuivre la sécurisation côté API et UI (suite Phase H).
+Objectif : compléter les phases restantes de l'audit dans l'ordre 1.3 → 2 → 4.2 → 3 → 5 → 6 → 7, sans régresser l'existant.
 
 ---
 
-## 1. Migration DB — `db/12_visibility_and_co_organizers.sql`
+### Phase 1.3 — Création transactionnelle
 
-```text
-- ENUM public.group_visibility ('private','link','directory')
-- ALTER TABLE public.groups
-    ADD COLUMN visibility group_visibility NOT NULL DEFAULT 'private',
-    ADD COLUMN co_organizers text[] NOT NULL DEFAULT '{}';
-- Recréer la vue my_groups_overview pour exposer:
-    visibility, my_status (déjà présent), my_role, organizer_name
-- GRANT SELECT sur la vue à authenticated (idempotent).
-```
+- Nouvelle migration `db/13_create_group_with_invitation.sql` :
+  - Fonction `public.create_group_with_invitation(payload jsonb)` `security definer`, `search_path = public`.
+  - Insère `groups` (avec `visibility`, `co_organizers`, `swap_policy`, `late_penalty_*`), insère `group_members` (organisateur `active`), insère `invitations` (code unique TD-XXXX-XXXX, retries sur collision), retourne `{ group_id, invite_code }`.
+  - Échec → rollback global.
+- `src/lib/api/groups.ts` : nouvelle fonction `createGroupWithInvitation(draft)`, appelle la RPC, supprime le fallback silencieux.
+- `src/lib/validation/group.ts` : `createGroupSchema` Zod complet (nom 3-60, description ≤280, contribution > 0, members 3-50, MSISDN, fréquence, rotation). Helper `formatGroupErrors` retournant `{ stepIndex, message }[]`.
+- `src/pages/CreateGroup.tsx` : `handleIssue` parse via Zod, si erreurs → toast + saut sur la première étape concernée, sinon RPC unique.
 
-Idempotent (`add column if not exists`, `create or replace view`).
+### Phase 2 — Émission propre
 
-## 2. Types & API
-- `src/lib/api/types.ts` :
-  - `DbGroup` ajoute `visibility`, `co_organizers`.
-  - `DbGroupOverview` ajoute `visibility`, `my_status: 'active'|'pending'|null`, `my_role`.
-  - `overviewToTontine` mappe `my_status='pending'` → `status='pending'`.
-- `src/lib/api/groups.ts` :
-  - `createGroup` envoie `visibility` (depuis `draft.visibility`) et `co_organizers` (depuis `draft.coOrganizerPhones`).
-  - Nouvelle fonction `listMyApplications()` → filtre overview où `my_status='pending'` et `is_organizer=false`.
+- `IssuedConfirmation` (dans `CreateGroup.tsx`) :
+  - Remplacer `Intl.NumberFormat` par `formatGNF`.
+  - Intégrer `ShareSheet` (QR + WhatsApp + lien + code) à la place du bloc « Lien d'invitation » actuel.
+  - Ajouter aperçu compact « ce que verra l'invité » (extrait `GroupProspectus`).
+  - CTA secondaire « Voir le groupe » → route `/groupes/:id`.
 
-## 3. Section « Mes candidatures » dans `MyGroups`
-- `src/pages/MyGroups.tsx` :
-  - Récupère via `useQuery(['applications','mine'], listMyApplications)`.
-  - Affiche `<ApplicationsList>` au-dessus de la grille principale quand la liste n'est pas vide.
-  - Bouton « Retirer la candidature » → RPC `leave_group` (existant) ou DELETE sur `group_members` (status='pending', user_id=auth.uid()).
-- `src/components/join-group/ApplicationsList.tsx` : déjà prêt visuellement, juste consommer les vraies données. Adapter mapping `DbGroupOverview` → `JoinApplication` (helper `overviewToApplication`).
+### Phase 4.2 — JoinFlow unifié
 
-## 4. Wizard `StepInvitations` / `CreateGroup`
-- `types.ts` du wizard expose déjà `visibility` et `coOrganizerPhones` — vérifier qu'ils remontent jusqu'à `createGroup(draft)`.
-- Validation Zod (`group.ts`) : ajouter règles MSISDN guinéen sur `coOrganizerPhones`.
+- Nouveau `src/components/join-group/JoinFlow.tsx` : composant dialog/route unique
+  - Étapes : Récap contrat → Choix opérateur Mobile Money (Orange / MTN) → Message à l'organisateur (optionnel, ≤280) → Consentement explicite (case à cocher + bouton « Confirmer mon adhésion »).
+  - Props : `mode: "code" | "directory"`, `groupSummary`, `onConfirm()`.
+- Refactor `ConfirmJoinDialog` → délègue à `JoinFlow` (`mode="code"`).
+- Refactor `SubscriptionDialog` → délègue à `JoinFlow` (`mode="directory"`).
+- Persistance opérateur + message : colonnes `preferred_operator text`, `applicant_message text` sur `group_members` (migration `db/14_join_metadata.sql`, défaut null, RLS inchangée).
 
-## 5. Suite Phase H (continuation du travail en cours)
-- `IssuedConfirmation` (dans `CreateGroup`) : intégrer `ShareSheet` (QR + WhatsApp) déjà créé à la place du bloc « Lien d'invitation » actuel.
-- `JoinGroup` : confirmer que `?code=` ne déclenche plus l'auto-join (déjà fait via `ConfirmJoinDialog`) et que la redirection post-`pending` pointe sur `/groupes` → la nouvelle section sera donc visible.
-- Petit empty state mis à jour dans `MyGroups` quand l'utilisateur n'a que des candidatures en attente.
+### Phase 3 — Invitations qualité marché
 
-## Fichiers
-- **Nouveau** : `db/12_visibility_and_co_organizers.sql`
-- **Édités** :
-  - `src/lib/api/types.ts`
-  - `src/lib/api/groups.ts`
-  - `src/lib/validation/group.ts`
-  - `src/pages/MyGroups.tsx`
-  - `src/pages/CreateGroup.tsx` (IssuedConfirmation + ShareSheet)
-  - `src/components/create-group/StepInvitations.tsx` (validation MSISDN)
-  - `src/components/join-group/ApplicationsList.tsx` (signature props si besoin)
+- `src/pages/InviteMembers.tsx` + `InvitationsTable` :
+  - Contrôles `max_uses` (number) et `expires_at` (date) dans `ComposeDialog`.
+  - Statuts traduits FR (`pending` → En attente, etc.) via helper `formatInvitationStatus`.
+  - Bouton « Partager WhatsApp » par ligne + bouton « QR » ouvrant un Sheet avec `QrCodeSvg`.
+  - Modal « Aperçu invité » réutilisant `GroupProspectus`.
 
-## Hors périmètre
-- Intégration réelle Orange/MTN, KYC, signature cryptographique, edge function de rate-limit (laissés en backlog).
-- Refonte visuelle autre que l'ajout de la section Candidatures.
+### Phase 5 — Discours produit aligné
 
-## Validation
-1. Migration exécutée → colonnes `visibility` + `co_organizers` présentes.
-2. Alice crée un groupe « privé sur lien » avec 2 co-organisateurs → valeurs persistées (vérif via inspection ligne `groups`).
-3. Bob saisit le code → `ConfirmJoinDialog` → status `pending` → redirigé sur `/groupes`.
-4. `/groupes` affiche la section « Mes candidatures » avec le groupe d'Alice en « En attente ».
-5. Alice approuve depuis l'écran organisateur → la candidature disparaît de la liste de Bob et le groupe apparaît en actif.
+- Recherche puis remplacement des mentions non implémentées dans `CreateGroup`, `JoinGroup`, `InviteMembers`, `GroupProspectus`, `ConfirmJoinDialog` :
+  - « OTP / biométrie / signature cryptographique / notarisé / registre immuable » → « horodaté », « trace d'audit », « validation par l'organisateur ».
+  - « réponse sous 72 h » → « selon l'organisateur » (paramétrage reporté en backlog).
+
+### Phase 6 — Accessibilité & micro-UX
+
+- `Stepper` : gestion clavier (←/→), `aria-current="step"`, focus auto sur titre d'étape au changement.
+- Empty states : `MyGroups` (aucun groupe, aucune candidature), `InviteMembers` (aucun code), avec CTA contextuel.
+- `min-h-11 min-w-11` sur boutons icône critiques du parcours.
+
+### Phase 7 — Sécurité RLS
+
+- Migration `db/15_rls_hardening.sql` :
+  - `invitations` INSERT/UPDATE → `auth.uid() = created_by AND public.is_group_organizer(group_id, auth.uid())`.
+  - `groups` UPDATE → organisateur uniquement.
+  - `group_members` INSERT → uniquement via RPC `join_group_with_code` ou `create_group_with_invitation` (revoke direct INSERT pour `authenticated`).
+- Rate-limit `join_group_with_code` : table `join_attempts(user_id, attempted_at)`, fonction lève `RATE_LIMITED` si > 10 tentatives / 10 min.
+
+---
+
+### Détails techniques
+
+- Nouveaux fichiers : `db/13_create_group_with_invitation.sql`, `db/14_join_metadata.sql`, `db/15_rls_hardening.sql`, `src/components/join-group/JoinFlow.tsx`, helpers `formatInvitationStatus`, `formatGroupErrors`.
+- Fichiers édités : `CreateGroup.tsx`, `InviteMembers.tsx`, `JoinGroup.tsx`, `CodeEntryHero.tsx`, `ConfirmJoinDialog.tsx`, `SubscriptionDialog.tsx`, `StepInvitations.tsx`, `Stepper.tsx`, `MyGroups.tsx`, `groups.ts`, `invitations.ts`, `validation/group.ts`, `GroupProspectus.tsx`, `InvitationsTable.tsx`, `ComposeDialog.tsx`.
+- Hors périmètre (laissé en backlog) : intégration réelle Orange/MTN Money, KYC, signature cryptographique réelle, paramétrage SLA par organisateur.
+
+### Validation
+
+Après chaque phase, vérifier en preview : création complète sans erreur, partage WhatsApp/QR, parcours code = parcours annuaire, candidature visible dans « Mes candidatures », annulation OK, RLS testée (membre non-organisateur ne peut pas créer d'invitation).

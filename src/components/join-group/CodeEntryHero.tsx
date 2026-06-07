@@ -5,7 +5,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { joinWithCodeAndStatus } from "@/lib/api/invitations";
-import { ConfirmJoinDialog } from "@/components/join-group/ConfirmJoinDialog";
+import { JoinFlow, type JoinFlowResult } from "@/components/join-group/JoinFlow";
 
 type LookupState = "idle" | "checking" | "error";
 
@@ -50,12 +50,15 @@ export function CodeEntryHero({ onMatch, onClear, matchedCode }: CodeEntryHeroPr
     setConfirmOpen(true);
   };
 
-  const performJoin = async () => {
+  const performJoin = async (payload: JoinFlowResult) => {
     if (!isComplete(code)) return;
     setState("checking");
     setErrorMsg(null);
     try {
-      const { groupId, status } = await joinWithCodeAndStatus(code);
+      const { groupId, status } = await joinWithCodeAndStatus(code, {
+        operator: payload.operator,
+        message: payload.message,
+      });
       await qc.invalidateQueries({ queryKey: ["groups", "mine"] });
       await qc.invalidateQueries({ queryKey: ["my-groups"] });
       setConfirmOpen(false);
@@ -200,7 +203,8 @@ export function CodeEntryHero({ onMatch, onClear, matchedCode }: CodeEntryHeroPr
         </aside>
       </div>
 
-      <ConfirmJoinDialog
+      <JoinFlow
+        mode="code"
         open={confirmOpen}
         onOpenChange={(o) => {
           setConfirmOpen(o);

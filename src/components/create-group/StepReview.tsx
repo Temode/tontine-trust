@@ -155,8 +155,9 @@ export function StepReview({
           <div className="text-sm">
             <p className="font-semibold text-foreground">J'émets ce groupe et j'en assume la responsabilité</p>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              Je confirme l'exactitude des termes ci-dessus et accepte qu'ils deviennent opposables aux membres.
-              Le registre Tontine Digital horodate cette émission de manière immuable.
+              Je confirme l'exactitude des termes ci-dessus et accepte qu'ils deviennent opposables
+              aux membres. Tontine Digital horodate l'émission et conserve une trace d'audit
+              consultable à tout moment.
             </p>
           </div>
         </label>
@@ -164,7 +165,7 @@ export function StepReview({
         <p className="inline-flex items-start gap-2 text-[11px] text-muted-foreground">
           <Shield className="mt-0.5 h-3.5 w-3.5 shrink-0 text-success" />
           <span>
-            L'émission génère un identifiant cryptographique unique. Les paramètres ne peuvent plus être
+            L'émission génère un identifiant unique horodaté. Les paramètres ne peuvent plus être
             modifiés librement après le démarrage du premier cycle.
           </span>
         </p>

@@ -54,10 +54,25 @@ const RPC_ERROR_LABELS: Record<string, string> = {
   INVITATION_EXPIRED: "Ce code a expiré.",
   INVITATION_EXHAUSTED: "Ce code a atteint son nombre maximum d'utilisations.",
   GROUP_FULL: "Ce groupe est complet.",
+  RATE_LIMITED: "Trop de tentatives. Réessayez dans quelques minutes.",
+  INVALID_OPERATOR: "Opérateur Mobile Money invalide.",
+  MESSAGE_TOO_LONG: "Message trop long (280 caractères max.).",
 };
 
-export async function joinWithCode(code: string): Promise<{ groupId: string }> {
-  const { data, error } = await supabase.rpc("join_group_with_code", { _code: code });
+export interface JoinWithCodeOptions {
+  operator?: "orange" | "mtn" | null;
+  message?: string | null;
+}
+
+export async function joinWithCode(
+  code: string,
+  options: JoinWithCodeOptions = {},
+): Promise<{ groupId: string }> {
+  const { data, error } = await supabase.rpc("join_group_with_code", {
+    _code: code,
+    _operator: options.operator ?? null,
+    _message: options.message ?? null,
+  });
   if (error) {
     const key = Object.keys(RPC_ERROR_LABELS).find((k) => error.message.includes(k));
     throw new Error(key ? RPC_ERROR_LABELS[key] : error.message);
@@ -69,8 +84,9 @@ export type JoinStatus = "active" | "pending";
 
 export async function joinWithCodeAndStatus(
   code: string,
+  options: JoinWithCodeOptions = {},
 ): Promise<{ groupId: string; status: JoinStatus }> {
-  const { groupId } = await joinWithCode(code);
+  const { groupId } = await joinWithCode(code, options);
   const { data: userRes } = await supabase.auth.getUser();
   const uid = userRes.user?.id;
   if (!uid) return { groupId, status: "active" };
