@@ -11,7 +11,10 @@ import { GroupsToolbar } from "@/components/groups/GroupsToolbar";
 import type { GroupsFilter, SortDir, SortKey, ViewMode } from "@/components/groups/types";
 import { getPortfolioStats } from "@/lib/mock-data";
 import { listMyGroups } from "@/lib/api/groups";
+import { listMyApplications, cancelMyApplication } from "@/lib/api/groups";
 import { overviewToTontine } from "@/lib/api/types";
+import { ApplicationsList } from "@/components/join-group/ApplicationsList";
+import { useQueryClient } from "@tanstack/react-query";
 import type { TontineGroup } from "@/lib/types";
 import { toast } from "sonner";
 
@@ -99,6 +102,26 @@ export default function MyGroups() {
     queryFn: listMyGroups,
   });
 
+  const queryClient = useQueryClient();
+  const { data: applications = [] } = useQuery({
+    queryKey: ["applications", "mine"],
+    queryFn: listMyApplications,
+  });
+
+  const handleCancelApplication = async (groupId: string) => {
+    try {
+      await cancelMyApplication(groupId);
+      toast.success("Candidature retirée");
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["applications", "mine"] }),
+        queryClient.invalidateQueries({ queryKey: ["groups", "mine"] }),
+      ]);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Erreur inconnue";
+      toast.error("Impossible de retirer la candidature", { description: msg });
+    }
+  };
+
   const allGroups = useMemo<TontineGroup[]>(() => rows.map(overviewToTontine), [rows]);
 
   const counts = useMemo<Record<GroupsFilter, number>>(() => {
@@ -166,6 +189,10 @@ export default function MyGroups() {
 
       <div className="space-y-6 px-5 py-6 lg:px-8 lg:py-8">
         <GroupsKpiStrip stats={portfolio} />
+
+        {applications.length > 0 && (
+          <ApplicationsList applications={applications} onCancel={handleCancelApplication} />
+        )}
 
         <GroupsToolbar
           query={query}
