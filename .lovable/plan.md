@@ -1,51 +1,84 @@
-## Finalisation qualité Tontine Digitale — patchs post-test
+## Audit final — pourquoi l'app devient blanche
 
-Test E2E (Alice → création « Lien partageable » + Bob → adhésion + candidature) validé. Trois imperfections doivent être corrigées pour atteindre la barre « marché réel ».
+### Cause racine identifiée (grâce à votre console)
+```
+[vite] Internal Server Error
+Failed to resolve import "qrcode" from "src/components/invite/ShareSheet.tsx"
+```
 
----
+- `qrcode` **est déclaré dans `package.json`** et installé dans la sandbox Lovable, mais **n'est pas installé sur votre machine locale** (`C:\Users\HP\…`, `localhost:8080`). Vous avez probablement `git pull` sans relancer `npm install` (ou `bun install`) après l'ajout de la dépendance lors du flux d'invitations.
+- Quand Vite échoue à résoudre un import, il renvoie **HTTP 500 sur tout le module graph**. React ne peut plus monter → page blanche totale. C'est exactement ce que vous voyez sur `/groupes` et au retour d'onglet (HMR retente, échoue à nouveau).
 
-### 1. `JoinFlow` — récap contrat complet
-
-Aujourd'hui la section « Termes du contrat » du dialog ne montre que le code. Le candidat s'engage à l'aveugle.
-
-- Ajouter une RPC `public.preview_group_by_code(_code text) returns jsonb` (`security definer`, `search_path = public`) renvoyant `{ name, description, contribution_amount, frequency, max_members, members_count, visibility, organizer_name }` à partir du code (lecture seule, ne touche pas aux compteurs, sans rate-limit).
-- Migration `db/14_preview_group_by_code.sql`.
-- `src/lib/api/invitations.ts` : `previewByCode(code)` qui appelle la RPC.
-- `src/components/join-group/JoinFlow.tsx` : si `mode="code"`, fetch via React Query au montage et afficher :
-  - Nom, organisateur, fréquence, cotisation (via `formatGNF`), membres, cagnotte totale (`contribution × max_members`).
-- Skeleton pendant le chargement, fallback erreur traduit (`INVITATION_NOT_FOUND` → message clair).
-
-### 2. `IssuedConfirmation` — intégrer QR + aperçu
-
-Le bloc post-émission affiche code + lien + WhatsApp + Copier mais omet le QR et l'aperçu invité.
-
-- Dans `src/pages/CreateGroup.tsx`, remplacer le bloc « Invitation prête à partager » par le composant `ShareSheet` existant (qui inclut déjà `QrCodeSvg`).
-- Ajouter sous le `ShareSheet` un encart compact « Ce que verra l'invité » réutilisant `GroupProspectus` en mode `compact` (props : nom, organisateur, cotisation, fréquence, membres) — sans bouton « Rejoindre » (mode lecture seule).
-
-### 3. `MyGroups` — KPI strip basé sur les vraies données
-
-Le strip affiche encore les valeurs mock (`7 groupes`, `51 450 000 GNF`…) alors que la section dessous est en données réelles.
-
-- Dans `src/pages/MyGroups.tsx`, dériver les KPIs depuis `listMyGroups()` :
-  - `PORTEFEUILLE` = `rows.length`, ventilé `actifs / votre tour / en cours / clos` via `status` + `is_my_turn`.
-  - `CAPITAL ENGAGÉ RESTANT` = somme `(max_members - completed_turns) × contribution_amount` sur les groupes actifs.
-  - `CAGNOTTES EN CIRCULATION` = somme `max_members × contribution_amount` sur les groupes actifs ; `Prochaine cagnotte` = min `next_payout_at`.
-  - `SCORE MOYEN` = laisser pour l'instant en `—` si `profile.reliability` indisponible, sinon utiliser la valeur réelle.
-- Supprimer l'import de mock-data dans `MyGroups.tsx`.
+### Action immédiate côté utilisateur
+Dans le terminal du projet local :
+```bash
+npm install        # ou: bun install
+```
+puis redémarrer `npm run dev`. La page reviendra instantanément.
 
 ---
 
-### Fichiers
+## Audit de robustesse (pour que ça ne ternisse plus jamais Tontine Digital)
 
-- Nouveaux : `db/14_preview_group_by_code.sql`.
-- Édités : `src/lib/api/invitations.ts`, `src/components/join-group/JoinFlow.tsx`, `src/pages/CreateGroup.tsx`, `src/components/join-group/GroupProspectus.tsx` (mode `compact`), `src/pages/MyGroups.tsx`.
+Même une fois `qrcode` installé, l'app reste **fragile** : un seul import cassé ou une seule exception au rendu efface tout. Les correctifs suivants garantissent qu'**on ne reverra plus jamais une page 100% blanche**.
 
-### Validation après build
+### 1. ErrorBoundary global + boundary par route
+- Envelopper `<Routes>` dans `App.tsx` avec un `ErrorBoundary` qui propose **Recharger l'application**.
+- Envelopper l'`<Outlet />` dans `AppShell` avec un second boundary : la **sidebar et la nav restent visibles** même si la page courante crashe, et l'utilisateur peut naviguer ailleurs.
+- Améliorer `ErrorBoundary.tsx` : bouton "Recharger la page" + reset automatique au changement de `location.pathname`.
 
-1. Créer un groupe « Lien partageable » → vérifier QR + aperçu invité visibles dans la confirmation.
-2. Coller le lien dans un onglet privé connecté en tant que Bob → JoinFlow affiche nom + cotisation + organisateur.
-3. Revenir sur `/mes-groupes` → KPIs cohérents avec la liste affichée.
+### 2. Lazy-load des écrans + Suspense
+- Convertir les imports de pages en `lazy(() => import(...))` dans `App.tsx` avec un `<Suspense fallback={spinner}>`.
+- **Bénéfice clé** : un import cassé dans `ShareSheet` (ou n'importe quel sous-composant) n'affectera que la route qui l'utilise (`/inviter`), pas le dashboard ni `/groupes`.
 
-### Hors périmètre
+### 3. QueryClient durci
+```ts
+new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,  // stop la tempête de refetch au retour d'onglet
+      retry: 1,
+      staleTime: 30_000,
+    },
+    mutations: { retry: 0 },
+  },
+})
+```
+Garder `refetchOnWindowFocus: true` uniquement sur la cloche de notifications.
 
-Mock-data résiduelles ailleurs (Dashboard, MyContributions), intégration réelle Mobile Money, paramétrage SLA. À traiter dans un lot dédié.
+### 4. AuthProvider robuste
+- Flag `mounted` pour éviter `setState` après démontage.
+- `setLoading(false)` aussi sur le premier `onAuthStateChange` (pas seulement `getSession`).
+- Re-fetch `user_roles` uniquement si `user.id` change (évite spam au `TOKEN_REFRESHED` qui survient au retour d'onglet).
+
+### 5. Hygiène realtime
+- `supabase.removeChannel(channel)` au cleanup de `useNotificationsRealtime` (plus fiable que `unsubscribe()` seul).
+
+### 6. Observabilité
+- Dans `main.tsx`, brancher `window.addEventListener("error", ...)` et `"unhandledrejection"` → `console.error("[GlobalError]", ...)`.
+- `ErrorBoundary.componentDidCatch` logge déjà ; ajouter la stack complète.
+
+### 7. Filets de sécurité MyGroups
+- `try/catch` autour de `computePortfolio` (fallback zéros).
+- Afficher un encart d'erreur si `useQuery({ queryKey: ["groups","mine"] })` est en `isError` (au lieu d'un "Chargement…" infini).
+
+---
+
+## Fichiers touchés
+- `src/App.tsx` — QueryClient configuré, ErrorBoundary global, lazy() + Suspense
+- `src/components/layout/AppShell.tsx` — ErrorBoundary autour de l'Outlet
+- `src/components/ErrorBoundary.tsx` — bouton recharger + reset sur changement de route
+- `src/hooks/useAuth.tsx` — mounted flag, loading sur auth event, refetch roles conditionnel
+- `src/hooks/useNotifications.ts` — cleanup via removeChannel
+- `src/main.tsx` — handlers globaux error / unhandledrejection
+- `src/pages/MyGroups.tsx` — état isError + computePortfolio défensif
+
+## Non-objectifs
+- Aucun changement métier, schéma DB, RPC ou visuel des KPIs/tableaux.
+- Aucun ajout de dépendance.
+
+## Résultat attendu
+- Plus jamais d'écran 100% blanc : on aura au pire un encart d'erreur avec sidebar visible et bouton "Recharger".
+- Le retour sur l'onglet ne déclenche plus de cascade de refetch (fin du blanc sur `/groupes`).
+- Un import cassé n'impacte qu'une seule route, pas toute l'app.
+- Diagnostic futur facilité par les logs globaux `[ErrorBoundary]` / `[GlobalError]`.
