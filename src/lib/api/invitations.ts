@@ -101,3 +101,24 @@ export async function joinWithCodeAndStatus(
 }
 
 export { generateInviteCode };
+
+export interface InvitationPreview {
+  name: string;
+  description: string | null;
+  contribution_amount: number;
+  frequency: "hebdomadaire" | "quinzaine" | "mensuelle";
+  max_members: number;
+  members_count: number;
+  visibility: "private" | "public-link" | "directory";
+  organizer_name: string;
+}
+
+/** Charge un aperçu lecture seule du groupe associé à un code d'invitation. */
+export async function previewByCode(code: string): Promise<InvitationPreview> {
+  const { data, error } = await supabase.rpc("preview_group_by_code", { _code: code });
+  if (error) {
+    const key = Object.keys(RPC_ERROR_LABELS).find((k) => error.message.includes(k));
+    throw new Error(key ? RPC_ERROR_LABELS[key] : error.message);
+  }
+  return data as InvitationPreview;
+}
