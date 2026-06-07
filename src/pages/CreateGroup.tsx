@@ -180,9 +180,10 @@ interface IssuedConfirmationProps {
   draft: GroupDraft;
   cagnotte: number;
   groupId: string | null;
+  inviteCode: string;
 }
 
-function IssuedConfirmation({ draft, cagnotte, groupId }: IssuedConfirmationProps) {
+function IssuedConfirmation({ draft, cagnotte, groupId, inviteCode }: IssuedConfirmationProps) {
   return (
     <article className="rounded-xl border border-hairline bg-card">
       <header className="flex items-start gap-4 border-b border-hairline bg-success/5 px-5 py-6 lg:px-7">
@@ -207,7 +208,7 @@ function IssuedConfirmation({ draft, cagnotte, groupId }: IssuedConfirmationProp
           </p>
           <div className="mt-3">
             <ShareSheet
-              code={draft.inviteCode}
+              code={inviteCode}
               groupName={draft.name}
               contribution={draft.contribution}
               frequency={draft.frequency}
