@@ -15,9 +15,13 @@ export interface DbGroupOverview {
   frequency: DbFrequency;
   max_members: number;
   status: DbGroupStatus;
+  visibility?: "private" | "public-link" | "directory";
   created_at: string;
   members_count: number;
   is_organizer: boolean;
+  my_status?: DbMemberStatus | null;
+  my_role?: DbMemberRole | null;
+  organizer_name?: string | null;
 }
 
 export interface DbGroup {
@@ -32,6 +36,8 @@ export interface DbGroup {
   late_penalty_percent: number;
   late_penalty_after_days: number;
   status: DbGroupStatus;
+  visibility?: "private" | "public-link" | "directory";
+  co_organizers?: string[];
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -87,6 +93,7 @@ export const FREQ_TO_DB: Record<Frequency, DbFrequency> = {
 /** Adapter : ligne DB -> TontineGroup utilisable par l'UI existante. */
 export function overviewToTontine(row: DbGroupOverview): TontineGroup {
   const totalCollected = row.contribution_amount * row.members_count;
+  const isPending = row.my_status === "pending";
   return {
     id: row.id,
     name: row.name,
@@ -98,7 +105,13 @@ export function overviewToTontine(row: DbGroupOverview): TontineGroup {
     progress: 0,
     currentTurn: "—",
     yourTurn: 0,
-    status: row.status === "completed" ? "completed" : row.status === "active" ? "active" : "pending",
+    status: isPending
+      ? "pending"
+      : row.status === "completed"
+      ? "completed"
+      : row.status === "active"
+      ? "active"
+      : "pending",
     totalCollected,
     rules: [],
     role: row.is_organizer ? "organizer" : "participant",
