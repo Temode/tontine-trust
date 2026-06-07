@@ -1,51 +1,70 @@
-Constat principal
+Objectif
 
-L’erreur qui provoque l’écran blanc n’est plus le paquet `qrcode`. Le crash actuel est :
+Rendre tout crash React reproductible et corrigeable en 30 secondes : trace complète, route, utilisateur, composant fautif. Garantir qu'aucune route (Auth comprise) ne devient un écran blanc.
+
+1. Journalisation centralisée des erreurs
+
+Créer `src/lib/diagnostics/crashLogger.ts` exposant `logCrash({ source, error, info, extra })` qui imprime un bloc unique :
 
 ```text
-NotFoundError: Failed to execute 'insertBefore' on 'Node'
-The above error occurred in the <LoaderCircle> component
+[Tontine Crash] 2026-06-07T21:10:00Z
+  source       : ErrorBoundary | window.error | unhandledrejection
+  route        : /auth
+  user         : <uid|anon>  roles: [participant]
+  componentStack: ...
+  error        : NotFoundError: Failed to execute 'insertBefore'...
+  stack        : ...
+  extra        : { lastFocusedTab: "signin", submitting: true }
 ```
 
-Ce pattern est typique quand Chrome/Google Translate ou une extension modifie le DOM que React contrôle. On voit justement l’icône/traduction Chrome active dans la capture. React essaie ensuite d’insérer le spinner `Loader2` avant un texte de bouton qui n’est plus le même nœud DOM, donc il crashe.
+Champs récoltés :
+- `location.pathname + search`
+- `user.id` et `roles` lus via un petit registre `setAuthSnapshot({ userId, roles })` mis à jour dans `useAuth.tsx` à chaque changement de session
+- `navigator.userAgent`, `document.documentElement.lang`
+- Compteur incrémental de crash dans la session (utile pour distinguer boucles)
 
-Le `POST /auth/v1/token ... Invalid Refresh Token` est un second problème : une ancienne session locale invalide est restée dans le navigateur. Ce n’est pas la cause directe du crash `LoaderCircle`, mais il faut le gérer proprement.
+Le logger garde aussi les 20 derniers crashs en mémoire (`window.__tontineCrashes`) pour copier/coller depuis la console.
 
-Plan de correction
+2. Branchement sur toutes les sources d'erreurs
 
-1. Stabiliser les boutons de connexion
-   - Dans `src/pages/Auth.tsx`, remplacer les rendus conditionnels du spinner :
-     ```tsx
-     {submitting && <Loader2 />}
-     Se connecter
-     ```
-     par une structure DOM stable :
-     ```tsx
-     <span className="...">{submitting ? <Loader2 /> : null}</span>
-     <span>Se connecter</span>
-     ```
-   - Même correction pour “Créer mon compte”.
-   - Objectif : React ne doit plus insérer/supprimer un SVG directement avant un nœud texte traduisible.
+- `src/main.tsx` : `window.error` et `unhandledrejection` appellent `logCrash`.
+- `src/components/ErrorBoundary.tsx` : `componentDidCatch` appelle `logCrash` avec `componentStack` (info.componentStack) et le `fallbackTitle` comme `extra.boundary`.
+- React Query : ajouter `queryCache` et `mutationCache` global handlers dans `App.tsx` qui transmettent les échecs au logger.
 
-2. Étendre ce durcissement aux autres boutons à risque
-   - Rechercher les patterns `condition && <Loader2 ... />` dans les boutons.
-   - Corriger les cas critiques déjà visibles : `Auth`, `JoinFlow`, `SubscriptionDialog`, `PaymentModal`, `InvitePanel`, `MyContributions`, `InviteMembers`.
-   - Principe : garder un conteneur `<span>` fixe pour les icônes/spinners et envelopper le texte du bouton dans un `<span>`.
+3. Diagnostic ciblé `insertBefore` / Google Translate
 
-3. Protéger `/auth` avec une frontière d’erreur dédiée
-   - Ajouter un `ErrorBoundary` autour de la route `/auth`, pas seulement autour des pages protégées.
-   - Le fallback doit afficher un message propre Tontine Digital + bouton “Recharger la page”, au lieu d’un écran blanc.
+- Ajouter dans `main.tsx` un `MutationObserver` léger qui détecte si `<html>` reçoit `class="translated-ltr"` ou `translated-rtl` (signature Google Translate) et logge `[Tontine Diag] translate-detected`.
+- Dans `crashLogger`, si le message contient `insertBefore` ou `removeChild` + `not a child`, ajouter automatiquement `extra.likelyCause = "DOM externe (Google Translate / extension)"` et la liste des classes de `<html>`.
+- Confirmer ainsi que le crash `<LoaderCircle>` observé sur `/auth` vient bien d'une mutation externe, pas d'un bug Tontine.
+- Garder le durcissement déjà en place (`translate="no"`, balise `<meta name="google" content="notranslate">`, boutons spinner enveloppés dans `<span>`).
 
-4. Gérer les refresh tokens invalides
-   - Dans `useAuth.tsx`, si `getSession()` ou l’initialisation auth rencontre `Invalid Refresh Token` / `Refresh Token Not Found`, nettoyer la session locale via `supabase.auth.signOut()` ou équivalent contrôlé, puis remettre `loading=false`.
-   - Objectif : l’utilisateur revient simplement à l’écran de connexion, sans boucle ni écran vide.
+4. Couverture ErrorBoundary sur 100% des routes
 
-5. Réduire l’impact de Google Translate sur l’app
-   - Ajouter au démarrage une protection légère : définir `document.documentElement.setAttribute("translate", "no")` et `document.body.classList.add("notranslate")`.
-   - Comme l’app est déjà en français, cela limite les mutations DOM automatiques de Chrome Translate.
-   - Garder le code côté React plutôt que modifier `index.html` inutilement.
+Refactor `src/App.tsx` :
 
-6. Vérification
-   - Tester `/auth` : chargement, connexion en échec, connexion en succès, changement d’onglet, retour sur `/groupes`.
-   - Vérifier que la console ne contient plus de crash `insertBefore` / `LoaderCircle`.
-   - Vérifier que les warnings React Router restent seulement des avertissements non bloquants.
+```text
+ErrorBoundary global (app)
+  └─ Routes
+      ├─ ErrorBoundary route "/"      → Index
+      ├─ ErrorBoundary route "/auth"  → Auth
+      ├─ ProtectedRoute
+      │   └─ AppShell (déjà ErrorBoundary autour de Outlet)
+      └─ ErrorBoundary route "*"     → NotFound
+```
+
+- Créer `RouteBoundary` (wrapper court qui prend `name` + `children` et utilise `useLocation` pour `resetKey={pathname}`) afin que naviguer vers une autre route réinitialise l'erreur automatiquement.
+- Le fallback affiche : titre, message court, bouton "Réessayer", bouton "Recharger la page", bouton "Copier le rapport" (copie le dernier crash formaté dans le presse-papier).
+- Aucune route ne reste sans frontière.
+
+5. Vérification
+
+- Provoquer manuellement un throw dans `Auth` : l'écran affiche le fallback, la console contient le bloc `[Tontine Crash]` complet avec route `/auth` et user `anon`.
+- Recharger `/groupes` avec une session expirée : pas d'écran blanc, log clair.
+- Si Google Translate est activé, `[Tontine Diag] translate-detected` apparaît avant le crash.
+
+Fichiers touchés
+- nouveau : `src/lib/diagnostics/crashLogger.ts`
+- nouveau : `src/components/RouteBoundary.tsx`
+- modif : `src/main.tsx`, `src/App.tsx`, `src/components/ErrorBoundary.tsx`, `src/hooks/useAuth.tsx`
+
+Aucun changement DB, aucun changement d'UX en mode nominal.

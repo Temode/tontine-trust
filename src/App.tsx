@@ -1,5 +1,5 @@
 import { lazy, Suspense } from "react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { MutationCache, QueryCache, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Outlet, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
@@ -8,6 +8,8 @@ import { AppShell } from "@/components/layout/AppShell";
 import { AuthProvider } from "@/hooks/useAuth";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { RouteBoundary } from "@/components/RouteBoundary";
+import { logCrash } from "@/lib/diagnostics/crashLogger";
 
 // Lazy-loaded pages : un import cassé n'efface plus toute l'app.
 const Auth = lazy(() => import("@/pages/Auth"));
@@ -34,6 +36,18 @@ const queryClient = new QueryClient({
     },
     mutations: { retry: 0 },
   },
+  queryCache: new QueryCache({
+    onError: (error, query) =>
+      logCrash({ source: "react-query", error, extra: { queryKey: query.queryKey } }),
+  }),
+  mutationCache: new MutationCache({
+    onError: (error, _vars, _ctx, mutation) =>
+      logCrash({
+        source: "react-query",
+        error,
+        extra: { mutationKey: mutation.options.mutationKey ?? null },
+      }),
+  }),
 });
 
 function AppSuspense() {
@@ -54,13 +68,20 @@ const App = () => (
           <AuthProvider>
             <Suspense fallback={<AppSuspense />}>
               <Routes>
-                <Route path="/" element={<Index />} />
+                <Route
+                  path="/"
+                  element={
+                    <RouteBoundary name="Accueil">
+                      <Index />
+                    </RouteBoundary>
+                  }
+                />
                 <Route
                   path="/auth"
                   element={
-                    <ErrorBoundary fallbackTitle="L'écran de connexion a rencontré un problème">
+                    <RouteBoundary name="Connexion">
                       <Auth />
-                    </ErrorBoundary>
+                    </RouteBoundary>
                   }
                 />
                 <Route element={<ProtectedRoute />}>
@@ -71,20 +92,20 @@ const App = () => (
                       </AppShell>
                     }
                   >
-                    <Route path="/dashboard" element={<Dashboard />} />
-                    <Route path="/groupes" element={<MyGroups />} />
-                    <Route path="/groupes/:id" element={<GroupDetail />} />
-                    <Route path="/cotisations" element={<MyContributions />} />
-                    <Route path="/recus" element={<Receipts />} />
-                    <Route path="/recus/:id" element={<Receipts />} />
-                    <Route path="/notifications" element={<Notifications />} />
-                    <Route path="/nouveau" element={<CreateGroup />} />
-                    <Route path="/rejoindre" element={<JoinGroup />} />
-                    <Route path="/inviter" element={<InviteMembers />} />
-                    <Route path="/profil" element={<Profile />} />
+                    <Route path="/dashboard" element={<RouteBoundary name="Tableau de bord"><Dashboard /></RouteBoundary>} />
+                    <Route path="/groupes" element={<RouteBoundary name="Mes groupes"><MyGroups /></RouteBoundary>} />
+                    <Route path="/groupes/:id" element={<RouteBoundary name="Détail du groupe"><GroupDetail /></RouteBoundary>} />
+                    <Route path="/cotisations" element={<RouteBoundary name="Mes cotisations"><MyContributions /></RouteBoundary>} />
+                    <Route path="/recus" element={<RouteBoundary name="Reçus"><Receipts /></RouteBoundary>} />
+                    <Route path="/recus/:id" element={<RouteBoundary name="Reçu"><Receipts /></RouteBoundary>} />
+                    <Route path="/notifications" element={<RouteBoundary name="Notifications"><Notifications /></RouteBoundary>} />
+                    <Route path="/nouveau" element={<RouteBoundary name="Créer un groupe"><CreateGroup /></RouteBoundary>} />
+                    <Route path="/rejoindre" element={<RouteBoundary name="Rejoindre un groupe"><JoinGroup /></RouteBoundary>} />
+                    <Route path="/inviter" element={<RouteBoundary name="Inviter"><InviteMembers /></RouteBoundary>} />
+                    <Route path="/profil" element={<RouteBoundary name="Profil"><Profile /></RouteBoundary>} />
                   </Route>
                 </Route>
-                <Route path="*" element={<NotFound />} />
+                <Route path="*" element={<RouteBoundary name="Page introuvable"><NotFound /></RouteBoundary>} />
               </Routes>
             </Suspense>
           </AuthProvider>
