@@ -3,6 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import { subscribeToMyNotifications } from "@/lib/api/notifications";
+import { supabase } from "@/integrations/supabase/client";
 
 /**
  * Souscrit aux notifications temps réel et invalide les caches pertinents.
@@ -19,7 +20,11 @@ export function useNotificationsRealtime() {
       toast(n.title, { description: n.body ?? undefined });
     });
     return () => {
-      channel.unsubscribe();
+      try {
+        supabase.removeChannel(channel);
+      } catch {
+        channel.unsubscribe();
+      }
     };
   }, [user, qc]);
 }

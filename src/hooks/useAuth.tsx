@@ -46,31 +46,70 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let mounted = true;
+    let lastUserId: string | null = null;
+
+    const loadRoles = (uid: string) => {
+      supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", uid)
+        .then(({ data }) => {
+          if (!mounted) return;
+          setRoles((data ?? []).map((r: { role: AppRole }) => r.role));
+        });
+    };
+
     const { data: sub } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      if (!mounted) return;
       setSession(newSession);
       setUser(newSession?.user ?? null);
-      if (newSession?.user) {
-        setTimeout(() => {
-          supabase
-            .from("user_roles")
-            .select("role")
-            .eq("user_id", newSession.user.id)
-            .then(({ data }) => {
-              setRoles((data ?? []).map((r: { role: AppRole }) => r.role));
-            });
-        }, 0);
-      } else {
+      setLoading(false);
+      const uid = newSession?.user?.id ?? null;
+      if (uid && uid !== lastUserId) {
+        lastUserId = uid;
+        setTimeout(() => loadRoles(uid), 0);
+      } else if (!uid) {
+        lastUserId = null;
         setRoles([]);
       }
     });
 
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
-      setUser(data.session?.user ?? null);
-      setLoading(false);
-    });
+    supabase.auth
+      .getSession()
+      .then(({ data, error }) => {
+        if (!mounted) return;
+        if (error) {
+          const msg = (error.message || "").toLowerCase();
+          if (msg.includes("refresh token")) {
+            // Session locale invalide : on nettoie pour revenir à /auth proprement.
+            supabase.auth.signOut().catch(() => undefined);
+          }
+          setSession(null);
+          setUser(null);
+          setLoading(false);
+          return;
+        }
+        setSession(data.session);
+        setUser(data.session?.user ?? null);
+        const uid = data.session?.user?.id ?? null;
+        if (uid && uid !== lastUserId) {
+          lastUserId = uid;
+          loadRoles(uid);
+        }
+        setLoading(false);
+      })
+      .catch(() => {
+        if (!mounted) return;
+        setSession(null);
+        setUser(null);
+        setLoading(false);
+      });
 
-    return () => sub.subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      sub.subscription.unsubscribe();
+    };
   }, []);
 
   const signIn: AuthContextValue["signIn"] = async (email, password) => {

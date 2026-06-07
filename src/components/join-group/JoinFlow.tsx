@@ -275,8 +275,10 @@ export function JoinFlow({
                     : "cursor-not-allowed bg-muted text-muted-foreground",
                 )}
               >
-                {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
-                {submitting ? "Adhésion en cours…" : "Confirmer mon adhésion"}
+                <span className="inline-flex h-4 w-4 items-center justify-center">
+                  {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                </span>
+                <span>{submitting ? "Adhésion en cours…" : "Confirmer mon adhésion"}</span>
               </button>
             </div>
 
