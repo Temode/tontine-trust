@@ -34,7 +34,27 @@ export const createGroupSchema = z.object({
     .string()
     .regex(/^TD-[A-Z0-9]{4}-[A-Z0-9]{4}$/, "Le code d'invitation doit suivre le format TD-XXXX-XXXX."),
   visibility: z.enum(["private", "public-link", "directory"]),
-  coOrganizerPhones: z.string().max(500).optional().or(z.literal("")),
+  coOrganizerPhones: z
+    .string()
+    .max(500)
+    .optional()
+    .or(z.literal(""))
+    .refine(
+      (val) => {
+        if (!val) return true;
+        const phones = val
+          .split(/[\n,;]+/)
+          .map((s) => s.trim())
+          .filter(Boolean);
+        // Format MSISDN guinéen accepté : +224XXXXXXXXX (9 chiffres) avec espaces optionnels.
+        const re = /^\+224\s?[6-7]\d{2}(\s?\d{2}){3}$/;
+        return phones.every((p) => re.test(p));
+      },
+      {
+        message:
+          "Chaque co-organisateur doit être un numéro guinéen au format +224 6XX XX XX XX.",
+      },
+    ),
 });
 
 export type CreateGroupInput = z.infer<typeof createGroupSchema>;
