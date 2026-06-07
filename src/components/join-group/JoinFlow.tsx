@@ -38,6 +38,10 @@ export interface JoinFlowProps {
   /** Invitation code, shown when mode === 'code'. */
   code?: string;
   submitting?: boolean;
+  /** Loading state for the summary fetch. */
+  loadingSummary?: boolean;
+  /** Human-readable error if the summary fetch failed. */
+  summaryError?: string | null;
   onConfirm: (payload: JoinFlowResult) => void;
 }
 
@@ -59,6 +63,8 @@ export function JoinFlow({
   summary,
   code,
   submitting,
+  loadingSummary,
+  summaryError,
   onConfirm,
 }: JoinFlowProps) {
   const [operator, setOperator] = useState<JoinOperator>("orange");
@@ -119,6 +125,17 @@ export function JoinFlow({
               <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                 Termes du contrat
               </p>
+              {loadingSummary && !summary ? (
+                <div className="mt-3 grid grid-cols-2 gap-3" aria-live="polite">
+                  {[0, 1, 2, 3].map((i) => (
+                    <div key={i} className="h-14 animate-pulse rounded-md bg-card" />
+                  ))}
+                </div>
+              ) : summaryError && !summary ? (
+                <p className="mt-3 text-xs text-destructive" role="alert">
+                  Impossible de charger les détails du groupe : {summaryError}
+                </p>
+              ) : (
               <dl className="mt-3 grid grid-cols-2 gap-3 text-sm">
                 {summary?.contribution !== undefined && (
                   <Field label="Cotisation" value={`${formatGNF(summary.contribution)} GNF`} />
@@ -138,6 +155,7 @@ export function JoinFlow({
                   />
                 )}
               </dl>
+              )}
               {code && (
                 <p className="mt-3 text-[11px] text-muted-foreground">
                   Code :{" "}
