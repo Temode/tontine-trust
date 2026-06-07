@@ -20,7 +20,7 @@ const STATUS_META: Record<
   collecting: {
     label: "Collecte en cours",
     dotClass: "bg-accent-600 text-accent-foreground ring-4 ring-accent-100",
-    lineClass: "bg-accent-200",
+    lineClass: "bg-accent-300",
   },
   upcoming: {
     label: "À venir",
@@ -94,7 +94,7 @@ export function TurnsTimeline({ turns, currentUserId }: TurnsTimelineProps) {
               className={cn(
                 "flex flex-1 flex-wrap items-center gap-3 rounded-lg border px-4 py-3",
                 t.status === "collecting"
-                  ? "border-accent-200 bg-accent-50/60"
+                  ? "border-accent-300 bg-accent-50/60"
                   : t.status === "paid"
                     ? "border-success/30 bg-success/5"
                     : "border-hairline bg-card",
