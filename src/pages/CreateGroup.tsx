@@ -82,12 +82,13 @@ export default function CreateGroup() {
         subtitle="Émettez une nouvelle tontine en cinq étapes structurées."
       />
 
-      <div className="space-y-6 px-5 py-6 lg:px-8 lg:py-8">
+      <div className="mx-auto max-w-6xl space-y-8 px-5 py-6 lg:px-8 lg:py-10">
         <ErrorBoundary fallbackTitle="L'assistant de création a rencontré une erreur">
         <Stepper current={step} onJump={handleJump} completed={completed} />
 
-        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_360px]">
+        <div className="grid grid-cols-1 gap-8 xl:grid-cols-12">
           <div>
+          <div className="xl:col-span-7">
             {state === "issued" ? (
               <IssuedConfirmation
                 draft={draft}
