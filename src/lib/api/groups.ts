@@ -62,6 +62,46 @@ export async function getGroup(id: string): Promise<DbGroup> {
   return data as DbGroup;
 }
 
+export interface UpdateGroupSettingsPayload {
+  name?: string;
+  description?: string | null;
+  category?: string | null;
+  contribution_amount?: number;
+  frequency?: "hebdomadaire" | "quinzaine" | "mensuelle";
+  max_members?: number;
+  rotation_order_kind?: "random" | "fixed" | "choice";
+  late_penalty_percent?: number;
+  late_penalty_after_days?: number;
+  visibility?: "private" | "public-link" | "directory";
+}
+
+const UPDATE_ERROR_LABELS: Record<string, string> = {
+  AUTH_REQUIRED: "Vous devez être connecté.",
+  FORBIDDEN: "Seul l'organisateur peut modifier ce groupe.",
+  GROUP_NOT_FOUND: "Groupe introuvable.",
+  CYCLE_ALREADY_STARTED:
+    "Le cycle est déjà démarré : les paramètres ne peuvent plus être modifiés.",
+  NAME_REQUIRED: "Le nom du groupe est requis.",
+  INVALID_CONTRIBUTION: "La cotisation doit être supérieure à zéro.",
+  INVALID_MAX_MEMBERS: "Le nombre de membres est invalide.",
+};
+
+export async function updateGroupSettings(
+  groupId: string,
+  payload: UpdateGroupSettingsPayload,
+): Promise<void> {
+  const { error } = await supabase.rpc("update_group_settings", {
+    _group_id: groupId,
+    _payload: payload,
+  });
+  if (error) {
+    const key = Object.keys(UPDATE_ERROR_LABELS).find((k) =>
+      error.message.includes(k),
+    );
+    throw new Error(key ? UPDATE_ERROR_LABELS[key] : error.message);
+  }
+}
+
 export interface CreateGroupResult {
   group: DbGroup;
   inviteCode: string;

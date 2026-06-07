@@ -8,6 +8,8 @@ export interface DbReceipt {
   group_id: string;
   group_name: string;
   amount: number;
+  fee_amount: number;
+  net_amount: number;
   provider: DbPaymentProvider;
   hash: string;
   issued_at: string;
