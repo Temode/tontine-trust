@@ -21,9 +21,8 @@ export default function JoinGroup() {
         <CodeEntryHero />
 
         <p className="text-[11px] text-muted-foreground">
-          Tontine Digital horodate chaque candidature sur un registre immuable. Aucune adhésion n'est
-          effective avant la validation explicite de l'organisateur du groupe et la confirmation
-          biométrique de votre côté.
+          Tontine Digital horodate chaque adhésion dans le registre du groupe. L'organisateur est
+          notifié dès que vous rejoignez et peut révoquer un code à tout moment.
         </p>
       </div>
     </div>

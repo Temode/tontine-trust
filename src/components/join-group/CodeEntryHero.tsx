@@ -5,6 +5,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { joinWithCodeAndStatus } from "@/lib/api/invitations";
+import { ConfirmJoinDialog } from "@/components/join-group/ConfirmJoinDialog";
 
 type LookupState = "idle" | "checking" | "error";
 
@@ -37,12 +38,19 @@ export function CodeEntryHero({ onMatch, onClear, matchedCode }: CodeEntryHeroPr
   const [code, setCode] = useState("");
   const [state, setState] = useState<LookupState>("idle");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [autoJoinTried, setAutoJoinTried] = useState(false);
 
-  const handleJoin = async () => {
+  /** Opens the consent gate. Actual network call happens in performJoin. */
+  const handleJoin = () => {
+    if (!isComplete(code)) return;
+    setErrorMsg(null);
+    setConfirmOpen(true);
+  };
+
+  const performJoin = async () => {
     if (!isComplete(code)) return;
     setState("checking");
     setErrorMsg(null);
@@ -50,6 +58,8 @@ export function CodeEntryHero({ onMatch, onClear, matchedCode }: CodeEntryHeroPr
       const { groupId, status } = await joinWithCodeAndStatus(code);
       await qc.invalidateQueries({ queryKey: ["groups", "mine"] });
       await qc.invalidateQueries({ queryKey: ["my-groups"] });
+      setConfirmOpen(false);
+      setState("idle");
       if (status === "pending") {
         toast.success("Demande envoyée", {
           description: "L'organisateur doit valider votre adhésion. Vous serez notifié.",
@@ -63,10 +73,13 @@ export function CodeEntryHero({ onMatch, onClear, matchedCode }: CodeEntryHeroPr
       const msg = e instanceof Error ? e.message : "Erreur inconnue";
       setErrorMsg(msg);
       setState("error");
+      setConfirmOpen(false);
+      toast.error("Adhésion impossible", { description: msg });
     }
   };
 
-  // Pré‑remplissage depuis l'URL (?code=TD-XXXX-XXXX)
+  // Pré‑remplissage depuis l'URL (?code=TD-XXXX-XXXX). Aucune adhésion
+  // automatique : l'utilisateur doit explicitement confirmer.
   useEffect(() => {
     const raw = searchParams.get("code");
     if (!raw || code) return;
@@ -77,15 +90,6 @@ export function CodeEntryHero({ onMatch, onClear, matchedCode }: CodeEntryHeroPr
     next.delete("code");
     setSearchParams(next, { replace: true });
   }, [searchParams, setSearchParams, code]);
-
-  // Auto‑join si code complet pré‑rempli
-  useEffect(() => {
-    if (!autoJoinTried && isComplete(code) && state === "idle") {
-      setAutoJoinTried(true);
-      void handleJoin();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [code]);
 
   const handlePaste = async () => {
     try {
@@ -184,10 +188,10 @@ export function CodeEntryHero({ onMatch, onClear, matchedCode }: CodeEntryHeroPr
             Sécurité
           </p>
           <ul className="mt-3 space-y-2.5 text-sm">
-            <Bullet>Chaque code est cryptographiquement signé et tracé.</Bullet>
-            <Bullet>Une seule adhésion par numéro et par cycle.</Bullet>
-            <Bullet>Tout code expire automatiquement à la complétion du groupe.</Bullet>
-            <Bullet>Les organisateurs valident manuellement chaque demande.</Bullet>
+            <Bullet>Chaque code est unique au groupe et tracé dans le registre.</Bullet>
+            <Bullet>Une seule adhésion par compte et par cycle.</Bullet>
+            <Bullet>Le code expire automatiquement à la complétion du groupe.</Bullet>
+            <Bullet>L'organisateur peut révoquer un code à tout moment.</Bullet>
           </ul>
           <p className="mt-4 inline-flex items-start gap-2 text-[11px] text-muted-foreground">
             <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-success" />
@@ -195,6 +199,17 @@ export function CodeEntryHero({ onMatch, onClear, matchedCode }: CodeEntryHeroPr
           </p>
         </aside>
       </div>
+
+      <ConfirmJoinDialog
+        open={confirmOpen}
+        onOpenChange={(o) => {
+          setConfirmOpen(o);
+          if (!o && state === "checking") setState("idle");
+        }}
+        code={code}
+        submitting={state === "checking"}
+        onConfirm={performJoin}
+      />
     </article>
   );
 }
@@ -202,7 +217,7 @@ export function CodeEntryHero({ onMatch, onClear, matchedCode }: CodeEntryHeroPr
 function StateLine({ state, errorMsg }: { state: LookupState; errorMsg: string | null }) {
   if (state === "idle") {
     return (
-      <p className="mt-2 text-[11px] text-muted-foreground">
+      <p className="mt-2 text-[11px] text-muted-foreground" aria-live="polite">
         Le code se compose des deux lettres <span className="font-mono">TD</span> suivies de deux groupes
         de quatre caractères alphanumériques.
       </p>
@@ -211,7 +226,7 @@ function StateLine({ state, errorMsg }: { state: LookupState; errorMsg: string |
 
   if (state === "checking") {
     return (
-      <p className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-primary">
+      <p className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-primary" aria-live="polite">
         <Loader2 className="h-3.5 w-3.5 animate-spin" />
         Adhésion en cours…
       </p>
@@ -219,7 +234,7 @@ function StateLine({ state, errorMsg }: { state: LookupState; errorMsg: string |
   }
 
   return (
-    <p className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-destructive">
+    <p className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-destructive" role="alert" aria-live="assertive">
       <X className="h-3.5 w-3.5" />
       {errorMsg ?? "Erreur."}
     </p>

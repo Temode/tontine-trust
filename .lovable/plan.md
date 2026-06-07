@@ -1,58 +1,126 @@
-## Objectif
-1. **Corriger** le bug critique : la page de création de groupe devient blanche dès que l'utilisateur saisit trop de caractères
-2. **Redessiner** le parcours de création (actuellement trop "enfantin") avec un ton professionnel adapté à un produit financier réel
-3. **Dérouler** le scénario de test E2E Alice → Bob sur un **nouveau groupe** créé proprement via l'UI
 
-## Phase 1 — Diagnostic & fix du crash "page blanche"
+## Audit du parcours adhésion (création → invitation → join)
 
-Investigation des fichiers du wizard :
-- `src/pages/CreateGroup.tsx`
-- `src/components/create-group/StepIdentity.tsx` (champs nom/description — suspect n°1)
-- `src/components/create-group/StepFinancials.tsx` (montants — suspect n°2 si `Number.parseInt` sur valeurs vides ou trop grandes)
-- `src/components/create-group/StepRules.tsx`, `StepInvitations.tsx`, `StepReview.tsx`, `TermSheet.tsx`
+Périmètre audité : `CreateGroup` (wizard 5 étapes), `InviteMembers`, `JoinGroup` (`CodeEntryHero`), API `groups.ts` / `invitations.ts`, dialog d'annuaire `SubscriptionDialog`, liste `ApplicationsList`.
 
-Hypothèses prioritaires :
-- `RangeError` / `NaN` sur un `Intl.NumberFormat` ou `formatGNF()` quand le champ devient une chaîne non-numérique
-- Erreur non capturée dans un `useMemo` qui recalcule l'aperçu (TermSheet) à chaque frappe
-- Un `.toFixed()` / `.toLocaleString()` sur `undefined`
-- Validation Zod qui throw au lieu de retourner un message
+---
 
-Correctifs :
-- Ajouter un `ErrorBoundary` local autour du wizard (évite l'écran blanc complet)
-- Guards défensifs sur les parseurs numériques (`Number.isFinite`)
-- Limites `maxLength` cohérentes sur les inputs texte
-- Logs `console.error` ciblés pour confirmer la cause exacte
+### Constats — ce qui ne tient pas la promesse « Tontine Digital »
 
-## Phase 2 — Refonte visuelle "tontine sérieuse"
+**A. Données du wizard partiellement perdues à la création**
+- `StepInvitations` collecte `visibility` (privé / lien / annuaire) et `coOrganizerPhones` mais `createGroup()` ne les envoie pas — les choix de l'organisateur sont silencieusement ignorés.
+- `latePenaltyPercent`, `latePenaltyAfterDays`, `swapPolicy`, `rotationOrder=auction` sont aplatis (auction → choice) sans avertir l'utilisateur.
+- Aucune validation Zod côté client avant `insert` : un nom de 2 caractères, une cotisation à 0, ou des membres à 1 partent en base.
 
-Direction : produit financier de confiance pour la Guinée — palette **Bleu sarcelle #0D7377 / Or #E8AA14** (déjà dans le design system), typographie display affirmée, densité d'information rassurante, micro-copies pédagogiques sans infantiliser.
+**B. Écran de confirmation fragile et incohérent**
+- `IssuedConfirmation` utilise `new Intl.NumberFormat("fr-FR").format(...)` au lieu du helper `formatGNF` durci → reproduit le risque de page blanche corrigé ailleurs.
+- Affiche « cagnotte … par tour » mais la création n'a pas persisté la fréquence localisée FR (jour/semaine/quinzaine/mois) — la valeur visible peut différer du contrat émis.
+- CTA secondaire « Voir le groupe » sans état (membre seul / en attente de quorum) — l'organisateur arrive sur une page vide.
 
-Pour cette phase, je vais générer **3 directions design rendues** via le tool prévu à cet effet, puis te laisser choisir avant d'implémenter. Cibles visuelles :
-- Stepper plus institutionnel (numérotation, libellés clairs, état de complétion)
-- Cards de formulaire avec hiérarchie nette, helpers explicatifs (ex. "Une cotisation hebdomadaire convient aux groupes de proches")
-- Récapitulatif `TermSheet` repensé comme un vrai contrat-aperçu (sections, bénéficiaires, calendrier, règles)
-- États vides / erreurs / loading dignes d'un produit fintech
+**C. Création + 1ère invitation non transactionnelles**
+- `createGroup` puis `createInvitation` sont deux appels séparés. Si la 2ᵉ échoue, le groupe existe sans code, sans message clair. Le fallback `catch { createInvitation({ groupId }) }` masque toute erreur (pas seulement collision de code).
+- L'organisateur n'est pas garanti ajouté en `group_members` côté client — on dépend d'un trigger DB invisible : à vérifier et documenter.
 
-⚠️ Périmètre strictement visuel + ergonomie. Pas de changement de logique métier (RPC, validation Zod, schémas DB inchangés).
+**D. Promesses marketing non tenues (risque de confiance)**
+Les textes annoncent « OTP », « biométrie », « signature cryptographique », « notarisation », « 72h », « registre immuable ». Aucun de ces mécanismes n'est implémenté dans le flux audité. Pour un produit financier en Guinée, cette sur-promesse est un risque réputationnel.
 
-## Phase 3 — Test E2E sur un nouveau groupe
+**E. Parcours « rejoindre par code » incohérent avec « rejoindre depuis l'annuaire »**
+- `CodeEntryHero` accepte le code et exécute `joinWithCodeAndStatus` **sans aucune étape de consentement**, sans récap des termes, sans choix opérateur Mobile Money, sans message à l'organisateur.
+- À l'inverse, `SubscriptionDialog` (annuaire) impose contrat, KYC, opérateur, consentement. Deux portes d'entrée, deux niveaux d'engagement → injuste pour le membre et risqué pour l'organisateur.
+- Pire : `?code=` dans l'URL déclenche un **auto-join silencieux**. Cliquer un lien WhatsApp = adhésion immédiate sans lire les termes.
 
-1. **Alice** se connecte (`alice@test.local`) → crée un **nouveau** groupe via le wizard refondé (ex. « Tontine Alpha 2026 »), génère un code d'invitation
-2. **Bob** (`bob@test.local`) → `/rejoindre` → saisit le code → vérifie le statut `pending` et la visibilité du groupe (validations des migrations 09/10/11)
-3. **Alice** → onglet Membres → **Approuve** Bob → vérifie transition `active` + notification
-4. **Bob** → recharge → badge `INSCRIPTION` disparu, notification reçue, accès complet
-5. **Cas d'erreur** : code invalide → message explicite
+**F. UX de l'invitation pauvre pour un marché réel**
+- `InviteMembers` n'a aucun partage natif (WhatsApp, SMS, copie de lien complet, QR code). En Guinée le canal de partage est WhatsApp à 90 % — il faut un bouton dédié avec message pré-rédigé.
+- Aucune date d'expiration ni `max_uses` éditables alors que l'API les supporte.
+- Le statut affiché brut (`pending`, `revoked`, `accepted`, `expired`) n'est pas traduit en français.
+- Pas d'aperçu « ce que verra l'invité » avant partage.
 
-## Phase 4 — Rapport final
-- ✅ Bug page blanche : cause + correctif
-- ✅ Refonte UI : avant/après, direction retenue
-- ✅ Scénario E2E : ce qui fonctionne, bugs résiduels, recommandations
+**G. Suivi côté membre invisible**
+- Après un join `pending`, `CodeEntryHero` redirige vers `/groupes` mais il n'existe aucune section « Mes candidatures en attente » dans la liste (le composant `ApplicationsList` existe mais n'est pas câblé sur des vraies données).
+- Le membre ne sait pas où retrouver sa demande, ni comment l'annuler.
 
-## Hors scope
-Paiements Orange/MTN, refonte annuaire, optimisations perf, refonte d'autres pages.
+**H. Accessibilité & UX détaillée**
+- L'input de code (`CodeEntryHero`) bloque à 12 caractères mais n'annonce pas la progression aux lecteurs d'écran (pas d'`aria-live` sur le `StateLine`).
+- Le bouton « Régénérer le code » dans `StepInvitations` ne demande pas confirmation alors qu'il invaliderait les codes déjà partagés (texte le promet, code ne l'applique pas — le code reste local jusqu'à l'émission).
+- `coOrganizerPhones` accepte n'importe quoi — pas de validation format MSISDN guinéen `+224 6XX XXX XXX`.
 
-## Ordre d'exécution proposé
-1. **Fix crash** (bloquant — sans ça impossible de créer un groupe)
-2. **Générer 3 directions design** → tu choisis
-3. **Implémenter la direction choisie**
-4. **Test E2E avec toi**
+**I. Sécurité / RLS à confirmer**
+- Vérifier que `invitations.insert` exige `created_by = auth.uid()` ET que l'utilisateur est organisateur du groupe (sinon n'importe quel membre peut générer des codes).
+- Vérifier que `join_group_with_code` ajoute toujours le candidat en `status='pending'` quand `visibility` ≠ `private`-invité, et déclenche la notification organisateur.
+- Vérifier que `revokeInvitation` est limité à l'organisateur (UPDATE policy).
+
+---
+
+### Plan de correction
+
+**Phase 1 — Intégrité des données (bloquant)**
+1. Étendre `createGroup` API + payload pour persister `visibility`, `co_organizers`, `swap_policy`, `late_penalty_*` ; créer migration si colonnes manquantes (ajouter `co_organizers text[]` et `visibility` enum).
+2. Ajouter validation Zod centralisée (`createGroupSchema`) avec messages FR ; bloquer le bouton « Émettre » si invalide et afficher la liste d'erreurs avec lien vers l'étape concernée.
+3. Encapsuler `createGroup + createInvitation + ensure_organizer_membership` dans une **RPC `create_group_with_invitation`** (transaction unique) ; supprimer le fallback silencieux.
+
+**Phase 2 — Émission propre**
+4. Refactor `IssuedConfirmation` : utiliser `formatGNF`, garder le récap aligné sur `derived`, ajouter QR code + 3 boutons partage (WhatsApp pré-rédigé, copier lien, copier code), prévisualisation « vue invité ».
+5. Confirmation de régénération de code dans `StepInvitations` + libellé honnête (« le code sera remplacé à l'émission »).
+
+**Phase 3 — Parcours invitation pro**
+6. `InviteMembers` : ajouter contrôles `max_uses` et `expires_at`, traduire les statuts, bouton « Partager via WhatsApp », QR code par invitation, modal « Aperçu invité ».
+7. Validation MSISDN guinéen sur `coOrganizerPhones` avec chips visuels.
+
+**Phase 4 — Parcours « Rejoindre » unifié et sûr**
+8. Désactiver l'auto-join sur `?code=` : pré-remplir, puis ouvrir un **écran de souscription** identique à `SubscriptionDialog` (récap contrat, opérateur Mobile Money, message, consentement explicite).
+9. Mutualiser le composant de souscription entre annuaire et code → un seul parcours d'engagement.
+10. Câbler `ApplicationsList` sur les vraies candidatures `pending/declined/accepted` du membre ; afficher la section sous `CodeEntryHero` et dans `MyGroups`.
+
+**Phase 5 — Discours produit aligné**
+11. Retirer ou justifier chaque mention « OTP / biométrie / cryptographique / notarisé / registre immuable » : soit on les implémente, soit on les remplace par des formulations vérifiables (« horodaté », « trace d'audit », « validation par l'organisateur »).
+12. Délais annoncés (« réponse sous 72h ») → rendre paramétrable par l'organisateur ou retirer.
+
+**Phase 6 — Accessibilité & micro-UX**
+13. `aria-live="polite"` sur `StateLine`, labels explicites, focus management après chaque étape, gestion clavier dans `Stepper`.
+14. Empty states dignes (pas de groupe / pas de code / pas de candidature) avec CTA contextuel.
+
+**Phase 7 — Sécurité (à confirmer puis durcir si besoin)**
+15. Audit RLS sur `invitations` (INSERT/UPDATE réservés organisateur), `group_members` (INSERT via RPC uniquement), `groups` (UPDATE limité organisateur).
+16. Rate-limit `join_group_with_code` (déjà côté DB ? sinon edge function) pour empêcher l'énumération de codes.
+
+---
+
+### Détails techniques
+
+- Fichiers principaux à modifier : `src/pages/CreateGroup.tsx`, `src/pages/InviteMembers.tsx`, `src/pages/JoinGroup.tsx`, `src/components/join-group/CodeEntryHero.tsx`, `src/components/join-group/SubscriptionDialog.tsx`, `src/components/create-group/StepInvitations.tsx`, `src/components/create-group/StepReview.tsx`, `src/lib/api/groups.ts`, `src/lib/api/invitations.ts`.
+- Nouvelles : `src/lib/validation/group.ts` (Zod), `src/components/join-group/JoinFlow.tsx` (parcours unifié), `src/components/invite/ShareSheet.tsx` (WhatsApp/QR), migration RPC `create_group_with_invitation`.
+- Hors périmètre : intégration réelle Orange/MTN Money, KYC, signature cryptographique (laissés en backlog explicite).
+
+### Diagramme du parcours cible
+
+```text
+Organisateur                               Invité
+────────────                               ──────
+Wizard 5 étapes  ──► RPC create_group_with_invitation
+       │                       │
+       │                       ├──► group + invitation + organizer membership
+       ▼                       │
+Confirmation + ShareSheet ◄────┘
+(QR, WhatsApp, lien, code)
+       │
+       └──► partage ───────────────►  /join?code=TD-XXXX-XXXX
+                                              │
+                                              ▼
+                                     Pré-remplit le code
+                                              │
+                                              ▼
+                                     Écran de souscription
+                                     (récap, opérateur, consentement)
+                                              │
+                                              ▼
+                                     RPC join_group_with_code → pending
+                                              │
+                                              ▼
+                                     ApplicationsList (Mes candidatures)
+                                              │
+                          Organisateur valide ▼
+                                     Notification + accès actif
+```
+
+### Ordre d'exécution proposé
+Phase 1 → 2 → 4 → 3 → 5 → 6 → 7. Les phases 1, 2, 4 sont prioritaires (intégrité + sécurité de l'adhésion). Les phases 3, 5, 6 finalisent l'image « marché réel ». La 7 nécessite vérifications RLS.
