@@ -14,6 +14,9 @@ alter table public.groups
   add column if not exists co_organizers text[] not null default '{}';
 
 -- 3. Vue agrégée enrichie (visibility + my_status + my_role)
+-- DROP requis : on insère `visibility` avant `created_at`, ce que
+-- CREATE OR REPLACE VIEW refuse (changement d'ordre/nom de colonnes).
+drop view if exists public.my_groups_overview;
 create or replace view public.my_groups_overview
 with (security_invoker = true) as
 select
