@@ -12,6 +12,7 @@ export interface DbContributionDue {
   beneficiary_user_id: string;
   beneficiary_name: string | null;
   days_to_due: number;
+  expected_penalty: number;
 }
 
 export async function listMyContributionsDue(): Promise<DbContributionDue[]> {
