@@ -35,6 +35,7 @@ export interface DbGroup {
   rotation_order_kind: "random" | "fixed" | "choice";
   late_penalty_percent: number;
   late_penalty_after_days: number;
+  swap_policy?: "none" | "with_consent" | "organizer_only";
   status: DbGroupStatus;
   visibility?: "private" | "public-link" | "directory";
   co_organizers?: string[];

@@ -35,8 +35,9 @@ import { InvitePanel, INVITE_PANEL_ID } from "@/components/groups/InvitePanel";
 import { GroupChat } from "@/components/group/GroupChat";
 import { AnnouncementsPanel } from "@/components/group/AnnouncementsPanel";
 import { AuditLog } from "@/components/group/AuditLog";
+import { SwapsPanel } from "@/components/group/SwapsPanel";
 
-type Section = "overview" | "members" | "rotation" | "chat" | "audit";
+type Section = "overview" | "members" | "rotation" | "swaps" | "chat" | "audit";
 
 const FREQ_LABEL: Record<string, string> = {
   mensuelle: "Mensuelle",
@@ -170,6 +171,7 @@ export default function GroupDetail() {
     { id: "overview", label: "Aperçu" },
     { id: "members", label: "Membres" },
     { id: "rotation", label: "Rotation" },
+    { id: "swaps", label: "Échanges" },
     { id: "chat", label: "Discussion" },
     ...(isOrganizer ? [{ id: "audit" as Section, label: "Audit" }] : []),
   ];
@@ -377,6 +379,13 @@ export default function GroupDetail() {
             />
           )}
           {section === "chat" && <GroupChat groupId={grp.id} />}
+          {section === "swaps" && (
+            <SwapsPanel
+              groupId={grp.id}
+              currentUserId={user?.id ?? null}
+              swapPolicy={grp.swap_policy ?? "with_consent"}
+            />
+          )}
           {section === "audit" && isOrganizer && <AuditLog groupId={grp.id} />}
         </div>
       </div>
