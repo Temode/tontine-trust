@@ -1,6 +1,6 @@
-import { LogOut, RefreshCw, AlertTriangle, Camera, Loader2 } from "lucide-react";
+import { LogOut, RefreshCw, AlertTriangle, Camera, Loader2, Bell } from "lucide-react";
 import { toast } from "sonner";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { TopBar } from "@/components/layout/TopBar";
 import { ReliabilityCard } from "@/components/dashboard/ReliabilityCard";
@@ -174,6 +174,14 @@ export default function Profile() {
           <LogOut className="h-4 w-4" />
           Se déconnecter
         </button>
+
+        <Link
+          to="/parametres/notifications"
+          className="inline-flex h-10 items-center gap-2 rounded-md border border-hairline bg-card px-4 text-sm font-semibold text-foreground transition hover:bg-secondary"
+        >
+          <Bell className="h-4 w-4" />
+          Préférences de notification
+        </Link>
       </div>
     </div>
   );
