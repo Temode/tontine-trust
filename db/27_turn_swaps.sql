@@ -345,7 +345,9 @@ begin
             updated_at = now()
       where id = _group_id;
     end if;
-    if (select count(*) from jsonb_object_keys(_payload) k where k <> 'swap_policy') > 0 then
+    if exists (
+      select 1 from jsonb_object_keys(_payload) as t(k) where t.k <> 'swap_policy'
+    ) then
       raise exception 'CYCLE_ALREADY_STARTED';
     end if;
     return;
