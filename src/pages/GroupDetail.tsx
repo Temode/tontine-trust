@@ -36,8 +36,10 @@ import { GroupChat } from "@/components/group/GroupChat";
 import { AnnouncementsPanel } from "@/components/group/AnnouncementsPanel";
 import { AuditLog } from "@/components/group/AuditLog";
 import { SwapsPanel } from "@/components/group/SwapsPanel";
+import { AuctionPanel } from "@/components/group/AuctionPanel";
+import { ReviewsPanel } from "@/components/group/ReviewsPanel";
 
-type Section = "overview" | "members" | "rotation" | "swaps" | "chat" | "audit";
+type Section = "overview" | "members" | "rotation" | "swaps" | "auctions" | "reviews" | "chat" | "audit";
 
 const FREQ_LABEL: Record<string, string> = {
   mensuelle: "Mensuelle",
@@ -172,6 +174,8 @@ export default function GroupDetail() {
     { id: "members", label: "Membres" },
     { id: "rotation", label: "Rotation" },
     { id: "swaps", label: "Échanges" },
+    ...(grp.rotation_order_kind === "auction" ? [{ id: "auctions" as Section, label: "Enchères" }] : []),
+    ...(grp.status === "completed" ? [{ id: "reviews" as Section, label: "Avis" }] : []),
     { id: "chat", label: "Discussion" },
     ...(isOrganizer ? [{ id: "audit" as Section, label: "Audit" }] : []),
   ];
@@ -384,6 +388,19 @@ export default function GroupDetail() {
               groupId={grp.id}
               currentUserId={user?.id ?? null}
               swapPolicy={grp.swap_policy ?? "with_consent"}
+            />
+          )}
+          {section === "auctions" && (
+            <AuctionPanel
+              groupId={grp.id}
+              currentUserId={user?.id ?? null}
+              isOrganizer={isOrganizer}
+            />
+          )}
+          {section === "reviews" && (
+            <ReviewsPanel
+              groupId={grp.id}
+              currentUserId={user?.id ?? null}
             />
           )}
           {section === "audit" && isOrganizer && <AuditLog groupId={grp.id} />}

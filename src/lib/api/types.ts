@@ -32,7 +32,7 @@ export interface DbGroup {
   contribution_amount: number;
   frequency: DbFrequency;
   max_members: number;
-  rotation_order_kind: "random" | "fixed" | "choice";
+  rotation_order_kind: "random" | "fixed" | "choice" | "auction";
   late_penalty_percent: number;
   late_penalty_after_days: number;
   swap_policy?: "none" | "with_consent" | "organizer_only";

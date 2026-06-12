@@ -17,6 +17,7 @@ const FREQ_OPTIONS = [
 const ROTATION_OPTIONS = [
   { value: "random", label: "Tirage au sort" },
   { value: "fixed", label: "Ordre fixe" },
+  { value: "auction", label: "Enchères" },
   { value: "choice", label: "Choix individuel" },
 ] as const;
 
