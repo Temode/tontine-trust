@@ -7,7 +7,7 @@ import {
   listGroupProofs, confirmExternalPayment, rejectExternalPayment,
   EXTERNAL_METHOD_LABEL,
 } from "@/lib/api/externalPayments";
-import { formatXof } from "@/lib/format";
+import { formatGNF } from "@/lib/format";
 
 interface Props { groupId: string }
 
@@ -48,7 +48,7 @@ export function ExternalPaymentsPanel({ groupId }: Props) {
         <li key={p.id} className="rounded-md border border-hairline p-3 text-sm">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
-              <p className="font-medium">{formatXof(p.amount)} · {EXTERNAL_METHOD_LABEL[p.method]}</p>
+              <p className="font-medium">{formatGNF(p.amount)} · {EXTERNAL_METHOD_LABEL[p.method]}</p>
               {p.reference && <p className="text-xs text-muted-foreground">Réf : {p.reference}</p>}
               {p.note && <p className="text-xs text-muted-foreground">{p.note}</p>}
             </div>

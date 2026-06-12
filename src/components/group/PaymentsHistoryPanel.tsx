@@ -3,7 +3,7 @@ import { Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { listGroupPaymentsHistory } from "@/lib/api/paymentsHistory";
 import { downloadCsv } from "@/lib/export/csv";
-import { formatXof } from "@/lib/format";
+import { formatGNF } from "@/lib/format";
 
 interface Props { groupId: string }
 
@@ -22,7 +22,7 @@ export function PaymentsHistoryPanel({ groupId }: Props) {
         <Button
           variant="outline"
           size="sm"
-          onClick={() => downloadCsv(`paiements-${groupId.slice(0, 8)}.csv`, rows)}
+          onClick={() => downloadCsv(`paiements-${groupId.slice(0, 8)}.csv`, rows as unknown as Array<Record<string, unknown>>)}
         >
           <Download className="mr-2 h-4 w-4" /> Exporter CSV
         </Button>
@@ -45,8 +45,8 @@ export function PaymentsHistoryPanel({ groupId }: Props) {
                 <td className="py-2">#{r.turn_number}</td>
                 <td>{r.payer_name ?? "—"}</td>
                 <td>{r.due_date}</td>
-                <td>{formatXof(r.amount)}</td>
-                <td>{r.penalty_amount > 0 ? formatXof(r.penalty_amount) : "—"}</td>
+                <td>{formatGNF(r.amount)}</td>
+                <td>{r.penalty_amount > 0 ? formatGNF(r.penalty_amount) : "—"}</td>
                 <td>{r.contribution_status}</td>
               </tr>
             ))}
