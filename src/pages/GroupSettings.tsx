@@ -8,6 +8,9 @@ import { SectionCard } from "@/components/dashboard/SectionCard";
 import { getGroup, updateGroupSettings, type UpdateGroupSettingsPayload } from "@/lib/api/groups";
 import { useAuth } from "@/hooks/useAuth";
 import { MembersAdminPanel } from "@/components/group/MembersAdminPanel";
+import { ExternalPaymentsPanel } from "@/components/group/ExternalPaymentsPanel";
+import { PaymentsHistoryPanel } from "@/components/group/PaymentsHistoryPanel";
+import { CycleAdminPanel } from "@/components/group/CycleAdminPanel";
 
 const FREQ_OPTIONS = [
   { value: "hebdomadaire", label: "Hebdomadaire" },
@@ -277,6 +280,18 @@ export default function GroupSettings() {
             ownerUserId={group.created_by}
           />
         )}
+
+        <SectionCard title="Paiements externes" subtitle="Cash, virement, mobile money hors-app à valider">
+          <ExternalPaymentsPanel groupId={group.id} />
+        </SectionCard>
+
+        <SectionCard title="Historique des paiements" subtitle="Toutes les cotisations reçues">
+          <PaymentsHistoryPanel groupId={group.id} />
+        </SectionCard>
+
+        <SectionCard title="Cycle" subtitle="Pause, reprise, archivage">
+          <CycleAdminPanel groupId={group.id} status={group.status} />
+        </SectionCard>
 
         <div className="flex items-center justify-end gap-3">
           <button
