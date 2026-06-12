@@ -12,6 +12,8 @@ export interface DbReliability {
   total_late: number;
   avg_delay_days: number;
   cycles_completed: number;
+  avg_rating?: number;
+  reviews_count?: number;
   last_computed_at: string;
 }
 
@@ -23,6 +25,8 @@ export interface DbGroupReliabilityRow {
   tier: ReliabilityTier;
   total_paid: number;
   total_late: number;
+  avg_rating?: number;
+  reviews_count?: number;
 }
 
 export interface DbLateContribution {
