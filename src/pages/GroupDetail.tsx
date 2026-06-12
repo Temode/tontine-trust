@@ -36,8 +36,10 @@ import { GroupChat } from "@/components/group/GroupChat";
 import { AnnouncementsPanel } from "@/components/group/AnnouncementsPanel";
 import { AuditLog } from "@/components/group/AuditLog";
 import { SwapsPanel } from "@/components/group/SwapsPanel";
+import { AuctionPanel } from "@/components/group/AuctionPanel";
+import { ReviewsPanel } from "@/components/group/ReviewsPanel";
 
-type Section = "overview" | "members" | "rotation" | "swaps" | "chat" | "audit";
+type Section = "overview" | "members" | "rotation" | "swaps" | "auctions" | "reviews" | "chat" | "audit";
 
 const FREQ_LABEL: Record<string, string> = {
   mensuelle: "Mensuelle",
