@@ -69,7 +69,7 @@ export interface UpdateGroupSettingsPayload {
   contribution_amount?: number;
   frequency?: "hebdomadaire" | "quinzaine" | "mensuelle";
   max_members?: number;
-  rotation_order_kind?: "random" | "fixed" | "choice";
+  rotation_order_kind?: "random" | "fixed" | "choice" | "auction";
   late_penalty_percent?: number;
   late_penalty_after_days?: number;
   visibility?: "private" | "public-link" | "directory";
