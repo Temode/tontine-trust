@@ -49,8 +49,14 @@ export function StepInvitations({ draft, onChange, onBack, onContinue, index, to
   };
 
   const handleRegenerate = () => {
+    const ok = typeof window === "undefined"
+      ? true
+      : window.confirm(
+          "Remplacer le code d'invitation ? Le code actuel ne sera pas activé tant que vous n'avez pas émis le groupe.",
+        );
+    if (!ok) return;
     onChange({ inviteCode: generateInviteCode() });
-    toast("Nouveau code généré", { description: "L'ancien code a été révoqué." });
+    toast("Nouveau code généré", { description: "Le précédent ne sera pas émis." });
   };
 
   const coOrganizers = draft.coOrganizerPhones
@@ -161,8 +167,8 @@ export function StepInvitations({ draft, onChange, onBack, onContinue, index, to
         <p className="inline-flex items-start gap-2 rounded-md border border-hairline bg-secondary/30 px-3 py-2 text-[11px] text-muted-foreground">
           <Shield className="mt-0.5 h-3.5 w-3.5 shrink-0 text-success" />
           <span>
-            Les invitations sont chiffrées et tracées. Chaque adhésion est confirmée par OTP et notarisée
-            sur le registre du groupe.
+            Chaque code est unique au groupe et tracé. Vous pouvez le révoquer ou en générer un nouveau
+            à tout moment depuis « Inviter des membres ».
           </span>
         </p>
       </div>

@@ -1,54 +1,122 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { lazy, Suspense } from "react";
+import { MutationCache, QueryCache, QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { BrowserRouter, Outlet, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppShell } from "@/components/layout/AppShell";
-import Calendar from "@/pages/Calendar";
-import Contributions from "@/pages/Contributions";
-import CreateGroup from "@/pages/CreateGroup";
-import Dashboard from "@/pages/Dashboard";
-import GroupDetail from "@/pages/GroupDetail";
-import History from "@/pages/History";
-import InviteMembers from "@/pages/InviteMembers";
-import JoinGroup from "@/pages/JoinGroup";
-import MyGroups from "@/pages/MyGroups";
-import NotFound from "@/pages/NotFound";
-import Notifications from "@/pages/Notifications";
-import Profile from "@/pages/Profile";
-import Rotations from "@/pages/Rotations";
-import Settings from "@/pages/Settings";
+import { AuthProvider } from "@/hooks/useAuth";
+import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { RouteBoundary } from "@/components/RouteBoundary";
+import { logCrash } from "@/lib/diagnostics/crashLogger";
 
-const queryClient = new QueryClient();
+// Lazy-loaded pages : un import cassé n'efface plus toute l'app.
+const Auth = lazy(() => import("@/pages/Auth"));
+const Index = lazy(() => import("@/pages/Index"));
+const CreateGroup = lazy(() => import("@/pages/CreateGroup"));
+const Dashboard = lazy(() => import("@/pages/Dashboard"));
+const GroupDetail = lazy(() => import("@/pages/GroupDetail"));
+const InviteMembers = lazy(() => import("@/pages/InviteMembers"));
+const JoinGroup = lazy(() => import("@/pages/JoinGroup"));
+const MyGroups = lazy(() => import("@/pages/MyGroups"));
+const MyContributions = lazy(() => import("@/pages/MyContributions"));
+const Receipts = lazy(() => import("@/pages/Receipts"));
+const Notifications = lazy(() => import("@/pages/Notifications"));
+const NotFound = lazy(() => import("@/pages/NotFound"));
+const Profile = lazy(() => import("@/pages/Profile"));
+const GroupSettings = lazy(() => import("@/pages/GroupSettings"));
+const NotificationPreferences = lazy(() => import("@/pages/NotificationPreferences"));
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,
+      retry: 1,
+      staleTime: 30_000,
+      gcTime: 5 * 60_000,
+    },
+    mutations: { retry: 0 },
+  },
+  queryCache: new QueryCache({
+    onError: (error, query) =>
+      logCrash({ source: "react-query", error, extra: { queryKey: query.queryKey } }),
+  }),
+  mutationCache: new MutationCache({
+    onError: (error, _vars, _ctx, mutation) =>
+      logCrash({
+        source: "react-query",
+        error,
+        extra: { mutationKey: mutation.options.mutationKey ?? null },
+      }),
+  }),
+});
+
+function AppSuspense() {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-background">
+      <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+    </div>
+  );
+}
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner position="top-center" />
-      <BrowserRouter>
-        <AppShell>
-          <Routes>
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/groupes" element={<MyGroups />} />
-            <Route path="/groupes/:id" element={<GroupDetail />} />
-            <Route path="/cotisations" element={<Contributions />} />
-            <Route path="/rotations" element={<Rotations />} />
-            <Route path="/historique" element={<History />} />
-            <Route path="/calendrier" element={<Calendar />} />
-            <Route path="/nouveau" element={<CreateGroup />} />
-            <Route path="/rejoindre" element={<JoinGroup />} />
-            <Route path="/inviter" element={<InviteMembers />} />
-            <Route path="/profil" element={<Profile />} />
-            <Route path="/parametres" element={<Settings />} />
-            <Route path="/notifications" element={<Notifications />} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </AppShell>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
+  <ErrorBoundary fallbackTitle="Tontine Digital a rencontré un problème">
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner position="top-center" />
+        <BrowserRouter>
+          <AuthProvider>
+            <Suspense fallback={<AppSuspense />}>
+              <Routes>
+                <Route
+                  path="/"
+                  element={
+                    <RouteBoundary name="Accueil">
+                      <Index />
+                    </RouteBoundary>
+                  }
+                />
+                <Route
+                  path="/auth"
+                  element={
+                    <RouteBoundary name="Connexion">
+                      <Auth />
+                    </RouteBoundary>
+                  }
+                />
+                <Route element={<ProtectedRoute />}>
+                  <Route
+                    element={
+                      <AppShell>
+                        <Outlet />
+                      </AppShell>
+                    }
+                  >
+                    <Route path="/dashboard" element={<RouteBoundary name="Tableau de bord"><Dashboard /></RouteBoundary>} />
+                    <Route path="/groupes" element={<RouteBoundary name="Mes groupes"><MyGroups /></RouteBoundary>} />
+                    <Route path="/groupes/:id" element={<RouteBoundary name="Détail du groupe"><GroupDetail /></RouteBoundary>} />
+                    <Route path="/groupes/:id/parametres" element={<RouteBoundary name="Paramètres du groupe"><GroupSettings /></RouteBoundary>} />
+                    <Route path="/cotisations" element={<RouteBoundary name="Mes cotisations"><MyContributions /></RouteBoundary>} />
+                    <Route path="/recus" element={<RouteBoundary name="Reçus"><Receipts /></RouteBoundary>} />
+                    <Route path="/recus/:id" element={<RouteBoundary name="Reçu"><Receipts /></RouteBoundary>} />
+                    <Route path="/notifications" element={<RouteBoundary name="Notifications"><Notifications /></RouteBoundary>} />
+                    <Route path="/nouveau" element={<RouteBoundary name="Créer un groupe"><CreateGroup /></RouteBoundary>} />
+                    <Route path="/rejoindre" element={<RouteBoundary name="Rejoindre un groupe"><JoinGroup /></RouteBoundary>} />
+                    <Route path="/inviter" element={<RouteBoundary name="Inviter"><InviteMembers /></RouteBoundary>} />
+                    <Route path="/profil" element={<RouteBoundary name="Profil"><Profile /></RouteBoundary>} />
+                    <Route path="/parametres/notifications" element={<RouteBoundary name="Préférences notifications"><NotificationPreferences /></RouteBoundary>} />
+                  </Route>
+                </Route>
+                <Route path="*" element={<RouteBoundary name="Page introuvable"><NotFound /></RouteBoundary>} />
+              </Routes>
+            </Suspense>
+          </AuthProvider>
+        </BrowserRouter>
+      </TooltipProvider>
+    </QueryClientProvider>
+  </ErrorBoundary>
 );
 
 export default App;

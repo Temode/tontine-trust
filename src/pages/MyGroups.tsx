@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { Plus } from "lucide-react";
 import { TopBar } from "@/components/layout/TopBar";
@@ -8,7 +9,11 @@ import { GroupsKpiStrip } from "@/components/groups/GroupsKpiStrip";
 import { GroupsTable } from "@/components/groups/GroupsTable";
 import { GroupsToolbar } from "@/components/groups/GroupsToolbar";
 import type { GroupsFilter, SortDir, SortKey, ViewMode } from "@/components/groups/types";
-import { getPortfolioStats, groups as allGroups } from "@/lib/mock-data";
+import { listMyGroups } from "@/lib/api/groups";
+import { listMyApplications, cancelMyApplication } from "@/lib/api/groups";
+import { overviewToTontine } from "@/lib/api/types";
+import { ApplicationsList } from "@/components/join-group/ApplicationsList";
+import { useQueryClient } from "@tanstack/react-query";
 import type { TontineGroup } from "@/lib/types";
 import { toast } from "sonner";
 
@@ -83,13 +88,60 @@ function toCsv(groups: TontineGroup[]): string {
 
 export default function MyGroups() {
   const navigate = useNavigate();
-  const portfolio = getPortfolioStats();
 
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<GroupsFilter>("all");
   const [sort, setSort] = useState<SortKey>("deadline");
   const [sortDir, setSortDir] = useState<SortDir>(STATUS_DEFAULT_DIRS.deadline);
   const [view, setView] = useState<ViewMode>("table");
+
+  const { data: rows = [], isLoading, isError, error, refetch } = useQuery({
+    queryKey: ["groups", "mine"],
+    queryFn: listMyGroups,
+  });
+
+  const queryClient = useQueryClient();
+  const { data: applications = [] } = useQuery({
+    queryKey: ["applications", "mine"],
+    queryFn: listMyApplications,
+  });
+
+  const handleCancelApplication = async (groupId: string) => {
+    try {
+      await cancelMyApplication(groupId);
+      toast.success("Candidature retirée");
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["applications", "mine"] }),
+        queryClient.invalidateQueries({ queryKey: ["groups", "mine"] }),
+      ]);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Erreur inconnue";
+      toast.error("Impossible de retirer la candidature", { description: msg });
+    }
+  };
+
+  const allGroups = useMemo<TontineGroup[]>(() => {
+    try {
+      return rows.map(overviewToTontine);
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.error("[MyGroups] overviewToTontine mapping failed", e);
+      return [];
+    }
+  }, [rows]);
+
+  const portfolio = useMemo(() => {
+    try {
+      return computePortfolio(allGroups);
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.error("[MyGroups] computePortfolio failed", e);
+      return {
+        total: 0, active: 0, yourTurn: 0, completed: 0, pending: 0,
+        capitalCommitted: 0, cagnotteCumulee: 0, avgScore: 0, upcomingTurn: null as null | { amount: number; days: number; groupName: string },
+      };
+    }
+  }, [allGroups]);
 
   const counts = useMemo<Record<GroupsFilter, number>>(() => {
     const base: Record<GroupsFilter, number> = {
@@ -101,7 +153,7 @@ export default function MyGroups() {
     };
     for (const g of allGroups) base[g.status]++;
     return base;
-  }, []);
+  }, [allGroups]);
 
   const filteredGroups = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -115,7 +167,7 @@ export default function MyGroups() {
       );
     });
     return [...result].sort((a, b) => compareGroups(a, b, sort, sortDir));
-  }, [query, filter, sort, sortDir]);
+  }, [allGroups, query, filter, sort, sortDir]);
 
   const handleSortChange = (key: SortKey) => {
     if (key === sort) {
@@ -157,6 +209,10 @@ export default function MyGroups() {
       <div className="space-y-6 px-5 py-6 lg:px-8 lg:py-8">
         <GroupsKpiStrip stats={portfolio} />
 
+        {applications.length > 0 && (
+          <ApplicationsList applications={applications} onCancel={handleCancelApplication} />
+        )}
+
         <GroupsToolbar
           query={query}
           onQueryChange={setQuery}
@@ -173,7 +229,23 @@ export default function MyGroups() {
           onExport={handleExport}
         />
 
-        {filteredGroups.length === 0 ? (
+        {isLoading ? (
+          <p className="text-sm text-muted-foreground">Chargement…</p>
+        ) : isError ? (
+          <div className="rounded-xl border border-destructive/40 bg-destructive/5 p-5 text-sm">
+            <p className="font-display text-base font-bold text-foreground">Impossible de charger vos groupes</p>
+            <p className="mt-1 text-muted-foreground">
+              {error instanceof Error ? error.message : "Erreur réseau inattendue."}
+            </p>
+            <button
+              type="button"
+              onClick={() => refetch()}
+              className="mt-3 inline-flex h-9 items-center rounded-md bg-primary px-3 text-xs font-semibold text-primary-foreground transition hover:bg-primary/90"
+            >
+              Réessayer
+            </button>
+          </div>
+        ) : filteredGroups.length === 0 ? (
           <EmptyState
             filtered={isFiltered}
             onClearFilters={() => {
@@ -188,10 +260,55 @@ export default function MyGroups() {
         )}
 
         <p className="text-[11px] text-muted-foreground">
-          {filteredGroups.length} {filteredGroups.length > 1 ? "groupes" : "groupe"} affichés ·
-          Données mises à jour en temps réel via les webhooks Mobile Money
+          {filteredGroups.length} {filteredGroups.length > 1 ? "groupes" : "groupe"} affichés · Données en direct depuis votre registre Tontine Digital.
         </p>
       </div>
     </div>
   );
+}
+
+/** Dérive les KPIs portefeuille depuis la liste réelle de groupes. */
+function computePortfolio(groups: TontineGroup[]) {
+  const total = groups.length;
+  const active = groups.filter((g) => g.status === "active").length;
+  const yourTurn = groups.filter((g) => g.status === "your-turn").length;
+  const completed = groups.filter((g) => g.status === "completed").length;
+  const pending = groups.filter((g) => g.status === "pending").length;
+
+  const capitalCommitted = groups
+    .filter((g) => g.status === "active" || g.status === "your-turn")
+    .reduce((sum, g) => {
+      const remaining = Math.max(0, g.members - Math.round((g.progress / 100) * g.members));
+      return sum + g.contribution * remaining;
+    }, 0);
+
+  const cagnotteCumulee = groups
+    .filter((g) => g.status === "active" || g.status === "your-turn")
+    .reduce((sum, g) => sum + g.contribution * g.members, 0);
+
+  const scored = groups.filter((g) => g.averageScore > 0);
+  const avgScore = scored.length > 0
+    ? Math.round(scored.reduce((sum, g) => sum + g.averageScore, 0) / scored.length)
+    : 0;
+
+  const upcomingTurn = groups
+    .filter((g) => g.status === "your-turn" && typeof g.daysToDeadline === "number")
+    .reduce<{ amount: number; days: number; groupName: string } | null>((best, g) => {
+      const amount = g.contribution * g.members;
+      const days = g.daysToDeadline ?? 9999;
+      if (!best || days < best.days) return { amount, days, groupName: g.name };
+      return best;
+    }, null);
+
+  return {
+    total,
+    active,
+    yourTurn,
+    completed,
+    pending,
+    capitalCommitted,
+    cagnotteCumulee,
+    avgScore,
+    upcomingTurn,
+  };
 }

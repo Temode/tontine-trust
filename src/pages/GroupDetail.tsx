@@ -1,51 +1,187 @@
-import { useMemo, useState } from "react";
-import { ArrowLeft, Calendar, CheckCircle2, MoreVertical, Star, Wallet, X } from "lucide-react";
+import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import {
+  ArrowLeft,
+  Calendar,
+  CheckCircle2,
+  HandCoins,
+  FileCheck2,
+  MoreVertical,
+  Play,
+  Star,
+  UserPlus,
+  Wallet,
+  X,
+} from "lucide-react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { formatGNF, formatRelativeDays } from "@/lib/format";
-import { getGroupById, members, transactions } from "@/lib/mock-data";
-import { PaymentModal } from "@/components/payment/PaymentModal";
+import { formatGNF, getInitials } from "@/lib/format";
+import { getGroup } from "@/lib/api/groups";
+import {
+  approveMember,
+  listGroupMembers,
+  rejectMember,
+  startCycle,
+} from "@/lib/api/members";
+import { listGroupTurns } from "@/lib/api/turns";
+import { releasePayout, listGroupLedger } from "@/lib/api/payouts";
+import { getGroupReliability, type DbGroupReliabilityRow } from "@/lib/api/reliability";
+import { ReliabilityBadge } from "@/components/reliability/ReliabilityBadge";
+import { useAuth } from "@/hooks/useAuth";
+import type { DbGroup, DbGroupMember, DbNextTurn } from "@/lib/api/types";
 import { SectionCard } from "@/components/dashboard/SectionCard";
-import type { Member, TontineGroup } from "@/lib/types";
+import { InvitePanel, INVITE_PANEL_ID } from "@/components/groups/InvitePanel";
+import { GroupChat } from "@/components/group/GroupChat";
+import { AnnouncementsPanel } from "@/components/group/AnnouncementsPanel";
+import { AuditLog } from "@/components/group/AuditLog";
+import { SwapsPanel } from "@/components/group/SwapsPanel";
+import { AuctionPanel } from "@/components/group/AuctionPanel";
+import { ReviewsPanel } from "@/components/group/ReviewsPanel";
 
-type Section = "overview" | "members" | "history";
+type Section = "overview" | "members" | "rotation" | "swaps" | "auctions" | "reviews" | "chat" | "audit";
 
-const tabs: Array<{ id: Section; label: string }> = [
-  { id: "overview", label: "Aperçu" },
-  { id: "members", label: "Membres" },
-  { id: "history", label: "Historique" },
-];
+const FREQ_LABEL: Record<string, string> = {
+  mensuelle: "Mensuelle",
+  hebdomadaire: "Hebdomadaire",
+  quinzaine: "Quinzaine",
+};
+
+function statusLabel(s: DbGroup["status"]): string {
+  switch (s) {
+    case "draft": return "Brouillon";
+    case "open": return "Ouvert";
+    case "active": return "Actif";
+    case "completed": return "Terminé";
+    case "cancelled": return "Annulé";
+  }
+}
+
+function statusTurnLabel(s: string): string {
+  switch (s) {
+    case "upcoming": return "À venir";
+    case "collecting": return "Collecte en cours";
+    case "paid": return "Versé";
+    case "skipped": return "Sauté";
+    default: return s;
+  }
+}
 
 export default function GroupDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const group = id ? getGroupById(id) : undefined;
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [section, setSection] = useState<Section>("overview");
-  const [paymentOpen, setPaymentOpen] = useState(false);
 
-  if (!group) {
+  const groupQ = useQuery({
+    queryKey: ["group", id],
+    queryFn: () => getGroup(id as string),
+    enabled: !!id,
+  });
+  const membersQ = useQuery({
+    queryKey: ["group", id, "members"],
+    queryFn: () => listGroupMembers(id as string),
+    enabled: !!id,
+  });
+  const turnsQ = useQuery({
+    queryKey: ["group", id, "turns"],
+    queryFn: () => listGroupTurns(id as string),
+    enabled: !!id,
+  });
+
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: ["group", id] });
+    queryClient.invalidateQueries({ queryKey: ["my-groups"] });
+  };
+
+  const approveM = useMutation({
+    mutationFn: (memberId: string) => approveMember(memberId),
+    onSuccess: () => { toast.success("Candidature acceptée"); invalidate(); },
+    onError: (e: Error) => toast.error("Erreur", { description: e.message }),
+  });
+  const rejectM = useMutation({
+    mutationFn: (memberId: string) => rejectMember(memberId),
+    onSuccess: () => { toast.success("Candidature refusée"); invalidate(); },
+    onError: (e: Error) => toast.error("Erreur", { description: e.message }),
+  });
+  const startCycleM = useMutation({
+    mutationFn: () => startCycle(id as string),
+    onSuccess: () => {
+      toast.success("Cycle démarré", { description: "L'ordre de rotation a été tiré." });
+      invalidate();
+    },
+    onError: (e: Error) => toast.error("Démarrage impossible", { description: e.message }),
+  });
+
+  const payoutM = useMutation({
+    mutationFn: (turnId: string) => releasePayout(turnId),
+    onSuccess: () => {
+      toast.success("Versement effectué", { description: "Le reçu numérique a été généré." });
+      invalidate();
+      queryClient.invalidateQueries({ queryKey: ["receipts"] });
+      queryClient.invalidateQueries({ queryKey: ["group", id, "ledger"] });
+    },
+    onError: (e: Error) => toast.error("Versement impossible", { description: e.message }),
+  });
+
+  const ledgerQ = useQuery({
+    queryKey: ["group", id, "ledger"],
+    queryFn: () => listGroupLedger(id as string, 5),
+    enabled: !!id,
+  });
+
+  const reliabilityQ = useQuery({
+    queryKey: ["group", id, "reliability"],
+    queryFn: () => getGroupReliability(id as string),
+    enabled: !!id,
+  });
+
+  if (groupQ.isLoading) {
+    return <div className="px-6 py-12 text-sm text-muted-foreground">Chargement…</div>;
+  }
+  if (!groupQ.data) {
     return (
       <div className="flex min-h-[60vh] flex-col items-center justify-center px-6 text-center">
         <h2 className="font-display text-lg font-bold text-foreground">Groupe introuvable</h2>
         <p className="mt-1 text-sm text-muted-foreground">Ce groupe n'existe pas ou a été supprimé.</p>
-        <Link
-          to="/dashboard"
-          className="mt-6 rounded-md bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground"
-        >
-          Retour au tableau de bord
+        <Link to="/groupes" className="mt-6 rounded-md bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground">
+          Retour à mes groupes
         </Link>
       </div>
     );
   }
 
-  const turnsCompleted = Math.round((group.progress / 100) * group.members);
-  const turnPayout = group.contribution * group.members;
-  const daysToPayment = 5;
-  const isYourTurn = group.status === "your-turn";
+  const grp = groupQ.data;
+  const allMembers = membersQ.data ?? [];
+  const activeMembers = allMembers.filter((m) => m.status === "active");
+  const pendingMembers = allMembers.filter((m) => m.status === "pending");
+  const turns = turnsQ.data ?? [];
+  const isOrganizer =
+    (!!user?.id && grp.created_by === user.id) ||
+    activeMembers.some((m) => m.user_id === user?.id && m.role === "organisateur");
+  const frequency = FREQ_LABEL[grp.frequency] ?? "Mensuelle";
+  const totalPayout = grp.contribution_amount * activeMembers.length;
+  const canStart =
+    isOrganizer && (grp.status === "draft" || grp.status === "open") && activeMembers.length >= 2;
+  const nextTurn =
+    turns.find((t) => t.status === "collecting") ?? turns.find((t) => t.status === "upcoming") ?? null;
+  const completedTurns = turns.filter((t) => t.status === "paid").length;
+  const progress = turns.length > 0 ? Math.round((completedTurns / turns.length) * 100) : 0;
+
+  const tabs: Array<{ id: Section; label: string }> = [
+    { id: "overview", label: "Aperçu" },
+    { id: "members", label: "Membres" },
+    { id: "rotation", label: "Rotation" },
+    { id: "swaps", label: "Échanges" },
+    ...(grp.rotation_order_kind === "auction" ? [{ id: "auctions" as Section, label: "Enchères" }] : []),
+    ...(grp.status === "completed" ? [{ id: "reviews" as Section, label: "Avis" }] : []),
+    { id: "chat", label: "Discussion" },
+    ...(isOrganizer ? [{ id: "audit" as Section, label: "Audit" }] : []),
+  ];
 
   return (
     <div className="animate-fade-in">
-      {/* Page header */}
       <header className="sticky top-0 z-30 border-b border-hairline bg-card/85 backdrop-blur">
         <div className="flex items-center gap-3 px-5 py-4 lg:px-8">
           <button
@@ -58,8 +194,21 @@ export default function GroupDetail() {
           </button>
           <div className="min-w-0 flex-1">
             <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Groupe de tontine</p>
-            <h1 className="truncate font-display text-xl font-bold text-foreground lg:text-2xl">{group.name}</h1>
+            <h1 className="truncate font-display text-xl font-bold text-foreground lg:text-2xl">{grp.name}</h1>
           </div>
+          {isOrganizer && (
+            <button
+              type="button"
+              onClick={() => {
+                const el = document.getElementById(INVITE_PANEL_ID);
+                el?.scrollIntoView({ behavior: "smooth", block: "start" });
+              }}
+              className="hidden h-10 items-center gap-1.5 rounded-lg border border-hairline px-3 text-xs font-medium text-foreground transition hover:bg-secondary sm:inline-flex"
+            >
+              <UserPlus className="h-4 w-4" />
+              Inviter
+            </button>
+          )}
           <button
             type="button"
             aria-label="Plus d'options"
@@ -71,54 +220,133 @@ export default function GroupDetail() {
       </header>
 
       <div className="px-5 py-6 lg:px-8 lg:py-8">
-        {/* Top — Cagnotte + meta */}
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
-          <article
-            className={cn(
-              "relative overflow-hidden rounded-xl p-6 text-primary-foreground lg:col-span-2",
-              isYourTurn ? "bg-accent-700" : "bg-primary",
-            )}
-          >
+          <article className="relative overflow-hidden rounded-xl bg-primary p-6 text-primary-foreground lg:col-span-2">
             <div aria-hidden className="pointer-events-none absolute inset-0 opacity-15">
               <div className="absolute -right-20 -top-20 h-56 w-56 rounded-full bg-primary-foreground/15 blur-3xl" />
             </div>
             <div className="relative">
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <p className="text-[11px] uppercase tracking-[0.14em] text-primary-100/80">Cagnotte du tour en cours</p>
+                  <p className="text-[11px] uppercase tracking-[0.14em] text-primary-100/80">Cagnotte du tour</p>
                   <p className="mt-2 font-display text-4xl font-bold leading-none num">
-                    {formatGNF(group.totalCollected)}
+                    {formatGNF(totalPayout)}
                     <span className="ml-2 text-lg font-medium text-primary-100/70">GNF</span>
                   </p>
                   <p className="mt-3 text-sm text-primary-100/85">
-                    Tour {turnsCompleted} sur {group.members} · {group.frequency.toLowerCase()} · cotisation {formatGNF(group.contribution, { withCurrency: true })}
+                    {turns.length > 0
+                      ? `Tour ${nextTurn?.turn_number ?? completedTurns} sur ${turns.length}`
+                      : `${activeMembers.length} membres actifs`}
+                    {" · "}
+                    {frequency.toLowerCase()} · cotisation {formatGNF(grp.contribution_amount, { withCurrency: true })}
                   </p>
                 </div>
                 <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-primary-foreground/10">
                   <Wallet className="h-5 w-5" />
                 </div>
               </div>
-
               <div className="mt-6">
                 <div className="mb-1.5 flex items-center justify-between text-[11px] uppercase tracking-wider text-primary-100/70">
                   <span>Progression</span>
-                  <span className="num">{group.progress}%</span>
+                  <span className="num">{progress}%</span>
                 </div>
                 <div className="h-1.5 overflow-hidden rounded-full bg-primary-foreground/15">
-                  <div className="h-full rounded-full bg-primary-foreground/80" style={{ width: `${group.progress}%` }} />
+                  <div className="h-full rounded-full bg-primary-foreground/80" style={{ width: `${progress}%` }} />
                 </div>
               </div>
             </div>
           </article>
 
           <div className="grid grid-cols-3 gap-3 rounded-xl border border-hairline bg-card p-3 lg:grid-cols-1 lg:p-2">
-            <Meta label="Cotisation" value={formatGNF(group.contribution, { withCurrency: true })} />
-            <Meta label="Fréquence" value={group.frequency} />
-            <Meta label="Votre tour" value={`#${group.yourTurn}`} />
+            <Meta label="Cotisation" value={formatGNF(grp.contribution_amount, { withCurrency: true })} />
+            <Meta label="Fréquence" value={frequency} />
+            <Meta label="Statut" value={statusLabel(grp.status)} />
           </div>
         </div>
 
-        {/* Tabs */}
+        {canStart && (
+          <div className="mt-5 flex flex-col gap-3 rounded-xl border border-accent-200 bg-accent-50/60 p-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-accent-600 text-accent-foreground">
+                <Play className="h-4 w-4" />
+              </div>
+              <div>
+                <p className="font-display text-sm font-bold text-foreground">Prêt à démarrer le cycle</p>
+                <p className="text-xs text-muted-foreground">
+                  {activeMembers.length} membres actifs · l'ordre de rotation sera tiré et les {activeMembers.length} tours planifiés.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              disabled={startCycleM.isPending}
+              onClick={() => startCycleM.mutate()}
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-accent-600 px-4 text-sm font-semibold text-accent-foreground transition hover:bg-accent-700 disabled:opacity-60"
+            >
+              {startCycleM.isPending ? "Démarrage…" : "Démarrer le cycle"}
+            </button>
+          </div>
+        )}
+
+        {isOrganizer && pendingMembers.length > 0 && (
+          <div className="mt-5">
+            <SectionCard
+              title="Candidatures en attente"
+              subtitle={`${pendingMembers.length} demande${pendingMembers.length > 1 ? "s" : ""}`}
+              bare
+            >
+              <ul className="divide-y divide-border/60">
+                {pendingMembers.map((m) => {
+                  const name = m.profile?.full_name?.trim() || "Membre";
+                  const initials = getInitials(name) || "··";
+                  return (
+                    <li key={m.id} className="flex flex-wrap items-center gap-3 px-5 py-3.5 lg:px-6">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-secondary text-sm font-bold text-foreground">
+                        {initials}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-semibold text-foreground">{name}</p>
+                        {m.profile?.phone_number && (
+                          <p className="text-xs text-muted-foreground num">{m.profile.phone_number}</p>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        disabled={approveM.isPending}
+                        onClick={() => approveM.mutate(m.id)}
+                        className="inline-flex h-9 items-center gap-1 rounded-md bg-success px-3 text-xs font-semibold text-success-foreground transition hover:opacity-90 disabled:opacity-50"
+                      >
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                        Accepter
+                      </button>
+                      <button
+                        type="button"
+                        disabled={rejectM.isPending}
+                        onClick={() => rejectM.mutate(m.id)}
+                        className="inline-flex h-9 items-center gap-1 rounded-md border border-hairline px-3 text-xs font-medium text-muted-foreground transition hover:bg-secondary disabled:opacity-50"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                        Refuser
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </SectionCard>
+          </div>
+        )}
+
+        {isOrganizer && (
+          <InvitePanel
+            groupId={grp.id}
+            groupName={grp.name}
+            contribution={grp.contribution_amount}
+            frequency={frequency}
+          />
+        )}
+
+        <AnnouncementsPanel groupId={grp.id} isOrganizer={isOrganizer} />
+
         <div className="mt-6 inline-flex items-center gap-1 rounded-lg border border-hairline bg-card p-1" role="tablist" aria-label="Sections du groupe">
           {tabs.map((tab) => (
             <button
@@ -140,21 +368,44 @@ export default function GroupDetail() {
         </div>
 
         <div className="mt-5">
-          {section === "overview" && (
-            <OverviewTab
-              group={group}
-              currentTurnIndex={turnsCompleted}
-              turnPayout={turnPayout}
-              daysToPayment={daysToPayment}
-              onPay={() => setPaymentOpen(true)}
+          {section === "overview" && <OverviewTab nextTurn={nextTurn} payout={totalPayout} />}
+          {section === "members" && (
+            <MembersTab members={activeMembers} reliability={reliabilityQ.data ?? []} />
+          )}
+          {section === "rotation" && (
+            <RotationTab
+              turns={turns}
+              userId={user?.id ?? null}
+              isOrganizer={isOrganizer}
+              onPayout={(turnId) => payoutM.mutate(turnId)}
+              payingTurnId={payoutM.isPending ? (payoutM.variables as string | undefined) ?? null : null}
+              ledger={ledgerQ.data ?? []}
             />
           )}
-          {section === "members" && <MembersTab members={members} />}
-          {section === "history" && <HistoryTab groupId={group.id} />}
+          {section === "chat" && <GroupChat groupId={grp.id} />}
+          {section === "swaps" && (
+            <SwapsPanel
+              groupId={grp.id}
+              currentUserId={user?.id ?? null}
+              swapPolicy={grp.swap_policy ?? "with_consent"}
+            />
+          )}
+          {section === "auctions" && (
+            <AuctionPanel
+              groupId={grp.id}
+              currentUserId={user?.id ?? null}
+              isOrganizer={isOrganizer}
+            />
+          )}
+          {section === "reviews" && (
+            <ReviewsPanel
+              groupId={grp.id}
+              currentUserId={user?.id ?? null}
+            />
+          )}
+          {section === "audit" && isOrganizer && <AuditLog groupId={grp.id} />}
         </div>
       </div>
-
-      <PaymentModal group={group} open={paymentOpen} onOpenChange={setPaymentOpen} />
     </div>
   );
 }
@@ -168,176 +419,222 @@ function Meta({ label, value }: { label: string; value: string }) {
   );
 }
 
-interface OverviewTabProps {
-  group: TontineGroup;
-  currentTurnIndex: number;
-  turnPayout: number;
-  daysToPayment: number;
-  onPay: () => void;
-}
-
-function OverviewTab({ group, currentTurnIndex, turnPayout, daysToPayment, onPay }: OverviewTabProps) {
-  return (
-    <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
-      <div className="space-y-5 lg:col-span-2">
-        {/* Beneficiary */}
-        <article className="rounded-xl border border-accent-100 bg-accent-50/60 p-5">
-          <div className="flex items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-accent-600 text-base font-bold text-accent-foreground">
-              MD
-            </div>
-            <div className="flex-1">
-              <p className="text-[11px] uppercase tracking-wider text-accent-700">Bénéficiaire actuel</p>
-              <p className="font-display text-base font-bold text-foreground">{group.currentTurn}</p>
-              <p className="text-xs text-muted-foreground">Tour #{currentTurnIndex + 1}</p>
-            </div>
-            <div className="text-right">
-              <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Reçoit</p>
-              <p className="font-display text-lg font-bold text-accent-700 num">
-                {formatGNF(turnPayout, { withCurrency: true })}
-              </p>
-            </div>
-          </div>
-        </article>
-
-        {/* Next deadline */}
-        <article className="rounded-xl border border-hairline bg-card p-5">
-          <h4 className="font-display text-sm font-bold text-foreground">Prochaine échéance</h4>
-          <div className="mt-3 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="flex h-12 w-12 flex-col items-center justify-center rounded-lg bg-destructive/10 text-destructive">
-                <span className="text-[10px] font-bold uppercase tracking-wider">JAN</span>
-                <span className="font-display text-base font-bold leading-none">15</span>
-              </div>
-              <div>
-                <p className="text-sm font-medium text-foreground">{group.nextPaymentDate}</p>
-                <p className="text-xs text-muted-foreground">{formatRelativeDays(daysToPayment)}</p>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={onPay}
-              className="rounded-md bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground transition hover:bg-primary-700"
-            >
-              Payer maintenant
-            </button>
-          </div>
-        </article>
-      </div>
-
-      <article className="rounded-xl border border-hairline bg-card p-5">
-        <h4 className="mb-3 font-display text-sm font-bold text-foreground">Règles du groupe</h4>
-        <ul className="space-y-2.5">
-          {group.rules.map((rule, i) => (
-            <li key={i} className="flex items-start gap-2.5">
-              <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary-50">
-                <CheckCircle2 className="h-3 w-3 text-primary" strokeWidth={2.25} />
-              </span>
-              <span className="text-xs text-muted-foreground">{rule}</span>
-            </li>
-          ))}
-        </ul>
-      </article>
-    </div>
-  );
-}
-
-function MembersTab({ members }: { members: Member[] }) {
-  return (
-    <SectionCard title="Membres du groupe" subtitle={`${members.length} participants`} bare>
-      <ul className="divide-y divide-border/60">
-        {members.map((member) => (
-          <li
-            key={member.id}
-            className={cn(
-              "flex items-center gap-3 px-5 py-3.5 lg:px-6",
-              member.isYou && "bg-primary-50/40",
-            )}
-          >
-            <div
-              className={cn(
-                "flex h-10 w-10 items-center justify-center rounded-lg text-sm font-bold",
-                member.isYou ? "bg-primary text-primary-foreground" : "bg-secondary text-foreground",
-              )}
-            >
-              {member.initials}
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <p className="truncate text-sm font-semibold text-foreground">{member.name}</p>
-                {member.isYou && (
-                  <span className="rounded-full bg-primary-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-primary">
-                    Vous
-                  </span>
-                )}
-              </div>
-              <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
-                <span>Tour #{member.turn}</span>
-                <span>·</span>
-                <span className="inline-flex items-center gap-1">
-                  <Star className="h-3 w-3 fill-accent-500 text-accent-500" />
-                  <span className="num">{member.reliabilityScore}%</span>
-                </span>
-              </div>
-            </div>
-            <span
-              aria-label={member.paid ? "Cotisation payée" : "En attente de paiement"}
-              className={cn(
-                "flex h-7 w-7 items-center justify-center rounded-full",
-                member.paid ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive",
-              )}
-            >
-              {member.paid ? <CheckCircle2 className="h-4 w-4" /> : <X className="h-4 w-4" />}
-            </span>
-          </li>
-        ))}
-      </ul>
-    </SectionCard>
-  );
-}
-
-function HistoryTab({ groupId }: { groupId: string }) {
-  const items = useMemo(() => transactions.filter((t) => t.groupId === groupId), [groupId]);
-
-  if (items.length === 0) {
+function OverviewTab({ nextTurn, payout }: { nextTurn: DbNextTurn | null; payout: number }) {
+  if (!nextTurn) {
     return (
-      <SectionCard title="Historique" subtitle="Aucune opération">
-        <p className="text-sm text-muted-foreground">Aucun mouvement enregistré pour ce groupe.</p>
+      <SectionCard title="Cycle non démarré" subtitle="Aucun tour planifié">
+        <p className="text-sm text-muted-foreground">
+          Le cycle n'a pas encore été lancé. Une fois le quorum atteint (au moins 2 membres actifs), l'organisateur peut démarrer la rotation.
+        </p>
       </SectionCard>
     );
   }
-
+  const dueLabel = new Date(nextTurn.due_date).toLocaleDateString("fr-FR", {
+    day: "2-digit", month: "short", year: "numeric",
+  });
+  const initials = getInitials(nextTurn.beneficiary_name ?? "··");
   return (
-    <SectionCard title="Historique" subtitle={`${items.length} opérations`} bare>
+    <article className="rounded-xl border border-accent-100 bg-accent-50/60 p-5">
+      <div className="flex items-center gap-4">
+        <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-accent-600 text-base font-bold text-accent-foreground">
+          {initials || "··"}
+        </div>
+        <div className="flex-1">
+          <p className="text-[11px] uppercase tracking-wider text-accent-700">
+            {nextTurn.status === "collecting" ? "Bénéficiaire en cours" : "Prochain bénéficiaire"}
+          </p>
+          <p className="font-display text-base font-bold text-foreground">
+            {nextTurn.beneficiary_name ?? "Membre"}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Tour #{nextTurn.turn_number} · échéance {dueLabel}
+          </p>
+        </div>
+        <div className="text-right">
+          <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Reçoit</p>
+          <p className="font-display text-lg font-bold text-accent-700 num">
+            {formatGNF(payout, { withCurrency: true })}
+          </p>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function MembersTab({
+  members,
+  reliability,
+}: {
+  members: DbGroupMember[];
+  reliability: DbGroupReliabilityRow[];
+}) {
+  const scoreMap = new Map(reliability.map((r) => [r.user_id, r]));
+  return (
+    <SectionCard title="Membres actifs" subtitle={`${members.length} participants`} bare>
       <ul className="divide-y divide-border/60">
-        {items.map((tx) => (
-          <li key={tx.id} className="flex items-center gap-3 px-5 py-3.5 lg:px-6">
-            <span
-              className={cn(
-                "flex h-9 w-9 items-center justify-center rounded-md",
-                tx.type === "in" ? "bg-success/10 text-success" : "bg-secondary text-muted-foreground",
+        {members.map((m) => {
+          const name = m.profile?.full_name?.trim() || "Membre";
+          const initials = getInitials(name) || "··";
+          const rel = scoreMap.get(m.user_id);
+          return (
+            <li key={m.id} className="flex items-center gap-3 px-5 py-3.5 lg:px-6">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-secondary text-sm font-bold text-foreground">
+                {initials}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <p className="truncate text-sm font-semibold text-foreground">{name}</p>
+                  {m.role === "organisateur" && (
+                    <span className="rounded-full bg-accent-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-accent-700">
+                      Organisateur
+                    </span>
+                  )}
+                </div>
+                <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
+                  {m.position != null && <span>Position #{m.position}</span>}
+                  {m.profile?.phone_number && (
+                    <>
+                      <span>·</span>
+                      <span className="num">{m.profile.phone_number}</span>
+                    </>
+                  )}
+                </div>
+              </div>
+              {rel ? (
+                <ReliabilityBadge score={rel.score} tier={rel.tier} />
+              ) : (
+                <Star className="h-4 w-4 text-muted-foreground/40" />
               )}
-            >
-              <Calendar className="h-4 w-4" />
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-foreground">
-                {tx.type === "in" ? "Cagnotte reçue" : "Cotisation payée"}
-              </p>
-              <p className="text-xs text-muted-foreground">{tx.date}</p>
-            </div>
-            <p
-              className={cn(
-                "font-display text-sm font-semibold num",
-                tx.type === "in" ? "text-success" : "text-foreground",
-              )}
-            >
-              {tx.type === "in" ? "+" : "−"}
-              {formatGNF(tx.amount, { withCurrency: true })}
-            </p>
+            </li>
+          );
+        })}
+        {members.length === 0 && (
+          <li className="px-5 py-6 text-sm text-muted-foreground lg:px-6">
+            Aucun membre actif pour le moment.
           </li>
-        ))}
+        )}
       </ul>
     </SectionCard>
+  );
+}
+
+function RotationTab({
+  turns,
+  userId,
+  isOrganizer,
+  onPayout,
+  payingTurnId,
+  ledger,
+}: {
+  turns: DbNextTurn[];
+  userId: string | null;
+  isOrganizer: boolean;
+  onPayout: (turnId: string) => void;
+  payingTurnId: string | null;
+  ledger: import("@/lib/api/payouts").DbLedgerRow[];
+}) {
+  if (turns.length === 0) {
+    return (
+      <SectionCard title="Calendrier de rotation" subtitle="Aucun tour planifié">
+        <p className="text-sm text-muted-foreground">
+          Le cycle n'a pas été démarré. Les tours apparaîtront ici une fois la rotation lancée.
+        </p>
+      </SectionCard>
+    );
+  }
+  return (
+    <div className="space-y-5">
+    <SectionCard title="Calendrier de rotation" subtitle={`${turns.length} tours planifiés`} bare>
+      <ul className="divide-y divide-border/60">
+        {turns.map((t) => {
+          const dueLabel = new Date(t.due_date).toLocaleDateString("fr-FR", {
+            day: "2-digit", month: "short",
+          });
+          const isYou = t.beneficiary_user_id === userId;
+          const canPay = isOrganizer && t.status === "collecting";
+          const paying = payingTurnId === t.turn_id;
+          return (
+            <li key={t.turn_id} className="flex flex-wrap items-center gap-3 px-5 py-3.5 lg:px-6">
+              <span
+                className={cn(
+                  "flex h-9 w-9 items-center justify-center rounded-md text-xs font-bold num",
+                  t.status === "paid"
+                    ? "bg-success/10 text-success"
+                    : t.status === "collecting"
+                    ? "bg-accent-600 text-accent-foreground"
+                    : "bg-secondary text-foreground",
+                )}
+              >
+                #{t.turn_number}
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold text-foreground">
+                  {t.beneficiary_name ?? "Membre"} {isYou && <span className="text-accent-700">(vous)</span>}
+                </p>
+                <p className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <Calendar className="h-3 w-3" />
+                  {dueLabel} · {statusTurnLabel(t.status)}
+                </p>
+              </div>
+              <p className="font-display text-sm font-semibold text-foreground num">
+                {formatGNF(t.payout_amount, { withCurrency: true })}
+              </p>
+              {canPay && (
+                <button
+                  type="button"
+                  disabled={paying}
+                  onClick={() => {
+                    if (window.confirm(`Verser ${formatGNF(t.payout_amount, { withCurrency: true })} GNF à ${t.beneficiary_name ?? "le bénéficiaire"} ?`)) {
+                      onPayout(t.turn_id);
+                    }
+                  }}
+                  className="inline-flex h-9 items-center gap-1.5 rounded-md bg-accent-600 px-3 text-xs font-semibold text-accent-foreground transition hover:bg-accent-700 disabled:opacity-60"
+                >
+                  <HandCoins className="h-3.5 w-3.5" />
+                  {paying ? "Versement…" : "Verser"}
+                </button>
+              )}
+              {t.status === "paid" && isYou && (
+                <Link
+                  to="/recus"
+                  className="inline-flex h-9 items-center gap-1.5 rounded-md border border-hairline px-3 text-xs font-medium text-foreground transition hover:bg-secondary"
+                >
+                  <FileCheck2 className="h-3.5 w-3.5" />
+                  Reçu
+                </Link>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </SectionCard>
+
+    {ledger.length > 0 && (
+      <SectionCard title="Registre du groupe" subtitle="Dernières opérations" bare>
+        <ul className="divide-y divide-border/60">
+          {ledger.map((e) => (
+            <li key={e.id} className="flex items-center gap-3 px-5 py-3 lg:px-6">
+              <span className={cn(
+                "flex h-8 w-8 items-center justify-center rounded-md text-[10px] font-bold uppercase",
+                e.amount >= 0 ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive",
+              )}>
+                {e.amount >= 0 ? "+" : "−"}
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium text-foreground">{e.memo ?? e.entry_type}</p>
+                <p className="text-xs text-muted-foreground">
+                  {new Date(e.created_at).toLocaleString("fr-FR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                  {e.user_name ? ` · ${e.user_name}` : ""}
+                </p>
+              </div>
+              <p className="font-display text-sm font-semibold num text-foreground">
+                {formatGNF(Math.abs(e.amount))} GNF
+              </p>
+            </li>
+          ))}
+        </ul>
+      </SectionCard>
+    )}
+    </div>
   );
 }

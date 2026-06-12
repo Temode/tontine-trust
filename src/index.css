@@ -2,14 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-/*
- * Tontine Digital — Design tokens (Institutional)
- *
- * Direction: financial infrastructure — not a consumer toy.
- * Deep teal anchored on warm ivory. Champagne gold as a single, restrained
- * accent. Information density over decoration. Numbers in tabular figures.
- */
-
 @layer base {
   :root {
     /* Surfaces */
@@ -23,27 +15,27 @@
     --popover-foreground: 200 35% 9%;
 
     /* Brand — Deep Teal */
-    --primary: 187 75% 19%;            /* #0B5559 */
+    --primary: 183 80% 26%;            /* #0D7377 — Bleu sarcelle brand */
     --primary-foreground: 40 30% 96%;
     --primary-50:  187 32% 94%;
     --primary-100: 187 36% 88%;
     --primary-200: 187 36% 76%;
-    --primary-400: 186 60% 30%;
-    --primary-500: 187 70% 22%;
-    --primary-600: 187 75% 19%;
-    --primary-700: 188 78% 14%;
-    --primary-800: 189 82% 10%;
-    --primary-900: 190 86% 7%;
+    --primary-400: 183 65% 32%;
+    --primary-500: 183 75% 28%;
+    --primary-600: 183 80% 26%;
+    --primary-700: 184 82% 20%;
+    --primary-800: 185 85% 14%;
+    --primary-900: 186 88% 10%;
 
     /* Accent — Champagne Gold */
-    --accent: 41 60% 42%;              /* #B8941F */
+    --accent: 43 84% 50%;              /* #E8AA14 — Or brand */
     --accent-foreground: 200 35% 9%;
-    --accent-50:  44 60% 94%;
-    --accent-100: 43 65% 86%;
-    --accent-300: 41 60% 64%;
-    --accent-500: 41 60% 42%;
-    --accent-600: 39 65% 34%;
-    --accent-700: 36 70% 28%;
+    --accent-50:  44 84% 94%;
+    --accent-100: 43 80% 86%;
+    --accent-300: 43 84% 64%;
+    --accent-500: 43 84% 50%;
+    --accent-600: 41 84% 42%;
+    --accent-700: 38 82% 34%;
 
     /* Neutrals — warm slate */
     --secondary: 40 14% 94%;
@@ -52,7 +44,7 @@
     --muted-foreground: 200 9% 38%;
     --border: 40 14% 88%;
     --input: 40 14% 88%;
-    --ring: 187 75% 19%;
+    --ring: 183 80% 26%;
 
     /* Semantic — restrained, not candy */
     --success: 158 65% 28%;
