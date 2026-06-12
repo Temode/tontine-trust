@@ -7,6 +7,7 @@ import { TopBar } from "@/components/layout/TopBar";
 import { SectionCard } from "@/components/dashboard/SectionCard";
 import { getGroup, updateGroupSettings, type UpdateGroupSettingsPayload } from "@/lib/api/groups";
 import { useAuth } from "@/hooks/useAuth";
+import { MembersAdminPanel } from "@/components/group/MembersAdminPanel";
 
 const FREQ_OPTIONS = [
   { value: "hebdomadaire", label: "Hebdomadaire" },
@@ -268,6 +269,14 @@ export default function GroupSettings() {
             ))}
           </div>
         </SectionCard>
+
+        {user?.id && (
+          <MembersAdminPanel
+            groupId={group.id}
+            currentUserId={user.id}
+            ownerUserId={group.created_by}
+          />
+        )}
 
         <div className="flex items-center justify-end gap-3">
           <button
