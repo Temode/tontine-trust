@@ -17,12 +17,7 @@ do $$ begin
   create type public.swap_status as enum ('pending','accepted','rejected','cancelled');
 exception when duplicate_object then null; end $$;
 
--- 3. Notification kinds
-do $$ begin
-  alter type public.notification_kind add value if not exists 'swap_requested';
-  alter type public.notification_kind add value if not exists 'swap_responded';
-  alter type public.notification_kind add value if not exists 'swap_executed';
-end $$;
+-- 3. Notification kinds : ajoutés via db/27a_swap_enum_prelude.sql (transaction séparée requise)
 
 -- 4. Préférences notif par défaut pour les nouveaux types
 insert into public.notification_preferences (user_id, notif_type, channel, enabled)
