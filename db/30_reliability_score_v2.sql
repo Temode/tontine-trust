@@ -149,3 +149,29 @@ begin
     end;
   end loop;
 end $$;
+
+-- Recrée les vues pour exposer avg_rating / reviews_count
+drop view if exists public.my_reliability;
+create view public.my_reliability
+with (security_invoker = true) as
+select * from public.user_reliability_scores where user_id = auth.uid();
+grant select on public.my_reliability to authenticated;
+
+drop view if exists public.group_reliability;
+create view public.group_reliability
+with (security_invoker = true) as
+select
+  gm.group_id,
+  gm.user_id,
+  p.full_name,
+  coalesce(s.score, 0) as score,
+  coalesce(s.tier, 'nouveau'::public.reliability_tier) as tier,
+  coalesce(s.total_paid, 0) as total_paid,
+  coalesce(s.total_late, 0) as total_late,
+  coalesce(s.avg_rating, 0) as avg_rating,
+  coalesce(s.reviews_count, 0) as reviews_count
+from public.group_members gm
+left join public.profiles p on p.id = gm.user_id
+left join public.user_reliability_scores s on s.user_id = gm.user_id
+where gm.status = 'active';
+grant select on public.group_reliability to authenticated;
