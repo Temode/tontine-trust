@@ -3,7 +3,7 @@ import type { Frequency, TontineGroup } from "@/lib/types";
 export type DbFrequency = "hebdomadaire" | "quinzaine" | "mensuelle";
 export type DbGroupStatus = "draft" | "open" | "active" | "completed" | "cancelled";
 export type DbMemberRole = "organisateur" | "membre";
-export type DbMemberStatus = "active" | "invited" | "removed" | "left" | "pending";
+export type DbMemberStatus = "active" | "invited" | "removed" | "left" | "pending" | "suspended";
 export type DbInvitationStatus = "pending" | "accepted" | "revoked" | "expired";
 export type DbTurnStatus = "upcoming" | "collecting" | "paid" | "skipped";
 
@@ -52,6 +52,12 @@ export interface DbGroupMember {
   status: DbMemberStatus;
   position: number | null;
   joined_at: string;
+  suspended_at?: string | null;
+  suspended_reason?: string | null;
+  can_chat?: boolean;
+  can_bid?: boolean;
+  can_swap?: boolean;
+  can_invite?: boolean;
   profile?: { full_name: string | null; phone_number: string | null } | null;
 }
 

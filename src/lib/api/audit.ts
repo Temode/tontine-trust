@@ -32,4 +32,11 @@ export const ACTION_LABEL: Record<string, string> = {
   record_payment: "Paiement enregistré",
   invitation_created: "Invitation créée",
   invitation_revoked: "Invitation révoquée",
+  member_suspended: "Membre suspendu",
+  member_reactivated: "Membre réactivé",
+  member_kicked: "Membre exclu",
+  member_permissions_changed: "Permissions membre modifiées",
+  permissions_changed: "Permissions co-organisateur modifiées",
+  permissions_revoked: "Co-organisateur révoqué",
+  ownership_transferred: "Propriété transférée",
 };
