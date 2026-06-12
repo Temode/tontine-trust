@@ -17,18 +17,27 @@ alter table public.group_members
   add column if not exists removed_by       uuid references public.profiles(id) on delete set null;
 
 -- 2. Préférences notification par défaut pour les nouveaux types
-insert into public.notification_preferences (user_id, notif_type, channel, enabled)
-select p.id, t.kind, c.channel, true
-from public.profiles p
-cross join (values
-  ('member_suspended'::public.notification_kind),
-  ('member_reactivated'::public.notification_kind),
-  ('member_kicked'::public.notification_kind),
-  ('permissions_changed'::public.notification_kind),
-  ('ownership_transferred'::public.notification_kind)) t(kind)
-cross join (values ('in_app'::public.notification_channel),
-                   ('email'::public.notification_channel)) c(channel)
-on conflict (user_id, notif_type, channel) do nothing;
+-- NOTE : on passe par EXECUTE pour éviter l'erreur 22P02 quand l'éditeur
+-- SQL exécute ce fichier dans la même transaction que le prélude d'enum
+-- (Postgres exige que les nouvelles valeurs d'enum soient committées
+-- avant d'être référencées en littéral).
+do $seed$
+declare
+  k text;
+  kinds text[] := array['member_suspended','member_reactivated','member_kicked',
+                        'permissions_changed','ownership_transferred'];
+begin
+  foreach k in array kinds loop
+    execute format($f$
+      insert into public.notification_preferences (user_id, notif_type, channel, enabled)
+      select p.id, %L::public.notification_kind, c.channel, true
+      from public.profiles p
+      cross join (values ('in_app'::public.notification_channel),
+                         ('email'::public.notification_channel)) c(channel)
+      on conflict (user_id, notif_type, channel) do nothing
+    $f$, k);
+  end loop;
+end $seed$;
 
 -- 3. RPC : suspend_member ---------------------------------------------
 create or replace function public.suspend_member(
