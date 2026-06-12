@@ -1,21 +1,11 @@
 -- =====================================================================
 -- Tontine Digital — P2.4 : enchères de tours (prime à la hausse)
--- À exécuter APRÈS db/27_turn_swaps.sql
+-- À exécuter APRÈS db/28a_auction_enum_prelude.sql
 -- Idempotent.
 -- =====================================================================
 
--- 1. Étend l'enum rotation_order avec 'auction'
-do $$ begin
-  alter type public.rotation_order add value if not exists 'auction';
-end $$;
-
--- 2. Nouveaux types de notification
-do $$ begin
-  alter type public.notification_kind add value if not exists 'auction_outbid';
-  alter type public.notification_kind add value if not exists 'auction_won';
-  alter type public.notification_kind add value if not exists 'auction_lost';
-  alter type public.notification_kind add value if not exists 'auction_closed';
-end $$;
+-- 1. rotation_order 'auction' et notification_kind (auction_*) :
+--    ajoutés via db/28a_auction_enum_prelude.sql (transaction séparée requise)
 
 -- 3. Préférences par défaut
 insert into public.notification_preferences (user_id, notif_type, channel, enabled)
