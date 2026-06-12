@@ -1,12 +1,11 @@
 -- =====================================================================
 -- Tontine Digital — P2.5 : avis post-cycle entre membres
--- À exécuter APRÈS db/28_turn_bids_auction.sql
+-- À exécuter APRÈS db/28_turn_bids_auction.sql ET db/29a_review_enum_prelude.sql
 -- Idempotent.
 -- =====================================================================
 
-do $$ begin
-  alter type public.notification_kind add value if not exists 'review_received';
-end $$;
+-- notification_kind 'review_received' : ajouté via db/29a_review_enum_prelude.sql
+-- (transaction séparée requise)
 
 insert into public.notification_preferences (user_id, notif_type, channel, enabled)
 select p.id, 'review_received'::public.notification_kind, c.channel, true
