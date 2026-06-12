@@ -390,6 +390,19 @@ export default function GroupDetail() {
               swapPolicy={grp.swap_policy ?? "with_consent"}
             />
           )}
+          {section === "auctions" && (
+            <AuctionPanel
+              groupId={grp.id}
+              currentUserId={user?.id ?? null}
+              isOrganizer={isOrganizer}
+            />
+          )}
+          {section === "reviews" && (
+            <ReviewsPanel
+              groupId={grp.id}
+              currentUserId={user?.id ?? null}
+            />
+          )}
           {section === "audit" && isOrganizer && <AuditLog groupId={grp.id} />}
         </div>
       </div>
