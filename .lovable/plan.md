@@ -1,152 +1,106 @@
-# Plan : Gestion administrateur des membres (4 phases)
+## Phase B — Gestion des membres (cœur admin)
 
-Objectif : donner à l'organisateur (et aux co-organisateurs avec droits granulaires) un vrai panneau de gestion de ses membres, sécurisé, RGPD-compatible pour un SaaS public.
+Phase A est appliquée. On enchaîne avec la gestion des membres complète. Cette phase est livrée en **2 migrations SQL + 1 dialogue UI** pour rester digestible.
 
-Livré en **4 phases successives**. À chaque phase, migration SQL + RPC + UI + tests rapides.
+### B1 — Statut `suspended` + RPC
+Fichier : `db/32_suspended_status.sql`
 
----
+- Ajoute la valeur `'suspended'` à l'enum `member_status` (prelude COMMIT obligatoire, vu le pattern utilisé en 27a/28a/29a → on splitte : `db/32a_suspended_enum_prelude.sql` puis `db/32_suspended_status.sql`).
+- Colonnes ajoutées sur `group_members` :
+  - `suspended_at timestamptz`
+  - `suspended_reason text`
+  - `suspended_by uuid` (FK profiles)
+- RPC `suspend_member(_member_id uuid, _reason text)` :
+  - Guard : `is_group_organizer` OU permission `can_suspend_member` (cf. B3).
+  - `set_config('app.via_rpc','1', true)` puis `status='suspended'`.
+  - Notif `member_suspended` + `log_audit`.
+- RPC `reactivate_member(_member_id uuid)` : symétrique → `status='active'`.
+- **Effets transverses** (policies/triggers existants à patcher) :
+  - `group_messages` INSERT : refuse si membre suspendu.
+  - `turn_bids` INSERT : refuse si suspendu.
+  - `turn_swaps` INSERT : refuse si suspendu.
+  - `groups` SELECT policy : un suspendu ne voit plus le groupe (lecture bloquée).
+  - `apply_late_penalty` : skip si payeur suspendu.
+  - `advance_rotation` / sélection prochain bénéficiaire : saute les `suspended`.
+- Nouvelles valeurs `notification_kind` : `member_suspended`, `member_reactivated`, `member_kicked`, `permissions_changed`, `ownership_transferred` (prelude COMMIT inclus dans `32a`).
 
-## Phase A — Sécurité critique (préalable bloquant)
+### B2 — Exclusion définitive
+Inclus dans `db/32_suspended_status.sql` :
 
-Avant d'ajouter quoi que ce soit, on referme les 2 trous identifiés par l'audit.
+- RPC `kick_member(_member_id uuid, _reason text)` :
+  - Guard organisateur ou permission `can_kick_member`.
+  - Marque `status='removed'`, libère `position`, recompacte les positions actives.
+  - Redistribue les tours `upcoming` non encore tirés (recalcul `payout_position`).
+  - Notif `member_kicked` au membre + `log_audit`.
 
-**A1. Patch `recompute_reliability(_user_id)`**
-- Ajouter guard : `auth.uid() = _user_id OR public.is_group_organizer_of_any_group_with(_user_id)` (helper à créer)
-- `revoke execute ... from public`, regrant ciblé à `authenticated`
+### B3 — Co-organisateurs avec permissions fines
+Fichier : `db/33_admin_permissions.sql`
 
-**A2. Verrouiller `group_members` contre UPDATE direct du `role` / `status`**
-- Remplacer la RLS `gm_update_organizer` par une policy qui n'autorise QUE des colonnes neutres (ex: `payout_position`) — et encore, via RPC
-- Toute mutation `role`/`status` doit passer par les RPC de la phase B
-- Helper SQL : trigger `BEFORE UPDATE` qui rejette si `OLD.role <> NEW.role OR OLD.status <> NEW.status` et que la session n'est pas marquée par un RPC `SECURITY DEFINER` (via `current_setting('app.via_rpc', true)`)
-
-**A3. Audit automatique sur invitations**
-- Patcher `createInvitation` / `revokeInvitation` (`src/lib/api/invitations.ts`) pour appeler `log_audit('invitation_created' | 'invitation_revoked', ...)`
-
-Livrable : `db/31_security_hardening.sql` + edits frontend.
-
----
-
-## Phase B — Gestion des membres (cœur de la demande)
-
-### B1. Statut `suspended` + suspension multi-effets
-
-- Nouveau libellé enum : `alter type member_status add value 'suspended'`
-- Colonnes : `suspended_at timestamptz`, `suspended_reason text`, `suspended_by uuid` sur `group_members`
-- RPC `suspend_member(member_id, reason)` → set status, audit, notif
-- RPC `reactivate_member(member_id)` → restaure `'active'`, audit, notif
-- Effets bloqués (selon ta sélection) :
-  - **Chat / enchères / swaps** : ajouter check `status = 'active'` dans les RPC `post_message`, `place_bid`, `request_turn_swap`, `respond_turn_swap`
-  - **Accès lecture au groupe** : adapter RLS `group_select_member` pour exclure `'suspended'` (le membre voit le groupe en lecture minimale via une vue dédiée `my_suspended_groups` pour qu'il sache qu'il est suspendu)
-  - **Saute son tour de rotation** : à la complétion d'un tour, `advance_cycle` saute le membre suspendu et marque son tour comme `'skipped_suspended'` (à reporter à la fin de la rotation)
-  - **Suspend pénalités** : `apply_late_penalty` skip si payeur suspendu
-
-### B2. `kick_member` (exclusion définitive)
-
-- RPC `kick_member(member_id, reason)` :
-  - Vérifie qu'aucune contribution due/payout en attente
-  - Set `status='removed'`, redistribue la position de rotation (decal des positions > N de -1)
-  - Audit + notif au membre
-- UI : bouton dans la liste membres
-
-### B3. Vrai système co-organisateur — permissions fines (tu as choisi cette option)
-
-- Nouvelle table `group_admin_permissions` :
+- Table `group_admin_permissions` :
   ```
-  group_id, member_id (group_members FK),
-  can_approve_members, can_kick, can_suspend,
-  can_edit_settings, can_invite, can_revoke_invites,
-  can_manage_payments, can_manage_penalties,
-  can_send_reminders, can_export_data,
-  granted_by, granted_at
+  group_id uuid, user_id uuid,
+  can_approve_members bool, can_suspend_member bool, can_kick_member bool,
+  can_edit_settings bool, can_manage_invitations bool,
+  can_confirm_payments bool, can_waive_penalty bool,
+  can_send_announcements bool, can_pause_cycle bool,
+  granted_by uuid, granted_at timestamptz,
+  PRIMARY KEY (group_id, user_id)
   ```
-- Supprimer / déprécier `groups.co_organizers` (téléphones) — migration : convertir si match phone→user
-- Helper SQL `has_admin_permission(group_id, user_id, permission_name)`
-- Toutes les RPC admin l'utilisent au lieu de `is_group_organizer` (le créateur reste admin total)
-- RPC `grant_admin_permission(member_id, perm, true|false)` réservée au `created_by`
-- UI : panneau "Co-organisateurs" dans `GroupSettings` avec checkboxes par permission
+- GRANTs + RLS : seul `created_by` du groupe lit/écrit (helper `is_group_owner`).
+- Helper `has_admin_permission(_group uuid, _user uuid, _perm text) returns bool` (SECURITY DEFINER).
+- RPC `grant_admin_permissions(_group, _user, _perms jsonb)` et `revoke_admin_permissions` — réservées au `created_by`.
+- Notif `permissions_changed` + audit.
+- `groups.co_organizers` (text[] de téléphones) marqué **deprecated** dans un commentaire SQL — non supprimé pour ne pas casser l'UI existante (sera nettoyé après migration des données en Phase C).
 
-### B4. Permissions fines par membre (au-delà du suspended)
+### B4 — Permissions fines par membre
+Fichier : `db/34_member_permissions.sql`
 
-- Table `member_permissions` :
-  ```
-  member_id PK, can_chat bool default true,
-  can_bid bool default true, can_swap bool default true,
-  can_invite bool default true
-  ```
-- Helpers + checks dans les RPC concernées
-- UI : bouton "Permissions" par ligne membre (dialog avec switches)
+- Ajout sur `group_members` :
+  - `can_chat bool default true`
+  - `can_bid bool default true`
+  - `can_swap bool default true`
+  - `can_invite bool default false`
+- RPC `set_member_permissions(_member_id, _perms jsonb)` — guard organisateur ou `can_suspend_member`.
+- Patch policies INSERT de `group_messages` / `turn_bids` / `turn_swaps` pour vérifier la flag.
+- Notif `permissions_changed` + audit.
 
-### B5. `transfer_ownership(new_owner_member_id)`
+### B5 — Transfert de propriété
+Inclus dans `db/33_admin_permissions.sql` :
 
-- Réservé au `created_by`
-- Met à jour `groups.created_by`, bascule l'ancien en `role='organisateur'` + toutes permissions
-- Confirmation 2 étapes + audit
+- RPC `transfer_ownership(_group_id, _new_owner_user_id)` :
+  - Guard : `auth.uid() = groups.created_by` strict.
+  - `groups.created_by = new`, l'ancien devient `organisateur` (membre actif) + ligne `group_admin_permissions` pleine.
+  - Le nouveau garde le rôle `organisateur`.
+  - Notif `ownership_transferred` aux deux parties + audit.
 
-### B6. UI "Gestion des membres" (refonte de `GroupSettings` onglet Membres)
+### B6 — UI « Gestion des membres »
+Côté frontend (aucun backend additionnel) :
 
-- Liste avec : nom, statut (badge), score, role, actions (Suspendre/Réactiver/Exclure/Permissions/Promouvoir co-organisateur)
-- Filtres : actifs / suspendus / removed
-- Modal de confirmation pour actions destructives + champ raison
+- Nouveau composant `src/components/group/MembersAdminPanel.tsx` injecté dans `GroupSettings.tsx` (nouvel onglet/section « Membres ») :
+  - Liste des membres : nom, score fiabilité, rôle, statut (badge `active` / `pending` / `suspended` / `removed`), position rotation.
+  - Actions par ligne (menu kebab) : Suspendre · Réactiver · Exclure · Permissions… · Promouvoir co-organisateur · Transférer la propriété.
+  - Dialogues `AlertDialog` pour les actions destructives avec champ « raison ».
+  - Dialogue `PermissionsDialog` (switches) pour `member_permissions` et `admin_permissions`.
+- Nouveaux helpers API :
+  - `src/lib/api/members.ts` : `suspendMember`, `reactivateMember`, `kickMember`, `setMemberPermissions`, `transferOwnership`.
+  - `src/lib/api/adminPermissions.ts` : `listAdminPermissions`, `grantAdminPermissions`, `revokeAdminPermissions`.
+- Hook `useAdminCapabilities(groupId)` qui combine `is_group_owner` + `group_admin_permissions` pour afficher/masquer les actions.
+- Labels d'audit ajoutés dans `src/lib/api/audit.ts` : `member_suspended`, `member_reactivated`, `member_kicked`, `permissions_changed`, `ownership_transferred`.
 
-Livrable : `db/32_suspended_status.sql`, `db/33_admin_permissions.sql`, `db/34_member_permissions.sql`, `db/35_ownership_transfer.sql`, nouvelles RPC, composants `MemberManagementPanel.tsx`, `AdminPermissionsDialog.tsx`, `MemberPermissionsDialog.tsx`.
+### Ordre d'exécution demandé
+1. `db/32a_suspended_enum_prelude.sql` (COMMIT enum)
+2. `db/32_suspended_status.sql` (suspend/reactivate/kick + effets)
+3. `db/33_admin_permissions.sql` (co-orgs granulaires + transfer)
+4. `db/34_member_permissions.sql` (permissions par membre)
+5. Code frontend (livré dans le même tour)
 
----
+### Points techniques
 
-## Phase C — Opérations avancées (utiles SaaS public)
+- Pattern enum prelude identique à `27a/28a/29a` pour éviter l'erreur 55P04 rencontrée précédemment.
+- Toutes les RPC mutant `role`/`status` appellent `set_config('app.via_rpc','1', true)` (Phase A2).
+- Aucune policy ne référence sa propre table → on passe par `has_admin_permission` SECURITY DEFINER (cf. règle RLS).
+- GRANTs explicites sur chaque nouvelle table (`authenticated` + `service_role`).
+- Pas de suppression de colonne existante → zéro risque de régression sur les écrans actuels.
 
-**C1.** RPC `confirm_external_payment(member_id, amount, method, proof_url)` — pour cash/virement hors-app (audit + notif)
-**C2.** RPC `waive_penalty(contribution_id, reason)` + `adjust_penalty(contribution_id, new_amount, reason)`
-**C3.** RPC `pause_cycle(reason)` / `resume_cycle()` + statut `groups.status='paused'` (nouvelle valeur enum) + RPC `shift_due_date(turn_id, new_date)`
-**C4.** RPC `archive_group(reason)` → statut `'cancelled'` propre, garde l'historique, bloque toute écriture future
-**C5.** RPC `send_manual_reminder(member_id, channel, message?)` — appelable par l'organisateur, rate-limité (1/24h par couple)
-**C6.** Vue `group_payments_history` (SECURITY DEFINER) + page "Historique" dans `GroupSettings`
-**C7.** Export CSV (membres + paiements) côté client + export PDF récap groupe via edge function
-
-Livrable : `db/36_external_payments.sql`, `db/37_penalty_management.sql`, `db/38_cycle_pause.sql`, `db/39_archive_group.sql`, `db/40_manual_reminders.sql`, edge function `export-group-pdf`.
-
----
-
-## Phase D — RGPD / Conformité publique
-
-**D1.** RPC `delete_account()` → anonymise `profiles` (`phone_number='', display_name='Utilisateur supprimé'`), garde les écritures comptables pseudonymisées, supprime `notifications_*`, `notification_prefs`. Soft-delete pour audit légal.
-**D2.** TTL `audit_log` : job pg_cron mensuel qui purge > 6 ans, archive optionnelle vers stockage
-**D3.** Consentement explicite à `join_group_with_code` : nouveau paramètre `_accepted_terms_version text`, insert dans `group_consent_log(member_id, terms_version, accepted_at, ip_hash)`
-**D4.** Masquage téléphone par défaut : nouvelle colonne `profiles.phone_visible_in_groups bool default false`, opt-in dans Profil + masque `+221••••••67` dans `listGroupMembers` quand non opt-in
-
-Livrable : `db/41_rgpd_delete_account.sql`, `db/42_audit_ttl.sql`, `db/43_consent_log.sql`, `db/44_phone_privacy.sql`, page "Confidentialité" dans Profil, page "Supprimer mon compte".
-
----
-
-## Détails techniques
-
-**Convention RPC SECURITY DEFINER** :
-```sql
-create or replace function public.X(...) returns ...
-language plpgsql security definer set search_path = public as $$
-declare v_uid uuid := auth.uid();
-begin
-  if v_uid is null then raise exception 'NOT_AUTHENTICATED'; end if;
-  -- check permission via has_admin_permission ou is_group_organizer
-  -- set app.via_rpc='1' pour passer le trigger de B1.A2
-  perform set_config('app.via_rpc','1', true);
-  -- ... mutation ...
-  perform public.log_audit(...);
-end$$;
-```
-
-**Notifications** : réutiliser `enqueue_notification` (`db/26`) avec nouveaux `notification_kind` : `member_suspended`, `member_reactivated`, `member_kicked`, `admin_role_granted`, `ownership_transferred`, `payment_confirmed_by_admin`, `penalty_waived`, `cycle_paused`, `group_archived`.
-
-**Tests post-phase** : pour chaque phase, smoke test manuel (créer un 2e compte test, suspendre, vérifier blocages).
-
----
-
-## Ordre d'exécution proposé
-
-```text
-Phase A  ──▶  Phase B  ──▶  Phase C  ──▶  Phase D
- (safety)     (member mgmt)   (ops)         (RGPD)
-  1 mig         5 mig          5 mig         4 mig
-  ~30 min       ~2-3 h         ~2 h          ~1.5 h
-```
-
-Je commence par la **Phase A** dès validation, puis enchaîne directement sur la **Phase B** dans la même livraison (les deux sont liées : B dépend des helpers de A). Phases C et D livrées séparément ensuite.
+### Hors scope (Phase C/D)
+Confirmation de paiement externe, gestion pénalités, pause/reprise cycle, archivage, rappels manuels, exports CSV/PDF, RGPD (suppression compte, TTL audit, consentement, masquage téléphones).
