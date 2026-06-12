@@ -174,6 +174,8 @@ export default function GroupDetail() {
     { id: "members", label: "Membres" },
     { id: "rotation", label: "Rotation" },
     { id: "swaps", label: "Échanges" },
+    ...(grp.rotation_order_kind === "auction" ? [{ id: "auctions" as Section, label: "Enchères" }] : []),
+    ...(grp.status === "completed" ? [{ id: "reviews" as Section, label: "Avis" }] : []),
     { id: "chat", label: "Discussion" },
     ...(isOrganizer ? [{ id: "audit" as Section, label: "Audit" }] : []),
   ];
