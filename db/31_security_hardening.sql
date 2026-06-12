@@ -222,3 +222,95 @@ create trigger invitations_audit_update
 --     perform set_config('app.via_rpc','1', true);
 --   en début de fonction (avant le UPDATE/INSERT).
 -- ---------------------------------------------------------------------
+
+-- ---------------------------------------------------------------------
+-- A5. Patch des RPC existantes pour passer le flag app.via_rpc
+--     (sinon le trigger A2 bloquerait approve_member / reject_member).
+-- ---------------------------------------------------------------------
+create or replace function public.approve_member(_member_id uuid)
+returns void
+language plpgsql security definer set search_path = public as $$
+declare
+  v_user uuid := auth.uid();
+  v_member public.group_members%rowtype;
+  v_active int;
+  v_max int;
+  v_next_pos int;
+  v_name text;
+begin
+  if v_user is null then raise exception 'AUTH_REQUIRED'; end if;
+
+  select * into v_member from public.group_members where id = _member_id;
+  if not found then raise exception 'MEMBER_NOT_FOUND'; end if;
+
+  if not public.is_group_organizer(v_member.group_id, v_user) then
+    raise exception 'FORBIDDEN';
+  end if;
+
+  if v_member.status <> 'pending' then
+    raise exception 'NOT_PENDING';
+  end if;
+
+  select max_members into v_max from public.groups where id = v_member.group_id;
+  select count(*) into v_active from public.group_members
+    where group_id = v_member.group_id and status = 'active';
+  if v_active >= v_max then raise exception 'GROUP_FULL'; end if;
+
+  select coalesce(max(position), 0) + 1 into v_next_pos
+    from public.group_members where group_id = v_member.group_id and status = 'active';
+
+  perform set_config('app.via_rpc', '1', true);
+  update public.group_members
+    set status = 'active', position = v_next_pos
+    where id = _member_id;
+
+  insert into public.notifications (user_id, kind, title, body, group_id)
+  values (v_member.user_id, 'invitation_accepted',
+    'Candidature acceptée',
+    'Votre demande d''adhésion au groupe a été acceptée.',
+    v_member.group_id);
+
+  select full_name into v_name from public.profiles where id = v_member.user_id;
+  perform public.log_audit(
+    v_member.group_id, 'approve_member', 'group_member', _member_id,
+    jsonb_build_object('user_id', v_member.user_id, 'full_name', v_name,
+                       'position', v_next_pos)
+  );
+end; $$;
+
+grant execute on function public.approve_member(uuid) to authenticated;
+
+create or replace function public.reject_member(_member_id uuid)
+returns void
+language plpgsql security definer set search_path = public as $$
+declare
+  v_user uuid := auth.uid();
+  v_member public.group_members%rowtype;
+begin
+  if v_user is null then raise exception 'AUTH_REQUIRED'; end if;
+
+  select * into v_member from public.group_members where id = _member_id;
+  if not found then raise exception 'MEMBER_NOT_FOUND'; end if;
+
+  if not public.is_group_organizer(v_member.group_id, v_user) then
+    raise exception 'FORBIDDEN';
+  end if;
+
+  if v_member.status <> 'pending' then raise exception 'NOT_PENDING'; end if;
+
+  perform set_config('app.via_rpc', '1', true);
+  update public.group_members set status = 'removed' where id = _member_id;
+
+  insert into public.notifications (user_id, kind, title, body, group_id)
+  values (v_member.user_id, 'system',
+    'Candidature refusée',
+    'Votre demande d''adhésion au groupe a été refusée.',
+    v_member.group_id);
+
+  perform public.log_audit(
+    v_member.group_id, 'reject_member', 'group_member', _member_id,
+    jsonb_build_object('user_id', v_member.user_id)
+  );
+end; $$;
+
+grant execute on function public.reject_member(uuid) to authenticated;
