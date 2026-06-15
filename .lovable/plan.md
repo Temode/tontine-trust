@@ -1,63 +1,70 @@
-# Plan — Écran dédié "Co-organisateurs"
+# Plan — Test E2E Phases A→D + correctif accès "Gérer les membres"
 
-Sortir la gestion des co-organisateurs du panneau membres global et lui donner une page autonome qui rend lisibles les 9 permissions granulaires et les actions disponibles selon le rôle de l'utilisateur connecté.
+## Constat préalable (à corriger en même temps)
 
-## Périmètre
+`MembersAdminPanel` (suspend / kick / permissions / promote co-org / transfer) n'est aujourd'hui accessible que via **Paramètres du groupe** (`/groupes/:id/parametres`). Cette page est gardée par `isOrganizer = group.created_by === user.id` ce qui exclut les co-organisateurs et n'offre aucun raccourci visible depuis le détail du groupe ni l'onglet "Membres". D'où le ressenti "je ne vois pas comment gérer les comptes".
 
-Frontend uniquement — toute la mécanique SQL (`db/33_admin_permissions.sql`, helpers `grant_admin_permissions`, `revoke_admin_permissions`, `has_admin_permission`, vue `group_admin_permissions_view`) et l'API (`src/lib/api/adminPermissions.ts`) sont déjà en place et inchangées.
+### Correctif UI (minimal, frontend)
 
-## Nouvelle page
+1. **`src/pages/GroupDetail.tsx`** — dans l'onglet *Membres* (`MembersTab`), si `isOrganizer` ou si l'utilisateur courant possède au moins une permission admin (`listAdminPermissions` retourne une ligne pour lui), afficher un bouton primaire **"Gérer les membres"** qui ouvre `/groupes/:id/membres`.
+2. **Nouvelle page `src/pages/GroupMembers.tsx`** montée sur `/groupes/:id/membres` :
+   - Garde d'accès : `isOwner || hasAnyAdminPermission` (sinon redirect + toast comme la page Co-organisateurs).
+   - Réutilise `MembersAdminPanel` (déjà complet) + un sous-onglet "Co-organisateurs" qui pointe vers `/groupes/:id/co-organisateurs`.
+3. **`src/App.tsx`** — route lazy `/groupes/:id/membres`.
+4. **`src/components/group/MembersAdminPanel.tsx`** — passer `isOwner` calculé par le parent (`currentUserId === ownerUserId`) tel quel ; étendre les boutons d'action pour qu'un co-organisateur avec `can_suspend_member` / `can_kick_member` voie aussi les options (la RPC fait déjà l'autorisation, on n'a qu'à débrider l'UI).
 
-`src/pages/GroupCoOrganizers.tsx` montée sur `/groupes/:id/co-organisateurs` (route protégée, dans `AppShell`, ajoutée à `src/App.tsx` en lazy import).
+Aucun changement SQL.
 
-Structure :
+## Test end-to-end (Playwright via shell, headless Chromium)
 
-1. **En-tête** — bouton retour vers le groupe, titre "Co-organisateurs", sous-titre rappelant le nom du groupe, badge rôle du visiteur (Organisateur / Co-organisateur / Membre).
-2. **Bandeau d'explication** — court paragraphe : "Un co-organisateur peut aider à gérer le groupe avec des droits que vous choisissez. Vous pouvez retirer ces droits à tout moment."
-3. **Liste des co-organisateurs actuels** (`listAdminPermissions(groupId)`) — une carte par personne avec :
-   - avatar + nom + téléphone masqué selon préférence,
-   - date d'attribution,
-   - **grille des 9 permissions** (`ADMIN_PERMISSION_KEYS`) avec icône check/cross + libellé `ADMIN_PERMISSION_LABELS`, regroupées en 3 sections visuelles :
-     - *Membres* (approve, suspend, kick)
-     - *Opérations* (edit_settings, manage_invitations, confirm_payments, pause_cycle)
-     - *Communication & finance* (send_announcements, waive_penalty)
-   - menu d'actions : "Modifier les permissions" (ouvre un Dialog avec 9 `Switch`) et "Retirer le rôle" (AlertDialog de confirmation → `revokeAdminPermissions`).
-4. **Section "Promouvoir un membre"** (visible uniquement si `isOwner`) — `Select` listant les membres `active` non encore co-organisateurs, puis le même Dialog de permissions, validation via `grantAdminPermissions`.
-5. **Empty state** quand aucun co-organisateur — illustration légère + bouton "Promouvoir un membre".
+Scénario complet exécuté contre `http://localhost:8080` avec deux sessions parallèles (Alice / Bob).
 
-## Règles d'affichage selon le rôle
+### Setup
+- Fichier `/tmp/browser/e2e_admin/script.py`.
+- Deux `BrowserContext` distincts (un par compte) pour login Alice + Bob simultanément.
+- Capture screenshots à chaque étape clé sous `screenshots/`.
 
-Calculées côté frontend à partir de `group.created_by` et de la ligne `group_admin_permissions_view` du visiteur :
+### Étapes
+1. **Auth** — Alice et Bob se connectent via `/auth` (form email/password). Vérif redirect `/dashboard`.
+2. **Création groupe (Alice)** — `/nouveau` → wizard 5 étapes → nom "Tontine E2E", cotisation 10000, 5 membres, fréquence hebdomadaire, rotation aléatoire, visibilité "lien partageable". Capture du code d'invitation à la fin.
+3. **Join (Bob)** — `/rejoindre` → entre le code → checkbox CGU (Phase D) → confirme. Vérif statut "En attente".
+4. **Approbation (Alice)** — `/groupes/:id` onglet Membres → "Accepter" la candidature de Bob.
+5. **Accès "Gérer les membres"** — Alice clique le bouton "Gérer les membres" (correctif) → vérifie présence du panneau, badge statut, menu actions.
+6. **Phase B1 — Suspension** — Alice suspend Bob avec motif "test e2e". Vérifs :
+   - Badge "Suspendu" + motif visible.
+   - Notification créée pour Bob (`/notifications`).
+   - Côté Bob, tentative de poster dans le chat → bloquée.
+7. **Réactivation** — Alice réactive Bob. Vérif badge "Actif" rétabli.
+8. **Phase B3 — Co-organisateur** — Alice ouvre `/groupes/:id/co-organisateurs` → promeut Bob avec `can_suspend_member` + `can_send_announcements`. Vérif card Bob dans la liste avec matrice verte sur les 2 permissions.
+9. **Phase B4 — Permissions membre** — Alice ouvre dialog "Permissions membre" sur Bob, désactive `can_chat`. Vérif côté Bob : envoi chat refusé.
+10. **Phase C2 — Pénalité** — (skip si pas de contribution générée). Si une cotisation existe, Alice tente `waive_penalty` via UI panneau.
+11. **Phase C3 — Pause cycle** — Alice met le cycle en pause (`CycleAdminPanel`). Vérif badge "En pause" sur la carte groupe.
+12. **Phase C7 — Historique paiements** — Alice ouvre `PaymentsHistoryPanel`, vérifie le rendu + bouton "Exporter CSV".
+13. **Phase B5 — Transfer ownership** — Alice transfère la propriété à Bob (confirmation 2 étapes). Vérif : Bob devient propriétaire (badge Crown), Alice reste co-org avec tous les droits.
+14. **Phase D4 — Privacy** — Bob ouvre `/profil/confidentialite`, toggle "Afficher mon téléphone". Vérif persistance.
+15. **Phase D1 — Suppression compte** — *(facultatif, destructif — on commente cette étape)* : naviguer vers `/profil/suppression`, vérifier l'écran de confirmation 2 étapes mais NE PAS valider (sinon le compte de test est perdu).
 
-- **Organisateur (`isOwner`)** : voit tout, peut promouvoir, modifier, révoquer n'importe qui, transférer la propriété (lien vers le panneau existant dans `MembersAdminPanel`).
-- **Co-organisateur** : voit la liste complète + ses propres permissions surlignées ("Vous"). Les actions modifier/révoquer sont masquées (uniquement l'organisateur peut éditer les permissions d'un autre admin).
-- **Membre simple** : redirection automatique vers `/groupes/:id` avec toast "Accès réservé à l'organisateur".
+### Vérifications transverses
+- Aucun error toast inattendu (capture console errors via `page.on("console")`).
+- Aucun appel réseau 4xx/5xx imprévu (capture `page.on("response")`, filtrer `.supabase.co/rest|rpc`).
+- Screenshots finaux comparés visuellement (badges, dialogs, matrices).
 
-## Composant réutilisable
+## Livrables du test
 
-`src/components/group/PermissionsMatrix.tsx` — affiche la grille 3 sections × N permissions, mode `readonly` (icônes) ou `editable` (Switch). Utilisé à la fois dans la carte de liste et dans le Dialog d'édition. Évite la duplication avec le dialog existant de `MembersAdminPanel`.
+- `/tmp/browser/e2e_admin/script.py` — script Playwright complet.
+- `/tmp/browser/e2e_admin/screenshots/*.png` — preuves visuelles par étape.
+- Rapport d'audit synthétique en réponse finale :
+  - ✅ ce qui marche
+  - ⚠️ régressions / friction UX détectées (notamment le manque de raccourci "Gérer les membres" — corrigé)
+  - ❌ bugs bloquants éventuels avec stack/erreur réseau.
 
-## Intégration
-
-- **`src/App.tsx`** : ajouter la route `/groupes/:id/co-organisateurs`.
-- **`src/pages/GroupSettings.tsx`** : le bloc "Co-organisateurs" actuel (intégré dans `MembersAdminPanel`) reste mais une bannière "Gérer sur la page dédiée →" pointe vers la nouvelle route. Pas de suppression de l'existant pour éviter toute régression.
-- **`src/pages/GroupDetail.tsx`** : ajouter dans le menu/quick-actions du groupe un raccourci "Co-organisateurs" visible aux owners + admins.
-
-## Détails UI (design system existant)
-
-- Bleu sarcelle pour les permissions actives, gris hairline pour inactives.
-- Or (#E8AA14) pour le badge "Organisateur principal" / icône `Crown`.
-- Cards `SectionCard`, Switch shadcn, Dialog shadcn, AlertDialog shadcn.
-- Mobile-first : grille permissions en 1 colonne <640px, 2 colonnes ≥640px.
-
-## Fichiers touchés
+## Fichiers touchés (correctif)
 
 ```text
-+ src/pages/GroupCoOrganizers.tsx
-+ src/components/group/PermissionsMatrix.tsx
-~ src/App.tsx                 (route + lazy import)
-~ src/pages/GroupSettings.tsx (bannière "voir l'écran dédié")
-~ src/pages/GroupDetail.tsx   (lien rapide)
++ src/pages/GroupMembers.tsx
+~ src/App.tsx               (route /groupes/:id/membres)
+~ src/pages/GroupDetail.tsx (bouton "Gérer les membres" dans onglet Membres)
+~ src/components/group/MembersAdminPanel.tsx (autorise co-org avec perms à voir les actions)
 ```
 
-Aucune migration, aucun changement API, aucun retrait de fonctionnalité existante.
+Test exécuté après le correctif pour valider de bout en bout.

@@ -12,6 +12,8 @@ import {
   Star,
   UserPlus,
   ShieldCheck,
+  Users,
+  ChevronRight,
   Wallet,
   X,
 } from "lucide-react";
@@ -83,6 +85,11 @@ export default function GroupDetail() {
   const membersQ = useQuery({
     queryKey: ["group", id, "members"],
     queryFn: () => listGroupMembers(id as string),
+    enabled: !!id,
+  });
+  const adminPermsQ = useQuery({
+    queryKey: ["group-admin-perms", id],
+    queryFn: () => import("@/lib/api/adminPermissions").then((m) => m.listAdminPermissions(id as string)),
     enabled: !!id,
   });
   const turnsQ = useQuery({
@@ -161,6 +168,8 @@ export default function GroupDetail() {
   const isOrganizer =
     (!!user?.id && grp.created_by === user.id) ||
     activeMembers.some((m) => m.user_id === user?.id && m.role === "organisateur");
+  const isCoOrgAdmin = !!user?.id && (adminPermsQ.data ?? []).some((r) => r.user_id === user.id);
+  const canManageMembers = isOrganizer || isCoOrgAdmin;
   const frequency = FREQ_LABEL[grp.frequency] ?? "Mensuelle";
   const totalPayout = grp.contribution_amount * activeMembers.length;
   const canStart =
@@ -380,7 +389,12 @@ export default function GroupDetail() {
         <div className="mt-5">
           {section === "overview" && <OverviewTab nextTurn={nextTurn} payout={totalPayout} />}
           {section === "members" && (
-            <MembersTab members={activeMembers} reliability={reliabilityQ.data ?? []} />
+            <MembersTab
+              members={activeMembers}
+              reliability={reliabilityQ.data ?? []}
+              canManage={canManageMembers}
+              groupId={grp.id}
+            />
           )}
           {section === "rotation" && (
             <RotationTab
@@ -474,13 +488,37 @@ function OverviewTab({ nextTurn, payout }: { nextTurn: DbNextTurn | null; payout
 function MembersTab({
   members,
   reliability,
+  canManage,
+  groupId,
 }: {
   members: DbGroupMember[];
   reliability: DbGroupReliabilityRow[];
+  canManage: boolean;
+  groupId: string;
 }) {
   const scoreMap = new Map(reliability.map((r) => [r.user_id, r]));
   return (
-    <SectionCard title="Membres actifs" subtitle={`${members.length} participants`} bare>
+    <div className="space-y-4">
+      {canManage && (
+        <Link
+          to={`/groupes/${groupId}/membres`}
+          className="flex items-center justify-between gap-3 rounded-lg border border-primary/30 bg-primary-50/40 px-4 py-3 text-sm transition hover:bg-primary-50"
+        >
+          <span className="flex items-center gap-3">
+            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <Users className="h-4 w-4" />
+            </span>
+            <span>
+              <span className="block font-semibold text-foreground">Gérer les membres</span>
+              <span className="text-xs text-muted-foreground">
+                Suspendre, exclure, permissions, co-organisateurs
+              </span>
+            </span>
+          </span>
+          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+        </Link>
+      )}
+      <SectionCard title="Membres actifs" subtitle={`${members.length} participants`} bare>
       <ul className="divide-y divide-border/60">
         {members.map((m) => {
           const name = m.profile?.full_name?.trim() || "Membre";
@@ -524,7 +562,8 @@ function MembersTab({
           </li>
         )}
       </ul>
-    </SectionCard>
+      </SectionCard>
+    </div>
   );
 }
 

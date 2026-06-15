@@ -27,6 +27,7 @@ const NotFound = lazy(() => import("@/pages/NotFound"));
 const Profile = lazy(() => import("@/pages/Profile"));
 const GroupSettings = lazy(() => import("@/pages/GroupSettings"));
 const GroupCoOrganizers = lazy(() => import("@/pages/GroupCoOrganizers"));
+const GroupMembers = lazy(() => import("@/pages/GroupMembers"));
 const NotificationPreferences = lazy(() => import("@/pages/NotificationPreferences"));
 const PrivacySettings = lazy(() => import("@/pages/PrivacySettings"));
 const DeleteAccount = lazy(() => import("@/pages/DeleteAccount"));
@@ -102,6 +103,7 @@ const App = () => (
                     <Route path="/groupes/:id" element={<RouteBoundary name="Détail du groupe"><GroupDetail /></RouteBoundary>} />
                     <Route path="/groupes/:id/parametres" element={<RouteBoundary name="Paramètres du groupe"><GroupSettings /></RouteBoundary>} />
                     <Route path="/groupes/:id/co-organisateurs" element={<RouteBoundary name="Co-organisateurs"><GroupCoOrganizers /></RouteBoundary>} />
+                    <Route path="/groupes/:id/membres" element={<RouteBoundary name="Gérer les membres"><GroupMembers /></RouteBoundary>} />
                     <Route path="/cotisations" element={<RouteBoundary name="Mes cotisations"><MyContributions /></RouteBoundary>} />
                     <Route path="/recus" element={<RouteBoundary name="Reçus"><Receipts /></RouteBoundary>} />
                     <Route path="/recus/:id" element={<RouteBoundary name="Reçu"><Receipts /></RouteBoundary>} />
