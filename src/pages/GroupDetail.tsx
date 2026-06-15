@@ -11,6 +11,7 @@ import {
   Play,
   Star,
   UserPlus,
+  ShieldCheck,
   Wallet,
   X,
 } from "lucide-react";
@@ -208,6 +209,15 @@ export default function GroupDetail() {
               <UserPlus className="h-4 w-4" />
               Inviter
             </button>
+          )}
+          {isOrganizer && (
+            <Link
+              to={`/groupes/${grp.id}/co-organisateurs`}
+              className="hidden h-10 items-center gap-1.5 rounded-lg border border-hairline px-3 text-xs font-medium text-foreground transition hover:bg-secondary sm:inline-flex"
+            >
+              <ShieldCheck className="h-4 w-4" />
+              Co-org.
+            </Link>
           )}
           <button
             type="button"
