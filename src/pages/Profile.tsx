@@ -1,4 +1,4 @@
-import { LogOut, RefreshCw, AlertTriangle, Camera, Loader2, Bell } from "lucide-react";
+import { LogOut, RefreshCw, AlertTriangle, Camera, Loader2, Bell, Shield } from "lucide-react";
 import { toast } from "sonner";
 import { Link, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -181,6 +181,14 @@ export default function Profile() {
         >
           <Bell className="h-4 w-4" />
           Préférences de notification
+        </Link>
+
+        <Link
+          to="/profil/confidentialite"
+          className="inline-flex h-10 items-center gap-2 rounded-md border border-hairline bg-card px-4 text-sm font-semibold text-foreground transition hover:bg-secondary"
+        >
+          <Shield className="h-4 w-4" />
+          Confidentialité &amp; suppression de compte
         </Link>
       </div>
     </div>
