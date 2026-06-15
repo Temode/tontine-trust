@@ -12,6 +12,7 @@ import {
   Star,
   UserPlus,
   ShieldCheck,
+  Users,
   Wallet,
   X,
 } from "lucide-react";
@@ -83,6 +84,11 @@ export default function GroupDetail() {
   const membersQ = useQuery({
     queryKey: ["group", id, "members"],
     queryFn: () => listGroupMembers(id as string),
+    enabled: !!id,
+  });
+  const adminPermsQ = useQuery({
+    queryKey: ["group-admin-perms", id],
+    queryFn: () => import("@/lib/api/adminPermissions").then((m) => m.listAdminPermissions(id as string)),
     enabled: !!id,
   });
   const turnsQ = useQuery({
@@ -161,6 +167,8 @@ export default function GroupDetail() {
   const isOrganizer =
     (!!user?.id && grp.created_by === user.id) ||
     activeMembers.some((m) => m.user_id === user?.id && m.role === "organisateur");
+  const isCoOrgAdmin = !!user?.id && (adminPermsQ.data ?? []).some((r) => r.user_id === user.id);
+  const canManageMembers = isOrganizer || isCoOrgAdmin;
   const frequency = FREQ_LABEL[grp.frequency] ?? "Mensuelle";
   const totalPayout = grp.contribution_amount * activeMembers.length;
   const canStart =
