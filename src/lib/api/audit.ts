@@ -49,4 +49,7 @@ export const ACTION_LABEL: Record<string, string> = {
   due_date_shifted: "Échéance reportée",
   group_archived: "Groupe archivé",
   manual_reminder_sent: "Rappel manuel envoyé",
+  account_deleted: "Compte supprimé",
+  phone_visibility_changed: "Visibilité téléphone modifiée",
+  terms_accepted: "CGU acceptées",
 };
