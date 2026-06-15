@@ -57,21 +57,26 @@ const RPC_ERROR_LABELS: Record<string, string> = {
   RATE_LIMITED: "Trop de tentatives. Réessayez dans quelques minutes.",
   INVALID_OPERATOR: "Opérateur Mobile Money invalide.",
   MESSAGE_TOO_LONG: "Message trop long (280 caractères max.).",
+  TERMS_REQUIRED: "Vous devez accepter les conditions générales d'utilisation.",
+  TERMS_VERSION_UNKNOWN: "Version des CGU inconnue.",
 };
 
 export interface JoinWithCodeOptions {
   operator?: "orange" | "mtn" | null;
   message?: string | null;
+  acceptedTermsVersion?: string;
 }
 
 export async function joinWithCode(
   code: string,
   options: JoinWithCodeOptions = {},
 ): Promise<{ groupId: string }> {
+  const { CURRENT_TERMS_VERSION } = await import("./privacy");
   const { data, error } = await supabase.rpc("join_group_with_code", {
     _code: code,
     _operator: options.operator ?? null,
     _message: options.message ?? null,
+    _accepted_terms_version: options.acceptedTermsVersion ?? CURRENT_TERMS_VERSION,
   });
   if (error) {
     const key = Object.keys(RPC_ERROR_LABELS).find((k) => error.message.includes(k));

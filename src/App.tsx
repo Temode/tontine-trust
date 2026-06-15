@@ -27,6 +27,8 @@ const NotFound = lazy(() => import("@/pages/NotFound"));
 const Profile = lazy(() => import("@/pages/Profile"));
 const GroupSettings = lazy(() => import("@/pages/GroupSettings"));
 const NotificationPreferences = lazy(() => import("@/pages/NotificationPreferences"));
+const PrivacySettings = lazy(() => import("@/pages/PrivacySettings"));
+const DeleteAccount = lazy(() => import("@/pages/DeleteAccount"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -107,6 +109,8 @@ const App = () => (
                     <Route path="/inviter" element={<RouteBoundary name="Inviter"><InviteMembers /></RouteBoundary>} />
                     <Route path="/profil" element={<RouteBoundary name="Profil"><Profile /></RouteBoundary>} />
                     <Route path="/parametres/notifications" element={<RouteBoundary name="Préférences notifications"><NotificationPreferences /></RouteBoundary>} />
+                    <Route path="/profil/confidentialite" element={<RouteBoundary name="Confidentialité"><PrivacySettings /></RouteBoundary>} />
+                    <Route path="/profil/suppression" element={<RouteBoundary name="Supprimer mon compte"><DeleteAccount /></RouteBoundary>} />
                   </Route>
                 </Route>
                 <Route path="*" element={<RouteBoundary name="Page introuvable"><NotFound /></RouteBoundary>} />
