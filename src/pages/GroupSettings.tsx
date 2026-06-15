@@ -11,6 +11,7 @@ import { MembersAdminPanel } from "@/components/group/MembersAdminPanel";
 import { ExternalPaymentsPanel } from "@/components/group/ExternalPaymentsPanel";
 import { PaymentsHistoryPanel } from "@/components/group/PaymentsHistoryPanel";
 import { CycleAdminPanel } from "@/components/group/CycleAdminPanel";
+import { ShieldCheck, ChevronRight } from "lucide-react";
 
 const FREQ_OPTIONS = [
   { value: "hebdomadaire", label: "Hebdomadaire" },
@@ -280,6 +281,24 @@ export default function GroupSettings() {
             ownerUserId={group.created_by}
           />
         )}
+
+        <Link
+          to={`/groupes/${id}/co-organisateurs`}
+          className="flex items-center justify-between gap-3 rounded-lg border border-primary/30 bg-primary-50/40 px-4 py-3 text-sm transition hover:bg-primary-50"
+        >
+          <span className="flex items-center gap-3">
+            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <ShieldCheck className="h-4 w-4" />
+            </span>
+            <span>
+              <span className="block font-semibold text-foreground">Co-organisateurs</span>
+              <span className="text-xs text-muted-foreground">
+                Page dédiée · permissions granulaires et historique
+              </span>
+            </span>
+          </span>
+          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+        </Link>
 
         <SectionCard title="Paiements externes" subtitle="Cash, virement, mobile money hors-app à valider">
           <ExternalPaymentsPanel groupId={group.id} />
