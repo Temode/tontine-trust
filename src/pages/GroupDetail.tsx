@@ -13,6 +13,7 @@ import {
   UserPlus,
   ShieldCheck,
   Users,
+  ChevronRight,
   Wallet,
   X,
 } from "lucide-react";
