@@ -1,6 +1,9 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import type { Session, User } from "@supabase/supabase-js";
-import { supabase, type AppRole } from "@/integrations/supabase/client";
+import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
+
+export type AppRole = Database["public"]["Enums"]["app_role"];
 import { setAuthSnapshot } from "@/lib/diagnostics/crashLogger";
 
 interface AuthContextValue {

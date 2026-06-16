@@ -125,5 +125,5 @@ export async function previewByCode(code: string): Promise<InvitationPreview> {
     const key = Object.keys(RPC_ERROR_LABELS).find((k) => error.message.includes(k));
     throw new Error(key ? RPC_ERROR_LABELS[key] : error.message);
   }
-  return data as InvitationPreview;
+  return data as unknown as InvitationPreview;
 }

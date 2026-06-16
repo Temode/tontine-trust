@@ -92,7 +92,7 @@ export async function updateGroupSettings(
 ): Promise<void> {
   const { error } = await supabase.rpc("update_group_settings", {
     _group_id: groupId,
-    _payload: payload,
+    _payload: payload as never,
   });
   if (error) {
     const key = Object.keys(UPDATE_ERROR_LABELS).find((k) =>
