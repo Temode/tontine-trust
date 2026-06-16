@@ -23,6 +23,7 @@ export type Database = {
           group_id: string
           id: string
           payer_user_id: string
+          penalty_amount: number
           provider: Database["public"]["Enums"]["payment_provider"] | null
           reference: string | null
           status: Database["public"]["Enums"]["contribution_status"]
@@ -37,6 +38,7 @@ export type Database = {
           group_id: string
           id?: string
           payer_user_id: string
+          penalty_amount?: number
           provider?: Database["public"]["Enums"]["payment_provider"] | null
           reference?: string | null
           status?: Database["public"]["Enums"]["contribution_status"]
@@ -51,6 +53,7 @@ export type Database = {
           group_id?: string
           id?: string
           payer_user_id?: string
+          penalty_amount?: number
           provider?: Database["public"]["Enums"]["payment_provider"] | null
           reference?: string | null
           status?: Database["public"]["Enums"]["contribution_status"]
@@ -188,6 +191,58 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      group_messages: {
+        Row: {
+          author_user_id: string
+          body: string
+          created_at: string
+          deleted_at: string | null
+          edited_at: string | null
+          group_id: string
+          id: string
+        }
+        Insert: {
+          author_user_id: string
+          body: string
+          created_at?: string
+          deleted_at?: string | null
+          edited_at?: string | null
+          group_id: string
+          id?: string
+        }
+        Update: {
+          author_user_id?: string
+          body?: string
+          created_at?: string
+          deleted_at?: string | null
+          edited_at?: string | null
+          group_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_messages_author_user_id_fkey"
+            columns: ["author_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_messages_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_messages_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "my_groups_overview"
             referencedColumns: ["id"]
           },
         ]
@@ -638,12 +693,14 @@ export type Database = {
           amount: number
           beneficiary_user_id: string
           cycle_id: string
+          fee_amount: number
           group_id: string
           hash: string
           id: string
           issued_at: string
           issued_by: string
           ledger_entry_id: string | null
+          net_amount: number | null
           payment_id: string
           provider: Database["public"]["Enums"]["payment_provider"]
           receipt_number: string
@@ -653,12 +710,14 @@ export type Database = {
           amount: number
           beneficiary_user_id: string
           cycle_id: string
+          fee_amount?: number
           group_id: string
           hash: string
           id?: string
           issued_at?: string
           issued_by: string
           ledger_entry_id?: string | null
+          net_amount?: number | null
           payment_id: string
           provider: Database["public"]["Enums"]["payment_provider"]
           receipt_number: string
@@ -668,12 +727,14 @@ export type Database = {
           amount?: number
           beneficiary_user_id?: string
           cycle_id?: string
+          fee_amount?: number
           group_id?: string
           hash?: string
           id?: string
           issued_at?: string
           issued_by?: string
           ledger_entry_id?: string | null
+          net_amount?: number | null
           payment_id?: string
           provider?: Database["public"]["Enums"]["payment_provider"]
           receipt_number?: string
@@ -985,6 +1046,7 @@ export type Database = {
           contribution_id: string | null
           days_to_due: number | null
           due_date: string | null
+          expected_penalty: number | null
           group_id: string | null
           group_name: string | null
           status: Database["public"]["Enums"]["contribution_status"] | null
@@ -1217,12 +1279,14 @@ export type Database = {
           amount: number | null
           beneficiary_name: string | null
           beneficiary_user_id: string | null
+          fee_amount: number | null
           group_id: string | null
           group_name: string | null
           hash: string | null
           id: string | null
           issued_at: string | null
           issued_by_name: string | null
+          net_amount: number | null
           provider: Database["public"]["Enums"]["payment_provider"] | null
           receipt_number: string | null
           turn_id: string | null
@@ -1546,6 +1610,7 @@ export type Database = {
         | "reliability_changed"
         | "member_joined"
         | "contribution_confirmed"
+        | "announcement"
       payment_provider: "orange_money" | "mtn_money" | "cash" | "simulation"
       payment_status:
         | "initiated"
@@ -1715,6 +1780,7 @@ export const Constants = {
         "reliability_changed",
         "member_joined",
         "contribution_confirmed",
+        "announcement",
       ],
       payment_provider: ["orange_money", "mtn_money", "cash", "simulation"],
       payment_status: [
