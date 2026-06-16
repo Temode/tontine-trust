@@ -119,7 +119,11 @@ export default function GroupDetail() {
       toast.success("Cycle démarré", { description: "L'ordre de rotation a été tiré." });
       invalidate();
     },
-    onError: (e: Error) => toast.error("Démarrage impossible", { description: e.message }),
+    onError: (e: unknown) => {
+      const err = e as { message?: string; details?: string; hint?: string; code?: string };
+      const desc = [err?.message, err?.details, err?.hint, err?.code].filter(Boolean).join(" — ");
+      toast.error("Démarrage impossible", { description: desc || "Erreur inconnue" });
+    },
   });
 
   const payoutM = useMutation({
