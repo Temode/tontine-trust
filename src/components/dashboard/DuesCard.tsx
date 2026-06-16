@@ -22,7 +22,7 @@ export function DuesCard({ dues, isLoading }: Props) {
     <SectionCard
       title="À payer"
       subtitle={isLoading ? "Chargement…" : `${dues.length} cotisation${dues.length > 1 ? "s" : ""} due${dues.length > 1 ? "s" : ""}`}
-      action={dues.length > 0 ? { label: "Tout voir", to: "/cotisations" } : undefined}
+      action={dues.length > 0 ? { label: "Tout voir", href: "/cotisations" } : undefined}
       bare
     >
       {isLoading ? (
