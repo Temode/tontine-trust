@@ -112,6 +112,7 @@ export default function GroupCoOrganizers() {
   const admins = adminsQ.data ?? [];
   const members = (membersQ.data ?? []).filter((m) => m.status === "active");
   const adminUserIds = new Set(admins.map((a) => a.user_id));
+  const activeNonOwner = members.filter((m) => m.user_id !== grp.created_by);
   const promotables = members.filter(
     (m) => m.user_id !== grp.created_by && !adminUserIds.has(m.user_id),
   );
@@ -160,7 +161,18 @@ export default function GroupCoOrganizers() {
             title="Promouvoir un membre"
             subtitle="Choisissez le membre à qui confier des droits supplémentaires"
           >
-            {promotables.length === 0 ? (
+            {activeNonOwner.length === 0 ? (
+              <div className="space-y-3">
+                <p className="text-sm text-muted-foreground">
+                  Aucun membre éligible. Invitez d'abord des participants au
+                  groupe, puis revenez ici pour leur confier des droits.
+                </p>
+                <Button variant="outline" size="sm" onClick={() => navigate(`/groupes/${id}`)}>
+                  <UserPlus className="mr-1.5 h-4 w-4" />
+                  Inviter des membres
+                </Button>
+              </div>
+            ) : promotables.length === 0 ? (
               <p className="text-sm text-muted-foreground">
                 Tous les membres actifs sont déjà co-organisateurs.
               </p>

@@ -12,6 +12,10 @@ import { overviewToTontine } from "@/lib/api/types";
 import { listMyNextTurns } from "@/lib/api/turns";
 import { listMyContributionsDue } from "@/lib/api/contributions";
 import { getMyReliability } from "@/lib/api/reliability";
+import { listMyRecentAnnouncements } from "@/lib/api/announcements";
+import { DuesCard } from "@/components/dashboard/DuesCard";
+import { UpcomingTurnsCard } from "@/components/dashboard/UpcomingTurnsCard";
+import { RecentAnnouncementsCard } from "@/components/dashboard/RecentAnnouncementsCard";
 import { formatGNF } from "@/lib/format";
 
 function KpiTile({
@@ -45,17 +49,21 @@ export default function Dashboard() {
     queryKey: ["groups", "mine"],
     queryFn: listMyGroups,
   });
-  const { data: nextTurns = [] } = useQuery({
+  const { data: nextTurns = [], isLoading: turnsLoading } = useQuery({
     queryKey: ["turns", "mine", "next"],
     queryFn: listMyNextTurns,
   });
-  const { data: dues = [] } = useQuery({
+  const { data: dues = [], isLoading: duesLoading } = useQuery({
     queryKey: ["contributions", "due"],
     queryFn: listMyContributionsDue,
   });
   const { data: reliability } = useQuery({
     queryKey: ["reliability", "mine"],
     queryFn: getMyReliability,
+  });
+  const { data: announcements = [] } = useQuery({
+    queryKey: ["announcements", "mine", "recent"],
+    queryFn: () => listMyRecentAnnouncements(3),
   });
 
   const groups = useMemo(() => rows.map(overviewToTontine), [rows]);
@@ -170,6 +178,18 @@ export default function Dashboard() {
             }
           />
         </div>
+
+        {/* Cartes actionnables membre */}
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+          <DuesCard dues={dues} isLoading={duesLoading} />
+          <UpcomingTurnsCard
+            turns={nextTurns}
+            myUserId={user?.id ?? null}
+            isLoading={turnsLoading}
+          />
+        </div>
+
+        <RecentAnnouncementsCard items={announcements} />
       </div>
     </div>
   );
