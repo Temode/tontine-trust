@@ -277,6 +277,13 @@ export type Database = {
             foreignKeyName: "external_payment_proofs_contribution_id_fkey"
             columns: ["contribution_id"]
             isOneToOne: false
+            referencedRelation: "group_payments_history"
+            referencedColumns: ["contribution_id"]
+          },
+          {
+            foreignKeyName: "external_payment_proofs_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
             referencedRelation: "my_contributions_due"
             referencedColumns: ["contribution_id"]
           },
@@ -525,6 +532,9 @@ export type Database = {
       }
       groups: {
         Row: {
+          archived_at: string | null
+          archived_by: string | null
+          archived_reason: string | null
           category: string | null
           co_organizers: string[]
           contribution_amount: number
@@ -548,6 +558,9 @@ export type Database = {
           visibility: Database["public"]["Enums"]["group_visibility"]
         }
         Insert: {
+          archived_at?: string | null
+          archived_by?: string | null
+          archived_reason?: string | null
           category?: string | null
           co_organizers?: string[]
           contribution_amount: number
@@ -571,6 +584,9 @@ export type Database = {
           visibility?: Database["public"]["Enums"]["group_visibility"]
         }
         Update: {
+          archived_at?: string | null
+          archived_by?: string | null
+          archived_reason?: string | null
           category?: string | null
           co_organizers?: string[]
           contribution_amount?: number
@@ -725,6 +741,13 @@ export type Database = {
             foreignKeyName: "ledger_entries_contribution_id_fkey"
             columns: ["contribution_id"]
             isOneToOne: false
+            referencedRelation: "group_payments_history"
+            referencedColumns: ["contribution_id"]
+          },
+          {
+            foreignKeyName: "ledger_entries_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
             referencedRelation: "my_contributions_due"
             referencedColumns: ["contribution_id"]
           },
@@ -789,6 +812,51 @@ export type Database = {
             columns: ["turn_id"]
             isOneToOne: false
             referencedRelation: "turns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      manual_reminders_log: {
+        Row: {
+          channel: Database["public"]["Enums"]["reminder_channel"]
+          created_at: string
+          group_id: string
+          id: string
+          message: string | null
+          recipient_id: string
+          sender_id: string
+        }
+        Insert: {
+          channel: Database["public"]["Enums"]["reminder_channel"]
+          created_at?: string
+          group_id: string
+          id?: string
+          message?: string | null
+          recipient_id: string
+          sender_id: string
+        }
+        Update: {
+          channel?: Database["public"]["Enums"]["reminder_channel"]
+          created_at?: string
+          group_id?: string
+          id?: string
+          message?: string | null
+          recipient_id?: string
+          sender_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "manual_reminders_log_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "manual_reminders_log_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "my_groups_overview"
             referencedColumns: ["id"]
           },
         ]
@@ -1002,6 +1070,13 @@ export type Database = {
             foreignKeyName: "payments_contribution_id_fkey"
             columns: ["contribution_id"]
             isOneToOne: false
+            referencedRelation: "group_payments_history"
+            referencedColumns: ["contribution_id"]
+          },
+          {
+            foreignKeyName: "payments_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
             referencedRelation: "my_contributions_due"
             referencedColumns: ["contribution_id"]
           },
@@ -1032,6 +1107,8 @@ export type Database = {
         Row: {
           avatar_url: string | null
           created_at: string
+          deleted_at: string | null
+          deletion_reason: string | null
           full_name: string
           id: string
           phone_number: string | null
@@ -1041,6 +1118,8 @@ export type Database = {
         Insert: {
           avatar_url?: string | null
           created_at?: string
+          deleted_at?: string | null
+          deletion_reason?: string | null
           full_name: string
           id: string
           phone_number?: string | null
@@ -1050,6 +1129,8 @@ export type Database = {
         Update: {
           avatar_url?: string | null
           created_at?: string
+          deleted_at?: string | null
+          deletion_reason?: string | null
           full_name?: string
           id?: string
           phone_number?: string | null
@@ -1209,6 +1290,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "contributions"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reminder_log_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
+            referencedRelation: "group_payments_history"
+            referencedColumns: ["contribution_id"]
           },
           {
             foreignKeyName: "reminder_log_contribution_id_fkey"
@@ -1673,6 +1761,64 @@ export type Database = {
           },
         ]
       }
+      group_payments_history: {
+        Row: {
+          amount: number | null
+          confirmed_at: string | null
+          confirmed_by: string | null
+          confirmed_by_name: string | null
+          contribution_id: string | null
+          contribution_status:
+            | Database["public"]["Enums"]["contribution_status"]
+            | null
+          due_date: string | null
+          group_id: string | null
+          payer_name: string | null
+          payer_user_id: string | null
+          penalty_amount: number | null
+          provider: Database["public"]["Enums"]["payment_provider"] | null
+          reference: string | null
+          turn_id: string | null
+          turn_number: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contributions_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contributions_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "my_groups_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contributions_turn_id_fkey"
+            columns: ["turn_id"]
+            isOneToOne: false
+            referencedRelation: "next_turn_per_group"
+            referencedColumns: ["turn_id"]
+          },
+          {
+            foreignKeyName: "contributions_turn_id_fkey"
+            columns: ["turn_id"]
+            isOneToOne: false
+            referencedRelation: "turn_settlement"
+            referencedColumns: ["turn_id"]
+          },
+          {
+            foreignKeyName: "contributions_turn_id_fkey"
+            columns: ["turn_id"]
+            isOneToOne: false
+            referencedRelation: "turns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       group_reliability: {
         Row: {
           avg_rating: number | null
@@ -1946,6 +2092,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "contributions"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
+            referencedRelation: "group_payments_history"
+            referencedColumns: ["contribution_id"]
           },
           {
             foreignKeyName: "payments_contribution_id_fkey"
@@ -2400,6 +2553,10 @@ export type Database = {
         Returns: string
       }
       approve_member: { Args: { _member_id: string }; Returns: undefined }
+      archive_group: {
+        Args: { _group_id: string; _reason?: string }
+        Returns: undefined
+      }
       cancel_my_bid: { Args: { _turn_id: string }; Returns: undefined }
       cancel_turn_swap: { Args: { _request_id: string }; Returns: undefined }
       close_auction: { Args: { _turn_id: string }; Returns: string }
@@ -2408,6 +2565,7 @@ export type Database = {
         Returns: undefined
       }
       create_group_with_invitation: { Args: { _payload: Json }; Returns: Json }
+      delete_account: { Args: { _reason?: string }; Returns: undefined }
       enqueue_payment_reminders: { Args: never; Returns: number }
       grant_admin_permissions: {
         Args: { _group_id: string; _perms: Json; _user_id: string }
@@ -2547,6 +2705,14 @@ export type Database = {
         Args: { _user_id: string }
         Returns: undefined
       }
+      send_manual_reminder: {
+        Args: {
+          _channel: Database["public"]["Enums"]["reminder_channel"]
+          _member_id: string
+          _message?: string
+        }
+        Returns: string
+      }
       set_member_permissions: {
         Args: { _member_id: string; _perms: Json }
         Returns: undefined
@@ -2679,6 +2845,8 @@ export type Database = {
         | "due_date_shifted"
         | "group_archived"
         | "manual_reminder"
+        | "account_deleted"
+        | "phone_visibility_changed"
       payment_method_external:
         | "cash"
         | "bank_transfer"
@@ -2694,6 +2862,7 @@ export type Database = {
         | "cancelled"
         | "refunded"
       reliability_tier: "nouveau" | "risque" | "moyen" | "bon" | "excellent"
+      reminder_channel: "in_app" | "sms" | "whatsapp" | "email"
       rotation_order: "random" | "fixed" | "choice" | "auction"
       swap_policy: "none" | "with_consent" | "organizer_only"
       swap_status: "pending" | "accepted" | "rejected" | "cancelled"
@@ -2897,6 +3066,8 @@ export const Constants = {
         "due_date_shifted",
         "group_archived",
         "manual_reminder",
+        "account_deleted",
+        "phone_visibility_changed",
       ],
       payment_method_external: [
         "cash",
@@ -2915,6 +3086,7 @@ export const Constants = {
         "refunded",
       ],
       reliability_tier: ["nouveau", "risque", "moyen", "bon", "excellent"],
+      reminder_channel: ["in_app", "sms", "whatsapp", "email"],
       rotation_order: ["random", "fixed", "choice", "auction"],
       swap_policy: ["none", "with_consent", "organizer_only"],
       swap_status: ["pending", "accepted", "rejected", "cancelled"],
