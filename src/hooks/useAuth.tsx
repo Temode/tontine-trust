@@ -49,7 +49,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [roles, setRoles] = useState<AppRole[]>([]);
   const [loading, setLoading] = useState(true);
-  const [rolesLoading, setRolesLoading] = useState(false);
+  // Démarre à true : tant qu'on n'a pas confirmé l'absence de session OU chargé les rôles,
+  // on ne laisse aucun garde décider d'une redirection.
+  const [rolesLoading, setRolesLoading] = useState(true);
 
   useEffect(() => {
     let mounted = true;
@@ -61,11 +63,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .from("user_roles")
         .select("role")
         .eq("user_id", uid)
-        .then(({ data }) => {
+        .then(({ data, error }) => {
           if (!mounted) return;
-          const next = (data ?? []).map((r: { role: AppRole }) => r.role);
-          setRoles(next);
-          setAuthSnapshot({ userId: uid, roles: next });
+          if (error) {
+            console.error("[useAuth] loadRoles error", error);
+            setRoles([]);
+            setAuthSnapshot({ userId: uid, roles: [] });
+          } else {
+            const next = (data ?? []).map((r: { role: AppRole }) => r.role);
+            setRoles(next);
+            setAuthSnapshot({ userId: uid, roles: next });
+          }
           setRolesLoading(false);
         });
     };
@@ -79,6 +87,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setAuthSnapshot({ userId: uid, roles: [] });
       if (uid && uid !== lastUserId) {
         lastUserId = uid;
+        // On marque rolesLoading immédiatement pour qu'aucun garde ne décide
+        // pendant la fenêtre où loadRoles n'est pas encore parti (setTimeout 0).
+        setRolesLoading(true);
         setTimeout(() => loadRoles(uid), 0);
       } else if (!uid) {
         lastUserId = null;
@@ -100,6 +111,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setSession(null);
           setUser(null);
           setLoading(false);
+          setRolesLoading(false);
           return;
         }
         setSession(data.session);
@@ -108,6 +120,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (uid && uid !== lastUserId) {
           lastUserId = uid;
           loadRoles(uid);
+        } else if (!uid) {
+          setRolesLoading(false);
         }
         setLoading(false);
       })
@@ -116,6 +130,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setSession(null);
         setUser(null);
         setLoading(false);
+        setRolesLoading(false);
       });
 
     return () => {
