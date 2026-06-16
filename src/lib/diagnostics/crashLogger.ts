@@ -18,6 +18,23 @@ interface AuthSnapshot {
 let authSnapshot: AuthSnapshot = { userId: null, roles: [] };
 let crashCounter = 0;
 
+function serializeError(err: unknown): string {
+  if (err == null) return "(unknown error)";
+  if (typeof err === "string") return err;
+  if (err instanceof Error) return err.message;
+  if (typeof err === "object") {
+    const e = err as Record<string, unknown>;
+    const parts: string[] = [];
+    if (typeof e.message === "string") parts.push(e.message);
+    if (typeof e.details === "string" && e.details) parts.push(`details: ${e.details}`);
+    if (typeof e.hint === "string" && e.hint) parts.push(`hint: ${e.hint}`);
+    if (typeof e.code === "string" && e.code) parts.push(`code: ${e.code}`);
+    if (parts.length) return parts.join(" — ");
+    try { return JSON.stringify(err); } catch { return String(err); }
+  }
+  return String(err);
+}
+
 export function setAuthSnapshot(snap: AuthSnapshot) {
   authSnapshot = snap;
 }
@@ -64,8 +81,7 @@ export function logCrash(input: {
 }): CrashReport {
   crashCounter += 1;
   const err = input.error;
-  const message =
-    err instanceof Error ? err.message : typeof err === "string" ? err : String(err);
+  const message = serializeError(err);
   const stack = err instanceof Error ? err.stack : undefined;
 
   const report: CrashReport = {
