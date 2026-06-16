@@ -3131,9 +3131,16 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "admin" | "organisateur" | "participant"
+      app_role: "admin" | "organisateur" | "participant" | "super_admin"
       bid_status: "active" | "won" | "lost" | "cancelled"
       contribution_status: "pending" | "submitted" | "confirmed" | "rejected"
+      deletion_request_status:
+        | "pending_members"
+        | "pending_admin"
+        | "approved"
+        | "rejected"
+        | "cancelled"
+      deletion_vote_choice: "yes" | "no"
       external_proof_status: "pending" | "confirmed" | "rejected"
       group_frequency: "hebdomadaire" | "quinzaine" | "mensuelle"
       group_status:
@@ -3202,6 +3209,12 @@ export type Database = {
         | "manual_reminder"
         | "account_deleted"
         | "phone_visibility_changed"
+        | "group_deletion_requested"
+        | "group_deletion_vote_recorded"
+        | "group_deletion_rejected_by_member"
+        | "group_deletion_pending_admin"
+        | "group_deletion_approved"
+        | "group_deletion_refused"
       payment_method_external:
         | "cash"
         | "bank_transfer"
@@ -3354,9 +3367,17 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "organisateur", "participant"],
+      app_role: ["admin", "organisateur", "participant", "super_admin"],
       bid_status: ["active", "won", "lost", "cancelled"],
       contribution_status: ["pending", "submitted", "confirmed", "rejected"],
+      deletion_request_status: [
+        "pending_members",
+        "pending_admin",
+        "approved",
+        "rejected",
+        "cancelled",
+      ],
+      deletion_vote_choice: ["yes", "no"],
       external_proof_status: ["pending", "confirmed", "rejected"],
       group_frequency: ["hebdomadaire", "quinzaine", "mensuelle"],
       group_status: [
@@ -3428,6 +3449,12 @@ export const Constants = {
         "manual_reminder",
         "account_deleted",
         "phone_visibility_changed",
+        "group_deletion_requested",
+        "group_deletion_vote_recorded",
+        "group_deletion_rejected_by_member",
+        "group_deletion_pending_admin",
+        "group_deletion_approved",
+        "group_deletion_refused",
       ],
       payment_method_external: [
         "cash",
