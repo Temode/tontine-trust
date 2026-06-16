@@ -1,57 +1,53 @@
-# Test E2E Paiement Djomy + Audit UX
+## Problème
 
-## Objectif
-Exécuter un parcours de bout en bout sur la preview en se connectant successivement avec **Alice** (organisatrice) puis **Bob** (membre payeur), pour :
-1. Vérifier que le flux de paiement Djomy s'initialise correctement (jusqu'à la redirection vers le portail sandbox).
-2. Capturer un audit UX (captures d'écran + observations) à chaque étape clé.
+La migration `db/46_djomy_payments.sql` référence une table inexistante `public.memberships` (avec des rôles `admin`/`co_admin`). Le vrai schéma utilise `public.group_members` avec les rôles `organisateur` / `co_organisateur` / `participant`, et un helper `public.is_group_organizer(group_id, user_id)`.
 
-## Périmètre du test fonctionnel
+## Correctif
 
-Parcours **Bob (membre)** — chemin principal :
-- Connexion via `/auth`
-- Dashboard → carte "À payer" / "Mes cotisations"
-- Page `/cotisations` (MyContributions)
-- Ouverture de `DjomyPaymentModal` sur une cotisation due
-- Sélection du moyen (OM / MTN / CARD), saisie du numéro
-- Clic "Continuer vers Djomy" → vérifier :
-  - appel à l'edge function `djomy-init-payment`
-  - création d'une ligne `payments` en statut `initiated` avec `djomy_transaction_id` et `redirect_url`
-  - réception d'une `redirectUrl` valide (`https://…`) — **on s'arrête juste avant la redirection** (on ne peut pas finaliser le paiement réel côté Djomy depuis Playwright)
-- Retour simulé via `/payment/return?transactionId=…` → vérifier l'écran de polling
+Remplacer dans `db/46_djomy_payments.sql` les deux policies RLS de `payment_links` :
 
-Parcours **Alice (organisatrice)** — vérification côté admin :
-- Connexion, ouverture du groupe
-- Onglet "Paiements" / historique : la tentative de Bob apparaît bien (statut `initiated` ou `pending`)
-- Aucun écran cassé, aucune erreur console
+- `payment_links_member_select` : utiliser `public.group_members gm` avec `gm.status = 'active'` au lieu de `memberships`.
+- `payment_links_admin_write` : utiliser `public.is_group_organizer(payment_links.group_id, auth.uid())` (helper SECURITY DEFINER déjà en place, cohérent avec le reste du schéma — couvre organisateur + co-organisateur).
 
-## Audit UX — grille d'observation
+Aucun autre changement nécessaire : les RPC (`start_djomy_payment`, `attach_djomy_reference`, `apply_djomy_webhook`), les colonnes ajoutées à `payments`, la table `djomy_webhook_events` et l'enum `djomy` sont corrects.
 
-Pour chaque écran capturé, noter :
-- **Lisibilité** : hiérarchie, contraste, densité d'information
-- **Clarté du CTA** : action principale visible, libellé sans ambiguïté
-- **Feedback** : loaders, toasts, états vides, gestion d'erreurs
-- **Cohérence visuelle** : respect tokens (bleu sarcelle / or), pas de hardcoded colors visibles
-- **Mobile-readiness** : le test tournera aussi en viewport 390×844 sur 2-3 écrans clés
-- **Accessibilité rapide** : labels formulaire, focus visibles, rôles ARIA sur la modale paiement
-- **Friction** : nombre de clics jusqu'au paiement, champs pré-remplis ou non (téléphone)
+## Étapes côté utilisateur
+
+1. Je corrige `db/46_djomy_payments.sql`.
+2. Tu relances **l'intégralité** du fichier dans le SQL Editor (il est idempotent — `if not exists`, `do $$ … exception …`, `drop policy if exists`).
+3. Le webhook Djomy `https://f51a5fe7-3210-4b4e-97ff-b6c5213b2913.functions.supabase.co/djomy-webhook` est correct, on garde tel quel.
+4. Je relance ensuite le test E2E Bob → paiement pour valider que `start_djomy_payment` et `djomy-init-payment` répondent OK.
 
 ## Détails techniques
 
-Script Playwright sous `/tmp/browser/djomy-e2e/` :
-- Chromium headless, viewport 1280×1800 (desktop) + run secondaire 390×844 (mobile)
-- Lecture des logs console + requêtes réseau (filtrage `djomy-init-payment`, `payments`)
-- Captures numérotées par étape dans `/tmp/browser/djomy-e2e/screenshots/`
-- Pas de seed : on utilise les comptes fournis tels quels. Si Bob n'a pas de cotisation due visible, le test bascule en mode "audit UX seul" sur les écrans accessibles et le signale.
-- Aucun secret n'est loggé (numéros de téléphone masqués dans le rapport).
+Diff conceptuel des policies :
 
-## Livrables
+```sql
+-- AVANT (cassé)
+using (exists (
+  select 1 from public.memberships m
+  where m.group_id = payment_links.group_id and m.user_id = auth.uid()
+))
 
-1. Tableau récapitulatif : étape → résultat (✅ / ⚠️ / ❌) → capture
-2. Liste priorisée des points UX (Bloquant / Majeur / Mineur / Polish)
-3. Erreurs console / réseau détectées avec contexte
-4. Recommandations concrètes (fichiers concernés) — **sans modification de code** dans ce tour
+-- APRÈS
+using (exists (
+  select 1 from public.group_members gm
+  where gm.group_id = payment_links.group_id
+    and gm.user_id = auth.uid()
+    and gm.status = 'active'
+))
+```
 
-## Hors périmètre
-- Finalisation réelle du paiement côté Djomy (nécessite le portail sandbox interactif)
-- Test du webhook (nécessite un appel signé depuis Djomy — peut être simulé séparément si souhaité)
-- Modifications de code : ce plan est strictement diagnostic
+```sql
+-- AVANT (cassé)
+using (exists (
+  select 1 from public.memberships m
+  where m.group_id = payment_links.group_id
+    and m.user_id = auth.uid()
+    and m.role in ('admin','co_admin')
+))
+
+-- APRÈS
+using (public.is_group_organizer(payment_links.group_id, auth.uid()))
+with check (public.is_group_organizer(payment_links.group_id, auth.uid()))
+```
