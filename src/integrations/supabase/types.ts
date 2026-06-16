@@ -78,7 +78,14 @@ export type Database = {
           group_id: string
           id: string
           payer_user_id: string
+          penalty_adjust_reason: string | null
+          penalty_adjusted_at: string | null
+          penalty_adjusted_by: string | null
+          penalty_adjusted_from: number | null
           penalty_amount: number
+          penalty_waive_reason: string | null
+          penalty_waived_at: string | null
+          penalty_waived_by: string | null
           provider: Database["public"]["Enums"]["payment_provider"] | null
           reference: string | null
           status: Database["public"]["Enums"]["contribution_status"]
@@ -93,7 +100,14 @@ export type Database = {
           group_id: string
           id?: string
           payer_user_id: string
+          penalty_adjust_reason?: string | null
+          penalty_adjusted_at?: string | null
+          penalty_adjusted_by?: string | null
+          penalty_adjusted_from?: number | null
           penalty_amount?: number
+          penalty_waive_reason?: string | null
+          penalty_waived_at?: string | null
+          penalty_waived_by?: string | null
           provider?: Database["public"]["Enums"]["payment_provider"] | null
           reference?: string | null
           status?: Database["public"]["Enums"]["contribution_status"]
@@ -108,7 +122,14 @@ export type Database = {
           group_id?: string
           id?: string
           payer_user_id?: string
+          penalty_adjust_reason?: string | null
+          penalty_adjusted_at?: string | null
+          penalty_adjusted_by?: string | null
+          penalty_adjusted_from?: number | null
           penalty_amount?: number
+          penalty_waive_reason?: string | null
+          penalty_waived_at?: string | null
+          penalty_waived_by?: string | null
           provider?: Database["public"]["Enums"]["payment_provider"] | null
           reference?: string | null
           status?: Database["public"]["Enums"]["contribution_status"]
@@ -192,38 +213,224 @@ export type Database = {
           },
         ]
       }
+      external_payment_proofs: {
+        Row: {
+          amount: number
+          contribution_id: string
+          group_id: string
+          id: string
+          member_user_id: string
+          method: Database["public"]["Enums"]["payment_method_external"]
+          note: string | null
+          proof_url: string | null
+          recorded_at: string
+          recorded_by: string
+          reference: string | null
+          reject_reason: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: Database["public"]["Enums"]["external_proof_status"]
+        }
+        Insert: {
+          amount: number
+          contribution_id: string
+          group_id: string
+          id?: string
+          member_user_id: string
+          method: Database["public"]["Enums"]["payment_method_external"]
+          note?: string | null
+          proof_url?: string | null
+          recorded_at?: string
+          recorded_by: string
+          reference?: string | null
+          reject_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: Database["public"]["Enums"]["external_proof_status"]
+        }
+        Update: {
+          amount?: number
+          contribution_id?: string
+          group_id?: string
+          id?: string
+          member_user_id?: string
+          method?: Database["public"]["Enums"]["payment_method_external"]
+          note?: string | null
+          proof_url?: string | null
+          recorded_at?: string
+          recorded_by?: string
+          reference?: string | null
+          reject_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: Database["public"]["Enums"]["external_proof_status"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "external_payment_proofs_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
+            referencedRelation: "contributions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "external_payment_proofs_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
+            referencedRelation: "my_contributions_due"
+            referencedColumns: ["contribution_id"]
+          },
+          {
+            foreignKeyName: "external_payment_proofs_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
+            referencedRelation: "my_late_contributions"
+            referencedColumns: ["contribution_id"]
+          },
+          {
+            foreignKeyName: "external_payment_proofs_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "external_payment_proofs_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "my_groups_overview"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      group_admin_permissions: {
+        Row: {
+          can_approve_members: boolean
+          can_confirm_payments: boolean
+          can_edit_settings: boolean
+          can_kick_member: boolean
+          can_manage_invitations: boolean
+          can_pause_cycle: boolean
+          can_send_announcements: boolean
+          can_suspend_member: boolean
+          can_waive_penalty: boolean
+          granted_at: string
+          granted_by: string | null
+          group_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          can_approve_members?: boolean
+          can_confirm_payments?: boolean
+          can_edit_settings?: boolean
+          can_kick_member?: boolean
+          can_manage_invitations?: boolean
+          can_pause_cycle?: boolean
+          can_send_announcements?: boolean
+          can_suspend_member?: boolean
+          can_waive_penalty?: boolean
+          granted_at?: string
+          granted_by?: string | null
+          group_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          can_approve_members?: boolean
+          can_confirm_payments?: boolean
+          can_edit_settings?: boolean
+          can_kick_member?: boolean
+          can_manage_invitations?: boolean
+          can_pause_cycle?: boolean
+          can_send_announcements?: boolean
+          can_suspend_member?: boolean
+          can_waive_penalty?: boolean
+          granted_at?: string
+          granted_by?: string | null
+          group_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_admin_permissions_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_admin_permissions_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "my_groups_overview"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       group_members: {
         Row: {
           applicant_message: string | null
+          can_bid: boolean
+          can_chat: boolean
+          can_invite: boolean
+          can_swap: boolean
           group_id: string
           id: string
           joined_at: string
           position: number | null
           preferred_operator: string | null
+          removed_at: string | null
+          removed_by: string | null
+          removed_reason: string | null
           role: Database["public"]["Enums"]["member_role"]
           status: Database["public"]["Enums"]["member_status"]
+          suspended_at: string | null
+          suspended_by: string | null
+          suspended_reason: string | null
           user_id: string
         }
         Insert: {
           applicant_message?: string | null
+          can_bid?: boolean
+          can_chat?: boolean
+          can_invite?: boolean
+          can_swap?: boolean
           group_id: string
           id?: string
           joined_at?: string
           position?: number | null
           preferred_operator?: string | null
+          removed_at?: string | null
+          removed_by?: string | null
+          removed_reason?: string | null
           role?: Database["public"]["Enums"]["member_role"]
           status?: Database["public"]["Enums"]["member_status"]
+          suspended_at?: string | null
+          suspended_by?: string | null
+          suspended_reason?: string | null
           user_id: string
         }
         Update: {
           applicant_message?: string | null
+          can_bid?: boolean
+          can_chat?: boolean
+          can_invite?: boolean
+          can_swap?: boolean
           group_id?: string
           id?: string
           joined_at?: string
           position?: number | null
           preferred_operator?: string | null
+          removed_at?: string | null
+          removed_by?: string | null
+          removed_reason?: string | null
           role?: Database["public"]["Enums"]["member_role"]
           status?: Database["public"]["Enums"]["member_status"]
+          suspended_at?: string | null
+          suspended_by?: string | null
+          suspended_reason?: string | null
           user_id?: string
         }
         Relationships: [
@@ -239,6 +446,20 @@ export type Database = {
             columns: ["group_id"]
             isOneToOne: false
             referencedRelation: "my_groups_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_members_removed_by_fkey"
+            columns: ["removed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_members_suspended_by_fkey"
+            columns: ["suspended_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
@@ -316,9 +537,13 @@ export type Database = {
           late_penalty_percent: number
           max_members: number
           name: string
+          paused_at: string | null
+          paused_by: string | null
+          paused_reason: string | null
           rotation_order_kind: Database["public"]["Enums"]["rotation_order"]
           status: Database["public"]["Enums"]["group_status"]
           swap_policy: Database["public"]["Enums"]["swap_policy"]
+          total_paused_days: number
           updated_at: string
           visibility: Database["public"]["Enums"]["group_visibility"]
         }
@@ -335,9 +560,13 @@ export type Database = {
           late_penalty_percent?: number
           max_members: number
           name: string
+          paused_at?: string | null
+          paused_by?: string | null
+          paused_reason?: string | null
           rotation_order_kind?: Database["public"]["Enums"]["rotation_order"]
           status?: Database["public"]["Enums"]["group_status"]
           swap_policy?: Database["public"]["Enums"]["swap_policy"]
+          total_paused_days?: number
           updated_at?: string
           visibility?: Database["public"]["Enums"]["group_visibility"]
         }
@@ -354,9 +583,13 @@ export type Database = {
           late_penalty_percent?: number
           max_members?: number
           name?: string
+          paused_at?: string | null
+          paused_by?: string | null
+          paused_reason?: string | null
           rotation_order_kind?: Database["public"]["Enums"]["rotation_order"]
           status?: Database["public"]["Enums"]["group_status"]
           swap_policy?: Database["public"]["Enums"]["swap_policy"]
+          total_paused_days?: number
           updated_at?: string
           visibility?: Database["public"]["Enums"]["group_visibility"]
         }
@@ -1235,8 +1468,10 @@ export type Database = {
       user_reliability_scores: {
         Row: {
           avg_delay_days: number
+          avg_rating: number
           cycles_completed: number
           last_computed_at: string
+          reviews_count: number
           score: number
           tier: Database["public"]["Enums"]["reliability_tier"]
           total_due: number
@@ -1247,8 +1482,10 @@ export type Database = {
         }
         Insert: {
           avg_delay_days?: number
+          avg_rating?: number
           cycles_completed?: number
           last_computed_at?: string
+          reviews_count?: number
           score?: number
           tier?: Database["public"]["Enums"]["reliability_tier"]
           total_due?: number
@@ -1259,8 +1496,10 @@ export type Database = {
         }
         Update: {
           avg_delay_days?: number
+          avg_rating?: number
           cycles_completed?: number
           last_computed_at?: string
+          reviews_count?: number
           score?: number
           tier?: Database["public"]["Enums"]["reliability_tier"]
           total_due?: number
@@ -1323,6 +1562,42 @@ export type Database = {
           },
           {
             foreignKeyName: "audit_log_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "my_groups_overview"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      group_admin_permissions_view: {
+        Row: {
+          can_approve_members: boolean | null
+          can_confirm_payments: boolean | null
+          can_edit_settings: boolean | null
+          can_kick_member: boolean | null
+          can_manage_invitations: boolean | null
+          can_pause_cycle: boolean | null
+          can_send_announcements: boolean | null
+          can_suspend_member: boolean | null
+          can_waive_penalty: boolean | null
+          full_name: string | null
+          granted_at: string | null
+          granted_by: string | null
+          group_id: string | null
+          phone_number: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_admin_permissions_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_admin_permissions_group_id_fkey"
             columns: ["group_id"]
             isOneToOne: false
             referencedRelation: "my_groups_overview"
@@ -1400,8 +1675,10 @@ export type Database = {
       }
       group_reliability: {
         Row: {
+          avg_rating: number | null
           full_name: string | null
           group_id: string | null
+          reviews_count: number | null
           score: number | null
           tier: Database["public"]["Enums"]["reliability_tier"] | null
           total_late: number | null
@@ -1759,8 +2036,10 @@ export type Database = {
       my_reliability: {
         Row: {
           avg_delay_days: number | null
+          avg_rating: number | null
           cycles_completed: number | null
           last_computed_at: string | null
+          reviews_count: number | null
           score: number | null
           tier: Database["public"]["Enums"]["reliability_tier"] | null
           total_due: number | null
@@ -1771,8 +2050,10 @@ export type Database = {
         }
         Insert: {
           avg_delay_days?: number | null
+          avg_rating?: number | null
           cycles_completed?: number | null
           last_computed_at?: string | null
+          reviews_count?: number | null
           score?: number | null
           tier?: Database["public"]["Enums"]["reliability_tier"] | null
           total_due?: number | null
@@ -1783,8 +2064,10 @@ export type Database = {
         }
         Update: {
           avg_delay_days?: number | null
+          avg_rating?: number | null
           cycles_completed?: number | null
           last_computed_at?: string | null
+          reviews_count?: number | null
           score?: number | null
           tier?: Database["public"]["Enums"]["reliability_tier"] | null
           total_due?: number | null
@@ -2094,6 +2377,14 @@ export type Database = {
     }
     Functions: {
       _generate_invite_code: { Args: never; Returns: string }
+      adjust_penalty: {
+        Args: {
+          _contribution_id: string
+          _new_amount: number
+          _reason?: string
+        }
+        Returns: undefined
+      }
       append_ledger: {
         Args: {
           _amount: number
@@ -2112,8 +2403,20 @@ export type Database = {
       cancel_my_bid: { Args: { _turn_id: string }; Returns: undefined }
       cancel_turn_swap: { Args: { _request_id: string }; Returns: undefined }
       close_auction: { Args: { _turn_id: string }; Returns: string }
+      confirm_external_payment: {
+        Args: { _proof_id: string }
+        Returns: undefined
+      }
       create_group_with_invitation: { Args: { _payload: Json }; Returns: Json }
       enqueue_payment_reminders: { Args: never; Returns: number }
+      grant_admin_permissions: {
+        Args: { _group_id: string; _perms: Json; _user_id: string }
+        Returns: undefined
+      }
+      has_admin_permission: {
+        Args: { _group: string; _perm: string; _user: string }
+        Returns: boolean
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -2129,13 +2432,22 @@ export type Database = {
         Args: { _group: string; _user: string }
         Returns: boolean
       }
+      is_group_owner: {
+        Args: { _group: string; _user: string }
+        Returns: boolean
+      }
       is_group_participant: {
         Args: { _group: string; _user: string }
         Returns: boolean
       }
+      is_rpc_context: { Args: never; Returns: boolean }
       join_group_with_code: {
         Args: { _code: string; _message?: string; _operator?: string }
         Returns: string
+      }
+      kick_member: {
+        Args: { _member_id: string; _reason?: string }
+        Returns: undefined
       }
       log_audit: {
         Args: {
@@ -2149,6 +2461,10 @@ export type Database = {
       }
       mark_all_notifications_read: { Args: never; Returns: number }
       mark_notification_read: { Args: { _id: string }; Returns: undefined }
+      member_can: {
+        Args: { _flag: string; _group: string; _user: string }
+        Returns: boolean
+      }
       notify: {
         Args: {
           _body?: string
@@ -2162,17 +2478,24 @@ export type Database = {
         }
         Returns: string
       }
+      pause_cycle: {
+        Args: { _group_id: string; _reason?: string }
+        Returns: undefined
+      }
       place_bid: {
         Args: { _amount: number; _turn_id: string }
         Returns: string
       }
       preview_group_by_code: { Args: { _code: string }; Returns: Json }
+      reactivate_member: { Args: { _member_id: string }; Returns: undefined }
       recompute_reliability: {
         Args: { _user_id?: string }
         Returns: {
           avg_delay_days: number
+          avg_rating: number
           cycles_completed: number
           last_computed_at: string
+          reviews_count: number
           score: number
           tier: Database["public"]["Enums"]["reliability_tier"]
           total_due: number
@@ -2195,6 +2518,10 @@ export type Database = {
         }
         Returns: string
       }
+      reject_external_payment: {
+        Args: { _proof_id: string; _reason?: string }
+        Returns: undefined
+      }
       reject_member: { Args: { _member_id: string }; Returns: undefined }
       release_payout: {
         Args: {
@@ -2211,13 +2538,26 @@ export type Database = {
         Args: { _accept: boolean; _request_id: string }
         Returns: undefined
       }
+      resume_cycle: { Args: { _group_id: string }; Returns: number }
+      revoke_admin_permissions: {
+        Args: { _group_id: string; _user_id: string }
+        Returns: undefined
+      }
       seed_notification_preferences: {
         Args: { _user_id: string }
+        Returns: undefined
+      }
+      set_member_permissions: {
+        Args: { _member_id: string; _perms: Json }
         Returns: undefined
       }
       shares_group_with: {
         Args: { _me: string; _other: string }
         Returns: boolean
+      }
+      shift_due_date: {
+        Args: { _new_date: string; _reason?: string; _turn_id: string }
+        Returns: undefined
       }
       should_notify: {
         Args: {
@@ -2228,6 +2568,17 @@ export type Database = {
         Returns: boolean
       }
       start_cycle: { Args: { _group_id: string }; Returns: string }
+      submit_external_payment: {
+        Args: {
+          _amount: number
+          _contribution_id: string
+          _method: Database["public"]["Enums"]["payment_method_external"]
+          _note?: string
+          _proof_url?: string
+          _reference?: string
+        }
+        Returns: string
+      }
       submit_review: {
         Args: {
           _comment?: string
@@ -2237,6 +2588,14 @@ export type Database = {
         }
         Returns: string
       }
+      suspend_member: {
+        Args: { _member_id: string; _reason?: string }
+        Returns: undefined
+      }
+      transfer_ownership: {
+        Args: { _group_id: string; _new_owner_user_id: string }
+        Returns: undefined
+      }
       update_group_settings: {
         Args: { _group_id: string; _payload: Json }
         Returns: undefined
@@ -2245,13 +2604,24 @@ export type Database = {
         Args: { _payload: Json }
         Returns: number
       }
+      waive_penalty: {
+        Args: { _contribution_id: string; _reason?: string }
+        Returns: undefined
+      }
     }
     Enums: {
       app_role: "admin" | "organisateur" | "participant"
       bid_status: "active" | "won" | "lost" | "cancelled"
       contribution_status: "pending" | "submitted" | "confirmed" | "rejected"
+      external_proof_status: "pending" | "confirmed" | "rejected"
       group_frequency: "hebdomadaire" | "quinzaine" | "mensuelle"
-      group_status: "draft" | "open" | "active" | "completed" | "cancelled"
+      group_status:
+        | "draft"
+        | "open"
+        | "active"
+        | "completed"
+        | "cancelled"
+        | "paused"
       group_visibility: "private" | "public-link" | "directory"
       invitation_status: "pending" | "accepted" | "revoked" | "expired"
       ledger_entry_type:
@@ -2299,6 +2669,22 @@ export type Database = {
         | "member_kicked"
         | "permissions_changed"
         | "ownership_transferred"
+        | "payment_confirmed_by_admin"
+        | "payment_rejected_by_admin"
+        | "external_payment_submitted"
+        | "penalty_waived"
+        | "penalty_adjusted"
+        | "cycle_paused"
+        | "cycle_resumed"
+        | "due_date_shifted"
+        | "group_archived"
+        | "manual_reminder"
+      payment_method_external:
+        | "cash"
+        | "bank_transfer"
+        | "om_external"
+        | "mtn_external"
+        | "other"
       payment_provider: "orange_money" | "mtn_money" | "cash" | "simulation"
       payment_status:
         | "initiated"
@@ -2442,8 +2828,16 @@ export const Constants = {
       app_role: ["admin", "organisateur", "participant"],
       bid_status: ["active", "won", "lost", "cancelled"],
       contribution_status: ["pending", "submitted", "confirmed", "rejected"],
+      external_proof_status: ["pending", "confirmed", "rejected"],
       group_frequency: ["hebdomadaire", "quinzaine", "mensuelle"],
-      group_status: ["draft", "open", "active", "completed", "cancelled"],
+      group_status: [
+        "draft",
+        "open",
+        "active",
+        "completed",
+        "cancelled",
+        "paused",
+      ],
       group_visibility: ["private", "public-link", "directory"],
       invitation_status: ["pending", "accepted", "revoked", "expired"],
       ledger_entry_type: [
@@ -2493,6 +2887,23 @@ export const Constants = {
         "member_kicked",
         "permissions_changed",
         "ownership_transferred",
+        "payment_confirmed_by_admin",
+        "payment_rejected_by_admin",
+        "external_payment_submitted",
+        "penalty_waived",
+        "penalty_adjusted",
+        "cycle_paused",
+        "cycle_resumed",
+        "due_date_shifted",
+        "group_archived",
+        "manual_reminder",
+      ],
+      payment_method_external: [
+        "cash",
+        "bank_transfer",
+        "om_external",
+        "mtn_external",
+        "other",
       ],
       payment_provider: ["orange_money", "mtn_money", "cash", "simulation"],
       payment_status: [
