@@ -23,6 +23,7 @@ export type Database = {
           group_id: string
           id: string
           payer_user_id: string
+          penalty_amount: number
           provider: Database["public"]["Enums"]["payment_provider"] | null
           reference: string | null
           status: Database["public"]["Enums"]["contribution_status"]
@@ -37,6 +38,7 @@ export type Database = {
           group_id: string
           id?: string
           payer_user_id: string
+          penalty_amount?: number
           provider?: Database["public"]["Enums"]["payment_provider"] | null
           reference?: string | null
           status?: Database["public"]["Enums"]["contribution_status"]
@@ -51,6 +53,7 @@ export type Database = {
           group_id?: string
           id?: string
           payer_user_id?: string
+          penalty_amount?: number
           provider?: Database["public"]["Enums"]["payment_provider"] | null
           reference?: string | null
           status?: Database["public"]["Enums"]["contribution_status"]
@@ -985,6 +988,7 @@ export type Database = {
           contribution_id: string | null
           days_to_due: number | null
           due_date: string | null
+          expected_penalty: number | null
           group_id: string | null
           group_name: string | null
           status: Database["public"]["Enums"]["contribution_status"] | null
