@@ -14,6 +14,61 @@ export type Database = {
   }
   public: {
     Tables: {
+      audit_log: {
+        Row: {
+          action: string
+          actor_user_id: string | null
+          created_at: string
+          entity_id: string | null
+          entity_type: string | null
+          group_id: string | null
+          id: string
+          metadata: Json | null
+        }
+        Insert: {
+          action: string
+          actor_user_id?: string | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          group_id?: string | null
+          id?: string
+          metadata?: Json | null
+        }
+        Update: {
+          action?: string
+          actor_user_id?: string | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          group_id?: string | null
+          id?: string
+          metadata?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_log_actor_user_id_fkey"
+            columns: ["actor_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "audit_log_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "audit_log_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "my_groups_overview"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contributions: {
         Row: {
           amount: number
@@ -263,6 +318,7 @@ export type Database = {
           name: string
           rotation_order_kind: Database["public"]["Enums"]["rotation_order"]
           status: Database["public"]["Enums"]["group_status"]
+          swap_policy: Database["public"]["Enums"]["swap_policy"]
           updated_at: string
           visibility: Database["public"]["Enums"]["group_visibility"]
         }
@@ -281,6 +337,7 @@ export type Database = {
           name: string
           rotation_order_kind?: Database["public"]["Enums"]["rotation_order"]
           status?: Database["public"]["Enums"]["group_status"]
+          swap_policy?: Database["public"]["Enums"]["swap_policy"]
           updated_at?: string
           visibility?: Database["public"]["Enums"]["group_visibility"]
         }
@@ -299,6 +356,7 @@ export type Database = {
           name?: string
           rotation_order_kind?: Database["public"]["Enums"]["rotation_order"]
           status?: Database["public"]["Enums"]["group_status"]
+          swap_policy?: Database["public"]["Enums"]["swap_policy"]
           updated_at?: string
           visibility?: Database["public"]["Enums"]["group_visibility"]
         }
@@ -501,6 +559,85 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      member_reviews: {
+        Row: {
+          comment: string | null
+          created_at: string
+          cycle_id: string
+          group_id: string
+          id: string
+          rating: number
+          reviewed_user_id: string
+          reviewer_user_id: string
+        }
+        Insert: {
+          comment?: string | null
+          created_at?: string
+          cycle_id: string
+          group_id: string
+          id?: string
+          rating: number
+          reviewed_user_id: string
+          reviewer_user_id: string
+        }
+        Update: {
+          comment?: string | null
+          created_at?: string
+          cycle_id?: string
+          group_id?: string
+          id?: string
+          rating?: number
+          reviewed_user_id?: string
+          reviewer_user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "member_reviews_cycle_id_fkey"
+            columns: ["cycle_id"]
+            isOneToOne: false
+            referencedRelation: "cycles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_reviews_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_reviews_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "my_groups_overview"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notification_preferences: {
+        Row: {
+          channel: Database["public"]["Enums"]["notification_channel"]
+          enabled: boolean
+          notif_type: Database["public"]["Enums"]["notification_kind"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          channel: Database["public"]["Enums"]["notification_channel"]
+          enabled?: boolean
+          notif_type: Database["public"]["Enums"]["notification_kind"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          channel?: Database["public"]["Enums"]["notification_channel"]
+          enabled?: boolean
+          notif_type?: Database["public"]["Enums"]["notification_kind"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       notifications: {
         Row: {
@@ -813,6 +950,227 @@ export type Database = {
           },
         ]
       }
+      reminder_log: {
+        Row: {
+          bucket: string
+          contribution_id: string
+          created_at: string
+          sent_on: string
+        }
+        Insert: {
+          bucket: string
+          contribution_id: string
+          created_at?: string
+          sent_on?: string
+        }
+        Update: {
+          bucket?: string
+          contribution_id?: string
+          created_at?: string
+          sent_on?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reminder_log_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
+            referencedRelation: "contributions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reminder_log_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
+            referencedRelation: "my_contributions_due"
+            referencedColumns: ["contribution_id"]
+          },
+          {
+            foreignKeyName: "reminder_log_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
+            referencedRelation: "my_late_contributions"
+            referencedColumns: ["contribution_id"]
+          },
+        ]
+      }
+      turn_bids: {
+        Row: {
+          amount: number
+          bidder_user_id: string
+          created_at: string
+          cycle_id: string
+          group_id: string
+          id: string
+          status: Database["public"]["Enums"]["bid_status"]
+          turn_id: string
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          bidder_user_id: string
+          created_at?: string
+          cycle_id: string
+          group_id: string
+          id?: string
+          status?: Database["public"]["Enums"]["bid_status"]
+          turn_id: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          bidder_user_id?: string
+          created_at?: string
+          cycle_id?: string
+          group_id?: string
+          id?: string
+          status?: Database["public"]["Enums"]["bid_status"]
+          turn_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "turn_bids_cycle_id_fkey"
+            columns: ["cycle_id"]
+            isOneToOne: false
+            referencedRelation: "cycles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "turn_bids_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "turn_bids_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "my_groups_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "turn_bids_turn_id_fkey"
+            columns: ["turn_id"]
+            isOneToOne: false
+            referencedRelation: "next_turn_per_group"
+            referencedColumns: ["turn_id"]
+          },
+          {
+            foreignKeyName: "turn_bids_turn_id_fkey"
+            columns: ["turn_id"]
+            isOneToOne: false
+            referencedRelation: "turn_settlement"
+            referencedColumns: ["turn_id"]
+          },
+          {
+            foreignKeyName: "turn_bids_turn_id_fkey"
+            columns: ["turn_id"]
+            isOneToOne: false
+            referencedRelation: "turns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      turn_swap_requests: {
+        Row: {
+          created_at: string
+          from_turn_id: string
+          from_user_id: string
+          group_id: string
+          id: string
+          reason: string | null
+          responded_at: string | null
+          responded_by: string | null
+          status: Database["public"]["Enums"]["swap_status"]
+          to_turn_id: string
+          to_user_id: string
+        }
+        Insert: {
+          created_at?: string
+          from_turn_id: string
+          from_user_id: string
+          group_id: string
+          id?: string
+          reason?: string | null
+          responded_at?: string | null
+          responded_by?: string | null
+          status?: Database["public"]["Enums"]["swap_status"]
+          to_turn_id: string
+          to_user_id: string
+        }
+        Update: {
+          created_at?: string
+          from_turn_id?: string
+          from_user_id?: string
+          group_id?: string
+          id?: string
+          reason?: string | null
+          responded_at?: string | null
+          responded_by?: string | null
+          status?: Database["public"]["Enums"]["swap_status"]
+          to_turn_id?: string
+          to_user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "turn_swap_requests_from_turn_id_fkey"
+            columns: ["from_turn_id"]
+            isOneToOne: false
+            referencedRelation: "next_turn_per_group"
+            referencedColumns: ["turn_id"]
+          },
+          {
+            foreignKeyName: "turn_swap_requests_from_turn_id_fkey"
+            columns: ["from_turn_id"]
+            isOneToOne: false
+            referencedRelation: "turn_settlement"
+            referencedColumns: ["turn_id"]
+          },
+          {
+            foreignKeyName: "turn_swap_requests_from_turn_id_fkey"
+            columns: ["from_turn_id"]
+            isOneToOne: false
+            referencedRelation: "turns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "turn_swap_requests_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "turn_swap_requests_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "my_groups_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "turn_swap_requests_to_turn_id_fkey"
+            columns: ["to_turn_id"]
+            isOneToOne: false
+            referencedRelation: "next_turn_per_group"
+            referencedColumns: ["turn_id"]
+          },
+          {
+            foreignKeyName: "turn_swap_requests_to_turn_id_fkey"
+            columns: ["to_turn_id"]
+            isOneToOne: false
+            referencedRelation: "turn_settlement"
+            referencedColumns: ["turn_id"]
+          },
+          {
+            foreignKeyName: "turn_swap_requests_to_turn_id_fkey"
+            columns: ["to_turn_id"]
+            isOneToOne: false
+            referencedRelation: "turns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       turns: {
         Row: {
           beneficiary_user_id: string
@@ -936,6 +1294,42 @@ export type Database = {
       }
     }
     Views: {
+      audit_log_view: {
+        Row: {
+          action: string | null
+          actor_name: string | null
+          actor_user_id: string | null
+          created_at: string | null
+          entity_id: string | null
+          entity_type: string | null
+          group_id: string | null
+          id: string | null
+          metadata: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_log_actor_user_id_fkey"
+            columns: ["actor_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "audit_log_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "audit_log_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "my_groups_overview"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       group_ledger_view: {
         Row: {
           amount: number | null
@@ -1034,6 +1428,38 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      member_review_global: {
+        Row: {
+          avg_rating: number | null
+          reviews_count: number | null
+          user_id: string | null
+        }
+        Relationships: []
+      }
+      member_review_summary: {
+        Row: {
+          avg_rating: number | null
+          group_id: string | null
+          reviews_count: number | null
+          user_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "member_reviews_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_reviews_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "my_groups_overview"
             referencedColumns: ["id"]
           },
         ]
@@ -1369,6 +1795,58 @@ export type Database = {
         }
         Relationships: []
       }
+      my_reviews_given: {
+        Row: {
+          comment: string | null
+          created_at: string | null
+          cycle_id: string | null
+          group_id: string | null
+          id: string | null
+          rating: number | null
+          reviewed_user_id: string | null
+        }
+        Insert: {
+          comment?: string | null
+          created_at?: string | null
+          cycle_id?: string | null
+          group_id?: string | null
+          id?: string | null
+          rating?: number | null
+          reviewed_user_id?: string | null
+        }
+        Update: {
+          comment?: string | null
+          created_at?: string | null
+          cycle_id?: string | null
+          group_id?: string | null
+          id?: string | null
+          rating?: number | null
+          reviewed_user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "member_reviews_cycle_id_fkey"
+            columns: ["cycle_id"]
+            isOneToOne: false
+            referencedRelation: "cycles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_reviews_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_reviews_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "my_groups_overview"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       next_turn_per_group: {
         Row: {
           beneficiary_name: string | null
@@ -1401,6 +1879,66 @@ export type Database = {
             columns: ["group_id"]
             isOneToOne: false
             referencedRelation: "my_groups_overview"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      turn_bids_view: {
+        Row: {
+          amount: number | null
+          bidder_name: string | null
+          bidder_user_id: string | null
+          created_at: string | null
+          cycle_id: string | null
+          due_date: string | null
+          group_id: string | null
+          id: string | null
+          status: Database["public"]["Enums"]["bid_status"] | null
+          turn_id: string | null
+          turn_number: number | null
+          updated_at: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "turn_bids_cycle_id_fkey"
+            columns: ["cycle_id"]
+            isOneToOne: false
+            referencedRelation: "cycles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "turn_bids_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "turn_bids_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "my_groups_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "turn_bids_turn_id_fkey"
+            columns: ["turn_id"]
+            isOneToOne: false
+            referencedRelation: "next_turn_per_group"
+            referencedColumns: ["turn_id"]
+          },
+          {
+            foreignKeyName: "turn_bids_turn_id_fkey"
+            columns: ["turn_id"]
+            isOneToOne: false
+            referencedRelation: "turn_settlement"
+            referencedColumns: ["turn_id"]
+          },
+          {
+            foreignKeyName: "turn_bids_turn_id_fkey"
+            columns: ["turn_id"]
+            isOneToOne: false
+            referencedRelation: "turns"
             referencedColumns: ["id"]
           },
         ]
@@ -1475,6 +2013,84 @@ export type Database = {
           },
         ]
       }
+      turn_swap_requests_view: {
+        Row: {
+          created_at: string | null
+          from_due_date: string | null
+          from_turn_id: string | null
+          from_turn_number: number | null
+          from_user_id: string | null
+          from_user_name: string | null
+          group_id: string | null
+          id: string | null
+          reason: string | null
+          responded_at: string | null
+          status: Database["public"]["Enums"]["swap_status"] | null
+          to_due_date: string | null
+          to_turn_id: string | null
+          to_turn_number: number | null
+          to_user_id: string | null
+          to_user_name: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "turn_swap_requests_from_turn_id_fkey"
+            columns: ["from_turn_id"]
+            isOneToOne: false
+            referencedRelation: "next_turn_per_group"
+            referencedColumns: ["turn_id"]
+          },
+          {
+            foreignKeyName: "turn_swap_requests_from_turn_id_fkey"
+            columns: ["from_turn_id"]
+            isOneToOne: false
+            referencedRelation: "turn_settlement"
+            referencedColumns: ["turn_id"]
+          },
+          {
+            foreignKeyName: "turn_swap_requests_from_turn_id_fkey"
+            columns: ["from_turn_id"]
+            isOneToOne: false
+            referencedRelation: "turns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "turn_swap_requests_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "turn_swap_requests_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "my_groups_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "turn_swap_requests_to_turn_id_fkey"
+            columns: ["to_turn_id"]
+            isOneToOne: false
+            referencedRelation: "next_turn_per_group"
+            referencedColumns: ["turn_id"]
+          },
+          {
+            foreignKeyName: "turn_swap_requests_to_turn_id_fkey"
+            columns: ["to_turn_id"]
+            isOneToOne: false
+            referencedRelation: "turn_settlement"
+            referencedColumns: ["turn_id"]
+          },
+          {
+            foreignKeyName: "turn_swap_requests_to_turn_id_fkey"
+            columns: ["to_turn_id"]
+            isOneToOne: false
+            referencedRelation: "turns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       _generate_invite_code: { Args: never; Returns: string }
@@ -1493,7 +2109,11 @@ export type Database = {
         Returns: string
       }
       approve_member: { Args: { _member_id: string }; Returns: undefined }
+      cancel_my_bid: { Args: { _turn_id: string }; Returns: undefined }
+      cancel_turn_swap: { Args: { _request_id: string }; Returns: undefined }
+      close_auction: { Args: { _turn_id: string }; Returns: string }
       create_group_with_invitation: { Args: { _payload: Json }; Returns: Json }
+      enqueue_payment_reminders: { Args: never; Returns: number }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -1517,6 +2137,16 @@ export type Database = {
         Args: { _code: string; _message?: string; _operator?: string }
         Returns: string
       }
+      log_audit: {
+        Args: {
+          _action: string
+          _entity_id?: string
+          _entity_type?: string
+          _group_id: string
+          _metadata?: Json
+        }
+        Returns: string
+      }
       mark_all_notifications_read: { Args: never; Returns: number }
       mark_notification_read: { Args: { _id: string }; Returns: undefined }
       notify: {
@@ -1530,6 +2160,10 @@ export type Database = {
           _turn_id?: string
           _user_id: string
         }
+        Returns: string
+      }
+      place_bid: {
+        Args: { _amount: number; _turn_id: string }
         Returns: string
       }
       preview_group_by_code: { Args: { _code: string }; Returns: Json }
@@ -1569,18 +2203,52 @@ export type Database = {
         }
         Returns: string
       }
+      request_turn_swap: {
+        Args: { _from_turn: string; _reason?: string; _to_turn: string }
+        Returns: string
+      }
+      respond_turn_swap: {
+        Args: { _accept: boolean; _request_id: string }
+        Returns: undefined
+      }
+      seed_notification_preferences: {
+        Args: { _user_id: string }
+        Returns: undefined
+      }
       shares_group_with: {
         Args: { _me: string; _other: string }
         Returns: boolean
       }
+      should_notify: {
+        Args: {
+          _channel: Database["public"]["Enums"]["notification_channel"]
+          _type: Database["public"]["Enums"]["notification_kind"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
       start_cycle: { Args: { _group_id: string }; Returns: string }
+      submit_review: {
+        Args: {
+          _comment?: string
+          _group_id: string
+          _rating: number
+          _reviewed_user_id: string
+        }
+        Returns: string
+      }
       update_group_settings: {
         Args: { _group_id: string; _payload: Json }
         Returns: undefined
       }
+      update_notification_preferences: {
+        Args: { _payload: Json }
+        Returns: number
+      }
     }
     Enums: {
       app_role: "admin" | "organisateur" | "participant"
+      bid_status: "active" | "won" | "lost" | "cancelled"
       contribution_status: "pending" | "submitted" | "confirmed" | "rejected"
       group_frequency: "hebdomadaire" | "quinzaine" | "mensuelle"
       group_status: "draft" | "open" | "active" | "completed" | "cancelled"
@@ -1594,7 +2262,14 @@ export type Database = {
         | "penalty"
         | "adjustment"
       member_role: "organisateur" | "membre"
-      member_status: "active" | "invited" | "removed" | "left" | "pending"
+      member_status:
+        | "active"
+        | "invited"
+        | "removed"
+        | "left"
+        | "pending"
+        | "suspended"
+      notification_channel: "in_app" | "email" | "sms"
       notification_kind:
         | "invitation_received"
         | "invitation_accepted"
@@ -1611,6 +2286,19 @@ export type Database = {
         | "member_joined"
         | "contribution_confirmed"
         | "announcement"
+        | "swap_requested"
+        | "swap_responded"
+        | "swap_executed"
+        | "auction_outbid"
+        | "auction_won"
+        | "auction_lost"
+        | "auction_closed"
+        | "review_received"
+        | "member_suspended"
+        | "member_reactivated"
+        | "member_kicked"
+        | "permissions_changed"
+        | "ownership_transferred"
       payment_provider: "orange_money" | "mtn_money" | "cash" | "simulation"
       payment_status:
         | "initiated"
@@ -1620,7 +2308,9 @@ export type Database = {
         | "cancelled"
         | "refunded"
       reliability_tier: "nouveau" | "risque" | "moyen" | "bon" | "excellent"
-      rotation_order: "random" | "fixed" | "choice"
+      rotation_order: "random" | "fixed" | "choice" | "auction"
+      swap_policy: "none" | "with_consent" | "organizer_only"
+      swap_status: "pending" | "accepted" | "rejected" | "cancelled"
       turn_status: "upcoming" | "collecting" | "paid" | "skipped"
     }
     CompositeTypes: {
@@ -1750,6 +2440,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "organisateur", "participant"],
+      bid_status: ["active", "won", "lost", "cancelled"],
       contribution_status: ["pending", "submitted", "confirmed", "rejected"],
       group_frequency: ["hebdomadaire", "quinzaine", "mensuelle"],
       group_status: ["draft", "open", "active", "completed", "cancelled"],
@@ -1764,7 +2455,15 @@ export const Constants = {
         "adjustment",
       ],
       member_role: ["organisateur", "membre"],
-      member_status: ["active", "invited", "removed", "left", "pending"],
+      member_status: [
+        "active",
+        "invited",
+        "removed",
+        "left",
+        "pending",
+        "suspended",
+      ],
+      notification_channel: ["in_app", "email", "sms"],
       notification_kind: [
         "invitation_received",
         "invitation_accepted",
@@ -1781,6 +2480,19 @@ export const Constants = {
         "member_joined",
         "contribution_confirmed",
         "announcement",
+        "swap_requested",
+        "swap_responded",
+        "swap_executed",
+        "auction_outbid",
+        "auction_won",
+        "auction_lost",
+        "auction_closed",
+        "review_received",
+        "member_suspended",
+        "member_reactivated",
+        "member_kicked",
+        "permissions_changed",
+        "ownership_transferred",
       ],
       payment_provider: ["orange_money", "mtn_money", "cash", "simulation"],
       payment_status: [
@@ -1792,7 +2504,9 @@ export const Constants = {
         "refunded",
       ],
       reliability_tier: ["nouveau", "risque", "moyen", "bon", "excellent"],
-      rotation_order: ["random", "fixed", "choice"],
+      rotation_order: ["random", "fixed", "choice", "auction"],
+      swap_policy: ["none", "with_consent", "organizer_only"],
+      swap_status: ["pending", "accepted", "rejected", "cancelled"],
       turn_status: ["upcoming", "collecting", "paid", "skipped"],
     },
   },
