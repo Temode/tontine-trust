@@ -76,6 +76,20 @@ export type Database = {
             foreignKeyName: "contributions_turn_id_fkey"
             columns: ["turn_id"]
             isOneToOne: false
+            referencedRelation: "next_turn_per_group"
+            referencedColumns: ["turn_id"]
+          },
+          {
+            foreignKeyName: "contributions_turn_id_fkey"
+            columns: ["turn_id"]
+            isOneToOne: false
+            referencedRelation: "turn_settlement"
+            referencedColumns: ["turn_id"]
+          },
+          {
+            foreignKeyName: "contributions_turn_id_fkey"
+            columns: ["turn_id"]
+            isOneToOne: false
             referencedRelation: "turns"
             referencedColumns: ["id"]
           },
@@ -267,6 +281,138 @@ export type Database = {
           },
         ]
       }
+      ledger_entries: {
+        Row: {
+          amount: number
+          balance_after: number | null
+          contribution_id: string | null
+          created_at: string
+          cycle_id: string | null
+          entry_type: Database["public"]["Enums"]["ledger_entry_type"]
+          group_id: string
+          hash: string
+          id: string
+          memo: string | null
+          payment_id: string | null
+          prev_hash: string | null
+          seq: number
+          turn_id: string | null
+          user_id: string | null
+        }
+        Insert: {
+          amount: number
+          balance_after?: number | null
+          contribution_id?: string | null
+          created_at?: string
+          cycle_id?: string | null
+          entry_type: Database["public"]["Enums"]["ledger_entry_type"]
+          group_id: string
+          hash: string
+          id?: string
+          memo?: string | null
+          payment_id?: string | null
+          prev_hash?: string | null
+          seq?: number
+          turn_id?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          amount?: number
+          balance_after?: number | null
+          contribution_id?: string | null
+          created_at?: string
+          cycle_id?: string | null
+          entry_type?: Database["public"]["Enums"]["ledger_entry_type"]
+          group_id?: string
+          hash?: string
+          id?: string
+          memo?: string | null
+          payment_id?: string | null
+          prev_hash?: string | null
+          seq?: number
+          turn_id?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ledger_entries_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
+            referencedRelation: "contributions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ledger_entries_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
+            referencedRelation: "my_contributions_due"
+            referencedColumns: ["contribution_id"]
+          },
+          {
+            foreignKeyName: "ledger_entries_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
+            referencedRelation: "my_late_contributions"
+            referencedColumns: ["contribution_id"]
+          },
+          {
+            foreignKeyName: "ledger_entries_cycle_id_fkey"
+            columns: ["cycle_id"]
+            isOneToOne: false
+            referencedRelation: "cycles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ledger_entries_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ledger_entries_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "my_groups_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ledger_entries_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "my_payments_history"
+            referencedColumns: ["payment_id"]
+          },
+          {
+            foreignKeyName: "ledger_entries_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "payments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ledger_entries_turn_id_fkey"
+            columns: ["turn_id"]
+            isOneToOne: false
+            referencedRelation: "next_turn_per_group"
+            referencedColumns: ["turn_id"]
+          },
+          {
+            foreignKeyName: "ledger_entries_turn_id_fkey"
+            columns: ["turn_id"]
+            isOneToOne: false
+            referencedRelation: "turn_settlement"
+            referencedColumns: ["turn_id"]
+          },
+          {
+            foreignKeyName: "ledger_entries_turn_id_fkey"
+            columns: ["turn_id"]
+            isOneToOne: false
+            referencedRelation: "turns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notifications: {
         Row: {
           body: string | null
@@ -275,8 +421,10 @@ export type Database = {
           group_id: string | null
           id: string
           kind: Database["public"]["Enums"]["notification_kind"]
+          link: string | null
           read_at: string | null
           title: string
+          turn_id: string | null
           user_id: string
         }
         Insert: {
@@ -286,8 +434,10 @@ export type Database = {
           group_id?: string | null
           id?: string
           kind: Database["public"]["Enums"]["notification_kind"]
+          link?: string | null
           read_at?: string | null
           title: string
+          turn_id?: string | null
           user_id: string
         }
         Update: {
@@ -297,8 +447,10 @@ export type Database = {
           group_id?: string | null
           id?: string
           kind?: Database["public"]["Enums"]["notification_kind"]
+          link?: string | null
           read_at?: string | null
           title?: string
+          turn_id?: string | null
           user_id?: string
         }
         Relationships: [
@@ -311,6 +463,105 @@ export type Database = {
           },
           {
             foreignKeyName: "notifications_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "my_groups_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_turn_id_fkey"
+            columns: ["turn_id"]
+            isOneToOne: false
+            referencedRelation: "next_turn_per_group"
+            referencedColumns: ["turn_id"]
+          },
+          {
+            foreignKeyName: "notifications_turn_id_fkey"
+            columns: ["turn_id"]
+            isOneToOne: false
+            referencedRelation: "turn_settlement"
+            referencedColumns: ["turn_id"]
+          },
+          {
+            foreignKeyName: "notifications_turn_id_fkey"
+            columns: ["turn_id"]
+            isOneToOne: false
+            referencedRelation: "turns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payments: {
+        Row: {
+          amount: number
+          contribution_id: string
+          error_message: string | null
+          group_id: string
+          id: string
+          initiated_at: string
+          provider: Database["public"]["Enums"]["payment_provider"]
+          provider_ref: string | null
+          settled_at: string | null
+          status: Database["public"]["Enums"]["payment_status"]
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          contribution_id: string
+          error_message?: string | null
+          group_id: string
+          id?: string
+          initiated_at?: string
+          provider: Database["public"]["Enums"]["payment_provider"]
+          provider_ref?: string | null
+          settled_at?: string | null
+          status?: Database["public"]["Enums"]["payment_status"]
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          contribution_id?: string
+          error_message?: string | null
+          group_id?: string
+          id?: string
+          initiated_at?: string
+          provider?: Database["public"]["Enums"]["payment_provider"]
+          provider_ref?: string | null
+          settled_at?: string | null
+          status?: Database["public"]["Enums"]["payment_status"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payments_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
+            referencedRelation: "contributions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
+            referencedRelation: "my_contributions_due"
+            referencedColumns: ["contribution_id"]
+          },
+          {
+            foreignKeyName: "payments_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
+            referencedRelation: "my_late_contributions"
+            referencedColumns: ["contribution_id"]
+          },
+          {
+            foreignKeyName: "payments_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_group_id_fkey"
             columns: ["group_id"]
             isOneToOne: false
             referencedRelation: "my_groups_overview"
@@ -347,6 +598,125 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      receipts: {
+        Row: {
+          amount: number
+          beneficiary_user_id: string
+          cycle_id: string
+          group_id: string
+          hash: string
+          id: string
+          issued_at: string
+          issued_by: string
+          ledger_entry_id: string | null
+          payment_id: string
+          provider: Database["public"]["Enums"]["payment_provider"]
+          receipt_number: string
+          turn_id: string
+        }
+        Insert: {
+          amount: number
+          beneficiary_user_id: string
+          cycle_id: string
+          group_id: string
+          hash: string
+          id?: string
+          issued_at?: string
+          issued_by: string
+          ledger_entry_id?: string | null
+          payment_id: string
+          provider: Database["public"]["Enums"]["payment_provider"]
+          receipt_number: string
+          turn_id: string
+        }
+        Update: {
+          amount?: number
+          beneficiary_user_id?: string
+          cycle_id?: string
+          group_id?: string
+          hash?: string
+          id?: string
+          issued_at?: string
+          issued_by?: string
+          ledger_entry_id?: string | null
+          payment_id?: string
+          provider?: Database["public"]["Enums"]["payment_provider"]
+          receipt_number?: string
+          turn_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "receipts_cycle_id_fkey"
+            columns: ["cycle_id"]
+            isOneToOne: false
+            referencedRelation: "cycles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "receipts_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "receipts_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "my_groups_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "receipts_ledger_entry_id_fkey"
+            columns: ["ledger_entry_id"]
+            isOneToOne: false
+            referencedRelation: "group_ledger_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "receipts_ledger_entry_id_fkey"
+            columns: ["ledger_entry_id"]
+            isOneToOne: false
+            referencedRelation: "ledger_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "receipts_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "my_payments_history"
+            referencedColumns: ["payment_id"]
+          },
+          {
+            foreignKeyName: "receipts_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "payments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "receipts_turn_id_fkey"
+            columns: ["turn_id"]
+            isOneToOne: true
+            referencedRelation: "next_turn_per_group"
+            referencedColumns: ["turn_id"]
+          },
+          {
+            foreignKeyName: "receipts_turn_id_fkey"
+            columns: ["turn_id"]
+            isOneToOne: true
+            referencedRelation: "turn_settlement"
+            referencedColumns: ["turn_id"]
+          },
+          {
+            foreignKeyName: "receipts_turn_id_fkey"
+            columns: ["turn_id"]
+            isOneToOne: true
+            referencedRelation: "turns"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       turns: {
         Row: {
@@ -409,6 +779,45 @@ export type Database = {
           },
         ]
       }
+      user_reliability_scores: {
+        Row: {
+          avg_delay_days: number
+          cycles_completed: number
+          last_computed_at: string
+          score: number
+          tier: Database["public"]["Enums"]["reliability_tier"]
+          total_due: number
+          total_late: number
+          total_on_time: number
+          total_paid: number
+          user_id: string
+        }
+        Insert: {
+          avg_delay_days?: number
+          cycles_completed?: number
+          last_computed_at?: string
+          score?: number
+          tier?: Database["public"]["Enums"]["reliability_tier"]
+          total_due?: number
+          total_late?: number
+          total_on_time?: number
+          total_paid?: number
+          user_id: string
+        }
+        Update: {
+          avg_delay_days?: number
+          cycles_completed?: number
+          last_computed_at?: string
+          score?: number
+          tier?: Database["public"]["Enums"]["reliability_tier"]
+          total_due?: number
+          total_late?: number
+          total_on_time?: number
+          total_paid?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -432,6 +841,153 @@ export type Database = {
       }
     }
     Views: {
+      group_ledger_view: {
+        Row: {
+          amount: number | null
+          balance_after: number | null
+          created_at: string | null
+          entry_type: Database["public"]["Enums"]["ledger_entry_type"] | null
+          group_id: string | null
+          id: string | null
+          memo: string | null
+          payment_id: string | null
+          seq: number | null
+          turn_id: string | null
+          turn_number: number | null
+          user_id: string | null
+          user_name: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ledger_entries_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ledger_entries_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "my_groups_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ledger_entries_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "my_payments_history"
+            referencedColumns: ["payment_id"]
+          },
+          {
+            foreignKeyName: "ledger_entries_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "payments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ledger_entries_turn_id_fkey"
+            columns: ["turn_id"]
+            isOneToOne: false
+            referencedRelation: "next_turn_per_group"
+            referencedColumns: ["turn_id"]
+          },
+          {
+            foreignKeyName: "ledger_entries_turn_id_fkey"
+            columns: ["turn_id"]
+            isOneToOne: false
+            referencedRelation: "turn_settlement"
+            referencedColumns: ["turn_id"]
+          },
+          {
+            foreignKeyName: "ledger_entries_turn_id_fkey"
+            columns: ["turn_id"]
+            isOneToOne: false
+            referencedRelation: "turns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      group_reliability: {
+        Row: {
+          full_name: string | null
+          group_id: string | null
+          score: number | null
+          tier: Database["public"]["Enums"]["reliability_tier"] | null
+          total_late: number | null
+          total_paid: number | null
+          user_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_members_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_members_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "my_groups_overview"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      my_contributions_due: {
+        Row: {
+          amount: number | null
+          beneficiary_name: string | null
+          beneficiary_user_id: string | null
+          contribution_id: string | null
+          days_to_due: number | null
+          due_date: string | null
+          group_id: string | null
+          group_name: string | null
+          status: Database["public"]["Enums"]["contribution_status"] | null
+          turn_id: string | null
+          turn_number: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contributions_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contributions_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "my_groups_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contributions_turn_id_fkey"
+            columns: ["turn_id"]
+            isOneToOne: false
+            referencedRelation: "next_turn_per_group"
+            referencedColumns: ["turn_id"]
+          },
+          {
+            foreignKeyName: "contributions_turn_id_fkey"
+            columns: ["turn_id"]
+            isOneToOne: false
+            referencedRelation: "turn_settlement"
+            referencedColumns: ["turn_id"]
+          },
+          {
+            foreignKeyName: "contributions_turn_id_fkey"
+            columns: ["turn_id"]
+            isOneToOne: false
+            referencedRelation: "turns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       my_groups_overview: {
         Row: {
           contribution_amount: number | null
@@ -471,8 +1027,302 @@ export type Database = {
         }
         Relationships: []
       }
+      my_late_contributions: {
+        Row: {
+          amount: number | null
+          confirmed_at: string | null
+          contribution_id: string | null
+          delay_days: number | null
+          due_date: string | null
+          group_id: string | null
+          group_name: string | null
+          turn_number: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contributions_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contributions_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "my_groups_overview"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      my_payments_history: {
+        Row: {
+          amount: number | null
+          contribution_id: string | null
+          group_id: string | null
+          group_name: string | null
+          initiated_at: string | null
+          payment_id: string | null
+          provider: Database["public"]["Enums"]["payment_provider"] | null
+          provider_ref: string | null
+          settled_at: string | null
+          status: Database["public"]["Enums"]["payment_status"] | null
+          turn_number: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payments_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
+            referencedRelation: "contributions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
+            referencedRelation: "my_contributions_due"
+            referencedColumns: ["contribution_id"]
+          },
+          {
+            foreignKeyName: "payments_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
+            referencedRelation: "my_late_contributions"
+            referencedColumns: ["contribution_id"]
+          },
+          {
+            foreignKeyName: "payments_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "my_groups_overview"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      my_receipts: {
+        Row: {
+          amount: number | null
+          beneficiary_name: string | null
+          beneficiary_user_id: string | null
+          group_id: string | null
+          group_name: string | null
+          hash: string | null
+          id: string | null
+          issued_at: string | null
+          issued_by_name: string | null
+          provider: Database["public"]["Enums"]["payment_provider"] | null
+          receipt_number: string | null
+          turn_id: string | null
+          turn_number: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "receipts_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "receipts_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "my_groups_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "receipts_turn_id_fkey"
+            columns: ["turn_id"]
+            isOneToOne: true
+            referencedRelation: "next_turn_per_group"
+            referencedColumns: ["turn_id"]
+          },
+          {
+            foreignKeyName: "receipts_turn_id_fkey"
+            columns: ["turn_id"]
+            isOneToOne: true
+            referencedRelation: "turn_settlement"
+            referencedColumns: ["turn_id"]
+          },
+          {
+            foreignKeyName: "receipts_turn_id_fkey"
+            columns: ["turn_id"]
+            isOneToOne: true
+            referencedRelation: "turns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      my_reliability: {
+        Row: {
+          avg_delay_days: number | null
+          cycles_completed: number | null
+          last_computed_at: string | null
+          score: number | null
+          tier: Database["public"]["Enums"]["reliability_tier"] | null
+          total_due: number | null
+          total_late: number | null
+          total_on_time: number | null
+          total_paid: number | null
+          user_id: string | null
+        }
+        Insert: {
+          avg_delay_days?: number | null
+          cycles_completed?: number | null
+          last_computed_at?: string | null
+          score?: number | null
+          tier?: Database["public"]["Enums"]["reliability_tier"] | null
+          total_due?: number | null
+          total_late?: number | null
+          total_on_time?: number | null
+          total_paid?: number | null
+          user_id?: string | null
+        }
+        Update: {
+          avg_delay_days?: number | null
+          cycles_completed?: number | null
+          last_computed_at?: string | null
+          score?: number | null
+          tier?: Database["public"]["Enums"]["reliability_tier"] | null
+          total_due?: number | null
+          total_late?: number | null
+          total_on_time?: number | null
+          total_paid?: number | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      next_turn_per_group: {
+        Row: {
+          beneficiary_name: string | null
+          beneficiary_user_id: string | null
+          cycle_id: string | null
+          due_date: string | null
+          group_id: string | null
+          payout_amount: number | null
+          status: Database["public"]["Enums"]["turn_status"] | null
+          turn_id: string | null
+          turn_number: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "turns_cycle_id_fkey"
+            columns: ["cycle_id"]
+            isOneToOne: false
+            referencedRelation: "cycles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "turns_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "turns_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "my_groups_overview"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      turn_settlement: {
+        Row: {
+          beneficiary_user_id: string | null
+          collected_amount: number | null
+          confirmed_count: number | null
+          cycle_id: string | null
+          due_date: string | null
+          expected_count: number | null
+          group_id: string | null
+          paid_at: string | null
+          payout_amount: number | null
+          receipt_id: string | null
+          status: Database["public"]["Enums"]["turn_status"] | null
+          turn_id: string | null
+          turn_number: number | null
+        }
+        Insert: {
+          beneficiary_user_id?: string | null
+          collected_amount?: never
+          confirmed_count?: never
+          cycle_id?: string | null
+          due_date?: string | null
+          expected_count?: never
+          group_id?: string | null
+          paid_at?: string | null
+          payout_amount?: number | null
+          receipt_id?: never
+          status?: Database["public"]["Enums"]["turn_status"] | null
+          turn_id?: string | null
+          turn_number?: number | null
+        }
+        Update: {
+          beneficiary_user_id?: string | null
+          collected_amount?: never
+          confirmed_count?: never
+          cycle_id?: string | null
+          due_date?: string | null
+          expected_count?: never
+          group_id?: string | null
+          paid_at?: string | null
+          payout_amount?: number | null
+          receipt_id?: never
+          status?: Database["public"]["Enums"]["turn_status"] | null
+          turn_id?: string | null
+          turn_number?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "turns_cycle_id_fkey"
+            columns: ["cycle_id"]
+            isOneToOne: false
+            referencedRelation: "cycles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "turns_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "turns_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "my_groups_overview"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
+      append_ledger: {
+        Args: {
+          _amount: number
+          _contribution_id: string
+          _cycle_id: string
+          _entry_type: Database["public"]["Enums"]["ledger_entry_type"]
+          _group_id: string
+          _memo: string
+          _payment_id: string
+          _turn_id: string
+          _user_id: string
+        }
+        Returns: string
+      }
+      approve_member: { Args: { _member_id: string }; Returns: undefined }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -489,6 +1339,47 @@ export type Database = {
         Returns: boolean
       }
       join_group_with_code: { Args: { _code: string }; Returns: string }
+      recompute_reliability: {
+        Args: { _user_id?: string }
+        Returns: {
+          avg_delay_days: number
+          cycles_completed: number
+          last_computed_at: string
+          score: number
+          tier: Database["public"]["Enums"]["reliability_tier"]
+          total_due: number
+          total_late: number
+          total_on_time: number
+          total_paid: number
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "user_reliability_scores"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      record_mock_payment: {
+        Args: {
+          _contribution_id: string
+          _provider?: Database["public"]["Enums"]["payment_provider"]
+        }
+        Returns: string
+      }
+      reject_member: { Args: { _member_id: string }; Returns: undefined }
+      release_payout: {
+        Args: {
+          _provider?: Database["public"]["Enums"]["payment_provider"]
+          _turn_id: string
+        }
+        Returns: string
+      }
+      shares_group_with: {
+        Args: { _me: string; _other: string }
+        Returns: boolean
+      }
+      start_cycle: { Args: { _group_id: string }; Returns: string }
     }
     Enums: {
       app_role: "admin" | "organisateur" | "participant"
@@ -496,8 +1387,15 @@ export type Database = {
       group_frequency: "hebdomadaire" | "quinzaine" | "mensuelle"
       group_status: "draft" | "open" | "active" | "completed" | "cancelled"
       invitation_status: "pending" | "accepted" | "revoked" | "expired"
+      ledger_entry_type:
+        | "contribution_in"
+        | "payout_out"
+        | "fee"
+        | "refund"
+        | "penalty"
+        | "adjustment"
       member_role: "organisateur" | "membre"
-      member_status: "active" | "invited" | "removed" | "left"
+      member_status: "active" | "invited" | "removed" | "left" | "pending"
       notification_kind:
         | "invitation_received"
         | "invitation_accepted"
@@ -507,7 +1405,21 @@ export type Database = {
         | "turn_paid"
         | "group_completed"
         | "system"
+        | "payout_released"
+        | "turn_started"
+        | "receipt_ready"
+        | "reliability_changed"
+        | "member_joined"
+        | "contribution_confirmed"
       payment_provider: "orange_money" | "mtn_money" | "cash" | "simulation"
+      payment_status:
+        | "initiated"
+        | "pending"
+        | "succeeded"
+        | "failed"
+        | "cancelled"
+        | "refunded"
+      reliability_tier: "nouveau" | "risque" | "moyen" | "bon" | "excellent"
       rotation_order: "random" | "fixed" | "choice"
       turn_status: "upcoming" | "collecting" | "paid" | "skipped"
     }
@@ -642,8 +1554,16 @@ export const Constants = {
       group_frequency: ["hebdomadaire", "quinzaine", "mensuelle"],
       group_status: ["draft", "open", "active", "completed", "cancelled"],
       invitation_status: ["pending", "accepted", "revoked", "expired"],
+      ledger_entry_type: [
+        "contribution_in",
+        "payout_out",
+        "fee",
+        "refund",
+        "penalty",
+        "adjustment",
+      ],
       member_role: ["organisateur", "membre"],
-      member_status: ["active", "invited", "removed", "left"],
+      member_status: ["active", "invited", "removed", "left", "pending"],
       notification_kind: [
         "invitation_received",
         "invitation_accepted",
@@ -653,8 +1573,23 @@ export const Constants = {
         "turn_paid",
         "group_completed",
         "system",
+        "payout_released",
+        "turn_started",
+        "receipt_ready",
+        "reliability_changed",
+        "member_joined",
+        "contribution_confirmed",
       ],
       payment_provider: ["orange_money", "mtn_money", "cash", "simulation"],
+      payment_status: [
+        "initiated",
+        "pending",
+        "succeeded",
+        "failed",
+        "cancelled",
+        "refunded",
+      ],
+      reliability_tier: ["nouveau", "risque", "moyen", "bon", "excellent"],
       rotation_order: ["random", "fixed", "choice"],
       turn_status: ["upcoming", "collecting", "paid", "skipped"],
     },
