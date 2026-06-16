@@ -11,6 +11,7 @@ import { MembersAdminPanel } from "@/components/group/MembersAdminPanel";
 import { ExternalPaymentsPanel } from "@/components/group/ExternalPaymentsPanel";
 import { PaymentsHistoryPanel } from "@/components/group/PaymentsHistoryPanel";
 import { CycleAdminPanel } from "@/components/group/CycleAdminPanel";
+import { DeletionPanel } from "@/components/group/DeletionPanel";
 import { ShieldCheck, ChevronRight } from "lucide-react";
 
 const FREQ_OPTIONS = [
@@ -311,6 +312,16 @@ export default function GroupSettings() {
         <SectionCard title="Cycle" subtitle="Pause, reprise, archivage">
           <CycleAdminPanel groupId={group.id} status={group.status} />
         </SectionCard>
+
+        {user?.id && (
+          <SectionCard title="Suppression du groupe" subtitle="Vote des membres puis validation Tontine">
+            <DeletionPanel
+              groupId={group.id}
+              isOrganizer={isOrganizer}
+              currentUserId={user.id}
+            />
+          </SectionCard>
+        )}
 
         <div className="flex items-center justify-end gap-3">
           <button

@@ -33,6 +33,7 @@ const PrivacySettings = lazy(() => import("@/pages/PrivacySettings"));
 const DeleteAccount = lazy(() => import("@/pages/DeleteAccount"));
 const PaymentReturn = lazy(() => import("@/pages/PaymentReturn"));
 const PaymentCancel = lazy(() => import("@/pages/PaymentCancel"));
+const AdminDeletionRequests = lazy(() => import("@/pages/AdminDeletionRequests"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -119,6 +120,7 @@ const App = () => (
                     <Route path="/profil/suppression" element={<RouteBoundary name="Supprimer mon compte"><DeleteAccount /></RouteBoundary>} />
                     <Route path="/payment/return" element={<RouteBoundary name="Retour paiement"><PaymentReturn /></RouteBoundary>} />
                     <Route path="/payment/cancel" element={<RouteBoundary name="Paiement annulé"><PaymentCancel /></RouteBoundary>} />
+                    <Route path="/admin/suppressions" element={<RouteBoundary name="Admin suppressions"><AdminDeletionRequests /></RouteBoundary>} />
                   </Route>
                 </Route>
                 <Route path="*" element={<RouteBoundary name="Page introuvable"><NotFound /></RouteBoundary>} />
