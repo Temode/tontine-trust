@@ -64,8 +64,7 @@ export function logCrash(input: {
 }): CrashReport {
   crashCounter += 1;
   const err = input.error;
-  const message =
-    err instanceof Error ? err.message : typeof err === "string" ? err : String(err);
+  const message = serializeError(err);
   const stack = err instanceof Error ? err.stack : undefined;
 
   const report: CrashReport = {
