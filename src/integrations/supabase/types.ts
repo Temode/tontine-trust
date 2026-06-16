@@ -14,6 +14,61 @@ export type Database = {
   }
   public: {
     Tables: {
+      audit_log: {
+        Row: {
+          action: string
+          actor_user_id: string | null
+          created_at: string
+          entity_id: string | null
+          entity_type: string | null
+          group_id: string | null
+          id: string
+          metadata: Json | null
+        }
+        Insert: {
+          action: string
+          actor_user_id?: string | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          group_id?: string | null
+          id?: string
+          metadata?: Json | null
+        }
+        Update: {
+          action?: string
+          actor_user_id?: string | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          group_id?: string | null
+          id?: string
+          metadata?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_log_actor_user_id_fkey"
+            columns: ["actor_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "audit_log_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "audit_log_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "my_groups_overview"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contributions: {
         Row: {
           amount: number
@@ -502,6 +557,30 @@ export type Database = {
           },
         ]
       }
+      notification_preferences: {
+        Row: {
+          channel: Database["public"]["Enums"]["notification_channel"]
+          enabled: boolean
+          notif_type: Database["public"]["Enums"]["notification_kind"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          channel: Database["public"]["Enums"]["notification_channel"]
+          enabled?: boolean
+          notif_type: Database["public"]["Enums"]["notification_kind"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          channel?: Database["public"]["Enums"]["notification_channel"]
+          enabled?: boolean
+          notif_type?: Database["public"]["Enums"]["notification_kind"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       notifications: {
         Row: {
           body: string | null
@@ -813,6 +892,49 @@ export type Database = {
           },
         ]
       }
+      reminder_log: {
+        Row: {
+          bucket: string
+          contribution_id: string
+          created_at: string
+          sent_on: string
+        }
+        Insert: {
+          bucket: string
+          contribution_id: string
+          created_at?: string
+          sent_on?: string
+        }
+        Update: {
+          bucket?: string
+          contribution_id?: string
+          created_at?: string
+          sent_on?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reminder_log_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
+            referencedRelation: "contributions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reminder_log_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
+            referencedRelation: "my_contributions_due"
+            referencedColumns: ["contribution_id"]
+          },
+          {
+            foreignKeyName: "reminder_log_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
+            referencedRelation: "my_late_contributions"
+            referencedColumns: ["contribution_id"]
+          },
+        ]
+      }
       turns: {
         Row: {
           beneficiary_user_id: string
@@ -936,6 +1058,42 @@ export type Database = {
       }
     }
     Views: {
+      audit_log_view: {
+        Row: {
+          action: string | null
+          actor_name: string | null
+          actor_user_id: string | null
+          created_at: string | null
+          entity_id: string | null
+          entity_type: string | null
+          group_id: string | null
+          id: string | null
+          metadata: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_log_actor_user_id_fkey"
+            columns: ["actor_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "audit_log_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "audit_log_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "my_groups_overview"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       group_ledger_view: {
         Row: {
           amount: number | null
@@ -1494,6 +1652,7 @@ export type Database = {
       }
       approve_member: { Args: { _member_id: string }; Returns: undefined }
       create_group_with_invitation: { Args: { _payload: Json }; Returns: Json }
+      enqueue_payment_reminders: { Args: never; Returns: number }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -1515,6 +1674,16 @@ export type Database = {
       }
       join_group_with_code: {
         Args: { _code: string; _message?: string; _operator?: string }
+        Returns: string
+      }
+      log_audit: {
+        Args: {
+          _action: string
+          _entity_id?: string
+          _entity_type?: string
+          _group_id: string
+          _metadata?: Json
+        }
         Returns: string
       }
       mark_all_notifications_read: { Args: never; Returns: number }
@@ -1569,14 +1738,30 @@ export type Database = {
         }
         Returns: string
       }
+      seed_notification_preferences: {
+        Args: { _user_id: string }
+        Returns: undefined
+      }
       shares_group_with: {
         Args: { _me: string; _other: string }
+        Returns: boolean
+      }
+      should_notify: {
+        Args: {
+          _channel: Database["public"]["Enums"]["notification_channel"]
+          _type: Database["public"]["Enums"]["notification_kind"]
+          _user_id: string
+        }
         Returns: boolean
       }
       start_cycle: { Args: { _group_id: string }; Returns: string }
       update_group_settings: {
         Args: { _group_id: string; _payload: Json }
         Returns: undefined
+      }
+      update_notification_preferences: {
+        Args: { _payload: Json }
+        Returns: number
       }
     }
     Enums: {
@@ -1595,6 +1780,7 @@ export type Database = {
         | "adjustment"
       member_role: "organisateur" | "membre"
       member_status: "active" | "invited" | "removed" | "left" | "pending"
+      notification_channel: "in_app" | "email" | "sms"
       notification_kind:
         | "invitation_received"
         | "invitation_accepted"
@@ -1765,6 +1951,7 @@ export const Constants = {
       ],
       member_role: ["organisateur", "membre"],
       member_status: ["active", "invited", "removed", "left", "pending"],
+      notification_channel: ["in_app", "email", "sms"],
       notification_kind: [
         "invitation_received",
         "invitation_accepted",
