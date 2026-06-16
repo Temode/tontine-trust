@@ -1107,6 +1107,8 @@ export type Database = {
         Row: {
           avatar_url: string | null
           created_at: string
+          deleted_at: string | null
+          deletion_reason: string | null
           full_name: string
           id: string
           phone_number: string | null
@@ -1116,6 +1118,8 @@ export type Database = {
         Insert: {
           avatar_url?: string | null
           created_at?: string
+          deleted_at?: string | null
+          deletion_reason?: string | null
           full_name: string
           id: string
           phone_number?: string | null
@@ -1125,6 +1129,8 @@ export type Database = {
         Update: {
           avatar_url?: string | null
           created_at?: string
+          deleted_at?: string | null
+          deletion_reason?: string | null
           full_name?: string
           id?: string
           phone_number?: string | null
@@ -2559,6 +2565,7 @@ export type Database = {
         Returns: undefined
       }
       create_group_with_invitation: { Args: { _payload: Json }; Returns: Json }
+      delete_account: { Args: { _reason?: string }; Returns: undefined }
       enqueue_payment_reminders: { Args: never; Returns: number }
       grant_admin_permissions: {
         Args: { _group_id: string; _perms: Json; _user_id: string }
