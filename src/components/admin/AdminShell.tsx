@@ -16,17 +16,17 @@ function Fallback() {
 }
 
 export function AdminShell({ children }: { children: ReactNode }) {
-  const { roles, loading, user } = useAuth();
+  const { roles, loading, rolesLoading, user } = useAuth();
   const location = useLocation();
   const isSuper = roles.includes("super_admin" as AppRole);
 
   useEffect(() => {
-    if (!loading && user && !isSuper) {
+    if (!loading && !rolesLoading && user && !isSuper) {
       toast.error("Accès réservé", { description: "Cette zone est réservée aux administrateurs Tontine." });
     }
-  }, [loading, user, isSuper]);
+  }, [loading, rolesLoading, user, isSuper]);
 
-  if (loading) return <Fallback />;
+  if (loading || (user && rolesLoading)) return <Fallback />;
   if (!user) return <Navigate to="/auth" replace state={{ from: location.pathname }} />;
   if (!isSuper) return <Navigate to="/dashboard" replace />;
 
