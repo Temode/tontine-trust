@@ -59,7 +59,7 @@ export interface MemberPermissions {
 export async function setMemberPermissions(memberId: string, perms: MemberPermissions): Promise<void> {
   const { error } = await supabase.rpc("set_member_permissions", {
     _member_id: memberId,
-    _perms: perms,
+    _perms: perms as unknown as Record<string, unknown>,
   });
   if (error) throw error;
 }
