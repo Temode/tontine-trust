@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Logo } from "@/components/brand/Logo";
 import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 
 const signInSchema = z.object({
   email: z.string().trim().email("Email invalide").max(255),
@@ -28,10 +29,12 @@ const signUpSchema = z.object({
 });
 
 export default function Auth() {
-  const { user, loading, signIn, signUp } = useAuth();
+  const { user, loading, roles, signIn, signUp } = useAuth();
   const navigate = useNavigate();
   const location = useLocation() as { state?: { from?: string } };
-  const redirectTo = location.state?.from && location.state.from !== "/auth" ? location.state.from : "/dashboard";
+  const fromPath = location.state?.from && location.state.from !== "/auth" ? location.state.from : null;
+  const defaultPath = roles.includes("super_admin") ? "/admin/overview" : "/dashboard";
+  const redirectTo = fromPath ?? defaultPath;
 
   const [tab, setTab] = useState<"signin" | "signup">("signin");
   const [submitting, setSubmitting] = useState(false);
@@ -74,8 +77,21 @@ export default function Auth() {
       toast.error(error);
       return;
     }
+    // Récupère le rôle pour rediriger les admins vers le back-office.
+    let dest = fromPath ?? "/dashboard";
+    const { data: sess } = await supabase.auth.getUser();
+    const uid = sess.user?.id;
+    if (!fromPath && uid) {
+      const { data: rolesRows } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", uid);
+      if ((rolesRows ?? []).some((r) => r.role === "super_admin")) {
+        dest = "/admin/overview";
+      }
+    }
     toast.success("Connexion réussie");
-    navigate(redirectTo, { replace: true });
+    navigate(dest, { replace: true });
   };
 
   const handleSignUp = async (e: React.FormEvent) => {
