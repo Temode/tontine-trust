@@ -641,12 +641,14 @@ export type Database = {
           amount: number
           beneficiary_user_id: string
           cycle_id: string
+          fee_amount: number
           group_id: string
           hash: string
           id: string
           issued_at: string
           issued_by: string
           ledger_entry_id: string | null
+          net_amount: number | null
           payment_id: string
           provider: Database["public"]["Enums"]["payment_provider"]
           receipt_number: string
@@ -656,12 +658,14 @@ export type Database = {
           amount: number
           beneficiary_user_id: string
           cycle_id: string
+          fee_amount?: number
           group_id: string
           hash: string
           id?: string
           issued_at?: string
           issued_by: string
           ledger_entry_id?: string | null
+          net_amount?: number | null
           payment_id: string
           provider: Database["public"]["Enums"]["payment_provider"]
           receipt_number: string
@@ -671,12 +675,14 @@ export type Database = {
           amount?: number
           beneficiary_user_id?: string
           cycle_id?: string
+          fee_amount?: number
           group_id?: string
           hash?: string
           id?: string
           issued_at?: string
           issued_by?: string
           ledger_entry_id?: string | null
+          net_amount?: number | null
           payment_id?: string
           provider?: Database["public"]["Enums"]["payment_provider"]
           receipt_number?: string
@@ -1221,12 +1227,14 @@ export type Database = {
           amount: number | null
           beneficiary_name: string | null
           beneficiary_user_id: string | null
+          fee_amount: number | null
           group_id: string | null
           group_name: string | null
           hash: string | null
           id: string | null
           issued_at: string | null
           issued_by_name: string | null
+          net_amount: number | null
           provider: Database["public"]["Enums"]["payment_provider"] | null
           receipt_number: string | null
           turn_id: string | null
