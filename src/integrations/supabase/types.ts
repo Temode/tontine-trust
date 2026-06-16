@@ -1610,6 +1610,7 @@ export type Database = {
         | "reliability_changed"
         | "member_joined"
         | "contribution_confirmed"
+        | "announcement"
       payment_provider: "orange_money" | "mtn_money" | "cash" | "simulation"
       payment_status:
         | "initiated"
@@ -1779,6 +1780,7 @@ export const Constants = {
         "reliability_changed",
         "member_joined",
         "contribution_confirmed",
+        "announcement",
       ],
       payment_provider: ["orange_money", "mtn_money", "cash", "simulation"],
       payment_status: [
