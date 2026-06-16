@@ -28,7 +28,7 @@ export E2E_SUPABASE_ANON_KEY=...
 export E2E_SUPABASE_SERVICE_ROLE=...
 
 bun install
-bunx tsx tests/e2e/fixtures/famille-alice.ts   # seed
+bun run tests/e2e/fixtures/famille-alice.ts    # seed
 bun run dev &                                  # serve at :8080
 bunx playwright test tests/e2e                 # run E2E
 ```
