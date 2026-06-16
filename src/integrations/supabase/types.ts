@@ -1779,7 +1779,13 @@ export type Database = {
         | "penalty"
         | "adjustment"
       member_role: "organisateur" | "membre"
-      member_status: "active" | "invited" | "removed" | "left" | "pending"
+      member_status:
+        | "active"
+        | "invited"
+        | "removed"
+        | "left"
+        | "pending"
+        | "suspended"
       notification_channel: "in_app" | "email" | "sms"
       notification_kind:
         | "invitation_received"
@@ -1797,6 +1803,19 @@ export type Database = {
         | "member_joined"
         | "contribution_confirmed"
         | "announcement"
+        | "swap_requested"
+        | "swap_responded"
+        | "swap_executed"
+        | "auction_outbid"
+        | "auction_won"
+        | "auction_lost"
+        | "auction_closed"
+        | "review_received"
+        | "member_suspended"
+        | "member_reactivated"
+        | "member_kicked"
+        | "permissions_changed"
+        | "ownership_transferred"
       payment_provider: "orange_money" | "mtn_money" | "cash" | "simulation"
       payment_status:
         | "initiated"
@@ -1806,7 +1825,7 @@ export type Database = {
         | "cancelled"
         | "refunded"
       reliability_tier: "nouveau" | "risque" | "moyen" | "bon" | "excellent"
-      rotation_order: "random" | "fixed" | "choice"
+      rotation_order: "random" | "fixed" | "choice" | "auction"
       turn_status: "upcoming" | "collecting" | "paid" | "skipped"
     }
     CompositeTypes: {
@@ -1950,7 +1969,14 @@ export const Constants = {
         "adjustment",
       ],
       member_role: ["organisateur", "membre"],
-      member_status: ["active", "invited", "removed", "left", "pending"],
+      member_status: [
+        "active",
+        "invited",
+        "removed",
+        "left",
+        "pending",
+        "suspended",
+      ],
       notification_channel: ["in_app", "email", "sms"],
       notification_kind: [
         "invitation_received",
@@ -1968,6 +1994,19 @@ export const Constants = {
         "member_joined",
         "contribution_confirmed",
         "announcement",
+        "swap_requested",
+        "swap_responded",
+        "swap_executed",
+        "auction_outbid",
+        "auction_won",
+        "auction_lost",
+        "auction_closed",
+        "review_received",
+        "member_suspended",
+        "member_reactivated",
+        "member_kicked",
+        "permissions_changed",
+        "ownership_transferred",
       ],
       payment_provider: ["orange_money", "mtn_money", "cash", "simulation"],
       payment_status: [
@@ -1979,7 +2018,7 @@ export const Constants = {
         "refunded",
       ],
       reliability_tier: ["nouveau", "risque", "moyen", "bon", "excellent"],
-      rotation_order: ["random", "fixed", "choice"],
+      rotation_order: ["random", "fixed", "choice", "auction"],
       turn_status: ["upcoming", "collecting", "paid", "skipped"],
     },
   },
