@@ -49,3 +49,27 @@ export async function togglePinAnnouncement(id: string, pinned: boolean): Promis
   const { error } = await supabase.from("group_announcements").update({ pinned }).eq("id", id);
   if (error) throw error;
 }
+
+export interface DbRecentAnnouncement extends DbAnnouncement {
+  group_name: string | null;
+}
+
+/**
+ * Liste les dernières annonces des groupes où l'utilisateur est membre actif.
+ * RLS filtre automatiquement (policy ann_select_members).
+ */
+export async function listMyRecentAnnouncements(
+  limit = 3,
+): Promise<DbRecentAnnouncement[]> {
+  const { data, error } = await supabase
+    .from("group_announcements")
+    .select("*, group:groups(name)")
+    .order("pinned", { ascending: false })
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return (data ?? []).map((r: any) => ({
+    ...(r as DbAnnouncement),
+    group_name: r.group?.name ?? null,
+  }));
+}
