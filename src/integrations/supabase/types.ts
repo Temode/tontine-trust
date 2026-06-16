@@ -68,7 +68,21 @@ export type Database = {
             foreignKeyName: "audit_log_actor_user_id_fkey"
             columns: ["actor_user_id"]
             isOneToOne: false
+            referencedRelation: "admin_user_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "audit_log_actor_user_id_fkey"
+            columns: ["actor_user_id"]
+            isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "audit_log_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "admin_group_overview"
             referencedColumns: ["id"]
           },
           {
@@ -177,6 +191,13 @@ export type Database = {
             foreignKeyName: "contributions_group_id_fkey"
             columns: ["group_id"]
             isOneToOne: false
+            referencedRelation: "admin_group_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contributions_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
             referencedRelation: "groups"
             referencedColumns: ["id"]
           },
@@ -233,6 +254,13 @@ export type Database = {
           started_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "cycles_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "admin_group_overview"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "cycles_group_id_fkey"
             columns: ["group_id"]
@@ -361,6 +389,13 @@ export type Database = {
             foreignKeyName: "external_payment_proofs_group_id_fkey"
             columns: ["group_id"]
             isOneToOne: false
+            referencedRelation: "admin_group_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "external_payment_proofs_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
             referencedRelation: "groups"
             referencedColumns: ["id"]
           },
@@ -427,6 +462,13 @@ export type Database = {
             foreignKeyName: "group_admin_permissions_group_id_fkey"
             columns: ["group_id"]
             isOneToOne: false
+            referencedRelation: "admin_group_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_admin_permissions_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
             referencedRelation: "groups"
             referencedColumns: ["id"]
           },
@@ -472,7 +514,21 @@ export type Database = {
             foreignKeyName: "group_announcements_author_user_id_fkey"
             columns: ["author_user_id"]
             isOneToOne: false
+            referencedRelation: "admin_user_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_announcements_author_user_id_fkey"
+            columns: ["author_user_id"]
+            isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_announcements_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "admin_group_overview"
             referencedColumns: ["id"]
           },
           {
@@ -521,6 +577,13 @@ export type Database = {
             foreignKeyName: "group_consent_log_group_id_fkey"
             columns: ["group_id"]
             isOneToOne: false
+            referencedRelation: "admin_group_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_consent_log_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
             referencedRelation: "groups"
             referencedColumns: ["id"]
           },
@@ -529,6 +592,13 @@ export type Database = {
             columns: ["group_id"]
             isOneToOne: false
             referencedRelation: "my_groups_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_consent_log_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "admin_user_overview"
             referencedColumns: ["id"]
           },
           {
@@ -581,6 +651,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "group_deletion_requests_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "admin_group_overview"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "group_deletion_requests_group_id_fkey"
             columns: ["group_id"]
@@ -702,6 +779,13 @@ export type Database = {
             foreignKeyName: "group_members_group_id_fkey"
             columns: ["group_id"]
             isOneToOne: false
+            referencedRelation: "admin_group_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_members_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
             referencedRelation: "groups"
             referencedColumns: ["id"]
           },
@@ -716,6 +800,13 @@ export type Database = {
             foreignKeyName: "group_members_removed_by_fkey"
             columns: ["removed_by"]
             isOneToOne: false
+            referencedRelation: "admin_user_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_members_removed_by_fkey"
+            columns: ["removed_by"]
+            isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
@@ -723,7 +814,21 @@ export type Database = {
             foreignKeyName: "group_members_suspended_by_fkey"
             columns: ["suspended_by"]
             isOneToOne: false
+            referencedRelation: "admin_user_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_members_suspended_by_fkey"
+            columns: ["suspended_by"]
+            isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_members_user_id_profile_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "admin_user_overview"
             referencedColumns: ["id"]
           },
           {
@@ -768,7 +873,21 @@ export type Database = {
             foreignKeyName: "group_messages_author_user_id_fkey"
             columns: ["author_user_id"]
             isOneToOne: false
+            referencedRelation: "admin_user_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_messages_author_user_id_fkey"
+            columns: ["author_user_id"]
+            isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_messages_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "admin_group_overview"
             referencedColumns: ["id"]
           },
           {
@@ -913,6 +1032,13 @@ export type Database = {
             foreignKeyName: "invitations_group_id_fkey"
             columns: ["group_id"]
             isOneToOne: false
+            referencedRelation: "admin_group_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invitations_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
             referencedRelation: "groups"
             referencedColumns: ["id"]
           },
@@ -1032,6 +1158,13 @@ export type Database = {
             foreignKeyName: "ledger_entries_group_id_fkey"
             columns: ["group_id"]
             isOneToOne: false
+            referencedRelation: "admin_group_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ledger_entries_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
             referencedRelation: "groups"
             referencedColumns: ["id"]
           },
@@ -1040,6 +1173,13 @@ export type Database = {
             columns: ["group_id"]
             isOneToOne: false
             referencedRelation: "my_groups_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ledger_entries_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "admin_payment_overview"
             referencedColumns: ["id"]
           },
           {
@@ -1112,6 +1252,13 @@ export type Database = {
             foreignKeyName: "manual_reminders_log_group_id_fkey"
             columns: ["group_id"]
             isOneToOne: false
+            referencedRelation: "admin_group_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "manual_reminders_log_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
             referencedRelation: "groups"
             referencedColumns: ["id"]
           },
@@ -1161,6 +1308,13 @@ export type Database = {
             columns: ["cycle_id"]
             isOneToOne: false
             referencedRelation: "cycles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_reviews_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "admin_group_overview"
             referencedColumns: ["id"]
           },
           {
@@ -1244,6 +1398,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "notifications_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "admin_group_overview"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "notifications_group_id_fkey"
             columns: ["group_id"]
@@ -1360,6 +1521,13 @@ export type Database = {
             foreignKeyName: "payment_links_group_id_fkey"
             columns: ["group_id"]
             isOneToOne: false
+            referencedRelation: "admin_group_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_links_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
             referencedRelation: "groups"
             referencedColumns: ["id"]
           },
@@ -1463,6 +1631,13 @@ export type Database = {
             foreignKeyName: "payments_group_id_fkey"
             columns: ["group_id"]
             isOneToOne: false
+            referencedRelation: "admin_group_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
             referencedRelation: "groups"
             referencedColumns: ["id"]
           },
@@ -1486,6 +1661,9 @@ export type Database = {
           phone_number: string | null
           phone_visible_in_groups: boolean
           reliability_score: number
+          suspended_at: string | null
+          suspended_by: string | null
+          suspended_reason: string | null
           updated_at: string
         }
         Insert: {
@@ -1498,6 +1676,9 @@ export type Database = {
           phone_number?: string | null
           phone_visible_in_groups?: boolean
           reliability_score?: number
+          suspended_at?: string | null
+          suspended_by?: string | null
+          suspended_reason?: string | null
           updated_at?: string
         }
         Update: {
@@ -1510,6 +1691,9 @@ export type Database = {
           phone_number?: string | null
           phone_visible_in_groups?: boolean
           reliability_score?: number
+          suspended_at?: string | null
+          suspended_by?: string | null
+          suspended_reason?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -1578,6 +1762,13 @@ export type Database = {
             foreignKeyName: "receipts_group_id_fkey"
             columns: ["group_id"]
             isOneToOne: false
+            referencedRelation: "admin_group_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "receipts_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
             referencedRelation: "groups"
             referencedColumns: ["id"]
           },
@@ -1600,6 +1791,13 @@ export type Database = {
             columns: ["ledger_entry_id"]
             isOneToOne: false
             referencedRelation: "ledger_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "receipts_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "admin_payment_overview"
             referencedColumns: ["id"]
           },
           {
@@ -1735,6 +1933,13 @@ export type Database = {
             foreignKeyName: "turn_bids_group_id_fkey"
             columns: ["group_id"]
             isOneToOne: false
+            referencedRelation: "admin_group_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "turn_bids_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
             referencedRelation: "groups"
             referencedColumns: ["id"]
           },
@@ -1834,6 +2039,13 @@ export type Database = {
             foreignKeyName: "turn_swap_requests_group_id_fkey"
             columns: ["group_id"]
             isOneToOne: false
+            referencedRelation: "admin_group_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "turn_swap_requests_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
             referencedRelation: "groups"
             referencedColumns: ["id"]
           },
@@ -1910,6 +2122,13 @@ export type Database = {
             columns: ["cycle_id"]
             isOneToOne: false
             referencedRelation: "cycles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "turns_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "admin_group_overview"
             referencedColumns: ["id"]
           },
           {
@@ -1996,6 +2215,127 @@ export type Database = {
       }
     }
     Views: {
+      admin_group_overview: {
+        Row: {
+          archived_at: string | null
+          contribution_amount: number | null
+          created_at: string | null
+          created_by: string | null
+          deleted_at: string | null
+          frequency: Database["public"]["Enums"]["group_frequency"] | null
+          id: string | null
+          max_members: number | null
+          members_count: number | null
+          name: string | null
+          organizer_name: string | null
+          paused_at: string | null
+          status: Database["public"]["Enums"]["group_status"] | null
+          volume_total: number | null
+        }
+        Insert: {
+          archived_at?: string | null
+          contribution_amount?: number | null
+          created_at?: string | null
+          created_by?: string | null
+          deleted_at?: string | null
+          frequency?: Database["public"]["Enums"]["group_frequency"] | null
+          id?: string | null
+          max_members?: number | null
+          members_count?: never
+          name?: string | null
+          organizer_name?: never
+          paused_at?: string | null
+          status?: Database["public"]["Enums"]["group_status"] | null
+          volume_total?: never
+        }
+        Update: {
+          archived_at?: string | null
+          contribution_amount?: number | null
+          created_at?: string | null
+          created_by?: string | null
+          deleted_at?: string | null
+          frequency?: Database["public"]["Enums"]["group_frequency"] | null
+          id?: string | null
+          max_members?: number | null
+          members_count?: never
+          name?: string | null
+          organizer_name?: never
+          paused_at?: string | null
+          status?: Database["public"]["Enums"]["group_status"] | null
+          volume_total?: never
+        }
+        Relationships: []
+      }
+      admin_payment_overview: {
+        Row: {
+          amount: number | null
+          djomy_transaction_id: string | null
+          error_message: string | null
+          group_id: string | null
+          group_name: string | null
+          id: string | null
+          initiated_at: string | null
+          payer_name: string | null
+          payment_method: string | null
+          provider: Database["public"]["Enums"]["payment_provider"] | null
+          settled_at: string | null
+          status: Database["public"]["Enums"]["payment_status"] | null
+          user_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payments_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "admin_group_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "my_groups_overview"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      admin_platform_kpis: {
+        Row: {
+          cycles_open: number | null
+          deletion_requests_open: number | null
+          groups_active: number | null
+          groups_total: number | null
+          payment_failures_7d: number | null
+          reliability_avg: number | null
+          users_new_7d: number | null
+          users_total: number | null
+          volume_30d: number | null
+        }
+        Relationships: []
+      }
+      admin_user_overview: {
+        Row: {
+          avatar_url: string | null
+          created_at: string | null
+          deleted_at: string | null
+          email: string | null
+          full_name: string | null
+          groups_count: number | null
+          id: string | null
+          phone_number: string | null
+          reliability_score: number | null
+          roles: string[] | null
+          suspended_at: string | null
+        }
+        Relationships: []
+      }
       audit_log_view: {
         Row: {
           action: string | null
@@ -2013,7 +2353,21 @@ export type Database = {
             foreignKeyName: "audit_log_actor_user_id_fkey"
             columns: ["actor_user_id"]
             isOneToOne: false
+            referencedRelation: "admin_user_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "audit_log_actor_user_id_fkey"
+            columns: ["actor_user_id"]
+            isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "audit_log_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "admin_group_overview"
             referencedColumns: ["id"]
           },
           {
@@ -2058,6 +2412,13 @@ export type Database = {
             foreignKeyName: "group_deletion_requests_group_id_fkey"
             columns: ["group_id"]
             isOneToOne: false
+            referencedRelation: "admin_group_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_deletion_requests_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
             referencedRelation: "groups"
             referencedColumns: ["id"]
           },
@@ -2090,6 +2451,13 @@ export type Database = {
           user_id: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "group_admin_permissions_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "admin_group_overview"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "group_admin_permissions_group_id_fkey"
             columns: ["group_id"]
@@ -2127,6 +2495,13 @@ export type Database = {
             foreignKeyName: "ledger_entries_group_id_fkey"
             columns: ["group_id"]
             isOneToOne: false
+            referencedRelation: "admin_group_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ledger_entries_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
             referencedRelation: "groups"
             referencedColumns: ["id"]
           },
@@ -2135,6 +2510,13 @@ export type Database = {
             columns: ["group_id"]
             isOneToOne: false
             referencedRelation: "my_groups_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ledger_entries_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "admin_payment_overview"
             referencedColumns: ["id"]
           },
           {
@@ -2197,6 +2579,13 @@ export type Database = {
             foreignKeyName: "group_members_group_id_fkey"
             columns: ["group_id"]
             isOneToOne: false
+            referencedRelation: "admin_group_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_members_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
             referencedRelation: "groups"
             referencedColumns: ["id"]
           },
@@ -2205,6 +2594,13 @@ export type Database = {
             columns: ["group_id"]
             isOneToOne: false
             referencedRelation: "my_groups_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_members_user_id_profile_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "admin_user_overview"
             referencedColumns: ["id"]
           },
           {
@@ -2237,6 +2633,13 @@ export type Database = {
           turn_number: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "contributions_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "admin_group_overview"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "contributions_group_id_fkey"
             columns: ["group_id"]
@@ -2291,6 +2694,13 @@ export type Database = {
             foreignKeyName: "group_members_group_id_fkey"
             columns: ["group_id"]
             isOneToOne: false
+            referencedRelation: "admin_group_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_members_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
             referencedRelation: "groups"
             referencedColumns: ["id"]
           },
@@ -2299,6 +2709,13 @@ export type Database = {
             columns: ["group_id"]
             isOneToOne: false
             referencedRelation: "my_groups_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_members_user_id_profile_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "admin_user_overview"
             referencedColumns: ["id"]
           },
           {
@@ -2326,6 +2743,13 @@ export type Database = {
           user_id: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "member_reviews_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "admin_group_overview"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "member_reviews_group_id_fkey"
             columns: ["group_id"]
@@ -2358,6 +2782,13 @@ export type Database = {
           turn_number: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "contributions_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "admin_group_overview"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "contributions_group_id_fkey"
             columns: ["group_id"]
@@ -2462,6 +2893,13 @@ export type Database = {
             foreignKeyName: "contributions_group_id_fkey"
             columns: ["group_id"]
             isOneToOne: false
+            referencedRelation: "admin_group_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contributions_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
             referencedRelation: "groups"
             referencedColumns: ["id"]
           },
@@ -2489,6 +2927,13 @@ export type Database = {
           user_id: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "notifications_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "admin_group_overview"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "notifications_group_id_fkey"
             columns: ["group_id"]
@@ -2573,6 +3018,13 @@ export type Database = {
             foreignKeyName: "payments_group_id_fkey"
             columns: ["group_id"]
             isOneToOne: false
+            referencedRelation: "admin_group_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
             referencedRelation: "groups"
             referencedColumns: ["id"]
           },
@@ -2604,6 +3056,13 @@ export type Database = {
           turn_number: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "receipts_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "admin_group_overview"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "receipts_group_id_fkey"
             columns: ["group_id"]
@@ -2726,6 +3185,13 @@ export type Database = {
             foreignKeyName: "member_reviews_group_id_fkey"
             columns: ["group_id"]
             isOneToOne: false
+            referencedRelation: "admin_group_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_reviews_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
             referencedRelation: "groups"
             referencedColumns: ["id"]
           },
@@ -2756,6 +3222,13 @@ export type Database = {
             columns: ["cycle_id"]
             isOneToOne: false
             referencedRelation: "cycles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "turns_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "admin_group_overview"
             referencedColumns: ["id"]
           },
           {
@@ -2795,6 +3268,13 @@ export type Database = {
             columns: ["cycle_id"]
             isOneToOne: false
             referencedRelation: "cycles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "turn_bids_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "admin_group_overview"
             referencedColumns: ["id"]
           },
           {
@@ -2892,6 +3372,13 @@ export type Database = {
             foreignKeyName: "turns_group_id_fkey"
             columns: ["group_id"]
             isOneToOne: false
+            referencedRelation: "admin_group_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "turns_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
             referencedRelation: "groups"
             referencedColumns: ["id"]
           },
@@ -2949,6 +3436,13 @@ export type Database = {
             foreignKeyName: "turn_swap_requests_group_id_fkey"
             columns: ["group_id"]
             isOneToOne: false
+            referencedRelation: "admin_group_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "turn_swap_requests_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
             referencedRelation: "groups"
             referencedColumns: ["id"]
           },
@@ -2995,6 +3489,22 @@ export type Database = {
       }
       admin_decide_deletion: {
         Args: { _approve: boolean; _reason?: string; _request_id: string }
+        Returns: undefined
+      }
+      admin_force_group_status: {
+        Args: { _action: string; _group_id: string; _reason?: string }
+        Returns: undefined
+      }
+      admin_set_user_role: {
+        Args: {
+          _grant: boolean
+          _role: Database["public"]["Enums"]["app_role"]
+          _target_user: string
+        }
+        Returns: undefined
+      }
+      admin_suspend_user: {
+        Args: { _reason?: string; _suspend: boolean; _target_user: string }
         Returns: undefined
       }
       append_ledger: {

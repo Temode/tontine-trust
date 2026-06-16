@@ -33,7 +33,13 @@ const PrivacySettings = lazy(() => import("@/pages/PrivacySettings"));
 const DeleteAccount = lazy(() => import("@/pages/DeleteAccount"));
 const PaymentReturn = lazy(() => import("@/pages/PaymentReturn"));
 const PaymentCancel = lazy(() => import("@/pages/PaymentCancel"));
-const AdminDeletionRequests = lazy(() => import("@/pages/AdminDeletionRequests"));
+const AdminOverview = lazy(() => import("@/pages/admin/Overview"));
+const AdminDeletions = lazy(() => import("@/pages/admin/Deletions"));
+const AdminUsers = lazy(() => import("@/pages/admin/Users"));
+const AdminGroups = lazy(() => import("@/pages/admin/Groups"));
+const AdminPayments = lazy(() => import("@/pages/admin/Payments"));
+const AdminAudit = lazy(() => import("@/pages/admin/Audit"));
+import { AdminShell } from "@/components/admin/AdminShell";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -120,7 +126,21 @@ const App = () => (
                     <Route path="/profil/suppression" element={<RouteBoundary name="Supprimer mon compte"><DeleteAccount /></RouteBoundary>} />
                     <Route path="/payment/return" element={<RouteBoundary name="Retour paiement"><PaymentReturn /></RouteBoundary>} />
                     <Route path="/payment/cancel" element={<RouteBoundary name="Paiement annulé"><PaymentCancel /></RouteBoundary>} />
-                    <Route path="/admin/suppressions" element={<RouteBoundary name="Admin suppressions"><AdminDeletionRequests /></RouteBoundary>} />
+                  </Route>
+                  <Route
+                    element={
+                      <AdminShell>
+                        <Outlet />
+                      </AdminShell>
+                    }
+                  >
+                    <Route path="/admin" element={<RouteBoundary name="Admin"><AdminOverview /></RouteBoundary>} />
+                    <Route path="/admin/overview" element={<RouteBoundary name="Admin overview"><AdminOverview /></RouteBoundary>} />
+                    <Route path="/admin/suppressions" element={<RouteBoundary name="Admin suppressions"><AdminDeletions /></RouteBoundary>} />
+                    <Route path="/admin/utilisateurs" element={<RouteBoundary name="Admin utilisateurs"><AdminUsers /></RouteBoundary>} />
+                    <Route path="/admin/groupes" element={<RouteBoundary name="Admin groupes"><AdminGroups /></RouteBoundary>} />
+                    <Route path="/admin/paiements" element={<RouteBoundary name="Admin paiements"><AdminPayments /></RouteBoundary>} />
+                    <Route path="/admin/audit" element={<RouteBoundary name="Admin audit"><AdminAudit /></RouteBoundary>} />
                   </Route>
                 </Route>
                 <Route path="*" element={<RouteBoundary name="Page introuvable"><NotFound /></RouteBoundary>} />
