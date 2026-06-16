@@ -2,3 +2,6 @@ project_id = "f51a5fe7-3210-4b4e-97ff-b6c5213b2913"
 
 [functions.delete-account]
 verify_jwt = false
+
+[functions.djomy-webhook]
+verify_jwt = false
