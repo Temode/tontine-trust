@@ -540,6 +540,99 @@ export type Database = {
           },
         ]
       }
+      group_deletion_requests: {
+        Row: {
+          admin_decision_at: string | null
+          admin_decision_by: string | null
+          admin_decision_reason: string | null
+          created_at: string
+          group_id: string
+          id: string
+          members_deadline: string
+          reason: string
+          requested_by: string
+          status: Database["public"]["Enums"]["deletion_request_status"]
+          updated_at: string
+        }
+        Insert: {
+          admin_decision_at?: string | null
+          admin_decision_by?: string | null
+          admin_decision_reason?: string | null
+          created_at?: string
+          group_id: string
+          id?: string
+          members_deadline: string
+          reason: string
+          requested_by: string
+          status?: Database["public"]["Enums"]["deletion_request_status"]
+          updated_at?: string
+        }
+        Update: {
+          admin_decision_at?: string | null
+          admin_decision_by?: string | null
+          admin_decision_reason?: string | null
+          created_at?: string
+          group_id?: string
+          id?: string
+          members_deadline?: string
+          reason?: string
+          requested_by?: string
+          status?: Database["public"]["Enums"]["deletion_request_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_deletion_requests_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_deletion_requests_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "my_groups_overview"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      group_deletion_votes: {
+        Row: {
+          request_id: string
+          user_id: string
+          vote: Database["public"]["Enums"]["deletion_vote_choice"]
+          voted_at: string
+        }
+        Insert: {
+          request_id: string
+          user_id: string
+          vote: Database["public"]["Enums"]["deletion_vote_choice"]
+          voted_at?: string
+        }
+        Update: {
+          request_id?: string
+          user_id?: string
+          vote?: Database["public"]["Enums"]["deletion_vote_choice"]
+          voted_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_deletion_votes_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "deletion_requests_admin_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_deletion_votes_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "group_deletion_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       group_members: {
         Row: {
           applicant_message: string | null
@@ -704,6 +797,8 @@ export type Database = {
           contribution_amount: number
           created_at: string
           created_by: string
+          deleted_at: string | null
+          deletion_request_id: string | null
           description: string | null
           frequency: Database["public"]["Enums"]["group_frequency"]
           id: string
@@ -730,6 +825,8 @@ export type Database = {
           contribution_amount: number
           created_at?: string
           created_by: string
+          deleted_at?: string | null
+          deletion_request_id?: string | null
           description?: string | null
           frequency?: Database["public"]["Enums"]["group_frequency"]
           id?: string
@@ -756,6 +853,8 @@ export type Database = {
           contribution_amount?: number
           created_at?: string
           created_by?: string
+          deleted_at?: string | null
+          deletion_request_id?: string | null
           description?: string | null
           frequency?: Database["public"]["Enums"]["group_frequency"]
           id?: string
@@ -1933,6 +2032,44 @@ export type Database = {
           },
         ]
       }
+      deletion_requests_admin_view: {
+        Row: {
+          active_members: number | null
+          admin_decision_at: string | null
+          admin_decision_by: string | null
+          admin_decision_reason: string | null
+          contribution_amount: number | null
+          created_at: string | null
+          frequency: Database["public"]["Enums"]["group_frequency"] | null
+          group_id: string | null
+          group_name: string | null
+          id: string | null
+          max_members: number | null
+          members_deadline: string | null
+          no_votes: number | null
+          reason: string | null
+          requested_by: string | null
+          requester_name: string | null
+          status: Database["public"]["Enums"]["deletion_request_status"] | null
+          yes_votes: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_deletion_requests_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_deletion_requests_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "my_groups_overview"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       group_admin_permissions_view: {
         Row: {
           can_approve_members: boolean | null
@@ -2856,6 +2993,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      admin_decide_deletion: {
+        Args: { _approve: boolean; _reason?: string; _request_id: string }
+        Returns: undefined
+      }
       append_ledger: {
         Args: {
           _amount: number
@@ -2903,6 +3044,7 @@ export type Database = {
       create_group_with_invitation: { Args: { _payload: Json }; Returns: Json }
       delete_account: { Args: { _reason?: string }; Returns: undefined }
       enqueue_payment_reminders: { Args: never; Returns: number }
+      finalize_deletion_votes: { Args: never; Returns: number }
       grant_admin_permissions: {
         Args: { _group_id: string; _perms: Json; _user_id: string }
         Returns: undefined
@@ -2935,6 +3077,7 @@ export type Database = {
         Returns: boolean
       }
       is_rpc_context: { Args: never; Returns: boolean }
+      is_super_admin: { Args: { _uid: string }; Returns: boolean }
       join_group_with_code: {
         Args: {
           _accepted_terms_version?: string
@@ -3031,6 +3174,10 @@ export type Database = {
         }
         Returns: string
       }
+      request_group_deletion: {
+        Args: { _group_id: string; _reason: string }
+        Returns: string
+      }
       request_turn_swap: {
         Args: { _from_turn: string; _reason?: string; _to_turn: string }
         Returns: string
@@ -3123,6 +3270,13 @@ export type Database = {
       }
       update_phone_visibility: {
         Args: { _visible: boolean }
+        Returns: undefined
+      }
+      vote_group_deletion: {
+        Args: {
+          _request_id: string
+          _vote: Database["public"]["Enums"]["deletion_vote_choice"]
+        }
         Returns: undefined
       }
       waive_penalty: {
