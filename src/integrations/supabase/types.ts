@@ -1235,8 +1235,10 @@ export type Database = {
       user_reliability_scores: {
         Row: {
           avg_delay_days: number
+          avg_rating: number
           cycles_completed: number
           last_computed_at: string
+          reviews_count: number
           score: number
           tier: Database["public"]["Enums"]["reliability_tier"]
           total_due: number
@@ -1247,8 +1249,10 @@ export type Database = {
         }
         Insert: {
           avg_delay_days?: number
+          avg_rating?: number
           cycles_completed?: number
           last_computed_at?: string
+          reviews_count?: number
           score?: number
           tier?: Database["public"]["Enums"]["reliability_tier"]
           total_due?: number
@@ -1259,8 +1263,10 @@ export type Database = {
         }
         Update: {
           avg_delay_days?: number
+          avg_rating?: number
           cycles_completed?: number
           last_computed_at?: string
+          reviews_count?: number
           score?: number
           tier?: Database["public"]["Enums"]["reliability_tier"]
           total_due?: number
@@ -1400,8 +1406,10 @@ export type Database = {
       }
       group_reliability: {
         Row: {
+          avg_rating: number | null
           full_name: string | null
           group_id: string | null
+          reviews_count: number | null
           score: number | null
           tier: Database["public"]["Enums"]["reliability_tier"] | null
           total_late: number | null
@@ -1759,8 +1767,10 @@ export type Database = {
       my_reliability: {
         Row: {
           avg_delay_days: number | null
+          avg_rating: number | null
           cycles_completed: number | null
           last_computed_at: string | null
+          reviews_count: number | null
           score: number | null
           tier: Database["public"]["Enums"]["reliability_tier"] | null
           total_due: number | null
@@ -1771,8 +1781,10 @@ export type Database = {
         }
         Insert: {
           avg_delay_days?: number | null
+          avg_rating?: number | null
           cycles_completed?: number | null
           last_computed_at?: string | null
+          reviews_count?: number | null
           score?: number | null
           tier?: Database["public"]["Enums"]["reliability_tier"] | null
           total_due?: number | null
@@ -1783,8 +1795,10 @@ export type Database = {
         }
         Update: {
           avg_delay_days?: number | null
+          avg_rating?: number | null
           cycles_completed?: number | null
           last_computed_at?: string | null
+          reviews_count?: number | null
           score?: number | null
           tier?: Database["public"]["Enums"]["reliability_tier"] | null
           total_due?: number | null
@@ -2133,6 +2147,7 @@ export type Database = {
         Args: { _group: string; _user: string }
         Returns: boolean
       }
+      is_rpc_context: { Args: never; Returns: boolean }
       join_group_with_code: {
         Args: { _code: string; _message?: string; _operator?: string }
         Returns: string
@@ -2171,8 +2186,10 @@ export type Database = {
         Args: { _user_id?: string }
         Returns: {
           avg_delay_days: number
+          avg_rating: number
           cycles_completed: number
           last_computed_at: string
+          reviews_count: number
           score: number
           tier: Database["public"]["Enums"]["reliability_tier"]
           total_due: number
