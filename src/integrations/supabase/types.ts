@@ -3508,6 +3508,7 @@ export type Database = {
       }
     }
     Functions: {
+      _audit_confirm_test_user: { Args: { _email: string }; Returns: undefined }
       _generate_invite_code: { Args: never; Returns: string }
       adjust_penalty: {
         Args: {

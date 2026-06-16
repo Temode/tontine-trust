@@ -1,73 +1,59 @@
-# Diagnostic et plan de correctifs
+# Audit E2E complet de la tontine
 
-J'ai investigué les 3 problèmes. Voici la cause racine de chacun et la correction proposée. Tout passe par **une seule migration SQL** + un petit ajustement front pour remonter le vrai message d'erreur de `start_cycle`.
+## Objectif
+Jouer le parcours complet bout-en-bout dans le navigateur (Playwright headless sur `localhost:8080`), recenser tous les bugs fonctionnels et frictions UX rencontrés, puis livrer un patch correctif unique.
 
----
+## Phase 1 — Préparation des comptes de test
+Créer 3 comptes via l'écran `/auth` (signup email + mot de passe, sans confirmation email puisque déjà désactivée) :
+- **Alice** (organisatrice) — alice.test+<timestamp>@tontine.test
+- **Bob** (membre) — bob.test+<timestamp>@tontine.test
+- **Carole** (membre) — carole.test+<timestamp>@tontine.test
 
-## 1. Bob rejoint sans validation d'Alice
+Sessions sauvegardées en JSON dans `/tmp/browser/audit/` pour pouvoir basculer rapidement d'un utilisateur à l'autre.
 
-**Cause** — Dans `join_group_with_code`, la règle actuelle est inversée :
+## Phase 2 — Scénario fonctionnel joué dans le navigateur
+1. **Alice** : compléter profil (nom, téléphone GN) → créer un groupe "Audit Tontine" (3 membres, 50 000 GNF, hebdomadaire) → récupérer le code d'invitation.
+2. **Bob** puis **Carole** : `/join` → saisir code → soumettre candidature.
+3. **Alice** : panneau "Candidatures en attente" → Accepter Bob et Carole.
+4. **Alice** : "Démarrer le cycle" → vérifier que turns sont générés et que l'erreur précédente ne se reproduit pas (sinon capturer le toast détaillé).
+5. **Bob** : `/mes-cotisations` → payer via **Djomy sandbox** (méthode OM ou MOMO, numéro sandbox) → suivre la redirection → revenir sur `/payment/return` → vérifier que la contribution passe en `succeeded`.
+6. **Carole** : même paiement.
+7. Vérifier le versement (payout) au bénéficiaire du tour 1, l'historique, les reçus, les notifications.
+8. **Admin** (super_admin déjà configuré) : `/admin` → vérifier overview, users, groups, payments, audit.
 
-```text
-visibility = 'private'  →  status = 'active'   (auto-accepté)
-visibility = 'public'   →  status = 'pending'  (validation requise)
-```
+À chaque étape : screenshot + capture console + capture network (statuts RPC/edge functions).
 
-Or le groupe d'Alice est `private`, donc Bob est activé immédiatement. C'est l'inverse du comportement attendu : **rejoindre via code doit toujours passer par une validation de l'organisateur**, sauf si le groupe est explicitement marqué « ouvert ».
+## Phase 3 — Recensement des problèmes
+Pour chaque écran traversé, lister :
+- **Bugs fonctionnels** : RPC en erreur, données manquantes, écrans cassés, redirections fausses, droits mal appliqués.
+- **UX** : libellés ambigus, boutons sans feedback, états de chargement manquants, parcours qui force l'utilisateur à deviner l'étape suivante, contraste/lisibilité, messages d'erreur incompréhensibles, mobile (826×528).
+- **Intégration Djomy sandbox** : init payment, redirection, webhook, retour, statut final, gestion des échecs et annulations.
 
-**Correctif** — Réécrire le bloc de décision : par défaut, toute adhésion via code arrive en `pending`. L'organisateur valide ensuite via le panneau « Candidatures en attente » déjà présent dans `GroupDetail.tsx` (qui appelle `approve_member` / `reject_member`).
+Le résultat de cette phase est un rapport synthétique (max 20 items priorisés P0/P1/P2) qui sera affiché à l'utilisateur avant les correctifs.
 
----
+## Phase 4 — Correctifs
+Implémenter en priorité P0 puis P1 :
+- Patchs SQL groupés dans **une seule migration** (RPC, vues, policies, grants).
+- Patchs front ciblés (toasts détaillés, états vides, loaders, libellés, accessibilité).
+- Edge functions Djomy si init/webhook/return présentent des défauts.
 
-## 2. `start_cycle` → 400 Bad Request
+Aucun refactor large : on touche uniquement ce que l'audit a démontré comme défaillant.
 
-**Cause probable** — Le message d'erreur est masqué côté front (`message: [object Object]`). En testant la fonction, la logique passe les gardes (Alice est bien `organisateur`, groupe `open`, 2 membres actifs). Le 400 vient soit de `log_audit` (trigger d'instrumentation), soit du cast d'enum sur `notifications`. Sans le vrai message, impossible d'être catégorique.
+## Phase 5 — Validation
+Rejouer le scénario complet (Phase 2) une seconde fois après les correctifs. Livrer :
+- Screenshots avant/après pour les problèmes UX visibles.
+- Confirmation que chaque P0/P1 du rapport est résolu.
+- Liste résiduelle des P2 non traités avec justification.
 
-**Correctif en 2 temps** :
+## Détails techniques
+- Outil : Playwright Python headless, viewport 1280×1800 pour desktop + un passage 390×844 pour mobile sur les écrans clés (Dashboard, GroupDetail, MesCotisations).
+- Sandbox Djomy : credentials `DJOMY_CLIENT_ID` / `DJOMY_CLIENT_SECRET` déjà configurés (à confirmer via `fetch_secrets`). Numéros de test sandbox Djomy : OM `224620000001`, MOMO `224660000001` (à valider lors de l'init).
+- Webhook : vérifier que l'URL configurée côté Djomy pointe bien vers `https://<project>.functions.supabase.co/djomy-webhook`. Si non, signaler à l'utilisateur (action manuelle requise côté dashboard Djomy).
+- Aucune donnée de prod n'est touchée : tous les comptes créés sont préfixés `*.test+<ts>@tontine.test`.
 
-a. **Front** — Dans `src/lib/diagnostics/crashLogger.ts` et le `onError` de `startCycleM` (`GroupDetail.tsx`), sérialiser correctement l'erreur Supabase (`error.message`, `error.details`, `error.hint`, `error.code`) au lieu de la stringifier brutalement en `[object Object]`. On verra enfin le vrai code Postgres.
+## Points nécessitant confirmation avant exécution
+1. **Webhook Djomy** : je n'ai pas accès au dashboard Djomy. Si le webhook n'est pas configuré côté Djomy vers notre edge function, le statut de paiement restera `pending` côté DB même si le paiement réussit côté téléphone. Acceptes-tu que dans ce cas je valide la partie « initiation + redirection » et que je documente l'action manuelle à faire côté Djomy ?
+2. **Confirmation email** : les comptes de test doivent pouvoir se connecter sans email confirmé. Si ce n'est pas déjà le cas, je devrai t'avertir avant de continuer.
+3. **Suppression post-audit** : je laisse les comptes/groupes de test en base (préfixés `*.test`) pour que tu puisses inspecter, ou tu préfères que je les supprime à la fin ?
 
-b. **SQL** — Durcir `start_cycle` : envelopper `log_audit` dans un `BEGIN … EXCEPTION WHEN OTHERS THEN NULL` pour qu'un échec d'audit n'avorte pas le démarrage du cycle, et garantir que `v_freq_days` n'est jamais NULL (raise explicit si la fréquence est inconnue).
-
-Une fois (a) déployé, on aura le message exact si (b) ne suffit pas — on itère.
-
----
-
-## 3. Back-office « Utilisateurs » vide
-
-**Cause confirmée** — La vue `admin_user_overview` est déclarée avec `security_invoker=on` et fait un `JOIN auth.users`. Or le rôle `authenticated` n'a **pas** le privilège `SELECT` sur `auth.users` (vérifié : `has_table_privilege = false`). Résultat : même pour un super_admin, la vue renvoie une erreur ou un set vide. Les 5 profils existent bien dans la base.
-
-**Correctif** — Recréer la vue en `security_invoker=off` (elle s'exécute alors avec les droits du propriétaire, qui voit `auth.users`), et ajouter une garde interne `WHERE public.has_role(auth.uid(), 'super_admin')` pour qu'aucun autre rôle ne puisse l'utiliser. Idem pour `admin_group_overview`, `admin_payment_overview`, `admin_platform_kpis` qui ont le même schéma et probablement le même bug latent.
-
----
-
-## Détails techniques (migration unique)
-
-```text
-1. CREATE OR REPLACE FUNCTION public.join_group_with_code(...)
-   → toujours v_target_status = 'pending' (sauf si invitation auto-approve future)
-   → v_target_position = NULL
-
-2. CREATE OR REPLACE FUNCTION public.start_cycle(uuid)
-   → wrap log_audit dans BEGIN/EXCEPTION
-   → RAISE EXCEPTION 'INVALID_FREQUENCY' si v_freq_days IS NULL
-
-3. DROP VIEW + CREATE VIEW admin_user_overview / admin_group_overview /
-   admin_payment_overview / admin_platform_kpis
-   → sans security_invoker (= security definer par défaut)
-   → ajouter WHERE has_role(auth.uid(),'super_admin') dans chaque vue
-   → GRANT SELECT ... TO authenticated
-```
-
-## Fichiers front modifiés
-
-- `src/lib/diagnostics/crashLogger.ts` — sérialisation propre des erreurs Supabase (message + details + hint + code).
-- `src/pages/GroupDetail.tsx` — `onError` de `startCycleM` affiche `error.details ?? error.message`.
-
-## Critères de validation
-
-- Bob saisit le code d'Alice → apparaît dans « Candidatures en attente » d'Alice, **pas** dans les membres actifs.
-- Alice approuve → Bob devient actif, position assignée.
-- Alice clique « Démarrer le cycle » → soit ça réussit, soit le toast affiche le vrai message Postgres (plus jamais `[object Object]`).
-- `/admin/utilisateurs` liste les 5 profils existants avec email, rôles, nb de groupes.
-- Un utilisateur non-admin appelant les vues admin via l'API obtient 0 ligne (garde interne).
+Réponds OK (et précise les 3 points ci-dessus si tu as une préférence) et je lance l'audit.
