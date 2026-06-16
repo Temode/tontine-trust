@@ -78,7 +78,14 @@ export type Database = {
           group_id: string
           id: string
           payer_user_id: string
+          penalty_adjust_reason: string | null
+          penalty_adjusted_at: string | null
+          penalty_adjusted_by: string | null
+          penalty_adjusted_from: number | null
           penalty_amount: number
+          penalty_waive_reason: string | null
+          penalty_waived_at: string | null
+          penalty_waived_by: string | null
           provider: Database["public"]["Enums"]["payment_provider"] | null
           reference: string | null
           status: Database["public"]["Enums"]["contribution_status"]
@@ -93,7 +100,14 @@ export type Database = {
           group_id: string
           id?: string
           payer_user_id: string
+          penalty_adjust_reason?: string | null
+          penalty_adjusted_at?: string | null
+          penalty_adjusted_by?: string | null
+          penalty_adjusted_from?: number | null
           penalty_amount?: number
+          penalty_waive_reason?: string | null
+          penalty_waived_at?: string | null
+          penalty_waived_by?: string | null
           provider?: Database["public"]["Enums"]["payment_provider"] | null
           reference?: string | null
           status?: Database["public"]["Enums"]["contribution_status"]
@@ -108,7 +122,14 @@ export type Database = {
           group_id?: string
           id?: string
           payer_user_id?: string
+          penalty_adjust_reason?: string | null
+          penalty_adjusted_at?: string | null
+          penalty_adjusted_by?: string | null
+          penalty_adjusted_from?: number | null
           penalty_amount?: number
+          penalty_waive_reason?: string | null
+          penalty_waived_at?: string | null
+          penalty_waived_by?: string | null
           provider?: Database["public"]["Enums"]["payment_provider"] | null
           reference?: string | null
           status?: Database["public"]["Enums"]["contribution_status"]
@@ -185,6 +206,96 @@ export type Database = {
           },
           {
             foreignKeyName: "cycles_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "my_groups_overview"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      external_payment_proofs: {
+        Row: {
+          amount: number
+          contribution_id: string
+          group_id: string
+          id: string
+          member_user_id: string
+          method: Database["public"]["Enums"]["payment_method_external"]
+          note: string | null
+          proof_url: string | null
+          recorded_at: string
+          recorded_by: string
+          reference: string | null
+          reject_reason: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: Database["public"]["Enums"]["external_proof_status"]
+        }
+        Insert: {
+          amount: number
+          contribution_id: string
+          group_id: string
+          id?: string
+          member_user_id: string
+          method: Database["public"]["Enums"]["payment_method_external"]
+          note?: string | null
+          proof_url?: string | null
+          recorded_at?: string
+          recorded_by: string
+          reference?: string | null
+          reject_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: Database["public"]["Enums"]["external_proof_status"]
+        }
+        Update: {
+          amount?: number
+          contribution_id?: string
+          group_id?: string
+          id?: string
+          member_user_id?: string
+          method?: Database["public"]["Enums"]["payment_method_external"]
+          note?: string | null
+          proof_url?: string | null
+          recorded_at?: string
+          recorded_by?: string
+          reference?: string | null
+          reject_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: Database["public"]["Enums"]["external_proof_status"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "external_payment_proofs_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
+            referencedRelation: "contributions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "external_payment_proofs_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
+            referencedRelation: "my_contributions_due"
+            referencedColumns: ["contribution_id"]
+          },
+          {
+            foreignKeyName: "external_payment_proofs_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
+            referencedRelation: "my_late_contributions"
+            referencedColumns: ["contribution_id"]
+          },
+          {
+            foreignKeyName: "external_payment_proofs_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "external_payment_proofs_group_id_fkey"
             columns: ["group_id"]
             isOneToOne: false
             referencedRelation: "my_groups_overview"
@@ -2254,6 +2365,14 @@ export type Database = {
     }
     Functions: {
       _generate_invite_code: { Args: never; Returns: string }
+      adjust_penalty: {
+        Args: {
+          _contribution_id: string
+          _new_amount: number
+          _reason?: string
+        }
+        Returns: undefined
+      }
       append_ledger: {
         Args: {
           _amount: number
@@ -2272,6 +2391,10 @@ export type Database = {
       cancel_my_bid: { Args: { _turn_id: string }; Returns: undefined }
       cancel_turn_swap: { Args: { _request_id: string }; Returns: undefined }
       close_auction: { Args: { _turn_id: string }; Returns: string }
+      confirm_external_payment: {
+        Args: { _proof_id: string }
+        Returns: undefined
+      }
       create_group_with_invitation: { Args: { _payload: Json }; Returns: Json }
       enqueue_payment_reminders: { Args: never; Returns: number }
       grant_admin_permissions: {
@@ -2379,6 +2502,10 @@ export type Database = {
         }
         Returns: string
       }
+      reject_external_payment: {
+        Args: { _proof_id: string; _reason?: string }
+        Returns: undefined
+      }
       reject_member: { Args: { _member_id: string }; Returns: undefined }
       release_payout: {
         Args: {
@@ -2420,6 +2547,17 @@ export type Database = {
         Returns: boolean
       }
       start_cycle: { Args: { _group_id: string }; Returns: string }
+      submit_external_payment: {
+        Args: {
+          _amount: number
+          _contribution_id: string
+          _method: Database["public"]["Enums"]["payment_method_external"]
+          _note?: string
+          _proof_url?: string
+          _reference?: string
+        }
+        Returns: string
+      }
       submit_review: {
         Args: {
           _comment?: string
@@ -2444,6 +2582,10 @@ export type Database = {
       update_notification_preferences: {
         Args: { _payload: Json }
         Returns: number
+      }
+      waive_penalty: {
+        Args: { _contribution_id: string; _reason?: string }
+        Returns: undefined
       }
     }
     Enums: {
