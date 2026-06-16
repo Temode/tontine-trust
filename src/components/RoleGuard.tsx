@@ -1,6 +1,8 @@
 import type { ReactNode } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import type { AppRole } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
+
+type AppRole = Database["public"]["Enums"]["app_role"];
 
 interface RoleGuardProps {
   allowedRoles: AppRole[];
