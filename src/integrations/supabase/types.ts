@@ -2222,14 +2222,14 @@ export type Database = {
           created_at: string | null
           created_by: string | null
           deleted_at: string | null
-          frequency: Database["public"]["Enums"]["group_frequency"] | null
+          frequency: string | null
           id: string | null
           max_members: number | null
           members_count: number | null
           name: string | null
           organizer_name: string | null
           paused_at: string | null
-          status: Database["public"]["Enums"]["group_status"] | null
+          status: string | null
           volume_total: number | null
         }
         Insert: {
@@ -2238,14 +2238,14 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           deleted_at?: string | null
-          frequency?: Database["public"]["Enums"]["group_frequency"] | null
+          frequency?: never
           id?: string | null
           max_members?: number | null
           members_count?: never
           name?: string | null
           organizer_name?: never
           paused_at?: string | null
-          status?: Database["public"]["Enums"]["group_status"] | null
+          status?: never
           volume_total?: never
         }
         Update: {
@@ -2254,14 +2254,14 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           deleted_at?: string | null
-          frequency?: Database["public"]["Enums"]["group_frequency"] | null
+          frequency?: never
           id?: string | null
           max_members?: number | null
           members_count?: never
           name?: string | null
           organizer_name?: never
           paused_at?: string | null
-          status?: Database["public"]["Enums"]["group_status"] | null
+          status?: never
           volume_total?: never
         }
         Relationships: []
@@ -2279,8 +2279,38 @@ export type Database = {
           payment_method: string | null
           provider: Database["public"]["Enums"]["payment_provider"] | null
           settled_at: string | null
-          status: Database["public"]["Enums"]["payment_status"] | null
+          status: string | null
           user_id: string | null
+        }
+        Insert: {
+          amount?: number | null
+          djomy_transaction_id?: string | null
+          error_message?: string | null
+          group_id?: string | null
+          group_name?: never
+          id?: string | null
+          initiated_at?: string | null
+          payer_name?: never
+          payment_method?: string | null
+          provider?: Database["public"]["Enums"]["payment_provider"] | null
+          settled_at?: string | null
+          status?: never
+          user_id?: string | null
+        }
+        Update: {
+          amount?: number | null
+          djomy_transaction_id?: string | null
+          error_message?: string | null
+          group_id?: string | null
+          group_name?: never
+          id?: string | null
+          initiated_at?: string | null
+          payer_name?: never
+          payment_method?: string | null
+          provider?: Database["public"]["Enums"]["payment_provider"] | null
+          settled_at?: string | null
+          status?: never
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -3590,10 +3620,10 @@ export type Database = {
       is_super_admin: { Args: { _uid: string }; Returns: boolean }
       join_group_with_code: {
         Args: {
-          _accepted_terms_version?: string
+          _accepted_terms_version: string
           _code: string
-          _message?: string
-          _operator?: string
+          _message: string
+          _operator: string
         }
         Returns: string
       }
