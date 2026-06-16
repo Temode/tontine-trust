@@ -14,6 +14,24 @@ export type Database = {
   }
   public: {
     Tables: {
+      app_terms_versions: {
+        Row: {
+          content: string
+          published_at: string
+          version: string
+        }
+        Insert: {
+          content: string
+          published_at?: string
+          version: string
+        }
+        Update: {
+          content?: string
+          published_at?: string
+          version?: string
+        }
+        Relationships: []
+      }
       audit_log: {
         Row: {
           action: string
@@ -68,6 +86,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      audit_log_purge_history: {
+        Row: {
+          id: string
+          purged_at: string
+          rows_deleted: number
+        }
+        Insert: {
+          id?: string
+          purged_at?: string
+          rows_deleted: number
+        }
+        Update: {
+          id?: string
+          purged_at?: string
+          rows_deleted?: number
+        }
+        Relationships: []
       }
       contributions: {
         Row: {
@@ -212,6 +248,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      djomy_webhook_events: {
+        Row: {
+          event_id: string
+          event_type: string
+          payload: Json
+          received_at: string
+          signature_valid: boolean
+          transaction_id: string | null
+        }
+        Insert: {
+          event_id: string
+          event_type: string
+          payload: Json
+          received_at?: string
+          signature_valid: boolean
+          transaction_id?: string | null
+        }
+        Update: {
+          event_id?: string
+          event_type?: string
+          payload?: Json
+          received_at?: string
+          signature_valid?: boolean
+          transaction_id?: string | null
+        }
+        Relationships: []
       }
       external_payment_proofs: {
         Row: {
@@ -372,6 +435,107 @@ export type Database = {
             columns: ["group_id"]
             isOneToOne: false
             referencedRelation: "my_groups_overview"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      group_announcements: {
+        Row: {
+          author_user_id: string
+          body: string
+          created_at: string
+          group_id: string
+          id: string
+          pinned: boolean
+          title: string
+        }
+        Insert: {
+          author_user_id: string
+          body: string
+          created_at?: string
+          group_id: string
+          id?: string
+          pinned?: boolean
+          title: string
+        }
+        Update: {
+          author_user_id?: string
+          body?: string
+          created_at?: string
+          group_id?: string
+          id?: string
+          pinned?: boolean
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_announcements_author_user_id_fkey"
+            columns: ["author_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_announcements_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_announcements_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "my_groups_overview"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      group_consent_log: {
+        Row: {
+          accepted_at: string
+          group_id: string
+          id: string
+          ip_hash: string | null
+          terms_version: string
+          user_id: string
+        }
+        Insert: {
+          accepted_at?: string
+          group_id: string
+          id?: string
+          ip_hash?: string | null
+          terms_version: string
+          user_id: string
+        }
+        Update: {
+          accepted_at?: string
+          group_id?: string
+          id?: string
+          ip_hash?: string | null
+          terms_version?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_consent_log_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_consent_log_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "my_groups_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_consent_log_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -1018,16 +1182,113 @@ export type Database = {
           },
         ]
       }
+      payment_links: {
+        Row: {
+          amount: number
+          contribution_id: string | null
+          created_at: string
+          created_by: string
+          djomy_reference: string
+          djomy_url: string
+          expires_at: string | null
+          group_id: string
+          id: string
+          metadata: Json | null
+          purpose: string
+          status: string
+          usage_type: string
+        }
+        Insert: {
+          amount: number
+          contribution_id?: string | null
+          created_at?: string
+          created_by: string
+          djomy_reference: string
+          djomy_url: string
+          expires_at?: string | null
+          group_id: string
+          id?: string
+          metadata?: Json | null
+          purpose: string
+          status?: string
+          usage_type?: string
+        }
+        Update: {
+          amount?: number
+          contribution_id?: string | null
+          created_at?: string
+          created_by?: string
+          djomy_reference?: string
+          djomy_url?: string
+          expires_at?: string | null
+          group_id?: string
+          id?: string
+          metadata?: Json | null
+          purpose?: string
+          status?: string
+          usage_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_links_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
+            referencedRelation: "contributions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_links_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
+            referencedRelation: "group_payments_history"
+            referencedColumns: ["contribution_id"]
+          },
+          {
+            foreignKeyName: "payment_links_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
+            referencedRelation: "my_contributions_due"
+            referencedColumns: ["contribution_id"]
+          },
+          {
+            foreignKeyName: "payment_links_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
+            referencedRelation: "my_late_contributions"
+            referencedColumns: ["contribution_id"]
+          },
+          {
+            foreignKeyName: "payment_links_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_links_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "my_groups_overview"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payments: {
         Row: {
           amount: number
           contribution_id: string
+          djomy_link_reference: string | null
+          djomy_transaction_id: string | null
           error_message: string | null
           group_id: string
           id: string
           initiated_at: string
+          metadata: Json | null
+          payer_phone: string | null
+          payment_method: string | null
           provider: Database["public"]["Enums"]["payment_provider"]
           provider_ref: string | null
+          redirect_url: string | null
           settled_at: string | null
           status: Database["public"]["Enums"]["payment_status"]
           user_id: string
@@ -1035,12 +1296,18 @@ export type Database = {
         Insert: {
           amount: number
           contribution_id: string
+          djomy_link_reference?: string | null
+          djomy_transaction_id?: string | null
           error_message?: string | null
           group_id: string
           id?: string
           initiated_at?: string
+          metadata?: Json | null
+          payer_phone?: string | null
+          payment_method?: string | null
           provider: Database["public"]["Enums"]["payment_provider"]
           provider_ref?: string | null
+          redirect_url?: string | null
           settled_at?: string | null
           status?: Database["public"]["Enums"]["payment_status"]
           user_id: string
@@ -1048,12 +1315,18 @@ export type Database = {
         Update: {
           amount?: number
           contribution_id?: string
+          djomy_link_reference?: string | null
+          djomy_transaction_id?: string | null
           error_message?: string | null
           group_id?: string
           id?: string
           initiated_at?: string
+          metadata?: Json | null
+          payer_phone?: string | null
+          payment_method?: string | null
           provider?: Database["public"]["Enums"]["payment_provider"]
           provider_ref?: string | null
+          redirect_url?: string | null
           settled_at?: string | null
           status?: Database["public"]["Enums"]["payment_status"]
           user_id?: string
@@ -1112,6 +1385,7 @@ export type Database = {
           full_name: string
           id: string
           phone_number: string | null
+          phone_visible_in_groups: boolean
           reliability_score: number
           updated_at: string
         }
@@ -1123,6 +1397,7 @@ export type Database = {
           full_name: string
           id: string
           phone_number?: string | null
+          phone_visible_in_groups?: boolean
           reliability_score?: number
           updated_at?: string
         }
@@ -1134,6 +1409,7 @@ export type Database = {
           full_name?: string
           id?: string
           phone_number?: string | null
+          phone_visible_in_groups?: boolean
           reliability_score?: number
           updated_at?: string
         }
@@ -1757,6 +2033,48 @@ export type Database = {
             columns: ["turn_id"]
             isOneToOne: false
             referencedRelation: "turns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      group_members_safe_view: {
+        Row: {
+          can_bid: boolean | null
+          can_chat: boolean | null
+          can_invite: boolean | null
+          can_swap: boolean | null
+          full_name: string | null
+          group_id: string | null
+          id: string | null
+          joined_at: string | null
+          phone_number: string | null
+          position: number | null
+          role: Database["public"]["Enums"]["member_role"] | null
+          status: Database["public"]["Enums"]["member_status"] | null
+          suspended_at: string | null
+          suspended_reason: string | null
+          user_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_members_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_members_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "my_groups_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_members_user_id_profile_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -2552,9 +2870,27 @@ export type Database = {
         }
         Returns: string
       }
+      apply_djomy_webhook: {
+        Args: {
+          _new_status: string
+          _paid_amount: number
+          _payment_id: string
+          _payment_method: string
+          _provider_ref: string
+        }
+        Returns: undefined
+      }
       approve_member: { Args: { _member_id: string }; Returns: undefined }
       archive_group: {
         Args: { _group_id: string; _reason?: string }
+        Returns: undefined
+      }
+      attach_djomy_reference: {
+        Args: {
+          _payment_id: string
+          _redirect_url: string
+          _transaction_id: string
+        }
         Returns: undefined
       }
       cancel_my_bid: { Args: { _turn_id: string }; Returns: undefined }
@@ -2600,7 +2936,12 @@ export type Database = {
       }
       is_rpc_context: { Args: never; Returns: boolean }
       join_group_with_code: {
-        Args: { _code: string; _message?: string; _operator?: string }
+        Args: {
+          _accepted_terms_version?: string
+          _code: string
+          _message?: string
+          _operator?: string
+        }
         Returns: string
       }
       kick_member: {
@@ -2619,6 +2960,7 @@ export type Database = {
       }
       mark_all_notifications_read: { Args: never; Returns: number }
       mark_notification_read: { Args: { _id: string }; Returns: undefined }
+      mask_phone: { Args: { _phone: string }; Returns: string }
       member_can: {
         Args: { _flag: string; _group: string; _user: string }
         Returns: boolean
@@ -2645,6 +2987,7 @@ export type Database = {
         Returns: string
       }
       preview_group_by_code: { Args: { _code: string }; Returns: Json }
+      purge_audit_log: { Args: never; Returns: number }
       reactivate_member: { Args: { _member_id: string }; Returns: undefined }
       recompute_reliability: {
         Args: { _user_id?: string }
@@ -2734,6 +3077,14 @@ export type Database = {
         Returns: boolean
       }
       start_cycle: { Args: { _group_id: string }; Returns: string }
+      start_djomy_payment: {
+        Args: {
+          _contribution_id: string
+          _method: string
+          _payer_phone: string
+        }
+        Returns: string
+      }
       submit_external_payment: {
         Args: {
           _amount: number
@@ -2769,6 +3120,10 @@ export type Database = {
       update_notification_preferences: {
         Args: { _payload: Json }
         Returns: number
+      }
+      update_phone_visibility: {
+        Args: { _visible: boolean }
+        Returns: undefined
       }
       waive_penalty: {
         Args: { _contribution_id: string; _reason?: string }
@@ -2853,7 +3208,12 @@ export type Database = {
         | "om_external"
         | "mtn_external"
         | "other"
-      payment_provider: "orange_money" | "mtn_money" | "cash" | "simulation"
+      payment_provider:
+        | "orange_money"
+        | "mtn_money"
+        | "cash"
+        | "simulation"
+        | "djomy"
       payment_status:
         | "initiated"
         | "pending"
@@ -3076,7 +3436,13 @@ export const Constants = {
         "mtn_external",
         "other",
       ],
-      payment_provider: ["orange_money", "mtn_money", "cash", "simulation"],
+      payment_provider: [
+        "orange_money",
+        "mtn_money",
+        "cash",
+        "simulation",
+        "djomy",
+      ],
       payment_status: [
         "initiated",
         "pending",
