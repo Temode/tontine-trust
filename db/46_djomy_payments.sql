@@ -48,25 +48,17 @@ drop policy if exists payment_links_member_select on public.payment_links;
 create policy payment_links_member_select on public.payment_links
   for select to authenticated
   using (exists (
-    select 1 from public.memberships m
-    where m.group_id = payment_links.group_id and m.user_id = auth.uid()
+    select 1 from public.group_members gm
+    where gm.group_id = payment_links.group_id
+      and gm.user_id = auth.uid()
+      and gm.status = 'active'
   ));
 
 drop policy if exists payment_links_admin_write on public.payment_links;
 create policy payment_links_admin_write on public.payment_links
   for all to authenticated
-  using (exists (
-    select 1 from public.memberships m
-    where m.group_id = payment_links.group_id
-      and m.user_id = auth.uid()
-      and m.role in ('admin','co_admin')
-  ))
-  with check (exists (
-    select 1 from public.memberships m
-    where m.group_id = payment_links.group_id
-      and m.user_id = auth.uid()
-      and m.role in ('admin','co_admin')
-  ));
+  using (public.is_group_organizer(payment_links.group_id, auth.uid()))
+  with check (public.is_group_organizer(payment_links.group_id, auth.uid()));
 
 -- 4. Table djomy_webhook_events (idempotence)
 create table if not exists public.djomy_webhook_events (
