@@ -136,28 +136,34 @@ export type Database = {
       }
       group_members: {
         Row: {
+          applicant_message: string | null
           group_id: string
           id: string
           joined_at: string
           position: number | null
+          preferred_operator: string | null
           role: Database["public"]["Enums"]["member_role"]
           status: Database["public"]["Enums"]["member_status"]
           user_id: string
         }
         Insert: {
+          applicant_message?: string | null
           group_id: string
           id?: string
           joined_at?: string
           position?: number | null
+          preferred_operator?: string | null
           role?: Database["public"]["Enums"]["member_role"]
           status?: Database["public"]["Enums"]["member_status"]
           user_id: string
         }
         Update: {
+          applicant_message?: string | null
           group_id?: string
           id?: string
           joined_at?: string
           position?: number | null
+          preferred_operator?: string | null
           role?: Database["public"]["Enums"]["member_role"]
           status?: Database["public"]["Enums"]["member_status"]
           user_id?: string
@@ -177,11 +183,19 @@ export type Database = {
             referencedRelation: "my_groups_overview"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "group_members_user_id_profile_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
         ]
       }
       groups: {
         Row: {
           category: string | null
+          co_organizers: string[]
           contribution_amount: number
           created_at: string
           created_by: string
@@ -195,9 +209,11 @@ export type Database = {
           rotation_order_kind: Database["public"]["Enums"]["rotation_order"]
           status: Database["public"]["Enums"]["group_status"]
           updated_at: string
+          visibility: Database["public"]["Enums"]["group_visibility"]
         }
         Insert: {
           category?: string | null
+          co_organizers?: string[]
           contribution_amount: number
           created_at?: string
           created_by: string
@@ -211,9 +227,11 @@ export type Database = {
           rotation_order_kind?: Database["public"]["Enums"]["rotation_order"]
           status?: Database["public"]["Enums"]["group_status"]
           updated_at?: string
+          visibility?: Database["public"]["Enums"]["group_visibility"]
         }
         Update: {
           category?: string | null
+          co_organizers?: string[]
           contribution_amount?: number
           created_at?: string
           created_by?: string
@@ -227,6 +245,7 @@ export type Database = {
           rotation_order_kind?: Database["public"]["Enums"]["rotation_order"]
           status?: Database["public"]["Enums"]["group_status"]
           updated_at?: string
+          visibility?: Database["public"]["Enums"]["group_visibility"]
         }
         Relationships: []
       }
@@ -280,6 +299,21 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      join_attempts: {
+        Row: {
+          attempted_at: string
+          user_id: string
+        }
+        Insert: {
+          attempted_at?: string
+          user_id: string
+        }
+        Update: {
+          attempted_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       ledger_entries: {
         Row: {
@@ -934,6 +968,13 @@ export type Database = {
             referencedRelation: "my_groups_overview"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "group_members_user_id_profile_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
         ]
       }
       my_contributions_due: {
@@ -998,8 +1039,12 @@ export type Database = {
           is_organizer: boolean | null
           max_members: number | null
           members_count: number | null
+          my_role: Database["public"]["Enums"]["member_role"] | null
+          my_status: Database["public"]["Enums"]["member_status"] | null
           name: string | null
+          organizer_name: string | null
           status: Database["public"]["Enums"]["group_status"] | null
+          visibility: Database["public"]["Enums"]["group_visibility"] | null
         }
         Insert: {
           contribution_amount?: number | null
@@ -1010,8 +1055,12 @@ export type Database = {
           is_organizer?: never
           max_members?: number | null
           members_count?: never
+          my_role?: never
+          my_status?: never
           name?: string | null
+          organizer_name?: never
           status?: Database["public"]["Enums"]["group_status"] | null
+          visibility?: Database["public"]["Enums"]["group_visibility"] | null
         }
         Update: {
           contribution_amount?: number | null
@@ -1022,8 +1071,12 @@ export type Database = {
           is_organizer?: never
           max_members?: number | null
           members_count?: never
+          my_role?: never
+          my_status?: never
           name?: string | null
+          organizer_name?: never
           status?: Database["public"]["Enums"]["group_status"] | null
+          visibility?: Database["public"]["Enums"]["group_visibility"] | null
         }
         Relationships: []
       }
@@ -1051,6 +1104,58 @@ export type Database = {
             columns: ["group_id"]
             isOneToOne: false
             referencedRelation: "my_groups_overview"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      my_notifications: {
+        Row: {
+          body: string | null
+          created_at: string | null
+          data: Json | null
+          group_id: string | null
+          id: string | null
+          kind: Database["public"]["Enums"]["notification_kind"] | null
+          link: string | null
+          read_at: string | null
+          title: string | null
+          turn_id: string | null
+          user_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "my_groups_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_turn_id_fkey"
+            columns: ["turn_id"]
+            isOneToOne: false
+            referencedRelation: "next_turn_per_group"
+            referencedColumns: ["turn_id"]
+          },
+          {
+            foreignKeyName: "notifications_turn_id_fkey"
+            columns: ["turn_id"]
+            isOneToOne: false
+            referencedRelation: "turn_settlement"
+            referencedColumns: ["turn_id"]
+          },
+          {
+            foreignKeyName: "notifications_turn_id_fkey"
+            columns: ["turn_id"]
+            isOneToOne: false
+            referencedRelation: "turns"
             referencedColumns: ["id"]
           },
         ]
@@ -1308,6 +1413,7 @@ export type Database = {
       }
     }
     Functions: {
+      _generate_invite_code: { Args: never; Returns: string }
       append_ledger: {
         Args: {
           _amount: number
@@ -1323,6 +1429,7 @@ export type Database = {
         Returns: string
       }
       approve_member: { Args: { _member_id: string }; Returns: undefined }
+      create_group_with_invitation: { Args: { _payload: Json }; Returns: Json }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -1338,7 +1445,30 @@ export type Database = {
         Args: { _group: string; _user: string }
         Returns: boolean
       }
-      join_group_with_code: { Args: { _code: string }; Returns: string }
+      is_group_participant: {
+        Args: { _group: string; _user: string }
+        Returns: boolean
+      }
+      join_group_with_code: {
+        Args: { _code: string; _message?: string; _operator?: string }
+        Returns: string
+      }
+      mark_all_notifications_read: { Args: never; Returns: number }
+      mark_notification_read: { Args: { _id: string }; Returns: undefined }
+      notify: {
+        Args: {
+          _body?: string
+          _data?: Json
+          _group_id?: string
+          _kind: Database["public"]["Enums"]["notification_kind"]
+          _link?: string
+          _title: string
+          _turn_id?: string
+          _user_id: string
+        }
+        Returns: string
+      }
+      preview_group_by_code: { Args: { _code: string }; Returns: Json }
       recompute_reliability: {
         Args: { _user_id?: string }
         Returns: {
@@ -1380,12 +1510,17 @@ export type Database = {
         Returns: boolean
       }
       start_cycle: { Args: { _group_id: string }; Returns: string }
+      update_group_settings: {
+        Args: { _group_id: string; _payload: Json }
+        Returns: undefined
+      }
     }
     Enums: {
       app_role: "admin" | "organisateur" | "participant"
       contribution_status: "pending" | "submitted" | "confirmed" | "rejected"
       group_frequency: "hebdomadaire" | "quinzaine" | "mensuelle"
       group_status: "draft" | "open" | "active" | "completed" | "cancelled"
+      group_visibility: "private" | "public-link" | "directory"
       invitation_status: "pending" | "accepted" | "revoked" | "expired"
       ledger_entry_type:
         | "contribution_in"
@@ -1553,6 +1688,7 @@ export const Constants = {
       contribution_status: ["pending", "submitted", "confirmed", "rejected"],
       group_frequency: ["hebdomadaire", "quinzaine", "mensuelle"],
       group_status: ["draft", "open", "active", "completed", "cancelled"],
+      group_visibility: ["private", "public-link", "directory"],
       invitation_status: ["pending", "accepted", "revoked", "expired"],
       ledger_entry_type: [
         "contribution_in",
