@@ -1,0 +1,83 @@
+name: E2E — Famille Alice
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+# Cancel in-flight runs on the same PR.
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    name: E2E (audit / notifications / RLS gating)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    env:
+      E2E_SUPABASE_URL: ${{ secrets.E2E_SUPABASE_URL }}
+      E2E_SUPABASE_ANON_KEY: ${{ secrets.E2E_SUPABASE_ANON_KEY }}
+      E2E_SUPABASE_SERVICE_ROLE: ${{ secrets.E2E_SUPABASE_SERVICE_ROLE }}
+      E2E_BASE_URL: http://localhost:8080
+      # Used by src/integrations/supabase/client.ts at build time if you wire it.
+      VITE_SUPABASE_URL: ${{ secrets.E2E_SUPABASE_URL }}
+      VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.E2E_SUPABASE_ANON_KEY }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Guard — required secrets present
+        run: |
+          test -n "$E2E_SUPABASE_URL" || { echo "::error::missing secret E2E_SUPABASE_URL"; exit 1; }
+          test -n "$E2E_SUPABASE_ANON_KEY" || { echo "::error::missing secret E2E_SUPABASE_ANON_KEY"; exit 1; }
+          test -n "$E2E_SUPABASE_SERVICE_ROLE" || { echo "::error::missing secret E2E_SUPABASE_SERVICE_ROLE"; exit 1; }
+
+      - uses: oven-sh/setup-bun@v2
+        with: { bun-version: latest }
+
+      - name: Install deps
+        run: bun install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        run: bunx playwright install --with-deps chromium
+
+      - name: Seed deterministic fixtures (Famille Alice)
+        run: bun run tests/e2e/fixtures/famille-alice.ts
+
+      - name: Start Vite preview
+        run: |
+          bun run dev &
+          echo $! > .vite.pid
+          # wait until server answers 200 on /
+          for i in $(seq 1 60); do
+            if curl -fsS http://localhost:8080/ -o /dev/null; then
+              echo "vite up"; exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::vite never became ready"; exit 1
+
+      # Run ALL E2E specs. The job fails (and blocks merge via branch protection)
+      # if any test fails — audit/notifications/RLS specs are tagged so a failure
+      # in those is surfaced first in the JUnit/HTML report.
+      - name: Run E2E (gating: @audit, @notifications, @rls)
+        run: bunx playwright test tests/e2e --reporter=list,junit,html
+        env:
+          PLAYWRIGHT_JUNIT_OUTPUT_NAME: e2e-results.xml
+
+      - name: Upload Playwright HTML report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report
+            e2e-results.xml
+          retention-days: 14
+
+      - name: Stop Vite
+        if: always()
+        run: |
+          if [ -f .vite.pid ]; then kill "$(cat .vite.pid)" 2>/dev/null || true; fi
