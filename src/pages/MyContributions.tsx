@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Wallet, ShieldCheck, Check, Loader2 } from "lucide-react";
+import { Wallet, ShieldCheck, Check } from "lucide-react";
 import { TopBar } from "@/components/layout/TopBar";
 import { SectionCard } from "@/components/dashboard/SectionCard";
 import { formatGNF, formatRelativeDays } from "@/lib/format";
