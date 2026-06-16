@@ -2450,8 +2450,15 @@ export type Database = {
       app_role: "admin" | "organisateur" | "participant"
       bid_status: "active" | "won" | "lost" | "cancelled"
       contribution_status: "pending" | "submitted" | "confirmed" | "rejected"
+      external_proof_status: "pending" | "confirmed" | "rejected"
       group_frequency: "hebdomadaire" | "quinzaine" | "mensuelle"
-      group_status: "draft" | "open" | "active" | "completed" | "cancelled"
+      group_status:
+        | "draft"
+        | "open"
+        | "active"
+        | "completed"
+        | "cancelled"
+        | "paused"
       group_visibility: "private" | "public-link" | "directory"
       invitation_status: "pending" | "accepted" | "revoked" | "expired"
       ledger_entry_type:
@@ -2499,6 +2506,22 @@ export type Database = {
         | "member_kicked"
         | "permissions_changed"
         | "ownership_transferred"
+        | "payment_confirmed_by_admin"
+        | "payment_rejected_by_admin"
+        | "external_payment_submitted"
+        | "penalty_waived"
+        | "penalty_adjusted"
+        | "cycle_paused"
+        | "cycle_resumed"
+        | "due_date_shifted"
+        | "group_archived"
+        | "manual_reminder"
+      payment_method_external:
+        | "cash"
+        | "bank_transfer"
+        | "om_external"
+        | "mtn_external"
+        | "other"
       payment_provider: "orange_money" | "mtn_money" | "cash" | "simulation"
       payment_status:
         | "initiated"
@@ -2642,8 +2665,16 @@ export const Constants = {
       app_role: ["admin", "organisateur", "participant"],
       bid_status: ["active", "won", "lost", "cancelled"],
       contribution_status: ["pending", "submitted", "confirmed", "rejected"],
+      external_proof_status: ["pending", "confirmed", "rejected"],
       group_frequency: ["hebdomadaire", "quinzaine", "mensuelle"],
-      group_status: ["draft", "open", "active", "completed", "cancelled"],
+      group_status: [
+        "draft",
+        "open",
+        "active",
+        "completed",
+        "cancelled",
+        "paused",
+      ],
       group_visibility: ["private", "public-link", "directory"],
       invitation_status: ["pending", "accepted", "revoked", "expired"],
       ledger_entry_type: [
@@ -2693,6 +2724,23 @@ export const Constants = {
         "member_kicked",
         "permissions_changed",
         "ownership_transferred",
+        "payment_confirmed_by_admin",
+        "payment_rejected_by_admin",
+        "external_payment_submitted",
+        "penalty_waived",
+        "penalty_adjusted",
+        "cycle_paused",
+        "cycle_resumed",
+        "due_date_shifted",
+        "group_archived",
+        "manual_reminder",
+      ],
+      payment_method_external: [
+        "cash",
+        "bank_transfer",
+        "om_external",
+        "mtn_external",
+        "other",
       ],
       payment_provider: ["orange_money", "mtn_money", "cash", "simulation"],
       payment_status: [
