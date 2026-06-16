@@ -537,9 +537,13 @@ export type Database = {
           late_penalty_percent: number
           max_members: number
           name: string
+          paused_at: string | null
+          paused_by: string | null
+          paused_reason: string | null
           rotation_order_kind: Database["public"]["Enums"]["rotation_order"]
           status: Database["public"]["Enums"]["group_status"]
           swap_policy: Database["public"]["Enums"]["swap_policy"]
+          total_paused_days: number
           updated_at: string
           visibility: Database["public"]["Enums"]["group_visibility"]
         }
@@ -556,9 +560,13 @@ export type Database = {
           late_penalty_percent?: number
           max_members: number
           name: string
+          paused_at?: string | null
+          paused_by?: string | null
+          paused_reason?: string | null
           rotation_order_kind?: Database["public"]["Enums"]["rotation_order"]
           status?: Database["public"]["Enums"]["group_status"]
           swap_policy?: Database["public"]["Enums"]["swap_policy"]
+          total_paused_days?: number
           updated_at?: string
           visibility?: Database["public"]["Enums"]["group_visibility"]
         }
@@ -575,9 +583,13 @@ export type Database = {
           late_penalty_percent?: number
           max_members?: number
           name?: string
+          paused_at?: string | null
+          paused_by?: string | null
+          paused_reason?: string | null
           rotation_order_kind?: Database["public"]["Enums"]["rotation_order"]
           status?: Database["public"]["Enums"]["group_status"]
           swap_policy?: Database["public"]["Enums"]["swap_policy"]
+          total_paused_days?: number
           updated_at?: string
           visibility?: Database["public"]["Enums"]["group_visibility"]
         }
@@ -2466,6 +2478,10 @@ export type Database = {
         }
         Returns: string
       }
+      pause_cycle: {
+        Args: { _group_id: string; _reason?: string }
+        Returns: undefined
+      }
       place_bid: {
         Args: { _amount: number; _turn_id: string }
         Returns: string
@@ -2522,6 +2538,7 @@ export type Database = {
         Args: { _accept: boolean; _request_id: string }
         Returns: undefined
       }
+      resume_cycle: { Args: { _group_id: string }; Returns: number }
       revoke_admin_permissions: {
         Args: { _group_id: string; _user_id: string }
         Returns: undefined
@@ -2537,6 +2554,10 @@ export type Database = {
       shares_group_with: {
         Args: { _me: string; _other: string }
         Returns: boolean
+      }
+      shift_due_date: {
+        Args: { _new_date: string; _reason?: string; _turn_id: string }
+        Returns: undefined
       }
       should_notify: {
         Args: {
