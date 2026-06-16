@@ -31,6 +31,8 @@ const GroupMembers = lazy(() => import("@/pages/GroupMembers"));
 const NotificationPreferences = lazy(() => import("@/pages/NotificationPreferences"));
 const PrivacySettings = lazy(() => import("@/pages/PrivacySettings"));
 const DeleteAccount = lazy(() => import("@/pages/DeleteAccount"));
+const PaymentReturn = lazy(() => import("@/pages/PaymentReturn"));
+const PaymentCancel = lazy(() => import("@/pages/PaymentCancel"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -115,6 +117,8 @@ const App = () => (
                     <Route path="/parametres/notifications" element={<RouteBoundary name="Préférences notifications"><NotificationPreferences /></RouteBoundary>} />
                     <Route path="/profil/confidentialite" element={<RouteBoundary name="Confidentialité"><PrivacySettings /></RouteBoundary>} />
                     <Route path="/profil/suppression" element={<RouteBoundary name="Supprimer mon compte"><DeleteAccount /></RouteBoundary>} />
+                    <Route path="/payment/return" element={<RouteBoundary name="Retour paiement"><PaymentReturn /></RouteBoundary>} />
+                    <Route path="/payment/cancel" element={<RouteBoundary name="Paiement annulé"><PaymentCancel /></RouteBoundary>} />
                   </Route>
                 </Route>
                 <Route path="*" element={<RouteBoundary name="Page introuvable"><NotFound /></RouteBoundary>} />
