@@ -44,7 +44,7 @@ jobs:
         run: bunx playwright install --with-deps chromium
 
       - name: Seed deterministic fixtures (Famille Alice)
-        run: bunx tsx tests/e2e/fixtures/famille-alice.ts
+        run: bun run tests/e2e/fixtures/famille-alice.ts
 
       - name: Start Vite preview
         run: |
