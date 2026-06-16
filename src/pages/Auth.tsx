@@ -78,17 +78,25 @@ export default function Auth() {
       return;
     }
     // Récupère le rôle pour rediriger les admins vers le back-office.
-    let dest = fromPath ?? "/dashboard";
     const { data: sess } = await supabase.auth.getUser();
     const uid = sess.user?.id;
-    if (!fromPath && uid) {
-      const { data: rolesRows } = await supabase
+    let isAdmin = false;
+    if (uid) {
+      const { data: rolesRows, error: rolesErr } = await supabase
         .from("user_roles")
         .select("role")
         .eq("user_id", uid);
-      if ((rolesRows ?? []).some((r) => r.role === "super_admin")) {
-        dest = "/admin/overview";
-      }
+      if (rolesErr) console.error("[Auth] role lookup failed", rolesErr);
+      isAdmin = (rolesRows ?? []).some((r) => r.role === "super_admin");
+    }
+    let dest: string;
+    if (fromPath) {
+      // On respecte la route d'origine uniquement si elle est cohérente avec le rôle.
+      const fromIsAdmin = fromPath.startsWith("/admin");
+      if (fromIsAdmin && !isAdmin) dest = "/dashboard";
+      else dest = fromPath;
+    } else {
+      dest = isAdmin ? "/admin/overview" : "/dashboard";
     }
     toast.success("Connexion réussie");
     navigate(dest, { replace: true });

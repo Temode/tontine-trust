@@ -20,7 +20,11 @@ export function TopBar({
 }: TopBarProps) {
   const { user, roles, signOut } = useAuth();
   const navigate = useNavigate();
-  const primaryRole = roles[0];
+  // Priorité : super_admin > admin > organisateur > participant
+  const ROLE_PRIORITY = ["super_admin", "admin", "organisateur", "participant"] as const;
+  const primaryRole =
+    ROLE_PRIORITY.find((r) => roles.includes(r as (typeof roles)[number])) ?? roles[0];
+  const roleLabel = primaryRole === "super_admin" ? "Super admin" : primaryRole;
 
   const handleSignOut = async () => {
     await signOut();
@@ -64,7 +68,7 @@ export function TopBar({
             <div className="flex items-center gap-2">
               {primaryRole && (
                 <span className="hidden rounded-full border border-hairline bg-secondary/60 px-2.5 py-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground md:inline-flex">
-                  {primaryRole}
+                  {roleLabel}
                 </span>
               )}
               <button
