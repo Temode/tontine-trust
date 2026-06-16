@@ -4,7 +4,7 @@ import type { DbGroupMember } from "./types";
 export async function listGroupMembers(groupId: string): Promise<DbGroupMember[]> {
   const { data, error } = await supabase
     .from("group_members")
-    .select("id, group_id, user_id, role, status, position, joined_at, suspended_at, suspended_reason, can_chat, can_bid, can_swap, can_invite, profile:profiles(full_name, phone_number)")
+    .select("id, group_id, user_id, role, status, position, joined_at, suspended_at, suspended_reason, can_chat, can_bid, can_swap, can_invite, profile:profiles!group_members_user_id_profile_fkey(full_name, phone_number)")
     .eq("group_id", groupId)
     .in("status", ["active", "pending", "suspended"])
     .order("position", { ascending: true });
