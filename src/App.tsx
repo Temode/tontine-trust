@@ -33,6 +33,7 @@ const PrivacySettings = lazy(() => import("@/pages/PrivacySettings"));
 const DeleteAccount = lazy(() => import("@/pages/DeleteAccount"));
 const PaymentReturn = lazy(() => import("@/pages/PaymentReturn"));
 const PaymentCancel = lazy(() => import("@/pages/PaymentCancel"));
+const AdminDeletionRequests = lazy(() => import("@/pages/AdminDeletionRequests"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
