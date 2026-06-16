@@ -1,7 +1,6 @@
 import { useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { Wallet, ShieldCheck, Check, Loader2 } from "lucide-react";
-import { toast } from "sonner";
 import { TopBar } from "@/components/layout/TopBar";
 import { SectionCard } from "@/components/dashboard/SectionCard";
 import { formatGNF, formatRelativeDays } from "@/lib/format";
@@ -12,24 +11,10 @@ import {
 } from "@/lib/api/contributions";
 import {
   listMyPaymentsHistory,
-  operatorToProvider,
-  payContribution,
 } from "@/lib/api/payments";
-import type { MobileMoneyOperator } from "@/lib/types";
-
-const operators: Array<{
-  id: MobileMoneyOperator;
-  name: string;
-  short: string;
-  swatch: string;
-  text: string;
-}> = [
-  { id: "orange", name: "Orange Money", short: "OM", swatch: "bg-orange-500", text: "text-white" },
-  { id: "mtn", name: "MTN Mobile Money", short: "MTN", swatch: "bg-yellow-400", text: "text-black" },
-];
+import { DjomyPaymentModal } from "@/components/payment/DjomyPaymentModal";
 
 export default function MyContributions() {
-  const qc = useQueryClient();
   const { data: dues = [], isLoading } = useQuery({
     queryKey: ["contributions", "due"],
     queryFn: listMyContributionsDue,
@@ -39,25 +24,7 @@ export default function MyContributions() {
     queryFn: listMyPaymentsHistory,
   });
 
-  const [paying, setPaying] = useState<{ id: string; op: MobileMoneyOperator } | null>(null);
-
-  const mutation = useMutation({
-    mutationFn: ({ id, op }: { id: string; op: MobileMoneyOperator }) =>
-      payContribution(id, operatorToProvider(op)),
-    onSuccess: (_data, vars) => {
-      toast.success("Paiement enregistré", {
-        description: `Cotisation confirmée via ${vars.op === "orange" ? "Orange Money" : "MTN MoMo"}.`,
-      });
-      qc.invalidateQueries({ queryKey: ["contributions"] });
-      qc.invalidateQueries({ queryKey: ["payments"] });
-      qc.invalidateQueries({ queryKey: ["turns"] });
-      setPaying(null);
-    },
-    onError: (err: Error) => {
-      toast.error("Paiement refusé", { description: err.message });
-      setPaying(null);
-    },
-  });
+  const [payingDue, setPayingDue] = useState<DbContributionDue | null>(null);
 
   const totalDue = dues.reduce((sum, d) => sum + d.amount, 0);
 
@@ -71,7 +38,7 @@ export default function MyContributions() {
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <KpiTile label="À payer" value={`${formatGNF(totalDue)} GNF`} hint={`${dues.length} cotisation${dues.length > 1 ? "s" : ""}`} />
           <KpiTile label="Paiements réussis" value={String(history.filter((p) => p.status === "succeeded").length)} />
-          <KpiTile label="Provider" value="Simulation" hint="Djomy à venir" />
+          <KpiTile label="Provider" value="Djomy" hint="OM · MTN · Carte" />
         </div>
 
         <SectionCard title="À régler" subtitle={isLoading ? "Chargement…" : undefined} bare>
@@ -87,14 +54,7 @@ export default function MyContributions() {
                 <ContributionRow
                   key={d.contribution_id}
                   due={d}
-                  isPaying={paying?.id === d.contribution_id}
-                  selectedOp={paying?.id === d.contribution_id ? paying.op : "orange"}
-                  loading={mutation.isPending && paying?.id === d.contribution_id}
-                  onSelectOp={(op) => setPaying({ id: d.contribution_id, op })}
-                  onPay={(op) => {
-                    setPaying({ id: d.contribution_id, op });
-                    mutation.mutate({ id: d.contribution_id, op });
-                  }}
+                  onPay={() => setPayingDue(d)}
                 />
               ))}
             </ul>
@@ -126,6 +86,15 @@ export default function MyContributions() {
           )}
         </SectionCard>
       </div>
+      {payingDue && (
+        <DjomyPaymentModal
+          open={!!payingDue}
+          onOpenChange={(o) => !o && setPayingDue(null)}
+          contributionId={payingDue.contribution_id}
+          groupName={payingDue.group_name}
+          amount={payingDue.amount}
+        />
+      )}
     </div>
   );
 }
