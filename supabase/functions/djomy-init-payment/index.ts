@@ -1,5 +1,6 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders, djomyFetch, json, normalizePhone } from "../_shared/djomy.ts";
+// redeploy-trigger: 2026-06-16
 
 interface Body {
   contributionId: string;

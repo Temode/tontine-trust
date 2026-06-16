@@ -1,3 +1,4 @@
+// redeploy-trigger: 2026-06-16
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders, djomyFetch, json } from "../_shared/djomy.ts";
 
