@@ -114,14 +114,10 @@ function KpiTile({ label, value, hint }: { label: string; value: string; hint?: 
 
 interface RowProps {
   due: DbContributionDue;
-  isPaying: boolean;
-  selectedOp: MobileMoneyOperator;
-  loading: boolean;
-  onSelectOp: (op: MobileMoneyOperator) => void;
-  onPay: (op: MobileMoneyOperator) => void;
+  onPay: () => void;
 }
 
-function ContributionRow({ due, isPaying, selectedOp, loading, onSelectOp, onPay }: RowProps) {
+function ContributionRow({ due, onPay }: RowProps) {
   const urgent = due.days_to_due <= 3;
   return (
     <li className="px-5 py-4 lg:px-6">
@@ -153,38 +149,14 @@ function ContributionRow({ due, isPaying, selectedOp, loading, onSelectOp, onPay
         </div>
       </div>
 
-      <div className="mt-3 flex flex-wrap items-center gap-2">
-        <div className="flex gap-2" role="radiogroup" aria-label="Opérateur">
-          {operators.map((op) => {
-            const selected = isPaying && selectedOp === op.id;
-            return (
-              <button
-                key={op.id}
-                type="button"
-                onClick={() => onSelectOp(op.id)}
-                className={cn(
-                  "flex items-center gap-2 rounded-md border-2 px-3 py-1.5 text-xs font-medium transition",
-                  selected
-                    ? "border-primary bg-primary-50 text-primary-700"
-                    : "border-hairline text-muted-foreground hover:border-muted-foreground/30",
-                )}
-              >
-                <span className={cn("flex h-5 w-5 items-center justify-center rounded text-[10px] font-bold", op.swatch, op.text)}>
-                  {op.short}
-                </span>
-                {op.name}
-              </button>
-            );
-          })}
-        </div>
+      <div className="mt-3 flex items-center justify-end">
         <button
           type="button"
-          disabled={loading}
-          onClick={() => onPay(isPaying ? selectedOp : "orange")}
-          className="ml-auto inline-flex h-9 items-center gap-1.5 rounded-md bg-primary px-4 text-xs font-semibold text-primary-foreground transition hover:bg-primary-700 disabled:opacity-60"
+          onClick={onPay}
+          className="inline-flex h-9 items-center gap-1.5 rounded-md bg-primary px-4 text-xs font-semibold text-primary-foreground transition hover:bg-primary-700"
         >
-          {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ShieldCheck className="h-3.5 w-3.5" />}
-          {loading ? "Traitement…" : "Payer maintenant"}
+          <ShieldCheck className="h-3.5 w-3.5" />
+          Payer via Djomy
         </button>
       </div>
     </li>
