@@ -29,7 +29,7 @@ const signUpSchema = z.object({
 });
 
 export default function Auth() {
-  const { user, loading, roles, signIn, signUp } = useAuth();
+  const { user, loading, roles, rolesLoading, signIn, signUp } = useAuth();
   const navigate = useNavigate();
   const location = useLocation() as { state?: { from?: string } };
   const fromPath = location.state?.from && location.state.from !== "/auth" ? location.state.from : null;
@@ -53,7 +53,7 @@ export default function Auth() {
     document.title = "Connexion · Tontine Digital";
   }, []);
 
-  if (loading) {
+  if (loading || (user && rolesLoading)) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <Loader2 className="h-6 w-6 animate-spin text-primary" />

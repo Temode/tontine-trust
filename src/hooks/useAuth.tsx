@@ -11,6 +11,7 @@ interface AuthContextValue {
   session: Session | null;
   roles: AppRole[];
   loading: boolean;
+  rolesLoading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signUp: (args: {
     email: string;
@@ -48,12 +49,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [roles, setRoles] = useState<AppRole[]>([]);
   const [loading, setLoading] = useState(true);
+  const [rolesLoading, setRolesLoading] = useState(false);
 
   useEffect(() => {
     let mounted = true;
     let lastUserId: string | null = null;
 
     const loadRoles = (uid: string) => {
+      setRolesLoading(true);
       supabase
         .from("user_roles")
         .select("role")
@@ -63,6 +66,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const next = (data ?? []).map((r: { role: AppRole }) => r.role);
           setRoles(next);
           setAuthSnapshot({ userId: uid, roles: next });
+          setRolesLoading(false);
         });
     };
 
@@ -79,6 +83,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else if (!uid) {
         lastUserId = null;
         setRoles([]);
+        setRolesLoading(false);
       }
     });
 
@@ -144,7 +149,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, roles, loading, signIn, signUp, signOut }}>
+    <AuthContext.Provider value={{ user, session, roles, loading, rolesLoading, signIn, signUp, signOut }}>
       {children}
     </AuthContext.Provider>
   );
