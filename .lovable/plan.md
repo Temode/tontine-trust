@@ -1,101 +1,93 @@
 
-## Constat (audit live)
+# Intégration Djomy — Paiements Mobile Money
 
-J'ai sondé l'état réel via Playwright connecté en Alice puis en Bob :
+Objectif : remplacer la simulation actuelle par de vraies initiations de paiement via Djomy (flux *redirection vers portail*), tout en gardant la traçabilité dans `payments` / `ledger_entries`. Couverture : cotisations membre→groupe, frais de service, versement bénéficiaire, liens partageables.
 
-1. **"0 membres" sur Famille Alice — faux positif** : la fiche groupe (`/groupes/:id`), le panneau d'admin (`/membres`), les paramètres (`/parametres`) et le dashboard affichent tous correctement **3 participants** pour Famille Alice (Alice, Bob, Hadja). Donnée DB OK (`my_groups_overview.members_count = 3`).  
-   Le seul endroit qui affiche un compteur trompeur lié à ce groupe est la page **Co-organisateurs** :  
-   *« Tous les membres actifs sont déjà co-organisateurs »* alors que la même page indique *« 0 co-organisateur »*. La condition `promotables.length === 0` est vraie dès qu'il n'y a aucun membre actif **non-owner et non-déjà-admin** : copy à corriger.  
-   → Si tu vois "0 membres" ailleurs précis, capture l'URL/écran exact, sinon je traite le seul faux compteur trouvé.
+## 1. Secrets & environnement
 
-2. **Migration `db/44_fk_turns_profiles.sql` — pas effective** : l'API renvoie encore `400 PGRST200 — Searched for FK 'turns_beneficiary_user_id_fkey'… no matches… 'Perhaps you meant cycles instead of profiles'`. Soit le fichier n'a pas tourné côté Supabase, soit le **cache de schéma PostgREST** ne l'a pas rechargé. Plutôt que de redépendre du FK, on rend le front **insensible** à l'embed et on republie un `NOTIFY pgrst, 'reload schema'`.
+Ajout via le secrets tool (Lovable Cloud) :
+- `DJOMY_CLIENT_ID`
+- `DJOMY_CLIENT_SECRET`
+- `DJOMY_ENV` = `sandbox` ou `prod` (switch — sandbox par défaut)
+- `DJOMY_WEBHOOK_SECRET` (= `DJOMY_CLIENT_SECRET` ; séparé pour pouvoir tourner indépendamment)
 
-3. **Dashboard membre — manques identifiés** côté Bob : les KPI sont là (Groupes / Prochain tour / À payer), mais :
-   - aucune **liste actionnable** des cotisations dues (juste un total) ;
-   - aucune **annonce récente** ni **notification non lue** visible ;
-   - les cartes "Mes groupes" affichent un cosmétique cassé : `VOTRE TOUR #0 —` quand aucun tour n'est encore assigné au membre ;
-   - pas d'accès rapide aux **prochains bénéficiaires** des groupes où Bob participe.
+Base URL résolue dans les edge functions :
+- sandbox : `https://sandbox-api.djomy.africa`
+- prod : `https://api.djomy.africa`
 
----
+## 2. Migration SQL (`db/46_djomy_payments.sql`)
 
-## Plan d'action
+- Étendre l'enum `public.payment_provider` avec `djomy` (on garde `orange_money` / `mtn_money` pour stats par opérateur final, mais provider initial = `djomy` + colonne `payment_method`).
+- Ajouter à `public.payments` :
+  - `djomy_transaction_id text` (id retourné par Djomy)
+  - `djomy_link_reference text` (si flow par lien)
+  - `payment_method text` (`OM` / `MOMO` / `CARD` …)
+  - `redirect_url text`
+  - `payer_phone text`
+  - `metadata jsonb`
+  - index unique sur `djomy_transaction_id`.
+- Nouvelle table `public.payment_links` (liens partageables) : `id`, `group_id`, `contribution_id` nullable, `purpose` (`contribution` | `service_fee` | `payout_refund` | `custom`), `amount`, `usage_type`, `djomy_reference`, `djomy_url`, `status`, `created_by`, `created_at`, `expires_at`, `metadata`. RLS : membre du groupe peut lire, organisateurs peuvent créer.
+- Nouvelle table `public.djomy_webhook_events` (idempotence) : `event_id uuid PK`, `event_type`, `transaction_id`, `signature_valid bool`, `payload jsonb`, `received_at`.
+- Toutes les nouvelles tables : `GRANT` pour `authenticated` / `service_role` + RLS conforme à la convention du projet.
+- Nouveaux RPC SECURITY DEFINER :
+  - `start_djomy_payment(_contribution_id uuid, _method text, _payer_phone text)` → insère un `payments` en `initiated`, renvoie l'id.
+  - `apply_djomy_webhook(_payment_id uuid, _new_status text, _provider_ref text, _paid_amount bigint, _payment_method text)` → met à jour `payments`, et si `succeeded` appelle la logique existante de contribution settlement / ledger.
 
-### Étape 1 — Page Co-organisateurs : copy + UX (cible bug #1)
-`src/pages/GroupCoOrganizers.tsx`
-- Remplacer le message unique `Tous les membres actifs sont déjà co-organisateurs` par 3 cas distincts :
-  - **Aucun membre actif** (uniquement le propriétaire) → *"Aucun membre éligible. Invitez d'abord des participants au groupe."* + bouton "Inviter des membres" (→ `/groupes/:id`).
-  - **Tous les membres actifs sont déjà co-organisateurs** → texte actuel conservé.
-  - **Sinon** → le `Select` normal.
-- Calcul : utiliser `members.length` (actifs hors owner) pour distinguer les deux premiers cas.
+## 3. Edge Functions Supabase
 
-### Étape 2 — Robustesse Rotation (cible bug #2)
-`src/lib/api/turns.ts`
-- Réécrire `listGroupTurns` en **2 requêtes** (sans embed FK) :
-  1. `select id,group_id,cycle_id,turn_number,due_date,payout_amount,status,beneficiary_user_id from turns where group_id=…`
-  2. `select id,full_name from profiles where id in (…uniques…)` puis mapper côté JS.
-- Idem pour `getNextTurnForGroup` / `listMyNextTurns` si elles dépendent de l'embed (déjà via vue `next_turn_per_group`, donc à laisser).
+Toutes les fonctions partagent un helper `_shared/djomy.ts` (HMAC SHA-256 sur `clientId` → `X-API-KEY: clientId:signature`, fetch `POST /v1/auth` pour Bearer, cache token en mémoire jusqu'à expiration).
 
-`db/45_reload_postgrest.sql` (nouveau, idempotent)
-- `notify pgrst, 'reload schema';` + ré-exécution défensive de la création de la contrainte (idempotent comme dans 44) pour que le redémarrage du cache prenne le FK même si 44 n'a pas été appliqué.
-- À exécuter via le bouton "Run migration" de Lovable Cloud.
+- `djomy-init-payment` (auth user) — entrée : `contributionId` (ou `purpose` + `amount` + `groupId`), `payerPhone`, `allowedPaymentMethods?`. Étapes :
+  1. Vérifie via Supabase que l'utilisateur est bien le membre lié à la contribution.
+  2. RPC `start_djomy_payment` pour créer la ligne `payments` (status `initiated`).
+  3. Appelle `POST /v1/payments/gateway` avec `merchantPaymentReference = payments.id`, `returnUrl`, `cancelUrl`, `metadata`.
+  4. Stocke `djomy_transaction_id` + `redirect_url`, renvoie `{ redirectUrl, paymentId }`.
+- `djomy-create-link` (auth user, organisateur) — `POST /v1/links` ; persiste dans `payment_links`. Retourne URL + référence (à partager via SMS/WhatsApp). Champ `sendSms` exposé.
+- `djomy-payment-status` (auth user) — `GET /v1/payments/{transactionId}/status`, met à jour `payments` si divergence.
+- `djomy-webhook` (public, **pas** d'auth JWT — `verify_jwt = false` dans `supabase/config.toml`) :
+  1. Lit body brut, recalcule HMAC SHA-256 avec `DJOMY_WEBHOOK_SECRET`, compare à `X-Webhook-Signature` (`v1:...`).
+  2. Idempotence : insère dans `djomy_webhook_events` (PK = `eventId`) ; si conflit → 200 OK no-op.
+  3. Retrouve `payments.id` via `metadata.merchantPaymentReference` ou `djomy_transaction_id`.
+  4. RPC `apply_djomy_webhook` → met à jour status + déclenche settlement contribution + ledger si `payment.success`.
+  5. Notifications via la chaîne existante (réutilise `notifications.ts` API).
 
-### Étape 3 — Dashboard membre enrichi (cible besoin #3)
-`src/pages/Dashboard.tsx` (+ 2 petits composants neufs `src/components/dashboard/`)
-- **Carte "À payer"** : remplacer la KPI passive par une liste de 1 à 3 cotisations dues (`listMyContributionsDue`) avec montant, groupe, échéance, bouton "Régler" (link `/cotisations`). Si aucune due → message "Vous êtes à jour".
-- **Carte "Prochaines échéances"** : top 3 `listMyNextTurns` (groupe, bénéficiaire, date) — utile pour les membres non-organisateurs aussi.
-- **Carte "Annonces récentes"** : 3 dernières annonces via un nouvel helper `listMyRecentAnnouncements(limit=3)` sur la table `group_announcements` filtrée par groupes où je suis participant actif. Si vide, on masque la carte.
-- **GroupRow** (`src/components/dashboard/GroupRow.tsx`) : ne plus afficher la mention `VOTRE TOUR #0 —` quand `yourTurn === 0` ; remplacer par `—` discret ou masquer la pastille.
+## 4. Frontend
 
-### Étape 4 — Vérification end-to-end (lecture seule)
-- Re-run du probe Playwright (Alice + Bob) :
-  - Co-organisateurs Famille Alice : message contextualisé OK.
-  - Rotation Famille Alice : plus aucun 400 dans le réseau, tour #N rendu avec nom bénéficiaire.
-  - Dashboard Bob : liste des dues, prochaines échéances, annonces visibles ; plus de `#0 —` cassé.
-- Capture d'écrans dans `/tmp/browser/audit_v2/`.
+- `src/lib/api/djomy.ts` : wrappers `initDjomyPayment`, `createDjomyLink`, `getDjomyStatus` via `supabase.functions.invoke`.
+- `PaymentModal` (`src/components/payment/PaymentModal.tsx`) :
+  - Étape `choose` : conserve choix opérateur (OM/MOMO) + input téléphone (préselectionné depuis profil), et bouton "Payer maintenant".
+  - À la confirmation, appelle `initDjomyPayment` → redirige (`window.location.href = redirectUrl`) vers le portail Djomy.
+  - Nouvelle page `src/pages/PaymentReturn.tsx` (`/payment/return`) : lit `?transactionId&status`, affiche état (succès / échec / en attente), polle `getDjomyStatus` toutes les 3 s pendant 30 s tant que `pending`, puis renvoie vers le groupe.
+  - Page `cancel` : `/payment/cancel` simple.
+- Page `GroupSettings` (organisateur) : section "Lien de paiement" pour générer un lien partageable (cotisation, frais, custom), affichage QR + bouton copier + bouton "Envoyer par SMS" (`sendSms=true`).
+- Bandeau "Mode sandbox" visible si `DJOMY_ENV=sandbox` (drapeau exposé via fonction edge `djomy-config`).
 
----
+## 5. Cas non couverts dans cette itération
 
-## Détails techniques
+- Versement au bénéficiaire : Djomy n'expose pas d'API payout dans la doc fournie. On enregistre les payouts manuellement (existant : `payouts.ts`) avec preuve, en attendant l'API disbursement.
+- `confirmOTP` (paiement direct sans redirection) : non implémenté puisque le choix utilisateur est *redirection portail*.
 
-```text
-turns embed (avant)               turns embed (après)
-─────────────────                 ───────────────────
-.select("…,beneficiary:           1) .select("…,beneficiary_user_id") 
-   profiles!turns_…_fkey(         2) .from("profiles")
-   full_name)")                       .select("id,full_name")
-                                      .in("id", uniqueIds)
-                                  3) merge { ...turn, beneficiary_name }
-```
+## 6. Tests
 
-```text
-GroupCoOrganizers — promotables logic
-─────────────────────────────────────
-const activeNonOwner = members.filter(m=>m.user_id !== grp.created_by)
-if (activeNonOwner.length === 0)        → "Aucun membre éligible"
-else if (promotables.length === 0)      → "Déjà tous co-organisateurs"
-else                                    → <Select>
-```
+- Edge function `djomy-webhook` : test unitaire HMAC + idempotence + transition `pending` → `success` (vitest dans `tests/`).
+- E2E Playwright `tests/e2e/djomy-payment.spec.ts` (sandbox) : mock l'init avec un fixture, vérifie redirection + retour `success` met bien à jour `DuesCard`.
+- Le CI E2E existant gate déjà sur RLS / audit / notifications ; on ajoute les specs Djomy au même workflow.
 
-```text
-Dashboard (nouvelle structure)
-──────────────────────────────
-[ KPI strip × 3 ]
-┌─ Mes groupes (2/3) ─┐  ┌─ Score de fiabilité ─┐
-│ ...                 │  │                       │
-└─────────────────────┘  └───────────────────────┘
-┌─ À payer (liste actionnable) ┐ ┌─ Prochaines échéances ┐
-│ • cotis groupe X – 50k – Régler │ • Tour #3 – 12 sept   │
-└──────────────────────────────┘  └───────────────────────┘
-┌─ Annonces récentes (si non vide) ──────────────────────┐
-│ • Famille Alice : "Réunion demain 9h"                  │
-└────────────────────────────────────────────────────────┘
-```
+## 7. Détails techniques sécurité
 
-### Fichiers
-- **Édités** : `src/pages/GroupCoOrganizers.tsx`, `src/lib/api/turns.ts`, `src/pages/Dashboard.tsx`, `src/components/dashboard/GroupRow.tsx`.
-- **Créés** : `src/components/dashboard/DuesCard.tsx`, `src/components/dashboard/UpcomingTurnsCard.tsx`, `src/components/dashboard/RecentAnnouncementsCard.tsx`, `src/lib/api/announcements.ts` (ajout `listMyRecentAnnouncements`), `db/45_reload_postgrest.sql`.
+- `clientSecret` ne quitte jamais l'edge function (jamais exposé au client).
+- `X-API-KEY` recalculé à chaque requête sortante (pas de cache de signature).
+- Bearer token Djomy mis en cache en mémoire process (max 1h, rafraîchi à expiration / 401).
+- Webhook public, mais : vérif signature obligatoire, idempotence par `eventId`, RPC `SECURITY DEFINER` avec `search_path = public` et validation stricte du `payment_id`.
+- Numéro de téléphone validé (format international, regex `^00\d{8,15}$`) avant envoi à Djomy.
+- `returnUrl` / `cancelUrl` forcés en HTTPS et préfixés par le domaine de l'app (jamais issus du client).
 
-### Hors scope
-- Pas de changement RLS ni de RPC.
-- Pas de modification du module paiements ni du wizard de création.
-- Si tu confirmes qu'un autre écran montre vraiment "0 membres", je l'ajoute en étape 1bis.
+## 8. Livrables / ordre d'exécution
+
+1. `db/46_djomy_payments.sql` (schéma + RPC + grants + RLS).
+2. Secrets Djomy (action utilisateur via dialog secrets).
+3. Edge functions : `_shared/djomy.ts`, `djomy-init-payment`, `djomy-create-link`, `djomy-payment-status`, `djomy-webhook` (+ `supabase/config.toml` pour `verify_jwt = false` sur webhook).
+4. `src/lib/api/djomy.ts` + refonte `PaymentModal` + pages `PaymentReturn` / `PaymentCancel` + route dans `App.tsx`.
+5. UI "Lien partageable" dans `GroupSettings`.
+6. Tests vitest + spec Playwright + ajout au workflow CI.
+7. Configuration de l'URL webhook côté Espace marchand Djomy : `https://<project>.functions.supabase.co/djomy-webhook` (action manuelle utilisateur — j'expliquerai où coller l'URL).
