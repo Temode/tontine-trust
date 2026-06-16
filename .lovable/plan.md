@@ -1,63 +1,161 @@
-## Contexte
+## Objectifs
 
-- Cloud backend neuf : 16 migrations rejouées (init → 16). Tables clés OK (`groups`, `payments`, `contributions`, `ledger_entries`, `user_roles`…), **mais pas encore** `djomy_webhook_events` ni les RPC `start_djomy_payment` / `apply_djomy_webhook`.
-- Secrets Djomy déjà présents côté Cloud : `DJOMY_CLIENT_ID`, `DJOMY_CLIENT_SECRET`, `DJOMY_ENV`, `DJOMY_WEBHOOK_SECRET`. ✅
-- Edge functions présentes dans le code (`djomy-init-payment`, `djomy-payment-status`, `djomy-webhook`, `delete-account`) mais pas encore déployées sur ce nouveau backend.
+1. **Audit complet** de l'app en se connectant comme Alice (organisatrice) puis Bob (membre), avec captures et observations.
+2. **Audit UX** page par page.
+3. **Audit sécurité** (lint Supabase + scan).
+4. **Nouvelle feature** : workflow de suppression de groupe avec consentement unanime (silence = oui) + back-office super_admin pour décision finale.
 
-## Plan
+---
 
-### Étape 1 — Rejouer les migrations restantes (`db/17` → `db/46`)
+## Partie 1 — Audit fonctionnel E2E (Alice + Bob)
 
-Application séquentielle via `supabase--migration`, en respectant les préludes d'enum (`32a`, `35a`, `40a` exécutés AVANT leur migration principale). Ordre :
+Script Playwright sous `/tmp/browser/audit/` qui exécute, captures à chaque étape :
 
+**Alice (organisatrice)**
+1. Login `alice@yopmail.com` → Dashboard (capture)
+2. Création groupe « Audit Test » (5 membres, 10 000 XOF, hebdo) → capture wizard étapes 1→5
+3. Page Invite Members → générer code, copier QR
+4. Vérifier notification, audit log, paramètres groupe
+
+**Bob (membre)**
+5. Login `bob@yopmail.com` → Join Group avec code
+6. Accepter CGU → soumettre candidature
+7. Retour Alice → approuver Bob (capture validations)
+8. Bob : voir groupe dans Mes Groupes → ouvrir → onglets Membres / Rotation / Chat / Annonces
+9. Test paiement Djomy sandbox (Orange Money) → capture modal + retour `/payment-return`
+10. Vérifier reçu, historique, score fiabilité
+
+**Pour chaque étape** : screenshot, logs console, requêtes réseau en erreur, temps de chargement.
+
+Livrable : tableau Markdown `findings-functional.md` avec sévérité (P0/P1/P2/P3).
+
+---
+
+## Partie 2 — Audit UX
+
+Revue page par page (Dashboard, MyGroups, GroupDetail, CreateGroup wizard, JoinGroup, InviteMembers, Profile, Notifications, PrivacySettings, DeleteAccount, MyContributions, Receipts) :
+
+- Cohérence Bleu sarcelle #0D7377 / Or #E8AA14
+- Hiérarchie typographique, espacements, contrastes WCAG AA
+- États vides, loading skeletons, erreurs
+- Mobile (375px) vs desktop (1280px) — bascule via `set_preview_device_viewport`
+- Affordances (CTA visibles, feedback toasts)
+- Navigation (BottomNav, breadcrumbs, retours)
+- Microcopie française (ton, clarté, accord)
+
+Livrable : `findings-ux.md` avec captures annotées.
+
+---
+
+## Partie 3 — Audit sécurité & perfs
+
+- `supabase--linter` : RLS manquantes, fonctions sans `search_path`, policies trop permissives
+- `security--run_security_scan`
+- Vérif clés exposées côté client
+- `supabase--slow_queries` + `supabase--db_health`
+- Revue policies sur `payment_links`, `djomy_webhook_events`, `manual_reminders_log`, `group_consent_log`
+- Audit edge functions Djomy (validation HMAC webhook, rate-limit)
+
+Livrable : `findings-security.md`.
+
+---
+
+## Partie 4 — Feature : Demande de suppression de groupe
+
+### Règles métier
+
+- **Pré-conditions** vérifiées côté serveur :
+  - `groups.status` ∈ (`draft`, `cancelled`) OU aucun `turns` avec `status='collecting'`
+  - Aucune `contributions.status='pending'` ou ledger non-soldé
+  - Aucun `payment_links.status='pending'`
+- **Vote** : tous les membres `active` doivent être notifiés. Délai 14 jours. **Non-réponse = OUI** (accord tacite).
+- **Un seul NON explicite** annule la demande immédiatement.
+- **Décision finale** : super_admin Tontine approuve/refuse via back-office avec motif.
+- **Effet** : soft-delete → `deleted_at`, `deletion_status='approved'`. Groupe invisible partout (queries filtrées). Données conservées 6 ans pour audit financier/RGPD. Job mensuel purge au-delà.
+
+### Schéma DB (migration unique)
+
+```sql
+-- enum
+create type deletion_request_status as enum
+  ('pending_members','pending_admin','approved','rejected','cancelled');
+create type deletion_vote as enum ('yes','no');
+
+-- table principale
+create table group_deletion_requests (
+  id uuid pk, group_id uuid fk → groups, requested_by uuid,
+  reason text, status deletion_request_status default 'pending_members',
+  members_deadline timestamptz,   -- now() + 14 days
+  admin_decision_by uuid, admin_decision_at timestamptz,
+  admin_decision_reason text,
+  created_at, updated_at
+);
+
+-- votes individuels (un seul NON explicite suffit à refuser)
+create table group_deletion_votes (
+  request_id uuid fk, user_id uuid, vote deletion_vote,
+  voted_at timestamptz, primary key(request_id, user_id)
+);
+
+-- soft-delete sur groups
+alter table groups add column deleted_at timestamptz,
+  add column deletion_request_id uuid;
 ```
-17 → 18 → 19 → 20 → 21 → 22 → 23 → 24 → 25 → 26 → 27 → 28 → 29 → 30 → 31
-→ 32a → 32 → 33 → 34 → 35a → 35 → 36 → 37 → 38 → 39 → 40a → 40 → 41 → 42 → 43 → 44 → 45 → 46
-```
 
-Regroupement en ~5 batches pour limiter les approvals. Si une migration échoue, on s'arrête, on diagnostique (souvent : dépendance manquante ou enum non préludé), on corrige, on reprend.
++ GRANT + RLS (membres lisent leur demande/vote ; super_admin lit tout).
 
-Vérifications à la fin :
-- `supabase--read_query` : présence de `djomy_webhook_events`, `start_djomy_payment`, `attach_djomy_reference`, `apply_djomy_webhook`, colonnes `payments.djomy_transaction_id` / `payments.redirect_url`.
-- `supabase--linter` pour repérer toute table sans RLS / GRANT manquant.
+### RPCs
 
-### Étape 2 — Déployer les edge functions Djomy
+- `request_group_deletion(_group_id, _reason)` → vérifie pré-conditions, crée la demande, notifie tous les membres actifs.
+- `vote_group_deletion(_request_id, _vote)` → enregistre vote ; si NON → bascule `rejected` immédiatement ; sinon attend deadline.
+- `finalize_deletion_votes()` (cron quotidien) → après deadline, si aucun NON → bascule `pending_admin` + notifie super_admins.
+- `admin_decide_deletion(_request_id, _approve, _reason)` → super_admin only, applique soft-delete.
 
-- `supabase--deploy_edge_functions` avec `["djomy-init-payment","djomy-payment-status","djomy-webhook","delete-account"]`.
-- Smoke test `supabase--curl_edge_functions` sur `/djomy-init-payment` (sans auth → 401 attendu, pas 404) pour confirmer que le routage marche.
+### Rôle super_admin
 
-### Étape 3 — Préparer les comptes de test
+- Ajouter `'super_admin'` à l'enum `app_role`.
+- Helper `is_super_admin(uid)` SECURITY DEFINER.
+- Page `/admin/deletion-requests` réservée via `RoleGuard`.
 
-Via `supabase--insert` / RPC :
-- Créer `bob@test.local` et `alice@test.local` (signup côté script ou seed direct).
-- Alice crée le groupe "Famille Alice" (500 000 XOF mensuel, 4 places) via `create_group_with_invitation`.
-- Bob rejoint via le code.
-- Démarrer le cycle (rotation programmée) pour qu'une cotisation Bob → tour Alice soit due.
+### UI
 
-### Étape 4 — Relancer le test E2E Djomy (Playwright)
+**Côté organisateur** (GroupSettings, remplacer / compléter le bouton Archiver actuel) :
+- Bouton « Demander la suppression » (visible seulement si pré-conditions OK).
+- Modal avec motif obligatoire + récap pré-conditions vérifiées.
+- Bannière « Demande en cours — X/Y votes, deadline le … ».
 
-Réutilise `/tmp/browser/djomy-e2e-v2/pay.py` (script du dernier plan), avec session pré-mintée via `LOVABLE_BROWSER_SUPABASE_SESSION_JSON` :
+**Côté membre** (GroupDetail) :
+- Carte vote « L'organisateur demande la suppression de ce groupe » → boutons Approuver / Refuser + motif.
+- Notification dédiée `group_deletion_requested`.
 
-1. Bob login → `/cotisations` → "Payer via Djomy" → modale OM `620000002` → "Continuer".
-2. Capture réseau : `POST /djomy-init-payment` doit renvoyer 200 + `redirectUrl`, `transactionId`, `paymentId`.
-3. Screenshot de la redirection vers `sandbox-api.djomy.africa` (sans finaliser).
-4. Vérif DB : `payments` row `provider='djomy'`, `status in ('initiated','pending')`, `djomy_transaction_id not null`.
-5. Simuler le webhook succès : `POST /djomy-webhook` avec payload signé HMAC SHA-256 (clé = `DJOMY_WEBHOOK_SECRET`, header `X-Djomy-Signature` selon `_shared/djomy.ts`), status `SUCCESS`. Rejouer 2× → idempotent.
-6. Vérif post-webhook : `payments.status='succeeded'`, `contributions.status='confirmed'`, 1 `ledger_entries` (`kind='contribution_in'`, 500 000), notification générée.
-7. Bob `/dashboard` rechargé → KPI "À payer" mis à jour, échéance disparue/marquée payée. Alice `/dashboard` → tour visible avec cotisation reçue.
+**Back-office super_admin** (`/admin/deletion-requests`) :
+- Liste des demandes `pending_admin` avec : nom groupe, organisateur, votes, motifs.
+- Actions Approuver / Refuser avec motif.
+- Notif retour à l'organisateur + journal audit.
 
-### Étape 5 — Livrable final
+### Notifications & audit
 
-- Tableau récap étape / statut / capture / requête réseau.
-- Captures `/tmp/browser/djomy-e2e-v2/screenshots/*`.
-- Extrait SQL final (payment + contribution + ledger).
-- Verdict explicite ✅/🔴 avec cause si échec.
+Nouvelles `notification_kind` :
+- `group_deletion_requested`
+- `group_deletion_vote_recorded`
+- `group_deletion_rejected_by_member`
+- `group_deletion_pending_admin`
+- `group_deletion_approved`
+- `group_deletion_refused`
 
-## Hors-scope
+Actions audit : `deletion_requested`, `deletion_voted`, `deletion_finalized`, `deletion_admin_decision`.
 
-- Paiement réel sur le portail Djomy sandbox (interaction humaine requise).
-- Corrections de code applicatif — on documente sans patcher dans ce passage, sauf bug bloquant le flux (à valider avec toi avant patch).
+---
 
-## Question avant exécution
+## Livrables finaux
 
-Confirme simplement "**go**" et j'enchaîne : batches de migrations 17→46, déploiement des 4 edge functions, puis test E2E complet d'une traite.
+1. 3 rapports Markdown sous `/mnt/documents/audit-2026-06-16/` (fonctionnel, UX, sécurité) + screenshots.
+2. Migration `group_deletion_workflow.sql` (enums, tables, RLS, RPCs, soft-delete, super_admin).
+3. Page `/admin/deletion-requests` + composants `DeletionRequestPanel` (organisateur) et `DeletionVoteCard` (membre).
+4. API client `src/lib/api/deletion.ts`.
+5. Re-test E2E du workflow de suppression sur le groupe « Audit Test » après implémentation.
+
+## Hors-périmètre (à confirmer plus tard)
+
+- Possibilité pour les membres d'**initier** une demande de suppression (actuellement réservé organisateur).
+- Email externe aux membres (uniquement in-app pour cette itération).
