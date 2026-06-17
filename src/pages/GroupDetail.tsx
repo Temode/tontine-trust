@@ -184,6 +184,10 @@ export default function GroupDetail() {
   const canManageMembers = isOrganizer || isCoOrgAdmin;
   const frequency = FREQ_LABEL[grp.frequency] ?? "Mensuelle";
   const totalPayout = grp.contribution_amount * activeMembers.length;
+
+  const myDueForGroup = (duesQ.data ?? [])
+    .filter((d) => d.group_id === grp.id && d.status !== "submitted")
+    .sort((a, b) => a.turn_number - b.turn_number)[0];
   const canStart =
     isOrganizer && (grp.status === "draft" || grp.status === "open") && activeMembers.length >= 2;
   const nextTurn =
