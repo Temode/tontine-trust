@@ -62,7 +62,8 @@ export function DjomyPaymentModal({ open, onOpenChange, contributionId, groupNam
       window.location.href = res.redirectUrl;
     } catch (e) {
       setLoading(false);
-      toast.error("Initialisation échouée", { description: (e as Error).message });
+      const msg = (e as Error).message ?? "Erreur inconnue";
+      toast.error("Initialisation échouée", { description: msg, duration: 8000 });
     }
   };
 
