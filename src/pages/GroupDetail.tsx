@@ -471,6 +471,15 @@ export default function GroupDetail() {
           {section === "audit" && isOrganizer && <AuditLog groupId={grp.id} />}
         </div>
       </div>
+      {myDueForGroup && (
+        <DjomyPaymentModal
+          open={payNow}
+          onOpenChange={setPayNow}
+          contributionId={myDueForGroup.contribution_id}
+          groupName={myDueForGroup.group_name}
+          amount={myDueForGroup.amount}
+        />
+      )}
     </div>
   );
 }
