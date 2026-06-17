@@ -163,3 +163,28 @@ export async function adminForceGroupStatus(
   } as never);
   if (error) throw new Error(error.message);
 }
+
+export async function adminReplayDjomyWebhook(
+  paymentId: string,
+  status: "succeeded" | "failed" | "cancelled" | "pending",
+): Promise<{ ok: true; paymentId: string; status: string }> {
+  const { data, error } = await supabase.functions.invoke<
+    { ok: true; paymentId: string; status: string } | { error: string; message?: string; hint?: string }
+  >("djomy-admin-replay", { body: { paymentId, status } });
+  if (error) {
+    // Tente d'extraire le détail du contexte
+    try {
+      const ctx = (error as { context?: Response }).context;
+      if (ctx?.json) {
+        const b = await ctx.clone().json();
+        throw new Error([b.error, b.message, b.hint].filter(Boolean).join(" — "));
+      }
+    } catch (inner) { if (inner instanceof Error) throw inner; }
+    throw new Error(error.message);
+  }
+  if (!data || "error" in data) {
+    const d = data as { error?: string; message?: string; hint?: string } | null;
+    throw new Error([d?.error, d?.message, d?.hint].filter(Boolean).join(" — ") || "REPLAY_FAILED");
+  }
+  return data;
+}
