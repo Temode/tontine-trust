@@ -1,52 +1,31 @@
-## Objectif
+## Problème
 
-1. Débloquer définitivement le webhook Djomy (P0 : `function digest(text, unknown) does not exist`) pour que les paiements passent de `pending` → `succeeded` et déclenchent reçus + ledger.
-2. Régler le vrai problème UX remonté : **le bouton « Payer » n'est pas accessible** depuis mobile ni depuis le détail du groupe. La page `/cotisations` existe mais n'est reliée à rien sur mobile.
+L'appel `djomy-init-payment` retourne **400 Bad Request** → aucune redirection.
 
-## Partie 1 — Fix P0 digest() (recommandée)
+Cause : dans `src/lib/api/djomy.ts`, `returnUrl`/`cancelUrl` sont construits à partir de `window.location.origin`. En preview Lovable / localhost, l'origine est `http://localhost:8080` (HTTP). Or l'edge function (`supabase/functions/djomy-init-payment/index.ts`) refuse toute URL non-HTTPS :
 
-**Cause :** `pgcrypto` est installé dans le schéma `extensions` (standard Supabase). Les fonctions `append_ledger`, `compute_payout_hash` et l'audit log appellent `digest(...)` sans qualifier le schéma, et leur `search_path` ne contient pas `extensions` → l'appel échoue dès qu'un webhook tente d'écrire dans le ledger.
+```ts
+if (!/^https:\/\//.test(body.returnUrl)) return json({ error: "RETURN_URL_NOT_HTTPS" }, 400);
+```
 
-**Solution retenue (la plus sûre) :** schema-qualifier tous les appels en `extensions.digest(...)` plutôt que de toucher au search_path global. C'est non destructif, rétro-compatible, et ça blinde l'app contre toute future migration de schéma.
+Djomy exige effectivement du HTTPS en sandbox/prod, donc on ne peut pas simplement enlever la garde — il faut fournir une URL HTTPS publique.
 
-Migration unique qui `CREATE OR REPLACE FUNCTION` pour :
-- `public.append_ledger(...)` (db/04) — remplacer `digest(...)` par `extensions.digest(...)`
-- `public.compute_payout_hash(...)` (db/05) — idem
-- `public.log_audit(...)` (db/25) — idem
-- `public.apply_djomy_webhook(...)` (migration 20260616154444) — relire et corriger si elle appelle digest directement
-- S'assurer que `pgcrypto` est bien dans `extensions` (`CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA extensions`)
+## Correctif
 
-**Alternative écartée :** ajouter `SET search_path = public, extensions` à chaque fonction. Marche aussi mais moins explicite et casse en cascade si une autre fonction `SECURITY DEFINER` oublie le set.
+### 1. `src/lib/api/djomy.ts` — calculer un `returnUrl` HTTPS robuste
+- Si `window.location.protocol === 'https:'` → utiliser `window.location.origin` (cas production / preview Lovable publiée).
+- Sinon (localhost/HTTP) → utiliser une variable d'env `VITE_PUBLIC_APP_URL` si définie, sinon fallback sur l'URL Lovable publiée du projet (`https://tontine-digitale.lovable.app`).
+- Construire `returnUrl = ${base}/payment/return?pid=...` et `cancelUrl = ${base}/payment/cancel?pid=...` pour permettre à `PaymentReturn` de re-poller le statut même hors de l'origine d'init.
 
-## Partie 2 — Rendre le bouton Payer accessible
+### 2. `supabase/functions/djomy-init-payment/index.ts` — message d'erreur exploitable
+Au lieu de `{ error: "RETURN_URL_NOT_HTTPS" }` sec, renvoyer aussi l'URL reçue + un `hint` pour qu'on voie immédiatement la cause dans le toast frontend.
 
-Le problème reporté par l'utilisateur (« je ne vois pas de bouton de paiement ») vient de la nav :
+### 3. `DjomyPaymentModal` — afficher le message détaillé
+Le `catch` actuel n'affiche que `(e as Error).message`. Pour les erreurs `FunctionsHttpError` de supabase-js, lire `error.context?.json()` quand dispo pour récupérer `{error, details, hint}` et l'afficher dans le toast (parité avec ce qu'on a fait pour `start_cycle`).
 
-- `BottomNav` (mobile, viewport actuel 712×489) liste seulement : Accueil, Groupes, Créer, Profil. **Aucun lien vers `/cotisations`.**
-- `DesktopSidebar` a bien le lien « Mes cotisations » mais il est masqué sous `lg:`.
-- Sur `GroupDetail`, aucun CTA direct « Payer ma cotisation » ne renvoie vers `/cotisations`.
+### Vérification
+- Re-tester depuis la preview : modal Djomy → "Continuer vers Djomy" → vérifier que la redirection sandbox Djomy s'ouvre.
+- Vérifier `payments` (status=`initiated` puis `pending` au retour webhook).
+- Vérifier que `PaymentReturn` reçoit bien le `pid` et poll le statut.
 
-### Changements front-end (présentation uniquement)
-
-1. **`src/components/layout/BottomNav.tsx`** : remplacer l'item « Profil » par « Cotisations » (icône `Wallet`, route `/cotisations`) et déplacer Profil dans le TopBar / menu utilisateur (il y est déjà accessible via l'avatar). Résultat : 4 items = Accueil · Groupes · Créer · Cotisations.
-2. **`src/pages/GroupDetail.tsx`** : ajouter un bouton primaire « Payer ma cotisation » dans l'en-tête du groupe quand le membre courant a au moins une cotisation due pour ce groupe. Le bouton ouvre directement `DjomyPaymentModal` avec la prochaine `contribution_due` du groupe (réutilise `listMyContributionsDue` filtrée par `group_id`). Si aucune cotisation due → bouton masqué.
-3. **`src/pages/Dashboard.tsx`** : le `DuesCard` existe déjà ; vérifier qu'il propose un CTA « Payer » qui route vers `/cotisations` (si non, ajouter un lien discret).
-
-Aucun changement de logique métier, aucune nouvelle table, aucun edge function modifié.
-
-## Partie 3 — Validation
-
-Après application :
-1. Rejouer l'audit API ciblé Djomy (script déjà en place dans `/tmp/browser/audit/`) → init paiement → simulation webhook via la RPC `_audit_simulate_djomy_webhook` (à ajouter dans la même migration, restreinte aux emails `*.audit+*@tontine.test`, signe le payload avec un secret de test interne pour court-circuiter `DJOMY_WEBHOOK_SECRET`).
-2. Vérifier en DB : `payments.status = 'succeeded'`, `receipts` rempli, `ledger_entries` créé avec hash non null.
-3. Playwright mobile (viewport 712×489) : vérifier que l'item « Cotisations » apparaît dans la BottomNav et que le bouton « Payer » est visible sur GroupDetail quand une cotisation est due.
-
-## Livrables
-
-- 1 migration SQL (fix digest + helper d'audit webhook)
-- 2 fichiers front modifiés : `BottomNav.tsx`, `GroupDetail.tsx`
-- Capture avant/après mobile + log SQL d'un paiement passé en `succeeded`
-
-## Question rapide avant de lancer
-
-Confirmes-tu le remplacement de « Profil » par « Cotisations » dans la BottomNav (Profil reste accessible via l'avatar du TopBar) ? Sinon je peux passer la BottomNav à 5 items, mais c'est plus serré visuellement sur petit écran.
+Aucune migration DB nécessaire.
