@@ -37,9 +37,19 @@ Deno.serve(async (req) => {
     if (!["OM", "MOMO", "CARD"].includes(body.method)) {
       return json({ error: "INVALID_METHOD" }, 400);
     }
-    if (!/^https:\/\//.test(body.returnUrl)) return json({ error: "RETURN_URL_NOT_HTTPS" }, 400);
+    if (!/^https:\/\//.test(body.returnUrl)) {
+      return json({
+        error: "RETURN_URL_NOT_HTTPS",
+        hint: "Djomy exige une returnUrl en HTTPS. En développement, configurez VITE_PUBLIC_APP_URL ou ouvrez l'app via l'URL Lovable publiée (https://...).",
+        details: { returnUrl: body.returnUrl },
+      }, 400);
+    }
     if (body.cancelUrl && !/^https:\/\//.test(body.cancelUrl)) {
-      return json({ error: "CANCEL_URL_NOT_HTTPS" }, 400);
+      return json({
+        error: "CANCEL_URL_NOT_HTTPS",
+        hint: "Djomy exige une cancelUrl en HTTPS.",
+        details: { cancelUrl: body.cancelUrl },
+      }, 400);
     }
 
     const phone = normalizePhone(body.payerPhone);
