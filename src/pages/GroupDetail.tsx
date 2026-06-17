@@ -726,5 +726,15 @@ function RotationTab({
       </SectionCard>
     )}
     </div>
+    {myDueForGroup && (
+      <DjomyPaymentModal
+        open={payNow}
+        onOpenChange={setPayNow}
+        contributionId={myDueForGroup.contribution_id}
+        groupName={myDueForGroup.group_name}
+        amount={myDueForGroup.amount}
+      />
+    )}
+    </>
   );
 }
