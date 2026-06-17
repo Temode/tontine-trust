@@ -1,59 +1,52 @@
-# Audit E2E complet de la tontine
-
 ## Objectif
-Jouer le parcours complet bout-en-bout dans le navigateur (Playwright headless sur `localhost:8080`), recenser tous les bugs fonctionnels et frictions UX rencontrés, puis livrer un patch correctif unique.
 
-## Phase 1 — Préparation des comptes de test
-Créer 3 comptes via l'écran `/auth` (signup email + mot de passe, sans confirmation email puisque déjà désactivée) :
-- **Alice** (organisatrice) — alice.test+<timestamp>@tontine.test
-- **Bob** (membre) — bob.test+<timestamp>@tontine.test
-- **Carole** (membre) — carole.test+<timestamp>@tontine.test
+1. Débloquer définitivement le webhook Djomy (P0 : `function digest(text, unknown) does not exist`) pour que les paiements passent de `pending` → `succeeded` et déclenchent reçus + ledger.
+2. Régler le vrai problème UX remonté : **le bouton « Payer » n'est pas accessible** depuis mobile ni depuis le détail du groupe. La page `/cotisations` existe mais n'est reliée à rien sur mobile.
 
-Sessions sauvegardées en JSON dans `/tmp/browser/audit/` pour pouvoir basculer rapidement d'un utilisateur à l'autre.
+## Partie 1 — Fix P0 digest() (recommandée)
 
-## Phase 2 — Scénario fonctionnel joué dans le navigateur
-1. **Alice** : compléter profil (nom, téléphone GN) → créer un groupe "Audit Tontine" (3 membres, 50 000 GNF, hebdomadaire) → récupérer le code d'invitation.
-2. **Bob** puis **Carole** : `/join` → saisir code → soumettre candidature.
-3. **Alice** : panneau "Candidatures en attente" → Accepter Bob et Carole.
-4. **Alice** : "Démarrer le cycle" → vérifier que turns sont générés et que l'erreur précédente ne se reproduit pas (sinon capturer le toast détaillé).
-5. **Bob** : `/mes-cotisations` → payer via **Djomy sandbox** (méthode OM ou MOMO, numéro sandbox) → suivre la redirection → revenir sur `/payment/return` → vérifier que la contribution passe en `succeeded`.
-6. **Carole** : même paiement.
-7. Vérifier le versement (payout) au bénéficiaire du tour 1, l'historique, les reçus, les notifications.
-8. **Admin** (super_admin déjà configuré) : `/admin` → vérifier overview, users, groups, payments, audit.
+**Cause :** `pgcrypto` est installé dans le schéma `extensions` (standard Supabase). Les fonctions `append_ledger`, `compute_payout_hash` et l'audit log appellent `digest(...)` sans qualifier le schéma, et leur `search_path` ne contient pas `extensions` → l'appel échoue dès qu'un webhook tente d'écrire dans le ledger.
 
-À chaque étape : screenshot + capture console + capture network (statuts RPC/edge functions).
+**Solution retenue (la plus sûre) :** schema-qualifier tous les appels en `extensions.digest(...)` plutôt que de toucher au search_path global. C'est non destructif, rétro-compatible, et ça blinde l'app contre toute future migration de schéma.
 
-## Phase 3 — Recensement des problèmes
-Pour chaque écran traversé, lister :
-- **Bugs fonctionnels** : RPC en erreur, données manquantes, écrans cassés, redirections fausses, droits mal appliqués.
-- **UX** : libellés ambigus, boutons sans feedback, états de chargement manquants, parcours qui force l'utilisateur à deviner l'étape suivante, contraste/lisibilité, messages d'erreur incompréhensibles, mobile (826×528).
-- **Intégration Djomy sandbox** : init payment, redirection, webhook, retour, statut final, gestion des échecs et annulations.
+Migration unique qui `CREATE OR REPLACE FUNCTION` pour :
+- `public.append_ledger(...)` (db/04) — remplacer `digest(...)` par `extensions.digest(...)`
+- `public.compute_payout_hash(...)` (db/05) — idem
+- `public.log_audit(...)` (db/25) — idem
+- `public.apply_djomy_webhook(...)` (migration 20260616154444) — relire et corriger si elle appelle digest directement
+- S'assurer que `pgcrypto` est bien dans `extensions` (`CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA extensions`)
 
-Le résultat de cette phase est un rapport synthétique (max 20 items priorisés P0/P1/P2) qui sera affiché à l'utilisateur avant les correctifs.
+**Alternative écartée :** ajouter `SET search_path = public, extensions` à chaque fonction. Marche aussi mais moins explicite et casse en cascade si une autre fonction `SECURITY DEFINER` oublie le set.
 
-## Phase 4 — Correctifs
-Implémenter en priorité P0 puis P1 :
-- Patchs SQL groupés dans **une seule migration** (RPC, vues, policies, grants).
-- Patchs front ciblés (toasts détaillés, états vides, loaders, libellés, accessibilité).
-- Edge functions Djomy si init/webhook/return présentent des défauts.
+## Partie 2 — Rendre le bouton Payer accessible
 
-Aucun refactor large : on touche uniquement ce que l'audit a démontré comme défaillant.
+Le problème reporté par l'utilisateur (« je ne vois pas de bouton de paiement ») vient de la nav :
 
-## Phase 5 — Validation
-Rejouer le scénario complet (Phase 2) une seconde fois après les correctifs. Livrer :
-- Screenshots avant/après pour les problèmes UX visibles.
-- Confirmation que chaque P0/P1 du rapport est résolu.
-- Liste résiduelle des P2 non traités avec justification.
+- `BottomNav` (mobile, viewport actuel 712×489) liste seulement : Accueil, Groupes, Créer, Profil. **Aucun lien vers `/cotisations`.**
+- `DesktopSidebar` a bien le lien « Mes cotisations » mais il est masqué sous `lg:`.
+- Sur `GroupDetail`, aucun CTA direct « Payer ma cotisation » ne renvoie vers `/cotisations`.
 
-## Détails techniques
-- Outil : Playwright Python headless, viewport 1280×1800 pour desktop + un passage 390×844 pour mobile sur les écrans clés (Dashboard, GroupDetail, MesCotisations).
-- Sandbox Djomy : credentials `DJOMY_CLIENT_ID` / `DJOMY_CLIENT_SECRET` déjà configurés (à confirmer via `fetch_secrets`). Numéros de test sandbox Djomy : OM `224620000001`, MOMO `224660000001` (à valider lors de l'init).
-- Webhook : vérifier que l'URL configurée côté Djomy pointe bien vers `https://<project>.functions.supabase.co/djomy-webhook`. Si non, signaler à l'utilisateur (action manuelle requise côté dashboard Djomy).
-- Aucune donnée de prod n'est touchée : tous les comptes créés sont préfixés `*.test+<ts>@tontine.test`.
+### Changements front-end (présentation uniquement)
 
-## Points nécessitant confirmation avant exécution
-1. **Webhook Djomy** : je n'ai pas accès au dashboard Djomy. Si le webhook n'est pas configuré côté Djomy vers notre edge function, le statut de paiement restera `pending` côté DB même si le paiement réussit côté téléphone. Acceptes-tu que dans ce cas je valide la partie « initiation + redirection » et que je documente l'action manuelle à faire côté Djomy ?
-2. **Confirmation email** : les comptes de test doivent pouvoir se connecter sans email confirmé. Si ce n'est pas déjà le cas, je devrai t'avertir avant de continuer.
-3. **Suppression post-audit** : je laisse les comptes/groupes de test en base (préfixés `*.test`) pour que tu puisses inspecter, ou tu préfères que je les supprime à la fin ?
+1. **`src/components/layout/BottomNav.tsx`** : remplacer l'item « Profil » par « Cotisations » (icône `Wallet`, route `/cotisations`) et déplacer Profil dans le TopBar / menu utilisateur (il y est déjà accessible via l'avatar). Résultat : 4 items = Accueil · Groupes · Créer · Cotisations.
+2. **`src/pages/GroupDetail.tsx`** : ajouter un bouton primaire « Payer ma cotisation » dans l'en-tête du groupe quand le membre courant a au moins une cotisation due pour ce groupe. Le bouton ouvre directement `DjomyPaymentModal` avec la prochaine `contribution_due` du groupe (réutilise `listMyContributionsDue` filtrée par `group_id`). Si aucune cotisation due → bouton masqué.
+3. **`src/pages/Dashboard.tsx`** : le `DuesCard` existe déjà ; vérifier qu'il propose un CTA « Payer » qui route vers `/cotisations` (si non, ajouter un lien discret).
 
-Réponds OK (et précise les 3 points ci-dessus si tu as une préférence) et je lance l'audit.
+Aucun changement de logique métier, aucune nouvelle table, aucun edge function modifié.
+
+## Partie 3 — Validation
+
+Après application :
+1. Rejouer l'audit API ciblé Djomy (script déjà en place dans `/tmp/browser/audit/`) → init paiement → simulation webhook via la RPC `_audit_simulate_djomy_webhook` (à ajouter dans la même migration, restreinte aux emails `*.audit+*@tontine.test`, signe le payload avec un secret de test interne pour court-circuiter `DJOMY_WEBHOOK_SECRET`).
+2. Vérifier en DB : `payments.status = 'succeeded'`, `receipts` rempli, `ledger_entries` créé avec hash non null.
+3. Playwright mobile (viewport 712×489) : vérifier que l'item « Cotisations » apparaît dans la BottomNav et que le bouton « Payer » est visible sur GroupDetail quand une cotisation est due.
+
+## Livrables
+
+- 1 migration SQL (fix digest + helper d'audit webhook)
+- 2 fichiers front modifiés : `BottomNav.tsx`, `GroupDetail.tsx`
+- Capture avant/après mobile + log SQL d'un paiement passé en `succeeded`
+
+## Question rapide avant de lancer
+
+Confirmes-tu le remplacement de « Profil » par « Cotisations » dans la BottomNav (Profil reste accessible via l'avatar du TopBar) ? Sinon je peux passer la BottomNav à 5 items, mais c'est plus serré visuellement sur petit écran.
