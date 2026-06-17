@@ -10,8 +10,11 @@ export default function PaymentReturn() {
   const navigate = useNavigate();
   const transactionId = params.get("transactionId") ?? params.get("transaction_id");
   const pidParam = params.get("pid") ?? params.get("paymentId");
-  const [paymentId, setPaymentId] = useState<string | null>(pidParam);
-  const [resolving, setResolving] = useState(!pidParam);
+  const storedPid = (() => {
+    try { return sessionStorage.getItem("lastDjomyPaymentId"); } catch { return null; }
+  })();
+  const [paymentId, setPaymentId] = useState<string | null>(pidParam ?? storedPid);
+  const [resolving, setResolving] = useState(!(pidParam ?? storedPid));
 
   useEffect(() => {
     if (paymentId || !transactionId) { setResolving(false); return; }
