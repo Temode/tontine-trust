@@ -1,84 +1,55 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { useQueryClient } from "@tanstack/react-query";
-import { Check, Loader2, AlertCircle, ArrowLeft } from "lucide-react";
-import { getDjomyPaymentStatus, type PaymentStatusResult } from "@/lib/api/djomy";
+import { Loader2, ArrowLeft } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { PaymentTracker } from "@/components/payment/PaymentTracker";
 
 type UiStatus = "loading" | "pending" | "succeeded" | "failed" | "cancelled";
 
 export default function PaymentReturn() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
-  const qc = useQueryClient();
   const transactionId = params.get("transactionId") ?? params.get("transaction_id");
-  const initialStatus = (params.get("status") ?? "").toUpperCase();
-  const [status, setStatus] = useState<UiStatus>("loading");
-  const [attempts, setAttempts] = useState(0);
+  const pidParam = params.get("pid") ?? params.get("paymentId");
+  const [paymentId, setPaymentId] = useState<string | null>(pidParam);
+  const [resolving, setResolving] = useState(!pidParam);
 
   useEffect(() => {
-    if (!transactionId) {
-      setStatus("failed");
-      return;
-    }
+    if (paymentId || !transactionId) { setResolving(false); return; }
     let cancelled = false;
-    const poll = async () => {
-      try {
-        const res: PaymentStatusResult = await getDjomyPaymentStatus(transactionId);
-        if (cancelled) return;
-        if (res.status === "succeeded") {
-          setStatus("succeeded");
-          qc.invalidateQueries({ queryKey: ["contributions"] });
-          qc.invalidateQueries({ queryKey: ["payments"] });
-          qc.invalidateQueries({ queryKey: ["turns"] });
-          qc.invalidateQueries({ queryKey: ["dashboard"] });
-          return;
-        }
-        if (res.status === "failed") return setStatus("failed");
-        if (res.status === "cancelled") return setStatus("cancelled");
-        setStatus("pending");
-        if (attempts < 10) {
-          setTimeout(() => setAttempts((a) => a + 1), 3000);
-        }
-      } catch {
-        if (!cancelled) setStatus(initialStatus === "SUCCESS" ? "pending" : "failed");
+    (async () => {
+      const { data } = await supabase
+        .from("payments")
+        .select("id")
+        .eq("djomy_transaction_id", transactionId)
+        .maybeSingle();
+      if (!cancelled) {
+        setPaymentId((data as { id: string } | null)?.id ?? null);
+        setResolving(false);
       }
-    };
-    poll();
+    })();
     return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [transactionId, attempts]);
+  }, [paymentId, transactionId]);
 
   return (
     <div className="mx-auto flex min-h-[60vh] max-w-md flex-col items-center justify-center px-5 py-10 text-center">
-      {status === "loading" || status === "pending" ? (
-        <>
-          <Loader2 className="mb-4 h-10 w-10 animate-spin text-primary" />
-          <h1 className="font-display text-xl font-bold text-foreground">Vérification du paiement…</h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Confirmez la transaction sur votre téléphone Mobile Money. Cette page se met à jour automatiquement.
-          </p>
-        </>
-      ) : status === "succeeded" ? (
-        <>
-          <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-success/10">
-            <Check className="h-7 w-7 text-success" strokeWidth={2.5} />
+      <h1 className="font-display text-xl font-bold text-foreground">Suivi du paiement</h1>
+      <p className="mt-1 mb-5 text-sm text-muted-foreground">
+        Mise à jour automatique dès réception du webhook Djomy.
+      </p>
+      <div className="w-full">
+        {resolving ? (
+          <div className="flex items-center justify-center gap-2 rounded-md border border-hairline bg-card px-3 py-4 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" /> Récupération du paiement…
           </div>
-          <h1 className="font-display text-xl font-bold text-foreground">Paiement confirmé</h1>
-          <p className="mt-2 text-sm text-muted-foreground">Votre cotisation a bien été enregistrée.</p>
-        </>
-      ) : (
-        <>
-          <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-destructive/10">
-            <AlertCircle className="h-7 w-7 text-destructive" />
+        ) : paymentId ? (
+          <PaymentTracker paymentId={paymentId} />
+        ) : (
+          <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-4 text-sm text-destructive">
+            Paiement introuvable. Vérifiez « Mes cotisations ».
           </div>
-          <h1 className="font-display text-xl font-bold text-foreground">
-            {status === "cancelled" ? "Paiement annulé" : "Paiement non abouti"}
-          </h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Vous pouvez réessayer depuis la page « Mes cotisations ».
-          </p>
-        </>
-      )}
+        )}
+      </div>
 
       <div className="mt-6 flex gap-3">
         <Link
