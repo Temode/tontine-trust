@@ -29,6 +29,8 @@ import {
 } from "@/lib/api/members";
 import { listGroupTurns } from "@/lib/api/turns";
 import { releasePayout, listGroupLedger } from "@/lib/api/payouts";
+import { listMyContributionsDue } from "@/lib/api/contributions";
+import { DjomyPaymentModal } from "@/components/payment/DjomyPaymentModal";
 import { getGroupReliability, type DbGroupReliabilityRow } from "@/lib/api/reliability";
 import { ReliabilityBadge } from "@/components/reliability/ReliabilityBadge";
 import { useAuth } from "@/hooks/useAuth";
@@ -149,6 +151,12 @@ export default function GroupDetail() {
     enabled: !!id,
   });
 
+  const duesQ = useQuery({
+    queryKey: ["contributions", "due"],
+    queryFn: listMyContributionsDue,
+  });
+  const [payNow, setPayNow] = useState(false);
+
   if (groupQ.isLoading) {
     return <div className="px-6 py-12 text-sm text-muted-foreground">Chargement…</div>;
   }
@@ -176,6 +184,10 @@ export default function GroupDetail() {
   const canManageMembers = isOrganizer || isCoOrgAdmin;
   const frequency = FREQ_LABEL[grp.frequency] ?? "Mensuelle";
   const totalPayout = grp.contribution_amount * activeMembers.length;
+
+  const myDueForGroup = (duesQ.data ?? [])
+    .filter((d) => d.group_id === grp.id && d.status !== "submitted")
+    .sort((a, b) => a.turn_number - b.turn_number)[0];
   const canStart =
     isOrganizer && (grp.status === "draft" || grp.status === "open") && activeMembers.length >= 2;
   const nextTurn =
@@ -311,6 +323,31 @@ export default function GroupDetail() {
           </div>
         )}
 
+        {myDueForGroup && (
+          <div className="mt-5 flex flex-col gap-3 rounded-xl border border-primary/20 bg-primary-50/60 p-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+                <Wallet className="h-4 w-4" />
+              </div>
+              <div>
+                <p className="font-display text-sm font-bold text-foreground">Votre cotisation est due</p>
+                <p className="text-xs text-muted-foreground">
+                  Tour #{myDueForGroup.turn_number} · {formatGNF(myDueForGroup.amount, { withCurrency: true })} ·
+                  échéance {new Date(myDueForGroup.due_date).toLocaleDateString("fr-FR")}
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setPayNow(true)}
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground transition hover:bg-primary-700"
+            >
+              <ShieldCheck className="h-4 w-4" />
+              Payer via Djomy
+            </button>
+          </div>
+        )}
+
         {isOrganizer && pendingMembers.length > 0 && (
           <div className="mt-5">
             <SectionCard
@@ -434,6 +471,15 @@ export default function GroupDetail() {
           {section === "audit" && isOrganizer && <AuditLog groupId={grp.id} />}
         </div>
       </div>
+      {myDueForGroup && (
+        <DjomyPaymentModal
+          open={payNow}
+          onOpenChange={setPayNow}
+          contributionId={myDueForGroup.contribution_id}
+          groupName={myDueForGroup.group_name}
+          amount={myDueForGroup.amount}
+        />
+      )}
     </div>
   );
 }

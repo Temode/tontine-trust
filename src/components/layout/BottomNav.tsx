@@ -1,4 +1,4 @@
-import { Home, Plus, User, Users } from "lucide-react";
+import { Home, Plus, Wallet, Users } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 
@@ -13,7 +13,7 @@ const items: NavItem[] = [
   { to: "/dashboard", label: "Accueil", icon: Home },
   { to: "/groupes", label: "Groupes", icon: Users },
   { to: "/nouveau", label: "Créer", icon: Plus, isMain: true },
-  { to: "/profil", label: "Profil", icon: User },
+  { to: "/cotisations", label: "Payer", icon: Wallet },
 ];
 
 export function BottomNav() {
