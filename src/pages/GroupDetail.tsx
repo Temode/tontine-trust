@@ -151,6 +151,12 @@ export default function GroupDetail() {
     enabled: !!id,
   });
 
+  const duesQ = useQuery({
+    queryKey: ["contributions", "due"],
+    queryFn: listMyContributionsDue,
+  });
+  const [payNow, setPayNow] = useState(false);
+
   if (groupQ.isLoading) {
     return <div className="px-6 py-12 text-sm text-muted-foreground">Chargement…</div>;
   }
