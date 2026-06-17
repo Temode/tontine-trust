@@ -13,8 +13,11 @@ import {
   listMyPaymentsHistory,
 } from "@/lib/api/payments";
 import { DjomyPaymentModal } from "@/components/payment/DjomyPaymentModal";
+import { InFlightPaymentsCard } from "@/components/payment/InFlightPaymentsCard";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function MyContributions() {
+  const { user } = useAuth();
   const { data: dues = [], isLoading } = useQuery({
     queryKey: ["contributions", "due"],
     queryFn: listMyContributionsDue,
@@ -40,6 +43,8 @@ export default function MyContributions() {
           <KpiTile label="Paiements réussis" value={String(history.filter((p) => p.status === "succeeded").length)} />
           <KpiTile label="Provider" value="Djomy" hint="OM · MTN · Carte" />
         </div>
+
+        <InFlightPaymentsCard userId={user?.id ?? null} />
 
         <SectionCard title="À régler" subtitle={isLoading ? "Chargement…" : undefined} bare>
           {isLoading ? (
