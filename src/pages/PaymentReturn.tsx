@@ -4,7 +4,6 @@ import { Loader2, ArrowLeft } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PaymentTracker } from "@/components/payment/PaymentTracker";
 
-type UiStatus = "loading" | "pending" | "succeeded" | "failed" | "cancelled";
 
 export default function PaymentReturn() {
   const [params] = useSearchParams();
