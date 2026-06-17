@@ -207,6 +207,7 @@ export default function GroupDetail() {
   ];
 
   return (
+    <>
     <div className="animate-fade-in">
       <header className="sticky top-0 z-30 border-b border-hairline bg-card/85 backdrop-blur">
         <div className="flex items-center gap-3 px-5 py-4 lg:px-8">
