@@ -58,6 +58,8 @@ export function DjomyPaymentModal({ open, onOpenChange, contributionId, groupNam
         method,
         payerPhone: phone || "00224000000000",
       });
+      // Mémorise le paymentId pour le retour (PaymentReturn lit ?pid=)
+      try { sessionStorage.setItem("lastDjomyPaymentId", res.paymentId); } catch { /* ignore */ }
       // Redirection vers le portail Djomy
       window.location.href = res.redirectUrl;
     } catch (e) {
