@@ -2,10 +2,16 @@ import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
-import { ArrowLeft, Save, Lock } from "lucide-react";
+import { ArrowLeft, Save, Lock, Info, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { TopBar } from "@/components/layout/TopBar";
 import { SectionCard } from "@/components/dashboard/SectionCard";
-import { getGroup, updateGroupSettings, type UpdateGroupSettingsPayload } from "@/lib/api/groups";
+import {
+  getGroup,
+  getGroupEditWindow,
+  updateGroupSettings,
+  type GroupEditWindow,
+  type UpdateGroupSettingsPayload,
+} from "@/lib/api/groups";
 import { useAuth } from "@/hooks/useAuth";
 import { MembersAdminPanel } from "@/components/group/MembersAdminPanel";
 import { ExternalPaymentsPanel } from "@/components/group/ExternalPaymentsPanel";
@@ -13,6 +19,16 @@ import { PaymentsHistoryPanel } from "@/components/group/PaymentsHistoryPanel";
 import { CycleAdminPanel } from "@/components/group/CycleAdminPanel";
 import { DeletionPanel } from "@/components/group/DeletionPanel";
 import { ShieldCheck, ChevronRight } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const FREQ_OPTIONS = [
   { value: "quotidienne", label: "Quotidienne (1 jour)" },
@@ -50,9 +66,21 @@ export default function GroupSettings() {
   });
 
   const isOrganizer = !!user?.id && !!group && group.created_by === user.id;
-  const locked = !!group && !(group.status === "draft" || group.status === "open");
+
+  const { data: editWindow } = useQuery({
+    queryKey: ["group-edit-window", id],
+    queryFn: () => getGroupEditWindow(id as string),
+    enabled: !!id && isOrganizer,
+    refetchOnWindowFocus: false,
+  });
+
+  const window: GroupEditWindow = editWindow ?? "pre_cycle";
+  const locked = window === "locked";
+  const inCycle = window === "in_cycle";
+  const structuralLocked = inCycle || locked;
 
   const [form, setForm] = useState<UpdateGroupSettingsPayload>({});
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   useEffect(() => {
     if (group) {
@@ -76,6 +104,7 @@ export default function GroupSettings() {
       toast.success("Paramètres enregistrés");
       queryClient.invalidateQueries({ queryKey: ["group", id] });
       queryClient.invalidateQueries({ queryKey: ["my-groups"] });
+      queryClient.invalidateQueries({ queryKey: ["group-edit-window", id] });
       navigate(`/groupes/${id}`);
     },
     onError: (e: Error) =>
@@ -91,6 +120,50 @@ export default function GroupSettings() {
     () => (form.contribution_amount ?? 0) * (form.max_members ?? 0),
     [form.contribution_amount, form.max_members],
   );
+
+  const structuralDiff = useMemo(() => {
+    if (!group) return [] as { label: string; from: string; to: string }[];
+    const out: { label: string; from: string; to: string }[] = [];
+    if (
+      form.contribution_amount !== undefined &&
+      form.contribution_amount !== group.contribution_amount
+    ) {
+      out.push({
+        label: "Cotisation",
+        from: `${group.contribution_amount.toLocaleString("fr-FR")} GNF`,
+        to: `${form.contribution_amount.toLocaleString("fr-FR")} GNF`,
+      });
+    }
+    if (form.frequency && form.frequency !== group.frequency) {
+      out.push({ label: "Fréquence", from: String(group.frequency), to: form.frequency });
+    }
+    if (form.max_members !== undefined && form.max_members !== group.max_members) {
+      out.push({
+        label: "Membres max.",
+        from: String(group.max_members),
+        to: String(form.max_members),
+      });
+    }
+    if (
+      form.rotation_order_kind &&
+      form.rotation_order_kind !== group.rotation_order_kind
+    ) {
+      out.push({
+        label: "Rotation",
+        from: String(group.rotation_order_kind),
+        to: form.rotation_order_kind,
+      });
+    }
+    return out;
+  }, [form, group]);
+
+  const handleSave = () => {
+    if (window === "between_cycles" && structuralDiff.length > 0) {
+      setConfirmOpen(true);
+      return;
+    }
+    saveM.mutate();
+  };
 
   if (isLoading || !group) {
     return (
@@ -134,15 +207,7 @@ export default function GroupSettings() {
           Retour au groupe
         </button>
 
-        {locked && (
-          <div className="flex items-start gap-3 rounded-lg border border-warning/30 bg-warning/5 px-4 py-3 text-sm">
-            <Lock className="mt-0.5 h-4 w-4 text-warning" />
-            <p className="text-foreground">
-              <strong>Cycle déjà démarré.</strong> Les paramètres sont verrouillés
-              pour préserver l'équité entre les membres.
-            </p>
-          </div>
-        )}
+        <EditWindowBanner window={window} />
 
         <SectionCard title="Identité" subtitle="Nom et description du groupe">
           <div className="space-y-4">
@@ -172,32 +237,32 @@ export default function GroupSettings() {
           subtitle={`Cagnotte par tour : ${totalPayout.toLocaleString("fr-FR")} GNF`}
         >
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Field label="Cotisation (GNF)">
+            <Field label="Cotisation (GNF)" locked={structuralLocked}>
               <input
                 type="number"
                 min={1000}
                 step={1000}
                 value={form.contribution_amount ?? 0}
-                disabled={locked}
+                disabled={structuralLocked}
                 onChange={(e) => update("contribution_amount", Number(e.target.value))}
                 className={`${INPUT_CLASS} num`}
               />
             </Field>
-            <Field label="Nombre de membres">
+            <Field label="Nombre de membres" locked={structuralLocked}>
               <input
                 type="number"
                 min={2}
                 max={100}
                 value={form.max_members ?? 0}
-                disabled={locked}
+                disabled={structuralLocked}
                 onChange={(e) => update("max_members", Number(e.target.value))}
                 className={`${INPUT_CLASS} num`}
               />
             </Field>
-            <Field label="Fréquence">
+            <Field label="Fréquence" locked={structuralLocked}>
               <select
                 value={form.frequency ?? "mensuelle"}
-                disabled={locked}
+                disabled={structuralLocked}
                 onChange={(e) => update("frequency", e.target.value as UpdateGroupSettingsPayload["frequency"])}
                 className={INPUT_CLASS}
               >
@@ -206,10 +271,10 @@ export default function GroupSettings() {
                 ))}
               </select>
             </Field>
-            <Field label="Ordre de rotation">
+            <Field label="Ordre de rotation" locked={structuralLocked}>
               <select
                 value={form.rotation_order_kind ?? "random"}
-                disabled={locked}
+                disabled={structuralLocked}
                 onChange={(e) => update("rotation_order_kind", e.target.value as UpdateGroupSettingsPayload["rotation_order_kind"])}
                 className={INPUT_CLASS}
               >
@@ -223,23 +288,23 @@ export default function GroupSettings() {
 
         <SectionCard title="Pénalités de retard" subtitle="Appliquées au moment du paiement">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Field label="Pénalité (%)">
+            <Field label="Pénalité (%)" locked={structuralLocked}>
               <input
                 type="number"
                 min={0}
                 max={100}
                 value={form.late_penalty_percent ?? 0}
-                disabled={locked}
+                disabled={structuralLocked}
                 onChange={(e) => update("late_penalty_percent", Number(e.target.value))}
                 className={`${INPUT_CLASS} num`}
               />
             </Field>
-            <Field label="Délai de grâce (jours)">
+            <Field label="Délai de grâce (jours)" locked={structuralLocked}>
               <input
                 type="number"
                 min={0}
                 value={form.late_penalty_after_days ?? 0}
-                disabled={locked}
+                disabled={structuralLocked}
                 onChange={(e) => update("late_penalty_after_days", Number(e.target.value))}
                 className={`${INPUT_CLASS} num`}
               />
@@ -335,7 +400,7 @@ export default function GroupSettings() {
           <button
             type="button"
             disabled={locked || saveM.isPending}
-            onClick={() => saveM.mutate()}
+            onClick={handleSave}
             className="inline-flex h-10 items-center gap-2 rounded-md bg-primary px-5 text-sm font-semibold text-primary-foreground transition hover:bg-primary-700 disabled:opacity-50"
           >
             <Save className="h-4 w-4" />
@@ -343,17 +408,117 @@ export default function GroupSettings() {
           </button>
         </div>
       </div>
+
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmer les changements structurels</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3 text-sm">
+                <p>
+                  Vous êtes entre deux cycles. Les modifications suivantes
+                  affecteront le prochain cycle et seront notifiées à tous les
+                  membres :
+                </p>
+                <ul className="rounded-md border border-hairline bg-secondary/40 p-3 text-xs">
+                  {structuralDiff.map((d) => (
+                    <li key={d.label} className="flex justify-between gap-2 py-0.5">
+                      <span className="font-medium text-foreground">{d.label}</span>
+                      <span className="text-muted-foreground">
+                        {d.from} → <strong className="text-foreground">{d.to}</strong>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                <p className="text-xs text-muted-foreground">
+                  Ce changement sera consigné dans l'historique d'audit et
+                  enregistré comme consentement de l'organisateur.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setConfirmOpen(false);
+                saveM.mutate();
+              }}
+            >
+              Confirmer et notifier
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({
+  label,
+  children,
+  locked,
+}: {
+  label: string;
+  children: React.ReactNode;
+  locked?: boolean;
+}) {
   return (
     <label className="block">
-      <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+      <span className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
         {label}
+        {locked && (
+          <Lock className="h-3 w-3" aria-label="Verrouillé pendant un cycle" />
+        )}
       </span>
       {children}
     </label>
+  );
+}
+
+function EditWindowBanner({ window: w }: { window: GroupEditWindow }) {
+  if (w === "locked") {
+    return (
+      <div className="flex items-start gap-3 rounded-lg border border-warning/30 bg-warning/5 px-4 py-3 text-sm">
+        <Lock className="mt-0.5 h-4 w-4 text-warning" />
+        <p className="text-foreground">
+          <strong>Groupe clôturé.</strong> La configuration ne peut plus être modifiée.
+        </p>
+      </div>
+    );
+  }
+  if (w === "in_cycle") {
+    return (
+      <div className="flex items-start gap-3 rounded-lg border border-hairline bg-secondary/40 px-4 py-3 text-sm">
+        <Info className="mt-0.5 h-4 w-4 text-muted-foreground" />
+        <p className="text-foreground">
+          <strong>Cycle en cours.</strong> Seuls le nom, la description et la
+          visibilité peuvent être modifiés pour préserver l'équité entre les
+          membres. Les règles financières seront déverrouillées à la fin du cycle.
+        </p>
+      </div>
+    );
+  }
+  if (w === "between_cycles") {
+    return (
+      <div className="flex items-start gap-3 rounded-lg border border-warning/30 bg-warning/5 px-4 py-3 text-sm">
+        <AlertTriangle className="mt-0.5 h-4 w-4 text-warning" />
+        <p className="text-foreground">
+          <strong>Entre deux cycles.</strong> Toutes les règles sont modifiables ;
+          les changements structurels (montant, fréquence, rotation, membres max.)
+          seront <strong>notifiés à tous les membres</strong> et consignés comme
+          consentement avant le prochain démarrage.
+        </p>
+      </div>
+    );
+  }
+  return (
+    <div className="flex items-start gap-3 rounded-lg border border-success/30 bg-success/5 px-4 py-3 text-sm">
+      <CheckCircle2 className="mt-0.5 h-4 w-4 text-success" />
+      <p className="text-foreground">
+        <strong>Configuration libre.</strong> Le cycle n'a pas démarré : vous
+        pouvez ajuster toutes les règles sans impact sur les membres.
+      </p>
+    </div>
   );
 }
