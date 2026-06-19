@@ -20,7 +20,7 @@ export const createGroupSchema = z.object({
     .int("La cotisation doit être un nombre entier.")
     .min(1000, "La cotisation doit être d'au moins 1 000 GNF.")
     .max(50_000_000, "La cotisation ne peut pas dépasser 50 000 000 GNF."),
-  frequency: z.enum(["Hebdomadaire", "Quinzaine", "Mensuelle"]),
+  frequency: z.enum(["Quotidienne", "Hebdomadaire", "Quinzaine", "Mensuelle"]),
   members: z
     .number({ invalid_type_error: "Nombre de membres requis." })
     .int()
