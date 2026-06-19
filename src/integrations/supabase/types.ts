@@ -3586,6 +3586,10 @@ export type Database = {
       delete_account: { Args: { _reason?: string }; Returns: undefined }
       enqueue_payment_reminders: { Args: never; Returns: number }
       finalize_deletion_votes: { Args: never; Returns: number }
+      frequency_to_days: {
+        Args: { _freq: Database["public"]["Enums"]["group_frequency"] }
+        Returns: number
+      }
       grant_admin_permissions: {
         Args: { _group_id: string; _perms: Json; _user_id: string }
         Returns: undefined
@@ -3662,6 +3666,7 @@ export type Database = {
         }
         Returns: string
       }
+      open_next_turn: { Args: { _cycle_id: string }; Returns: string }
       pause_cycle: {
         Args: { _group_id: string; _reason?: string }
         Returns: undefined

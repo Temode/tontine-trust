@@ -55,7 +55,7 @@ export function DuesCard({ dues, isLoading }: Props) {
                       {d.group_name}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      Tour #{d.turn_number} · {dueLabel(d.days_to_due)}
+                      Tour #{d.turn_number} · pour {d.beneficiary_name ?? "le bénéficiaire"} · {dueLabel(d.days_to_due)}
                     </p>
                   </div>
                   <div className="text-right">

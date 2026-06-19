@@ -14,8 +14,8 @@ export function UpcomingTurnsCard({ turns, myUserId, isLoading }: Props) {
   const top = turns.slice(0, 3);
   return (
     <SectionCard
-      title="Prochaines échéances"
-      subtitle={isLoading ? "Chargement…" : `${turns.length} tour${turns.length > 1 ? "s" : ""} à venir`}
+      title="Prochains bénéficiaires"
+      subtitle={isLoading ? "Chargement…" : `${turns.length} tour${turns.length > 1 ? "s" : ""} planifié${turns.length > 1 ? "s" : ""}`}
       bare
     >
       {isLoading ? (
@@ -57,7 +57,7 @@ export function UpcomingTurnsCard({ turns, myUserId, isLoading }: Props) {
                       )}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      Tour #{t.turn_number} · échéance {date}
+                      Tour #{t.turn_number} · reçoit le {date}
                     </p>
                   </div>
                   <div className="text-right">
