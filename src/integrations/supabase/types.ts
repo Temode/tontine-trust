@@ -4030,6 +4030,7 @@ export type Database = {
         Args: { _group_id: string; _perms: Json; _user_id: string }
         Returns: undefined
       }
+      group_edit_window: { Args: { _group_id: string }; Returns: string }
       has_admin_permission: {
         Args: { _group: string; _perm: string; _user: string }
         Returns: boolean

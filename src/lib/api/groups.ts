@@ -84,6 +84,14 @@ const UPDATE_ERROR_LABELS: Record<string, string> = {
   NAME_REQUIRED: "Le nom du groupe est requis.",
   INVALID_CONTRIBUTION: "La cotisation doit être supérieure à zéro.",
   INVALID_MAX_MEMBERS: "Le nombre de membres est invalide.",
+  STRUCTURAL_CHANGE_FORBIDDEN:
+    "Un cycle est en cours : seuls le nom, la description et la visibilité peuvent être modifiés. Attendez la fin du cycle pour ajuster les règles.",
+  MAX_MEMBERS_TOO_LOW:
+    "Le nombre maximum doit être au moins égal au nombre de membres actifs.",
+  GROUP_LOCKED:
+    "Ce groupe est clôturé : la configuration ne peut plus être modifiée.",
+  INVALID_FREQUENCY_LATE_DAYS:
+    "Pour une fréquence quotidienne, le délai de pénalité ne peut pas dépasser 1 jour.",
 };
 
 export async function updateGroupSettings(
@@ -100,6 +108,22 @@ export async function updateGroupSettings(
     );
     throw new Error(key ? UPDATE_ERROR_LABELS[key] : error.message);
   }
+}
+
+export type GroupEditWindow =
+  | "pre_cycle"
+  | "between_cycles"
+  | "in_cycle"
+  | "locked";
+
+export async function getGroupEditWindow(
+  groupId: string,
+): Promise<GroupEditWindow> {
+  const { data, error } = await supabase.rpc("group_edit_window", {
+    _group_id: groupId,
+  });
+  if (error) throw error;
+  return (data as GroupEditWindow) ?? "locked";
 }
 
 export interface CreateGroupResult {
