@@ -1,6 +1,6 @@
 import type { Frequency, TontineGroup } from "@/lib/types";
 
-export type DbFrequency = "hebdomadaire" | "quinzaine" | "mensuelle";
+export type DbFrequency = "quotidienne" | "hebdomadaire" | "quinzaine" | "mensuelle";
 export type DbGroupStatus = "draft" | "open" | "active" | "completed" | "cancelled";
 export type DbMemberRole = "organisateur" | "membre";
 export type DbMemberStatus = "active" | "invited" | "removed" | "left" | "pending" | "suspended";
@@ -86,12 +86,14 @@ export interface DbNextTurn {
 }
 
 const FREQ_TO_UI: Record<DbFrequency, Frequency> = {
+  quotidienne: "Quotidienne",
   hebdomadaire: "Hebdomadaire",
   quinzaine: "Quinzaine",
   mensuelle: "Mensuelle",
 };
 
 export const FREQ_TO_DB: Record<Frequency, DbFrequency> = {
+  Quotidienne: "quotidienne",
   Hebdomadaire: "hebdomadaire",
   Quinzaine: "quinzaine",
   Mensuelle: "mensuelle",
