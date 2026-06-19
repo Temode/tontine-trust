@@ -106,8 +106,7 @@ export function TurnsTimeline({ turns, currentUserId }: TurnsTimelineProps) {
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <p className="truncate text-sm font-semibold text-foreground">
-                    Tour #{t.turn_number} ·{" "}
-                    {t.beneficiary_name ?? "Membre"}
+                    Tour #{t.turn_number} · Bénéficiaire : {t.beneficiary_name ?? "Membre"}
                   </p>
                   {isYou && (
                     <span className="rounded-full bg-accent-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-accent-700">
