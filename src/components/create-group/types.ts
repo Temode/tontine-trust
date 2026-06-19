@@ -63,6 +63,35 @@ export const FREQUENCY_DAYS: Record<Frequency, number> = {
   Mensuelle: 30,
 };
 
+export interface SchedulePreview {
+  startDate: Date;
+  nextDueDates: Date[];
+  cycleEndDate: Date;
+}
+
+/**
+ * Calendrier prévisionnel basé sur la fréquence et le nombre de membres.
+ * Hypothèse : le cycle démarre le jour même de la création (indicatif).
+ */
+export function computeSchedulePreview(draft: GroupDraft, refDate: Date = new Date()): SchedulePreview {
+  const days = FREQUENCY_DAYS[draft.frequency] ?? 30;
+  const members = Math.max(1, Math.min(50, draft.members || 1));
+  const start = new Date(refDate);
+  start.setHours(0, 0, 0, 0);
+
+  const nextDueDates: Date[] = [];
+  for (let i = 1; i <= Math.min(3, members); i++) {
+    const d = new Date(start);
+    d.setDate(d.getDate() + days * i);
+    nextDueDates.push(d);
+  }
+
+  const end = new Date(start);
+  end.setDate(end.getDate() + days * members);
+
+  return { startDate: start, nextDueDates, cycleEndDate: end };
+}
+
 export interface DraftDerived {
   cagnotte: number;
   cycleDays: number;
