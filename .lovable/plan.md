@@ -1,31 +1,61 @@
-## Problème
 
-L'appel `djomy-init-payment` retourne **400 Bad Request** → aucune redirection.
+# Passage Djomy en mode production (live)
 
-Cause : dans `src/lib/api/djomy.ts`, `returnUrl`/`cancelUrl` sont construits à partir de `window.location.origin`. En preview Lovable / localhost, l'origine est `http://localhost:8080` (HTTP). Or l'edge function (`supabase/functions/djomy-init-payment/index.ts`) refuse toute URL non-HTTPS :
+## Ce qui change
+Le code reste identique : `supabase/functions/_shared/djomy.ts` choisit déjà l'URL sandbox ou prod à partir de la variable d'environnement `DJOMY_ENV`. Il suffit donc de :
 
-```ts
-if (!/^https:\/\//.test(body.returnUrl)) return json({ error: "RETURN_URL_NOT_HTTPS" }, 400);
-```
+1. Mettre à jour 3 secrets côté backend avec les valeurs **live** affichées dans l'espace développeur Djomy.
+2. Configurer le webhook live côté Djomy pour pointer vers notre edge function.
+3. Redéployer les 3 fonctions Djomy pour qu'elles relisent les nouveaux secrets.
+4. Faire un paiement test réel de petit montant pour valider.
 
-Djomy exige effectivement du HTTPS en sandbox/prod, donc on ne peut pas simplement enlever la garde — il faut fournir une URL HTTPS publique.
+## Étapes détaillées
 
-## Correctif
+### 1. Mise à jour des secrets (via `update_secret`)
+Une fenêtre sécurisée s'ouvrira, vous y collerez les valeurs depuis Djomy → Espace développeur → "Identifiants de production (live)" :
 
-### 1. `src/lib/api/djomy.ts` — calculer un `returnUrl` HTTPS robuste
-- Si `window.location.protocol === 'https:'` → utiliser `window.location.origin` (cas production / preview Lovable publiée).
-- Sinon (localhost/HTTP) → utiliser une variable d'env `VITE_PUBLIC_APP_URL` si définie, sinon fallback sur l'URL Lovable publiée du projet (`https://tontine-digitale.lovable.app`).
-- Construire `returnUrl = ${base}/payment/return?pid=...` et `cancelUrl = ${base}/payment/cancel?pid=...` pour permettre à `PaymentReturn` de re-poller le statut même hors de l'origine d'init.
+- `DJOMY_CLIENT_ID` → `djomy-client-1781853075821-edf9` (celui visible sur la capture)
+- `DJOMY_CLIENT_SECRET` → cliquer sur l'œil pour révéler la clé live, puis la copier
+- `DJOMY_WEBHOOK_SECRET` → à récupérer dans la section "Webhooks" de l'espace développeur (signing secret live, distinct du client secret)
+- `DJOMY_ENV` → valeur `prod` (à ajouter si absent ; sinon la passer de `sandbox` à `prod`)
 
-### 2. `supabase/functions/djomy-init-payment/index.ts` — message d'erreur exploitable
-Au lieu de `{ error: "RETURN_URL_NOT_HTTPS" }` sec, renvoyer aussi l'URL reçue + un `hint` pour qu'on voie immédiatement la cause dans le toast frontend.
+### 2. Configuration webhook côté Djomy
+Dans la section **Webhooks** de l'espace développeur Djomy (visible en bas de votre capture), saisir :
 
-### 3. `DjomyPaymentModal` — afficher le message détaillé
-Le `catch` actuel n'affiche que `(e as Error).message`. Pour les erreurs `FunctionsHttpError` de supabase-js, lire `error.context?.json()` quand dispo pour récupérer `{error, details, hint}` et l'afficher dans le toast (parité avec ce qu'on a fait pour `start_cycle`).
+- **URL du webhook** :  
+  `https://oljyzmannzejtsbfpzxp.supabase.co/functions/v1/djomy-webhook`
+- **Événements à activer** : `payment.success`, `payment.failed`, `payment.cancelled`, `payment.pending`, `payment.created`, `payment.redirected` (tous ceux liés aux paiements).
+- **Sauvegarder** puis copier le signing secret généré → c'est lui qui va dans `DJOMY_WEBHOOK_SECRET`.
 
-### Vérification
-- Re-tester depuis la preview : modal Djomy → "Continuer vers Djomy" → vérifier que la redirection sandbox Djomy s'ouvre.
-- Vérifier `payments` (status=`initiated` puis `pending` au retour webhook).
-- Vérifier que `PaymentReturn` reçoit bien le `pid` et poll le statut.
+### 3. Redéploiement des edge functions
+Une fois les secrets à jour, je redéploie :
+- `djomy-init-payment`
+- `djomy-webhook`
+- `djomy-payment-status`
+- `djomy-admin-replay`
 
-Aucune migration DB nécessaire.
+Cela force la relecture des nouvelles variables d'environnement.
+
+### 4. Validation en production
+Plan de test recommandé :
+1. Sur l'app publiée `https://tontine-digitale.lovable.app`, lancer un paiement réel de très faible montant (ex. 100 GNF si autorisé, sinon le minimum Djomy live) avec votre propre numéro Orange Money ou MTN.
+2. Vérifier la redirection vers la page Djomy **live** (URL `djomy.africa`, plus `sandbox-`).
+3. Confirmer le débit sur votre numéro, puis vérifier dans l'app :
+   - Le widget « Paiements en cours » passe à **Confirmé**.
+   - Le reçu apparaît dans `Mes cotisations`.
+   - Dans l'admin → Paiements, le statut est `succeeded` et `djomy_webhook_events` contient l'événement avec `signature_valid = true`.
+4. Si le webhook n'arrive pas : utiliser le bouton « Rejouer » de l'admin pour vérifier que le RPC interne fonctionne (ça permet d'isoler "problème côté Djomy" vs "problème côté app").
+
+## Pré-requis avant que je lance le passage en prod
+Merci de confirmer ces 3 points :
+
+1. **Le compte Djomy est bien activé en live** (KYC validé, encaissement autorisé). La présence de la section "Identifiants de production (live)" suggère que oui.
+2. **Vous avez le `DJOMY_WEBHOOK_SECRET` live sous la main** (ou êtes prêt à le créer en sauvegardant l'URL webhook ci-dessus).
+3. **Numéro de test prêt** (Orange Money ou MTN MoMo Guinée approvisionné) pour valider après bascule.
+
+## Rollback rapide
+Si quelque chose tourne mal, on revient à sandbox en passant `DJOMY_ENV` à `sandbox` et en remettant les anciens `CLIENT_ID` / `CLIENT_SECRET` / `WEBHOOK_SECRET` sandbox. Aucun changement de code requis.
+
+## Hors-scope (à traiter séparément si besoin)
+- Suppression de l'encart "Mode Sandbox" / pages d'info dédiées sandbox éventuellement présentes dans l'UI.
+- Mise à jour de la documentation README pour mentionner l'environnement prod.
