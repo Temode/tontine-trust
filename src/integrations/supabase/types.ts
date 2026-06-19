@@ -219,6 +219,13 @@ export type Database = {
             foreignKeyName: "contributions_turn_id_fkey"
             columns: ["turn_id"]
             isOneToOne: false
+            referencedRelation: "turn_assignment_audit"
+            referencedColumns: ["turn_id"]
+          },
+          {
+            foreignKeyName: "contributions_turn_id_fkey"
+            columns: ["turn_id"]
+            isOneToOne: false
             referencedRelation: "turn_settlement"
             referencedColumns: ["turn_id"]
           },
@@ -383,6 +390,13 @@ export type Database = {
             columns: ["contribution_id"]
             isOneToOne: false
             referencedRelation: "my_late_contributions"
+            referencedColumns: ["contribution_id"]
+          },
+          {
+            foreignKeyName: "external_payment_proofs_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
+            referencedRelation: "turn_assignment_audit"
             referencedColumns: ["contribution_id"]
           },
           {
@@ -1148,6 +1162,20 @@ export type Database = {
             referencedColumns: ["contribution_id"]
           },
           {
+            foreignKeyName: "ledger_entries_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
+            referencedRelation: "turn_assignment_audit"
+            referencedColumns: ["contribution_id"]
+          },
+          {
+            foreignKeyName: "ledger_entries_cycle_id_fkey"
+            columns: ["cycle_id"]
+            isOneToOne: false
+            referencedRelation: "cycle_open_turn_check"
+            referencedColumns: ["cycle_id"]
+          },
+          {
             foreignKeyName: "ledger_entries_cycle_id_fkey"
             columns: ["cycle_id"]
             isOneToOne: false
@@ -1201,6 +1229,13 @@ export type Database = {
             columns: ["turn_id"]
             isOneToOne: false
             referencedRelation: "next_turn_per_group"
+            referencedColumns: ["turn_id"]
+          },
+          {
+            foreignKeyName: "ledger_entries_turn_id_fkey"
+            columns: ["turn_id"]
+            isOneToOne: false
+            referencedRelation: "turn_assignment_audit"
             referencedColumns: ["turn_id"]
           },
           {
@@ -1303,6 +1338,13 @@ export type Database = {
           reviewer_user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "member_reviews_cycle_id_fkey"
+            columns: ["cycle_id"]
+            isOneToOne: false
+            referencedRelation: "cycle_open_turn_check"
+            referencedColumns: ["cycle_id"]
+          },
           {
             foreignKeyName: "member_reviews_cycle_id_fkey"
             columns: ["cycle_id"]
@@ -1430,6 +1472,13 @@ export type Database = {
             foreignKeyName: "notifications_turn_id_fkey"
             columns: ["turn_id"]
             isOneToOne: false
+            referencedRelation: "turn_assignment_audit"
+            referencedColumns: ["turn_id"]
+          },
+          {
+            foreignKeyName: "notifications_turn_id_fkey"
+            columns: ["turn_id"]
+            isOneToOne: false
             referencedRelation: "turn_settlement"
             referencedColumns: ["turn_id"]
           },
@@ -1515,6 +1564,13 @@ export type Database = {
             columns: ["contribution_id"]
             isOneToOne: false
             referencedRelation: "my_late_contributions"
+            referencedColumns: ["contribution_id"]
+          },
+          {
+            foreignKeyName: "payment_links_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
+            referencedRelation: "turn_assignment_audit"
             referencedColumns: ["contribution_id"]
           },
           {
@@ -1625,6 +1681,13 @@ export type Database = {
             columns: ["contribution_id"]
             isOneToOne: false
             referencedRelation: "my_late_contributions"
+            referencedColumns: ["contribution_id"]
+          },
+          {
+            foreignKeyName: "payments_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
+            referencedRelation: "turn_assignment_audit"
             referencedColumns: ["contribution_id"]
           },
           {
@@ -1755,6 +1818,13 @@ export type Database = {
             foreignKeyName: "receipts_cycle_id_fkey"
             columns: ["cycle_id"]
             isOneToOne: false
+            referencedRelation: "cycle_open_turn_check"
+            referencedColumns: ["cycle_id"]
+          },
+          {
+            foreignKeyName: "receipts_cycle_id_fkey"
+            columns: ["cycle_id"]
+            isOneToOne: false
             referencedRelation: "cycles"
             referencedColumns: ["id"]
           },
@@ -1825,6 +1895,13 @@ export type Database = {
             foreignKeyName: "receipts_turn_id_fkey"
             columns: ["turn_id"]
             isOneToOne: true
+            referencedRelation: "turn_assignment_audit"
+            referencedColumns: ["turn_id"]
+          },
+          {
+            foreignKeyName: "receipts_turn_id_fkey"
+            columns: ["turn_id"]
+            isOneToOne: true
             referencedRelation: "turn_settlement"
             referencedColumns: ["turn_id"]
           },
@@ -1885,6 +1962,140 @@ export type Database = {
             referencedRelation: "my_late_contributions"
             referencedColumns: ["contribution_id"]
           },
+          {
+            foreignKeyName: "reminder_log_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
+            referencedRelation: "turn_assignment_audit"
+            referencedColumns: ["contribution_id"]
+          },
+        ]
+      }
+      tontine_alerts: {
+        Row: {
+          code: string
+          contribution_id: string | null
+          created_at: string
+          group_id: string
+          id: string
+          message: string
+          metadata: Json | null
+          resolved_at: string | null
+          resolved_by: string | null
+          severity: string
+          turn_id: string | null
+        }
+        Insert: {
+          code: string
+          contribution_id?: string | null
+          created_at?: string
+          group_id: string
+          id?: string
+          message: string
+          metadata?: Json | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          severity: string
+          turn_id?: string | null
+        }
+        Update: {
+          code?: string
+          contribution_id?: string | null
+          created_at?: string
+          group_id?: string
+          id?: string
+          message?: string
+          metadata?: Json | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          severity?: string
+          turn_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tontine_alerts_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
+            referencedRelation: "contributions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tontine_alerts_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
+            referencedRelation: "group_payments_history"
+            referencedColumns: ["contribution_id"]
+          },
+          {
+            foreignKeyName: "tontine_alerts_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
+            referencedRelation: "my_contributions_due"
+            referencedColumns: ["contribution_id"]
+          },
+          {
+            foreignKeyName: "tontine_alerts_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
+            referencedRelation: "my_late_contributions"
+            referencedColumns: ["contribution_id"]
+          },
+          {
+            foreignKeyName: "tontine_alerts_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
+            referencedRelation: "turn_assignment_audit"
+            referencedColumns: ["contribution_id"]
+          },
+          {
+            foreignKeyName: "tontine_alerts_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "admin_group_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tontine_alerts_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tontine_alerts_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "my_groups_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tontine_alerts_turn_id_fkey"
+            columns: ["turn_id"]
+            isOneToOne: false
+            referencedRelation: "next_turn_per_group"
+            referencedColumns: ["turn_id"]
+          },
+          {
+            foreignKeyName: "tontine_alerts_turn_id_fkey"
+            columns: ["turn_id"]
+            isOneToOne: false
+            referencedRelation: "turn_assignment_audit"
+            referencedColumns: ["turn_id"]
+          },
+          {
+            foreignKeyName: "tontine_alerts_turn_id_fkey"
+            columns: ["turn_id"]
+            isOneToOne: false
+            referencedRelation: "turn_settlement"
+            referencedColumns: ["turn_id"]
+          },
+          {
+            foreignKeyName: "tontine_alerts_turn_id_fkey"
+            columns: ["turn_id"]
+            isOneToOne: false
+            referencedRelation: "turns"
+            referencedColumns: ["id"]
+          },
         ]
       }
       turn_bids: {
@@ -1926,6 +2137,13 @@ export type Database = {
             foreignKeyName: "turn_bids_cycle_id_fkey"
             columns: ["cycle_id"]
             isOneToOne: false
+            referencedRelation: "cycle_open_turn_check"
+            referencedColumns: ["cycle_id"]
+          },
+          {
+            foreignKeyName: "turn_bids_cycle_id_fkey"
+            columns: ["cycle_id"]
+            isOneToOne: false
             referencedRelation: "cycles"
             referencedColumns: ["id"]
           },
@@ -1955,6 +2173,13 @@ export type Database = {
             columns: ["turn_id"]
             isOneToOne: false
             referencedRelation: "next_turn_per_group"
+            referencedColumns: ["turn_id"]
+          },
+          {
+            foreignKeyName: "turn_bids_turn_id_fkey"
+            columns: ["turn_id"]
+            isOneToOne: false
+            referencedRelation: "turn_assignment_audit"
             referencedColumns: ["turn_id"]
           },
           {
@@ -2025,6 +2250,13 @@ export type Database = {
             foreignKeyName: "turn_swap_requests_from_turn_id_fkey"
             columns: ["from_turn_id"]
             isOneToOne: false
+            referencedRelation: "turn_assignment_audit"
+            referencedColumns: ["turn_id"]
+          },
+          {
+            foreignKeyName: "turn_swap_requests_from_turn_id_fkey"
+            columns: ["from_turn_id"]
+            isOneToOne: false
             referencedRelation: "turn_settlement"
             referencedColumns: ["turn_id"]
           },
@@ -2061,6 +2293,13 @@ export type Database = {
             columns: ["to_turn_id"]
             isOneToOne: false
             referencedRelation: "next_turn_per_group"
+            referencedColumns: ["turn_id"]
+          },
+          {
+            foreignKeyName: "turn_swap_requests_to_turn_id_fkey"
+            columns: ["to_turn_id"]
+            isOneToOne: false
+            referencedRelation: "turn_assignment_audit"
             referencedColumns: ["turn_id"]
           },
           {
@@ -2117,6 +2356,13 @@ export type Database = {
           turn_number?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "turns_cycle_id_fkey"
+            columns: ["cycle_id"]
+            isOneToOne: false
+            referencedRelation: "cycle_open_turn_check"
+            referencedColumns: ["cycle_id"]
+          },
           {
             foreignKeyName: "turns_cycle_id_fkey"
             columns: ["cycle_id"]
@@ -2416,6 +2662,39 @@ export type Database = {
           },
         ]
       }
+      cycle_open_turn_check: {
+        Row: {
+          cycle_id: string | null
+          cycle_number: number | null
+          group_id: string | null
+          open_turns: number | null
+          paid_turns: number | null
+          upcoming_turns: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cycles_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "admin_group_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cycles_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cycles_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "my_groups_overview"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       deletion_requests_admin_view: {
         Row: {
           active_members: number | null
@@ -2574,6 +2853,13 @@ export type Database = {
             foreignKeyName: "ledger_entries_turn_id_fkey"
             columns: ["turn_id"]
             isOneToOne: false
+            referencedRelation: "turn_assignment_audit"
+            referencedColumns: ["turn_id"]
+          },
+          {
+            foreignKeyName: "ledger_entries_turn_id_fkey"
+            columns: ["turn_id"]
+            isOneToOne: false
             referencedRelation: "turn_settlement"
             referencedColumns: ["turn_id"]
           },
@@ -2689,6 +2975,13 @@ export type Database = {
             columns: ["turn_id"]
             isOneToOne: false
             referencedRelation: "next_turn_per_group"
+            referencedColumns: ["turn_id"]
+          },
+          {
+            foreignKeyName: "contributions_turn_id_fkey"
+            columns: ["turn_id"]
+            isOneToOne: false
+            referencedRelation: "turn_assignment_audit"
             referencedColumns: ["turn_id"]
           },
           {
@@ -2844,6 +3137,13 @@ export type Database = {
             foreignKeyName: "contributions_turn_id_fkey"
             columns: ["turn_id"]
             isOneToOne: false
+            referencedRelation: "turn_assignment_audit"
+            referencedColumns: ["turn_id"]
+          },
+          {
+            foreignKeyName: "contributions_turn_id_fkey"
+            columns: ["turn_id"]
+            isOneToOne: false
             referencedRelation: "turn_settlement"
             referencedColumns: ["turn_id"]
           },
@@ -2989,6 +3289,13 @@ export type Database = {
             foreignKeyName: "notifications_turn_id_fkey"
             columns: ["turn_id"]
             isOneToOne: false
+            referencedRelation: "turn_assignment_audit"
+            referencedColumns: ["turn_id"]
+          },
+          {
+            foreignKeyName: "notifications_turn_id_fkey"
+            columns: ["turn_id"]
+            isOneToOne: false
             referencedRelation: "turn_settlement"
             referencedColumns: ["turn_id"]
           },
@@ -3042,6 +3349,13 @@ export type Database = {
             columns: ["contribution_id"]
             isOneToOne: false
             referencedRelation: "my_late_contributions"
+            referencedColumns: ["contribution_id"]
+          },
+          {
+            foreignKeyName: "payments_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
+            referencedRelation: "turn_assignment_audit"
             referencedColumns: ["contribution_id"]
           },
           {
@@ -3112,6 +3426,13 @@ export type Database = {
             columns: ["turn_id"]
             isOneToOne: true
             referencedRelation: "next_turn_per_group"
+            referencedColumns: ["turn_id"]
+          },
+          {
+            foreignKeyName: "receipts_turn_id_fkey"
+            columns: ["turn_id"]
+            isOneToOne: true
+            referencedRelation: "turn_assignment_audit"
             referencedColumns: ["turn_id"]
           },
           {
@@ -3208,6 +3529,13 @@ export type Database = {
             foreignKeyName: "member_reviews_cycle_id_fkey"
             columns: ["cycle_id"]
             isOneToOne: false
+            referencedRelation: "cycle_open_turn_check"
+            referencedColumns: ["cycle_id"]
+          },
+          {
+            foreignKeyName: "member_reviews_cycle_id_fkey"
+            columns: ["cycle_id"]
+            isOneToOne: false
             referencedRelation: "cycles"
             referencedColumns: ["id"]
           },
@@ -3247,6 +3575,75 @@ export type Database = {
           turn_number: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "turns_cycle_id_fkey"
+            columns: ["cycle_id"]
+            isOneToOne: false
+            referencedRelation: "cycle_open_turn_check"
+            referencedColumns: ["cycle_id"]
+          },
+          {
+            foreignKeyName: "turns_cycle_id_fkey"
+            columns: ["cycle_id"]
+            isOneToOne: false
+            referencedRelation: "cycles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "turns_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "admin_group_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "turns_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "turns_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "my_groups_overview"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      turn_assignment_audit: {
+        Row: {
+          amount: number | null
+          beneficiary_name: string | null
+          beneficiary_user_id: string | null
+          confirmed_at: string | null
+          contribution_id: string | null
+          contribution_status:
+            | Database["public"]["Enums"]["contribution_status"]
+            | null
+          cycle_id: string | null
+          cycle_number: number | null
+          due_date: string | null
+          flag_payer_is_beneficiary: boolean | null
+          flag_payer_not_active: boolean | null
+          group_id: string | null
+          group_name: string | null
+          paid_at: string | null
+          payer_name: string | null
+          payer_user_id: string | null
+          turn_id: string | null
+          turn_number: number | null
+          turn_status: Database["public"]["Enums"]["turn_status"] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "turns_cycle_id_fkey"
+            columns: ["cycle_id"]
+            isOneToOne: false
+            referencedRelation: "cycle_open_turn_check"
+            referencedColumns: ["cycle_id"]
+          },
           {
             foreignKeyName: "turns_cycle_id_fkey"
             columns: ["cycle_id"]
@@ -3297,6 +3694,13 @@ export type Database = {
             foreignKeyName: "turn_bids_cycle_id_fkey"
             columns: ["cycle_id"]
             isOneToOne: false
+            referencedRelation: "cycle_open_turn_check"
+            referencedColumns: ["cycle_id"]
+          },
+          {
+            foreignKeyName: "turn_bids_cycle_id_fkey"
+            columns: ["cycle_id"]
+            isOneToOne: false
             referencedRelation: "cycles"
             referencedColumns: ["id"]
           },
@@ -3326,6 +3730,13 @@ export type Database = {
             columns: ["turn_id"]
             isOneToOne: false
             referencedRelation: "next_turn_per_group"
+            referencedColumns: ["turn_id"]
+          },
+          {
+            foreignKeyName: "turn_bids_turn_id_fkey"
+            columns: ["turn_id"]
+            isOneToOne: false
+            referencedRelation: "turn_assignment_audit"
             referencedColumns: ["turn_id"]
           },
           {
@@ -3395,6 +3806,13 @@ export type Database = {
             foreignKeyName: "turns_cycle_id_fkey"
             columns: ["cycle_id"]
             isOneToOne: false
+            referencedRelation: "cycle_open_turn_check"
+            referencedColumns: ["cycle_id"]
+          },
+          {
+            foreignKeyName: "turns_cycle_id_fkey"
+            columns: ["cycle_id"]
+            isOneToOne: false
             referencedRelation: "cycles"
             referencedColumns: ["id"]
           },
@@ -3452,6 +3870,13 @@ export type Database = {
             foreignKeyName: "turn_swap_requests_from_turn_id_fkey"
             columns: ["from_turn_id"]
             isOneToOne: false
+            referencedRelation: "turn_assignment_audit"
+            referencedColumns: ["turn_id"]
+          },
+          {
+            foreignKeyName: "turn_swap_requests_from_turn_id_fkey"
+            columns: ["from_turn_id"]
+            isOneToOne: false
             referencedRelation: "turn_settlement"
             referencedColumns: ["turn_id"]
           },
@@ -3488,6 +3913,13 @@ export type Database = {
             columns: ["to_turn_id"]
             isOneToOne: false
             referencedRelation: "next_turn_per_group"
+            referencedColumns: ["turn_id"]
+          },
+          {
+            foreignKeyName: "turn_swap_requests_to_turn_id_fkey"
+            columns: ["to_turn_id"]
+            isOneToOne: false
+            referencedRelation: "turn_assignment_audit"
             referencedColumns: ["turn_id"]
           },
           {
@@ -3585,6 +4017,10 @@ export type Database = {
       create_group_with_invitation: { Args: { _payload: Json }; Returns: Json }
       delete_account: { Args: { _reason?: string }; Returns: undefined }
       enqueue_payment_reminders: { Args: never; Returns: number }
+      explain_contribution: {
+        Args: { _contribution_id: string }
+        Returns: Json
+      }
       finalize_deletion_votes: { Args: never; Returns: number }
       frequency_to_days: {
         Args: { _freq: Database["public"]["Enums"]["group_frequency"] }
@@ -3728,6 +4164,7 @@ export type Database = {
         Args: { _from_turn: string; _reason?: string; _to_turn: string }
         Returns: string
       }
+      resolve_tontine_alert: { Args: { _alert_id: string }; Returns: undefined }
       respond_turn_swap: {
         Args: { _accept: boolean; _request_id: string }
         Returns: undefined
