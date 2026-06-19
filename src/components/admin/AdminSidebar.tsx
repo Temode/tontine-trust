@@ -7,6 +7,7 @@ import {
   ScrollText,
   CreditCard,
   ArrowLeftCircle,
+  ShieldAlert,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -17,6 +18,7 @@ const ITEMS = [
   { to: "/admin/groupes", label: "Groupes & tontines", icon: Layers },
   { to: "/admin/paiements", label: "Paiements", icon: CreditCard },
   { to: "/admin/audit", label: "Audit", icon: ScrollText },
+  { to: "/admin/integrite", label: "Intégrité tontine", icon: ShieldAlert },
 ];
 
 export function AdminSidebar() {
