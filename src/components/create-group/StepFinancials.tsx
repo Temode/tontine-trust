@@ -14,9 +14,10 @@ interface StepFinancialsProps {
   total: number;
 }
 
-const QUICK_AMOUNTS = [100_000, 200_000, 500_000, 1_000_000, 2_000_000, 5_000_000];
+const QUICK_AMOUNTS = [1_000, 5_000, 100_000, 500_000, 1_000_000, 5_000_000];
 
 const FREQUENCIES: Array<{ id: Frequency; label: string; cadence: string }> = [
+  { id: "Quotidienne", label: "Quotidienne", cadence: "Tous les jours (test)" },
   { id: "Hebdomadaire", label: "Hebdomadaire", cadence: "Tous les 7 jours" },
   { id: "Quinzaine", label: "Quinzaine", cadence: "Tous les 14 jours" },
   { id: "Mensuelle", label: "Mensuelle", cadence: "Tous les 30 jours" },
@@ -32,7 +33,7 @@ function parseNonNegativeInt(raw: string, max = 1_000_000_000): number {
 
 export function StepFinancials({ draft, onChange, onBack, onContinue, index, total }: StepFinancialsProps) {
   const derived = deriveFromDraft(draft);
-  const canContinue = draft.contribution >= 10_000 && draft.members >= 3 && draft.members <= 50;
+  const canContinue = draft.contribution >= 1_000 && draft.members >= 3 && draft.members <= 50;
 
   const adjustMembers = (delta: number) => {
     const next = Math.max(3, Math.min(50, draft.members + delta));
@@ -52,7 +53,7 @@ export function StepFinancials({ draft, onChange, onBack, onContinue, index, tot
       <div className="space-y-7">
         {/* Cotisation */}
         <section>
-          <SectionHeader icon={<Coins className="h-4 w-4" />} title="Cotisation par tour" hint="Montant prélevé à chaque échéance auprès de chaque membre." />
+          <SectionHeader icon={<Coins className="h-4 w-4" />} title="Cotisation par tour" hint="Montant prélevé à chaque échéance auprès de chaque membre. Min. 1 000 GNF." />
 
           <div className="mt-3 flex items-stretch gap-2">
             <div className="relative flex-1">
@@ -95,7 +96,7 @@ export function StepFinancials({ draft, onChange, onBack, onContinue, index, tot
         {/* Fréquence */}
         <section>
           <SectionHeader icon={<Calendar className="h-4 w-4" />} title="Fréquence" hint="Plus la fréquence est courte, plus le cycle se boucle vite." />
-          <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
+          <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
             {FREQUENCIES.map((f) => {
               const active = draft.frequency === f.id;
               return (
