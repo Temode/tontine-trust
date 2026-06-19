@@ -43,8 +43,9 @@ import { AuditLog } from "@/components/group/AuditLog";
 import { SwapsPanel } from "@/components/group/SwapsPanel";
 import { AuctionPanel } from "@/components/group/AuctionPanel";
 import { ReviewsPanel } from "@/components/group/ReviewsPanel";
+import { TestModePanel } from "@/components/group/TestModePanel";
 
-type Section = "overview" | "members" | "rotation" | "swaps" | "auctions" | "reviews" | "chat" | "audit";
+type Section = "overview" | "members" | "rotation" | "swaps" | "auctions" | "reviews" | "chat" | "audit" | "test";
 
 const FREQ_LABEL: Record<string, string> = {
   mensuelle: "Mensuelle",
@@ -204,6 +205,7 @@ export default function GroupDetail() {
     ...(grp.status === "completed" ? [{ id: "reviews" as Section, label: "Avis" }] : []),
     { id: "chat", label: "Discussion" },
     ...(isOrganizer ? [{ id: "audit" as Section, label: "Audit" }] : []),
+    ...(isOrganizer ? [{ id: "test" as Section, label: "Mode test" }] : []),
   ];
 
   return (
@@ -469,6 +471,9 @@ export default function GroupDetail() {
             />
           )}
           {section === "audit" && isOrganizer && <AuditLog groupId={grp.id} />}
+          {section === "test" && isOrganizer && (
+            <TestModePanel groupId={grp.id} groupName={grp.name} />
+          )}
         </div>
       </div>
       {myDueForGroup && (

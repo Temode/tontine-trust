@@ -1,44 +1,63 @@
+## Plan : Amélioration de la création de groupe + mode test Djomy
 
-# Test-friendly : minimum 1 000 GNF et fréquence "Quotidienne"
+### 1. StepFinancials — UX du montant minimum
+**Fichier** : `src/components/create-group/StepFinancials.tsx`
+- Afficher un libellé permanent sous l'input : « Minimum 1 000 GNF · Exemples : 1 000, 5 000, 100 000 »
+- Ajouter un état d'erreur inline (rouge) quand `0 < contribution < 1000` :
+  - Bordure `border-destructive`, message : « La cotisation doit être d'au moins 1 000 GNF (saisie : X GNF). Augmentez le montant ou utilisez un raccourci ci-dessous. »
+- Conserver `canContinue` basé sur `>= 1_000`, mais le message d'erreur devient visible dès la saisie.
 
-Deux ajustements pour faciliter les tests réels en production Djomy sans dépenser ni attendre.
+### 2. Aperçu du calendrier dans la création de groupe
+**Fichiers** : `src/components/create-group/types.ts` (helper), `src/components/create-group/StepFinancials.tsx` (ou nouvelle section dans `TermSheet.tsx`)
+- Nouveau helper `computeSchedulePreview(draft)` qui retourne :
+  - `startDate` : aujourd'hui (date de référence par défaut, le cycle démarre quand l'organisateur l'active)
+  - `nextDueDates` : 3 prochaines échéances calculées selon `FREQUENCY_DAYS[frequency]` (1 / 7 / 14 / 30 jours)
+  - `cycleEndDate` : startDate + members × frequencyDays
+- Affichage dans **StepFinancials** sous la carte « Calculé à partir de vos paramètres » :
+  - Bloc « Calendrier prévisionnel » avec :
+    - Date de départ estimée
+    - Liste des 3 prochaines échéances (formatées FR : « lun. 23 juin 2026 »)
+    - Date de fin du cycle complet
+  - Note discrète : « Dates indicatives ; le cycle démarre à l'activation par l'organisateur. »
 
-## 1. Abaisser le minimum de cotisation à 1 000 GNF
+### 3. Validation serveur des fréquences
+**Migration SQL** sur `public.groups` (création) et la RPC `update_group_settings` (mise à jour) :
+- Ajouter un trigger `BEFORE INSERT OR UPDATE` `validate_group_frequency()` qui vérifie :
+  - `frequency IN ('quotidienne','hebdomadaire','quinzaine','mensuelle')` (déjà garanti par l'enum, mais on durcit)
+  - `contribution_amount >= 1000`
+  - `member_count BETWEEN 2 AND 50`
+  - Si `frequency = 'quotidienne'` : forcer `late_penalty_after_days <= 1` (sinon la pénalité de retard ne déclenche jamais — incohérence)
+- Mettre à jour la fonction `public.update_group_settings(...)` pour invoquer la même logique (ou s'appuyer sur le trigger).
+- Messages d'erreur explicites en français renvoyés via `RAISE EXCEPTION` (PostgREST les remonte au front).
 
-Le schéma Zod (`src/lib/validation/group.ts`) accepte déjà `min(1_000)`. Le blocage vient uniquement du bouton "Continuer" de l'étape Paramètres :
+### 4. Mode test Djomy
+**Objectif** : permettre à un organisateur de simuler un cycle complet sans attendre les échéances réelles.
 
-- **`src/components/create-group/StepFinancials.tsx`** ligne 35 : changer `draft.contribution >= 10_000` → `draft.contribution >= 1_000`.
-- Mettre à jour l'aide/placeholder de l'étape pour indiquer « Min. 1 000 GNF » au lieu de 10 000.
-- (Optionnel) Baisser le `DEFAULT_DRAFT.contribution` (`src/components/create-group/types.ts`) de `500_000` à une valeur de test plus modeste comme `5_000`, **uniquement si vous le souhaitez** — sinon on garde 500 000 par défaut pour la prod et l'utilisateur saisit 1 000 pour ses tests.
+**Backend** :
+- Nouvelle Edge Function `djomy-test-simulate` (admin/organizer only) qui :
+  - Prend `group_id` en entrée
+  - Avance le cycle : crée un tour fictif, génère une `payment_link` Djomy en montant 1 000 GNF, retourne l'URL
+  - Optionnellement, après paiement réel, force le passage au tour suivant
+- Réutilise les helpers existants de `_shared/djomy.ts`
 
-Côté backend, le `CHECK (contribution_amount > 0)` accepte déjà 1 000, pas de migration nécessaire pour cette partie.
+**Frontend** :
+- Nouveau composant `src/components/group/TestModePanel.tsx` visible uniquement aux organisateurs/admins, dans `GroupDetail.tsx` sous un onglet « Mode test »
+- Boutons :
+  - « Générer un paiement test 1 000 GNF » → ouvre le `DjomyPaymentModal` existant
+  - « Vérifier le statut » → appelle `djomy-payment-status` et affiche le résultat (succeeded / pending / failed)
+  - « Avancer le cycle » → déclenche la rotation manuellement
+- Badge visuel « MODE TEST » jaune sur le panneau pour éviter toute confusion en production.
 
-## 2. Ajouter la fréquence "Quotidienne" (1 jour)
+### Détails techniques
+- Fréquence quotidienne déjà supportée côté code + migration enum (faite précédemment).
+- Le mode test ne crée pas de tontine factice — il opère sur un groupe existant et marque les `payments` avec `metadata.test = true` pour exclusion des stats globales.
+- Aucun changement aux secrets Djomy : le mode production reste actif, on utilise simplement de petits montants (1 000 GNF).
 
-L'enum Postgres `group_frequency` ne contient que `hebdomadaire | quinzaine | mensuelle`. Il faut l'étendre proprement.
-
-### 2a. Migration SQL (deux étapes obligatoires pour ajouter une valeur d'enum)
-- **Migration A (prelude)** : `ALTER TYPE public.group_frequency ADD VALUE IF NOT EXISTS 'quotidienne';` dans sa propre transaction (Postgres interdit d'utiliser une nouvelle valeur d'enum dans la même transaction que son ajout).
-- **Migration B (logique)** : mettre à jour la fonction RPC `start_cycle` (`db/03_phase_b_rotation.sql`, lignes 228-232) pour ajouter `when 'quotidienne' then 1`. Idem partout où on case/switch sur la fréquence côté DB (à scanner pour s'assurer qu'il n'y en a pas d'autres).
-
-### 2b. Frontend
-- **`src/lib/types.ts`** : ajouter `"Quotidienne"` au type `Frequency`.
-- **`src/lib/validation/group.ts`** : ajouter `"Quotidienne"` à l'enum Zod ligne 23.
-- **`src/components/create-group/types.ts`** :
-  - `FREQUENCY_DAYS` → ajouter `Quotidienne: 1`.
-  - Pas besoin de toucher `DEFAULT_DRAFT.frequency` (reste `"Mensuelle"`).
-- **`src/components/create-group/StepFinancials.tsx`** : ajouter en tête de la liste des fréquences `{ id: "Quotidienne", label: "Quotidienne", cadence: "Tous les jours" }` (avec mention « Idéal pour tester » si vous voulez).
-- **`src/lib/api/groups.ts`** (et autres mappers) : si une fonction map le label FR vers le label DB minuscule (`Hebdomadaire` → `hebdomadaire`), ajouter l'entrée correspondante. Je vérifierai à l'implémentation.
-
-### 2c. Affichage
-- `formatHorizon` et `cycleLabel` dans `types.ts` gèrent déjà les durées en jours, donc l'affichage d'un cycle de 12 jours (12 membres × 1 jour) sera correct (« 12 jours »).
-
-## Étapes d'exécution
-1. Migration A (prelude enum) — 1 ligne SQL.
-2. Migration B (RPC `start_cycle` + recherche d'autres `case frequency`).
-3. Édits frontend listés au §1 et §2b/2c.
-4. Test manuel : créer un groupe « Test paiement » avec 3 membres, 1 000 GNF, fréquence Quotidienne → lancer le cycle → faire un paiement Djomy live de 1 000 GNF → vérifier le passage à `succeeded`.
-
-## Hors-scope
-- Pas de changement de l'UI de paramètres existants (`Group Settings`) au-delà de l'ajout de l'option Quotidienne dans le sélecteur si pertinent.
-- Pas de modification des montants ou fréquences des groupes déjà créés.
+### Fichiers touchés (résumé)
+- `src/components/create-group/StepFinancials.tsx` (UX min + calendrier)
+- `src/components/create-group/types.ts` (helper schedule)
+- 1 nouvelle migration SQL (trigger validation + update RPC)
+- `supabase/functions/djomy-test-simulate/index.ts` (nouvelle Edge Function)
+- `src/components/group/TestModePanel.tsx` (nouveau)
+- `src/pages/GroupDetail.tsx` (intégration de l'onglet)
+- `src/lib/api/djomy.ts` (wrapper appel test-simulate)
