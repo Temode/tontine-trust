@@ -15,6 +15,7 @@ import { DeletionPanel } from "@/components/group/DeletionPanel";
 import { ShieldCheck, ChevronRight } from "lucide-react";
 
 const FREQ_OPTIONS = [
+  { value: "quotidienne", label: "Quotidienne (1 jour)" },
   { value: "hebdomadaire", label: "Hebdomadaire" },
   { value: "quinzaine", label: "Quinzaine" },
   { value: "mensuelle", label: "Mensuelle" },
