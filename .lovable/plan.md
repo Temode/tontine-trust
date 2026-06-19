@@ -1,61 +1,44 @@
 
-# Passage Djomy en mode production (live)
+# Test-friendly : minimum 1 000 GNF et fréquence "Quotidienne"
 
-## Ce qui change
-Le code reste identique : `supabase/functions/_shared/djomy.ts` choisit déjà l'URL sandbox ou prod à partir de la variable d'environnement `DJOMY_ENV`. Il suffit donc de :
+Deux ajustements pour faciliter les tests réels en production Djomy sans dépenser ni attendre.
 
-1. Mettre à jour 3 secrets côté backend avec les valeurs **live** affichées dans l'espace développeur Djomy.
-2. Configurer le webhook live côté Djomy pour pointer vers notre edge function.
-3. Redéployer les 3 fonctions Djomy pour qu'elles relisent les nouveaux secrets.
-4. Faire un paiement test réel de petit montant pour valider.
+## 1. Abaisser le minimum de cotisation à 1 000 GNF
 
-## Étapes détaillées
+Le schéma Zod (`src/lib/validation/group.ts`) accepte déjà `min(1_000)`. Le blocage vient uniquement du bouton "Continuer" de l'étape Paramètres :
 
-### 1. Mise à jour des secrets (via `update_secret`)
-Une fenêtre sécurisée s'ouvrira, vous y collerez les valeurs depuis Djomy → Espace développeur → "Identifiants de production (live)" :
+- **`src/components/create-group/StepFinancials.tsx`** ligne 35 : changer `draft.contribution >= 10_000` → `draft.contribution >= 1_000`.
+- Mettre à jour l'aide/placeholder de l'étape pour indiquer « Min. 1 000 GNF » au lieu de 10 000.
+- (Optionnel) Baisser le `DEFAULT_DRAFT.contribution` (`src/components/create-group/types.ts`) de `500_000` à une valeur de test plus modeste comme `5_000`, **uniquement si vous le souhaitez** — sinon on garde 500 000 par défaut pour la prod et l'utilisateur saisit 1 000 pour ses tests.
 
-- `DJOMY_CLIENT_ID` → `djomy-client-1781853075821-edf9` (celui visible sur la capture)
-- `DJOMY_CLIENT_SECRET` → cliquer sur l'œil pour révéler la clé live, puis la copier
-- `DJOMY_WEBHOOK_SECRET` → à récupérer dans la section "Webhooks" de l'espace développeur (signing secret live, distinct du client secret)
-- `DJOMY_ENV` → valeur `prod` (à ajouter si absent ; sinon la passer de `sandbox` à `prod`)
+Côté backend, le `CHECK (contribution_amount > 0)` accepte déjà 1 000, pas de migration nécessaire pour cette partie.
 
-### 2. Configuration webhook côté Djomy
-Dans la section **Webhooks** de l'espace développeur Djomy (visible en bas de votre capture), saisir :
+## 2. Ajouter la fréquence "Quotidienne" (1 jour)
 
-- **URL du webhook** :  
-  `https://oljyzmannzejtsbfpzxp.supabase.co/functions/v1/djomy-webhook`
-- **Événements à activer** : `payment.success`, `payment.failed`, `payment.cancelled`, `payment.pending`, `payment.created`, `payment.redirected` (tous ceux liés aux paiements).
-- **Sauvegarder** puis copier le signing secret généré → c'est lui qui va dans `DJOMY_WEBHOOK_SECRET`.
+L'enum Postgres `group_frequency` ne contient que `hebdomadaire | quinzaine | mensuelle`. Il faut l'étendre proprement.
 
-### 3. Redéploiement des edge functions
-Une fois les secrets à jour, je redéploie :
-- `djomy-init-payment`
-- `djomy-webhook`
-- `djomy-payment-status`
-- `djomy-admin-replay`
+### 2a. Migration SQL (deux étapes obligatoires pour ajouter une valeur d'enum)
+- **Migration A (prelude)** : `ALTER TYPE public.group_frequency ADD VALUE IF NOT EXISTS 'quotidienne';` dans sa propre transaction (Postgres interdit d'utiliser une nouvelle valeur d'enum dans la même transaction que son ajout).
+- **Migration B (logique)** : mettre à jour la fonction RPC `start_cycle` (`db/03_phase_b_rotation.sql`, lignes 228-232) pour ajouter `when 'quotidienne' then 1`. Idem partout où on case/switch sur la fréquence côté DB (à scanner pour s'assurer qu'il n'y en a pas d'autres).
 
-Cela force la relecture des nouvelles variables d'environnement.
+### 2b. Frontend
+- **`src/lib/types.ts`** : ajouter `"Quotidienne"` au type `Frequency`.
+- **`src/lib/validation/group.ts`** : ajouter `"Quotidienne"` à l'enum Zod ligne 23.
+- **`src/components/create-group/types.ts`** :
+  - `FREQUENCY_DAYS` → ajouter `Quotidienne: 1`.
+  - Pas besoin de toucher `DEFAULT_DRAFT.frequency` (reste `"Mensuelle"`).
+- **`src/components/create-group/StepFinancials.tsx`** : ajouter en tête de la liste des fréquences `{ id: "Quotidienne", label: "Quotidienne", cadence: "Tous les jours" }` (avec mention « Idéal pour tester » si vous voulez).
+- **`src/lib/api/groups.ts`** (et autres mappers) : si une fonction map le label FR vers le label DB minuscule (`Hebdomadaire` → `hebdomadaire`), ajouter l'entrée correspondante. Je vérifierai à l'implémentation.
 
-### 4. Validation en production
-Plan de test recommandé :
-1. Sur l'app publiée `https://tontine-digitale.lovable.app`, lancer un paiement réel de très faible montant (ex. 100 GNF si autorisé, sinon le minimum Djomy live) avec votre propre numéro Orange Money ou MTN.
-2. Vérifier la redirection vers la page Djomy **live** (URL `djomy.africa`, plus `sandbox-`).
-3. Confirmer le débit sur votre numéro, puis vérifier dans l'app :
-   - Le widget « Paiements en cours » passe à **Confirmé**.
-   - Le reçu apparaît dans `Mes cotisations`.
-   - Dans l'admin → Paiements, le statut est `succeeded` et `djomy_webhook_events` contient l'événement avec `signature_valid = true`.
-4. Si le webhook n'arrive pas : utiliser le bouton « Rejouer » de l'admin pour vérifier que le RPC interne fonctionne (ça permet d'isoler "problème côté Djomy" vs "problème côté app").
+### 2c. Affichage
+- `formatHorizon` et `cycleLabel` dans `types.ts` gèrent déjà les durées en jours, donc l'affichage d'un cycle de 12 jours (12 membres × 1 jour) sera correct (« 12 jours »).
 
-## Pré-requis avant que je lance le passage en prod
-Merci de confirmer ces 3 points :
+## Étapes d'exécution
+1. Migration A (prelude enum) — 1 ligne SQL.
+2. Migration B (RPC `start_cycle` + recherche d'autres `case frequency`).
+3. Édits frontend listés au §1 et §2b/2c.
+4. Test manuel : créer un groupe « Test paiement » avec 3 membres, 1 000 GNF, fréquence Quotidienne → lancer le cycle → faire un paiement Djomy live de 1 000 GNF → vérifier le passage à `succeeded`.
 
-1. **Le compte Djomy est bien activé en live** (KYC validé, encaissement autorisé). La présence de la section "Identifiants de production (live)" suggère que oui.
-2. **Vous avez le `DJOMY_WEBHOOK_SECRET` live sous la main** (ou êtes prêt à le créer en sauvegardant l'URL webhook ci-dessus).
-3. **Numéro de test prêt** (Orange Money ou MTN MoMo Guinée approvisionné) pour valider après bascule.
-
-## Rollback rapide
-Si quelque chose tourne mal, on revient à sandbox en passant `DJOMY_ENV` à `sandbox` et en remettant les anciens `CLIENT_ID` / `CLIENT_SECRET` / `WEBHOOK_SECRET` sandbox. Aucun changement de code requis.
-
-## Hors-scope (à traiter séparément si besoin)
-- Suppression de l'encart "Mode Sandbox" / pages d'info dédiées sandbox éventuellement présentes dans l'UI.
-- Mise à jour de la documentation README pour mentionner l'environnement prod.
+## Hors-scope
+- Pas de changement de l'UI de paramètres existants (`Group Settings`) au-delà de l'ajout de l'option Quotidienne dans le sélecteur si pertinent.
+- Pas de modification des montants ou fréquences des groupes déjà créés.
