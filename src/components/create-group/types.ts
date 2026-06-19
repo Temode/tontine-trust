@@ -57,6 +57,7 @@ export function generateInviteCode(): string {
 }
 
 export const FREQUENCY_DAYS: Record<Frequency, number> = {
+  Quotidienne: 1,
   Hebdomadaire: 7,
   Quinzaine: 14,
   Mensuelle: 30,
