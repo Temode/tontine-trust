@@ -2,7 +2,7 @@ import { Calendar, Coins, Minus, Plus, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatGNF } from "@/lib/format";
 import type { Frequency } from "@/lib/types";
-import { deriveFromDraft, type GroupDraft } from "./types";
+import { computeSchedulePreview, deriveFromDraft, type GroupDraft } from "./types";
 import { StepWrapper } from "./StepWrapper";
 
 interface StepFinancialsProps {
@@ -33,7 +33,19 @@ function parseNonNegativeInt(raw: string, max = 1_000_000_000): number {
 
 export function StepFinancials({ draft, onChange, onBack, onContinue, index, total }: StepFinancialsProps) {
   const derived = deriveFromDraft(draft);
+  const schedule = computeSchedulePreview(draft);
   const canContinue = draft.contribution >= 1_000 && draft.members >= 3 && draft.members <= 50;
+  const contributionError =
+    draft.contribution > 0 && draft.contribution < 1_000
+      ? `Saisie : ${draft.contribution.toLocaleString("fr-FR")} GNF. Minimum requis : 1 000 GNF. Augmentez le montant ou utilisez un raccourci ci-dessous.`
+      : null;
+
+  const dateFmt = new Intl.DateTimeFormat("fr-FR", {
+    weekday: "short",
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
 
   const adjustMembers = (delta: number) => {
     const next = Math.max(3, Math.min(50, draft.members + delta));
@@ -64,13 +76,29 @@ export function StepFinancials({ draft, onChange, onBack, onContinue, index, tot
                 pattern="[0-9]*"
                 value={draft.contribution ? draft.contribution.toLocaleString("fr-FR") : ""}
                 onChange={(e) => onChange({ contribution: parseNonNegativeInt(e.target.value) })}
-                className="h-12 w-full rounded-md border border-border bg-card px-4 pr-16 font-display text-xl font-bold text-foreground num transition-colors focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                aria-invalid={contributionError ? true : undefined}
+                className={cn(
+                  "h-12 w-full rounded-md border bg-card px-4 pr-16 font-display text-xl font-bold text-foreground num transition-colors focus:outline-none focus:ring-1",
+                  contributionError
+                    ? "border-destructive focus:border-destructive focus:ring-destructive"
+                    : "border-border focus:border-primary focus:ring-primary",
+                )}
               />
               <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-muted-foreground">
                 GNF
               </span>
             </div>
           </div>
+
+          <p className="mt-2 text-[11px] text-muted-foreground">
+            Minimum <span className="num font-semibold text-foreground">1 000 GNF</span> · Exemples :{" "}
+            <span className="num">1 000</span>, <span className="num">5 000</span>, <span className="num">100 000</span>
+          </p>
+          {contributionError && (
+            <p role="alert" className="mt-1.5 text-xs font-medium text-destructive">
+              {contributionError}
+            </p>
+          )}
 
           <div className="mt-2.5 flex flex-wrap gap-1.5">
             {QUICK_AMOUNTS.map((amount) => {
@@ -188,6 +216,48 @@ export function StepFinancials({ draft, onChange, onBack, onContinue, index, tot
             <Metric label="Encaissement le + tôt" value={derived.yourTurnEarliestLabel} mute />
             <Metric label="Encaissement le + tard" value={derived.yourTurnLatestLabel} mute />
           </dl>
+        </section>
+
+        {/* Calendrier prévisionnel */}
+        <section className="rounded-lg border border-border bg-card p-5">
+          <header className="flex items-center gap-2">
+            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary-50 text-primary">
+              <Calendar className="h-4 w-4" />
+            </span>
+            <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+              Calendrier prévisionnel
+            </h3>
+          </header>
+          <dl className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="rounded-md bg-secondary/40 px-3 py-2.5">
+              <dt className="text-[10px] uppercase tracking-wider text-muted-foreground">Date de départ estimée</dt>
+              <dd className="mt-1 font-display text-sm font-bold text-foreground">
+                {dateFmt.format(schedule.startDate)}
+              </dd>
+            </div>
+            <div className="rounded-md bg-secondary/40 px-3 py-2.5">
+              <dt className="text-[10px] uppercase tracking-wider text-muted-foreground">Fin du cycle complet</dt>
+              <dd className="mt-1 font-display text-sm font-bold text-foreground">
+                {dateFmt.format(schedule.cycleEndDate)}
+              </dd>
+            </div>
+          </dl>
+          <div className="mt-3">
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Prochaines échéances</p>
+            <ol className="mt-1.5 space-y-1">
+              {schedule.nextDueDates.map((d, i) => (
+                <li key={i} className="flex items-center gap-2 text-sm text-foreground">
+                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary-50 text-[10px] font-bold text-primary num">
+                    {i + 1}
+                  </span>
+                  <span className="num">{dateFmt.format(d)}</span>
+                </li>
+              ))}
+            </ol>
+          </div>
+          <p className="mt-3 text-[11px] text-muted-foreground">
+            Dates indicatives ; le cycle démarre à l'activation par l'organisateur.
+          </p>
         </section>
       </div>
     </StepWrapper>
