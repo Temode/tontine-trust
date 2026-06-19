@@ -18,7 +18,7 @@ interface PaymentRow {
   id: string;
   amount: number;
   status: string;
-  method: string | null;
+  payment_method: string | null;
   djomy_transaction_id: string | null;
   created_at: string;
 }
@@ -26,12 +26,12 @@ interface PaymentRow {
 async function listGroupPayments(groupId: string): Promise<PaymentRow[]> {
   const { data, error } = await supabase
     .from("payments")
-    .select("id, amount, status, method, djomy_transaction_id, created_at")
+    .select("id, amount, status, payment_method, djomy_transaction_id, created_at")
     .eq("group_id", groupId)
     .order("created_at", { ascending: false })
     .limit(10);
   if (error) throw error;
-  return (data ?? []) as PaymentRow[];
+  return (data ?? []) as unknown as PaymentRow[];
 }
 
 const STATUS_COLOR: Record<string, string> = {
@@ -145,7 +145,7 @@ export function TestModePanel({ groupId, groupName }: Props) {
                 <p className="truncate font-mono text-[11px] text-muted-foreground">{p.id}</p>
                 <p className="mt-0.5 text-sm text-foreground">
                   <span className="font-display font-bold num">{formatGNF(p.amount)} GNF</span>
-                  {p.method && <span className="ml-2 text-xs text-muted-foreground">· {p.method}</span>}
+                  {p.payment_method && <span className="ml-2 text-xs text-muted-foreground">· {p.payment_method}</span>}
                 </p>
               </div>
               <span
