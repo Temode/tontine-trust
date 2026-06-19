@@ -3837,7 +3837,11 @@ export type Database = {
         | "cancelled"
       deletion_vote_choice: "yes" | "no"
       external_proof_status: "pending" | "confirmed" | "rejected"
-      group_frequency: "hebdomadaire" | "quinzaine" | "mensuelle"
+      group_frequency:
+        | "hebdomadaire"
+        | "quinzaine"
+        | "mensuelle"
+        | "quotidienne"
       group_status:
         | "draft"
         | "open"
@@ -4074,7 +4078,12 @@ export const Constants = {
       ],
       deletion_vote_choice: ["yes", "no"],
       external_proof_status: ["pending", "confirmed", "rejected"],
-      group_frequency: ["hebdomadaire", "quinzaine", "mensuelle"],
+      group_frequency: [
+        "hebdomadaire",
+        "quinzaine",
+        "mensuelle",
+        "quotidienne",
+      ],
       group_status: [
         "draft",
         "open",
