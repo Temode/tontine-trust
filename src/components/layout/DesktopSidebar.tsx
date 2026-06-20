@@ -30,21 +30,31 @@ interface NavSection {
 
 const sections: NavSection[] = [
   {
-    label: "Menu principal",
+    label: "Essentiel",
     items: [
-      { to: "/dashboard", label: "Tableau de bord", icon: LayoutDashboard },
-      { to: "/groupes", label: "Mes groupes", icon: Users },
-      { to: "/cotisations", label: "Mes cotisations", icon: Wallet },
-      { to: "/recus", label: "Mes reçus", icon: FileCheck2 },
+      { to: "/dashboard", label: "Accueil", icon: LayoutDashboard },
+      { to: "/groupes", label: "Mes tontines", icon: Users },
+      { to: "/cotisations", label: "Payer", icon: Wallet },
+    ],
+  },
+  {
+    label: "Activité",
+    items: [
+      { to: "/recus", label: "Historique & reçus", icon: FileCheck2 },
       { to: "/notifications", label: "Notifications", icon: Bell },
+    ],
+  },
+  {
+    label: "Compte",
+    items: [
       { to: "/profil", label: "Mon profil", icon: User },
     ],
   },
   {
     label: "Actions rapides",
     items: [
-      { to: "/nouveau", label: "Créer un groupe", icon: PlusCircle },
-      { to: "/rejoindre", label: "Rejoindre un groupe", icon: UserPlus },
+      { to: "/nouveau", label: "Créer une tontine", icon: PlusCircle },
+      { to: "/rejoindre", label: "Rejoindre une tontine", icon: UserPlus },
     ],
   },
 ];
