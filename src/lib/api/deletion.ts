@@ -54,6 +54,8 @@ const ERR: Record<string, string> = {
   GROUP_NOT_FOUND: "Groupe introuvable.",
   ALREADY_DELETED: "Ce groupe est déjà supprimé.",
   FORBIDDEN: "Seul l'organisateur peut effectuer cette action.",
+  DIRECT_GROUP_STATUS_UPDATE_FORBIDDEN:
+    "La base a bloqué le changement de statut direct de la tontine.",
   OPEN_TURNS_REMAIN: "Un tour est en cours : impossible de demander la suppression.",
   PENDING_CONTRIBUTIONS: "Des cotisations sont encore en attente.",
   PENDING_PAYMENT_LINKS: "Des paiements sont en cours de traitement.",
@@ -65,7 +67,9 @@ const ERR: Record<string, string> = {
 };
 
 function translate(msg: string): string {
-  const k = Object.keys(ERR).find((k) => msg.includes(k));
+  const k = Object.keys(ERR)
+    .sort((a, b) => b.length - a.length)
+    .find((k) => msg === k || msg.includes(k));
   return k ? ERR[k] : msg;
 }
 
