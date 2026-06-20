@@ -4,7 +4,7 @@
 
 const BASE_URLS = {
   sandbox: "https://sandbox-api.djomy.africa",
-  prod: "https://api.djomy.africa",
+  prod: "https://prod-api.djomy.africa",
 } as const;
 
 export function djomyBaseUrl(): string {
@@ -48,7 +48,9 @@ export async function getDjomyBearer(): Promise<string> {
   const now = Date.now();
   if (cachedToken && cachedToken.expiresAt > now + 60_000) return cachedToken.token;
   const apiKey = await buildApiKeyHeader();
-  const res = await fetch(`${djomyBaseUrl()}/v1/auth`, {
+  const authUrl = `${djomyBaseUrl()}/v1/auth`;
+  console.log("[djomy] AUTH URL =", authUrl, "ENV=", Deno.env.get("DJOMY_ENV"));
+  const res = await fetch(authUrl, {
     method: "POST",
     headers: { "X-API-KEY": apiKey, "Content-Type": "application/json" },
     body: "{}",

@@ -15,6 +15,7 @@ Deno.serve(async (req) => {
   if (req.method !== "POST") return json({ error: "METHOD_NOT_ALLOWED" }, 405);
 
   try {
+    // Force redeploy after shared/djomy.ts prod URL fix
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) return json({ error: "AUTH_REQUIRED" }, 401);
 
