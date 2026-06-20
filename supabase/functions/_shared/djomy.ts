@@ -4,7 +4,7 @@
 
 const BASE_URLS = {
   sandbox: "https://sandbox-api.djomy.africa",
-  prod: "https://api.djomy.africa",
+  prod: "https://prod-api.djomy.africa",
 } as const;
 
 export function djomyBaseUrl(): string {
