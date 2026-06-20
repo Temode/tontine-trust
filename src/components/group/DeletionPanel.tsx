@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Trash2, ShieldAlert, Check, X } from "lucide-react";
+import { Trash2, ShieldAlert, Check, X, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,6 +12,7 @@ import {
 import {
   getActiveDeletionRequest, requestGroupDeletion, voteGroupDeletion, listVotes,
 } from "@/lib/api/deletion";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Props {
   groupId: string;
@@ -36,6 +37,21 @@ export function DeletionPanel({ groupId, isOrganizer, currentUserId }: Props) {
     queryFn: () => getActiveDeletionRequest(groupId),
   });
 
+  // Détecte le cas fast-track : aucun paiement reçu ⇒ on saute le vote des membres
+  const fastTrackQ = useQuery({
+    queryKey: ["deletion-fast-track", groupId],
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from("payments")
+        .select("id, contributions!inner(group_id)", { count: "exact", head: true })
+        .eq("status", "succeeded")
+        .eq("contributions.group_id", groupId);
+      if (error) return true; // par défaut on suppose fast-track si on n'arrive pas à lire
+      return (count ?? 0) === 0;
+    },
+    enabled: isOrganizer && !reqQ.data,
+  });
+
   const votesQ = useQuery({
     queryKey: ["deletion-votes", reqQ.data?.id],
     queryFn: () => listVotes(reqQ.data!.id),
@@ -45,7 +61,11 @@ export function DeletionPanel({ groupId, isOrganizer, currentUserId }: Props) {
   const requestM = useMutation({
     mutationFn: () => requestGroupDeletion(groupId, reason),
     onSuccess: () => {
-      toast.success("Demande de suppression envoyée aux membres");
+      toast.success(
+        fastTrackQ.data
+          ? "Demande envoyée à Tontine Digital"
+          : "Demande de suppression envoyée aux membres",
+      );
       setReason("");
       qc.invalidateQueries({ queryKey: ["deletion-request", groupId] });
     },
@@ -69,6 +89,7 @@ export function DeletionPanel({ groupId, isOrganizer, currentUserId }: Props) {
   // No active request → show organizer entry point
   if (!req) {
     if (!isOrganizer) return null;
+    const fastTrack = fastTrackQ.data === true;
     return (
       <Card className="border-destructive/30">
         <CardHeader>
@@ -77,13 +98,30 @@ export function DeletionPanel({ groupId, isOrganizer, currentUserId }: Props) {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          <p className="text-sm text-muted-foreground">
-            La suppression nécessite l'accord unanime des membres (14 jours pour s'opposer)
-            puis la validation de Tontine. Pré-requis : aucun tour en cours, aucune cotisation
-            en attente.
-          </p>
+          {fastTrack ? (
+            <div className="rounded-lg border border-amber-400/40 bg-amber-50/60 p-3 text-sm dark:bg-amber-950/30">
+              <p className="flex items-center gap-2 font-medium text-amber-900 dark:text-amber-200">
+                <Zap className="h-4 w-4" /> Procédure rapide disponible
+              </p>
+              <p className="mt-1 text-amber-900/80 dark:text-amber-200/80">
+                Aucune cotisation n'a encore été reçue. Votre demande sera transmise
+                <strong> directement à l'équipe Tontine Digital</strong> pour décision, sans
+                vote ni délai de 14 jours.
+              </p>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              La suppression nécessite l'accord des membres (14 jours pour s'opposer)
+              puis la validation de Tontine Digital. Pré-requis : aucun tour en cours,
+              aucune cotisation en attente.
+            </p>
+          )}
           <Textarea
-            placeholder="Motif obligatoire (visible par les membres et Tontine)"
+            placeholder={
+              fastTrack
+                ? "Motif (visible par l'équipe Tontine Digital)"
+                : "Motif obligatoire (visible par les membres et Tontine)"
+            }
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             rows={3}
@@ -91,15 +129,17 @@ export function DeletionPanel({ groupId, isOrganizer, currentUserId }: Props) {
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button variant="destructive" disabled={!reason.trim()}>
-                <Trash2 className="mr-2 h-4 w-4" /> Soumettre la demande
+                {fastTrack ? <Zap className="mr-2 h-4 w-4" /> : <Trash2 className="mr-2 h-4 w-4" />}
+                {fastTrack ? "Demander à Tontine Digital" : "Soumettre la demande"}
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
               <AlertDialogHeader>
                 <AlertDialogTitle>Confirmer la demande ?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  Tous les membres seront notifiés. Un seul refus annule la demande.
-                  Si personne ne s'oppose sous 14 jours, Tontine statuera.
+                  {fastTrack
+                    ? "Aucune cotisation n'ayant été reçue, votre demande part directement chez Tontine Digital. Vous recevrez une notification dès qu'elle sera traitée."
+                    : "Tous les membres seront notifiés. Un seul refus annule la demande. Si personne ne s'oppose sous 14 jours, Tontine statuera."}
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
