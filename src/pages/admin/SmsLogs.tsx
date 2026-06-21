@@ -130,29 +130,36 @@ export default function AdminSmsLogs() {
                   <td className="px-4 py-3 font-mono text-slate-200 whitespace-nowrap">
                     {row.recipient_normalized ?? row.recipient}
                   </td>
-                  <td className="px-4 py-3 whitespace-nowrap space-y-1">
-                    {row.group ? (
-                      <Link
-                        to={`/groupes/${row.group.id}`}
-                        className="inline-flex items-center gap-1 text-amber-300 hover:text-amber-200 text-xs"
-                      >
-                        <ExternalLink className="h-3 w-3" />
-                        {row.group.name}
-                      </Link>
-                    ) : (
-                      <span className="text-slate-600 text-xs">—</span>
-                    )}
-                    {row.user_id && (
-                      <div>
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    <div className="flex flex-col gap-1.5">
+                      {row.group ? (
+                        <Link
+                          to={`/groupes/${row.group.id}`}
+                          className="inline-flex items-center gap-1 px-2 py-1 rounded border border-amber-500/30 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20 text-xs font-medium"
+                          title={row.group.name}
+                        >
+                          <ExternalLink className="h-3 w-3" /> Voir la tontine
+                        </Link>
+                      ) : (
+                        <span className="text-slate-600 text-xs">— tontine</span>
+                      )}
+                      {row.user_id ? (
                         <Link
                           to={`/admin/utilisateurs?focus=${row.user_id}`}
-                          className="inline-flex items-center gap-1 text-slate-300 hover:text-white text-xs"
+                          className="inline-flex items-center gap-1 px-2 py-1 rounded border border-slate-700 bg-slate-800 text-slate-200 hover:bg-slate-700 text-xs"
+                          title={row.profile?.full_name ?? row.user_id}
                         >
-                          <User className="h-3 w-3" />
-                          {row.profile?.full_name ?? row.user_id.slice(0, 8)}
+                          <User className="h-3 w-3" /> Voir le membre
                         </Link>
-                      </div>
-                    )}
+                      ) : (
+                        <span className="text-slate-600 text-xs">— membre</span>
+                      )}
+                      {(row.group?.name || row.profile?.full_name) && (
+                        <span className="text-[10px] text-slate-500 truncate max-w-[180px]">
+                          {[row.group?.name, row.profile?.full_name].filter(Boolean).join(" · ")}
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="px-4 py-3 text-slate-300 max-w-md">
                     <span className="line-clamp-2">{row.body}</span>
