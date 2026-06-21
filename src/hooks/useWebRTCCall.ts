@@ -2,11 +2,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import {
+  fetchIceServers,
   joinCall,
   leaveCall,
   listCallParticipants,
   setCallMute,
+  setCallRecording,
   subscribeCallParticipants,
+  uploadCallRecording,
   type CallParticipant,
 } from "@/lib/api/calls";
 
@@ -18,7 +21,7 @@ export interface RemotePeer {
   connectionState: RTCPeerConnectionState;
 }
 
-const ICE_SERVERS: RTCIceServer[] = [
+const FALLBACK_ICE: RTCIceServer[] = [
   { urls: "stun:stun.l.google.com:19302" },
   { urls: "stun:stun1.l.google.com:19302" },
 ];
@@ -26,9 +29,11 @@ const ICE_SERVERS: RTCIceServer[] = [
 interface UseWebRTCCallOpts {
   callId: string | null;
   enabled: boolean;
+  groupId?: string;
+  recordingEnabled?: boolean;
 }
 
-export function useWebRTCCall({ callId, enabled }: UseWebRTCCallOpts) {
+export function useWebRTCCall({ callId, enabled, groupId, recordingEnabled }: UseWebRTCCallOpts) {
   const { user } = useAuth();
   const myId = user?.id ?? null;
 
@@ -37,11 +42,20 @@ export function useWebRTCCall({ callId, enabled }: UseWebRTCCallOpts) {
   const [participants, setParticipants] = useState<CallParticipant[]>([]);
   const [peers, setPeers] = useState<Record<string, RemotePeer>>({});
   const [isMuted, setMuted] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [turnAvailable, setTurnAvailable] = useState(false);
 
   const localStreamRef = useRef<MediaStream | null>(null);
   const pcsRef = useRef<Record<string, RTCPeerConnection>>({});
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const startedRef = useRef(false);
+  const iceServersRef = useRef<RTCIceServer[]>(FALLBACK_ICE);
+  const usedRelayRef = useRef<Set<string>>(new Set());
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const recordedChunksRef = useRef<Blob[]>([]);
+  const recordStartRef = useRef<number>(0);
+  const mixedStreamRef = useRef<MediaStream | null>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
 
   const updatePeer = useCallback((id: string, patch: Partial<RemotePeer>) => {
     setPeers((prev) => ({
@@ -65,7 +79,11 @@ export function useWebRTCCall({ callId, enabled }: UseWebRTCCallOpts) {
 
   const createPeerConnection = useCallback(
     (peerId: string): RTCPeerConnection => {
-      const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+      const relay = usedRelayRef.current.has(peerId);
+      const pc = new RTCPeerConnection({
+        iceServers: iceServersRef.current,
+        iceTransportPolicy: relay ? "relay" : "all",
+      });
 
       const local = localStreamRef.current;
       if (local) local.getTracks().forEach((t) => pc.addTrack(t, local));
@@ -83,11 +101,33 @@ export function useWebRTCCall({ callId, enabled }: UseWebRTCCallOpts) {
       pc.ontrack = (ev) => {
         const [stream] = ev.streams;
         updatePeer(peerId, { stream });
+        // If a recording is active, plug the new remote stream into the mix.
+        if (audioCtxRef.current && mixedStreamRef.current) {
+          try {
+            const ctx = audioCtxRef.current;
+            const src = ctx.createMediaStreamSource(stream);
+            const dest = (mixedStreamRef.current as MediaStream & { _dest?: MediaStreamAudioDestinationNode })._dest;
+            if (dest) src.connect(dest);
+          } catch (e) {
+            console.warn("mix remote stream failed", e);
+          }
+        }
       };
 
       pc.onconnectionstatechange = () => {
         updatePeer(peerId, { connectionState: pc.connectionState });
-        if (pc.connectionState === "failed" || pc.connectionState === "closed") {
+        if (pc.connectionState === "failed") {
+          // Retry once with TURN-only if available and not yet tried.
+          if (turnAvailable && !usedRelayRef.current.has(peerId)) {
+            usedRelayRef.current.add(peerId);
+            pc.close();
+            delete pcsRef.current[peerId];
+            // Re-create with relay policy; the smaller id will re-offer on next peer-join cycle.
+            createPeerConnection(peerId);
+            return;
+          }
+          removePeer(peerId);
+        } else if (pc.connectionState === "closed") {
           removePeer(peerId);
         }
       };
@@ -96,7 +136,7 @@ export function useWebRTCCall({ callId, enabled }: UseWebRTCCallOpts) {
       updatePeer(peerId, { connectionState: pc.connectionState });
       return pc;
     },
-    [myId, updatePeer, removePeer],
+    [myId, updatePeer, removePeer, turnAvailable],
   );
 
   const refreshParticipants = useCallback(async () => {
@@ -130,6 +170,14 @@ export function useWebRTCCall({ callId, enabled }: UseWebRTCCallOpts) {
         localStreamRef.current = stream;
 
         setStatus("connecting");
+        // Fetch ICE servers (STUN-only or STUN+TURN if Twilio is configured)
+        try {
+          const ice = await fetchIceServers();
+          iceServersRef.current = ice.iceServers.length ? ice.iceServers : FALLBACK_ICE;
+          setTurnAvailable(ice.turn);
+        } catch {
+          iceServersRef.current = FALLBACK_ICE;
+        }
         await joinCall(callId);
         await refreshParticipants();
 
@@ -292,6 +340,84 @@ export function useWebRTCCall({ callId, enabled }: UseWebRTCCallOpts) {
     }
   }, [isMuted, callId]);
 
+  const startRecording = useCallback(async () => {
+    if (recorderRef.current) return;
+    const local = localStreamRef.current;
+    if (!local) throw new Error("Aucun flux local actif.");
+    if (typeof MediaRecorder === "undefined") {
+      throw new Error("Votre navigateur ne supporte pas l'enregistrement.");
+    }
+    const ctx = new AudioContext();
+    const dest = ctx.createMediaStreamDestination();
+    ctx.createMediaStreamSource(local).connect(dest);
+    Object.values(peers).forEach((p) => {
+      if (p.stream) ctx.createMediaStreamSource(p.stream).connect(dest);
+    });
+    audioCtxRef.current = ctx;
+    const mixed = dest.stream as MediaStream & { _dest?: MediaStreamAudioDestinationNode };
+    mixed._dest = dest;
+    mixedStreamRef.current = mixed;
+    const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+      ? "audio/webm;codecs=opus"
+      : MediaRecorder.isTypeSupported("audio/mp4")
+        ? "audio/mp4"
+        : "audio/webm";
+    const rec = new MediaRecorder(mixed, { mimeType });
+    recordedChunksRef.current = [];
+    rec.ondataavailable = (e) => {
+      if (e.data && e.data.size > 0) recordedChunksRef.current.push(e.data);
+    };
+    rec.start(1000);
+    recordStartRef.current = Date.now();
+    recorderRef.current = rec;
+    setIsRecording(true);
+  }, [peers]);
+
+  const stopRecording = useCallback(async (): Promise<Blob | null> => {
+    const rec = recorderRef.current;
+    if (!rec) return null;
+    return new Promise((resolve) => {
+      rec.onstop = async () => {
+        const blob = new Blob(recordedChunksRef.current, { type: rec.mimeType });
+        const duration = Math.round((Date.now() - recordStartRef.current) / 1000);
+        recordedChunksRef.current = [];
+        recorderRef.current = null;
+        if (audioCtxRef.current) {
+          try { await audioCtxRef.current.close(); } catch { /* ignore */ }
+          audioCtxRef.current = null;
+        }
+        mixedStreamRef.current = null;
+        setIsRecording(false);
+        // Upload if we have a groupId/callId
+        if (groupId && callId && blob.size > 0) {
+          try {
+            const { signedUrl } = await uploadCallRecording(groupId, callId, blob);
+            await setCallRecording(callId, signedUrl, blob.size, duration);
+          } catch (e) {
+            console.error("upload recording failed", e);
+          }
+        }
+        resolve(blob);
+      };
+      rec.stop();
+    });
+  }, [groupId, callId]);
+
+  // Auto-start recording if requested when call goes live
+  useEffect(() => {
+    if (status === "live" && recordingEnabled && !recorderRef.current) {
+      void startRecording().catch((e) => console.warn("auto-record", e));
+    }
+  }, [status, recordingEnabled, startRecording]);
+
+  // Stop recording before leaving
+  const leaveWithStop = useCallback(async () => {
+    if (recorderRef.current) {
+      try { await stopRecording(); } catch { /* ignore */ }
+    }
+    await leave();
+  }, [leave, stopRecording]);
+
   return {
     status,
     error,
@@ -299,6 +425,10 @@ export function useWebRTCCall({ callId, enabled }: UseWebRTCCallOpts) {
     peers,
     isMuted,
     toggleMute,
-    leave,
+    leave: leaveWithStop,
+    isRecording,
+    startRecording,
+    stopRecording,
+    turnAvailable,
   };
 }
