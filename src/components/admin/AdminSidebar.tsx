@@ -12,6 +12,7 @@ import {
   MessageSquare,
   Send,
   CalendarClock,
+  AlertOctagon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -23,6 +24,7 @@ const ITEMS = [
   { to: "/admin/paiements", label: "Paiements", icon: CreditCard },
   { to: "/admin/audit", label: "Audit", icon: ScrollText },
   { to: "/admin/integrite", label: "Intégrité tontine", icon: ShieldAlert },
+  { to: "/admin/defaillants", label: "Défaillants", icon: AlertOctagon },
   { to: "/admin/djomy", label: "Identifiants Djomy", icon: KeyRound },
   { to: "/admin/sms-test", label: "Test SMS", icon: Send },
   { to: "/admin/sms-logs", label: "Journal SMS", icon: MessageSquare },
