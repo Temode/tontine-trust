@@ -1,6 +1,11 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 
+function realtimeChannelId(prefix: string, id: string): string {
+  const suffix = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
+  return `${prefix}:${id}:${suffix}`;
+}
+
 export type CallStatus =
   | "pending"
   | "accepted"
@@ -68,7 +73,7 @@ export function subscribeCallRequests(
   groupId: string,
   onChange: () => void,
 ): RealtimeChannel {
-  const channelId = `call_requests:${groupId}:${crypto.randomUUID()}`;
+  const channelId = realtimeChannelId("call_requests", groupId);
   return supabase
     .channel(channelId)
     .on(
@@ -121,7 +126,7 @@ export function subscribeCallParticipants(
   callId: string,
   onChange: () => void,
 ): RealtimeChannel {
-  const channelId = `call_participants:${callId}:${crypto.randomUUID()}`;
+  const channelId = realtimeChannelId("call_participants", callId);
   return supabase
     .channel(channelId)
     .on(
