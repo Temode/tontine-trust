@@ -1,129 +1,113 @@
 ## Objectif
 
-Compléter l'expérience Discussions avec : conversation realtime déjà existante, pièces jointes (images + PDF), indicateurs de saisie, accusés de lecture serveur (vu / non vu), notifications in-app pour les autres conversations, et architecture UI complète des appels vocaux (boutons actifs, état disponible/occupé, historique) — canal audio désactivé. Tout doit respecter `docs/DESIGN_DOCTRINE.md` (sarcelle/or, font-display, tabular-nums, beaucoup d'air, une seule action primaire).
+Activer l'appel audio de groupe (jusqu'ici UI seule) dans les conversations Tontine Digital, en s'appuyant sur l'infrastructure `call_requests` / `user_call_presence` déjà en place. L'expérience reste fidèle à `docs/DESIGN_DOCTRINE.md` (sarcelle/or, une seule action primaire, pas de spinner brut, tabular-nums).
+
+## Choix techniques
+
+WebRTC pair-à-pair (mesh) côté navigateur, signalisation via **Supabase Realtime Broadcast** (canal `call:{call_id}`). Avantages : aucune dépendance payante au démarrage, déjà inclus dans Lovable Cloud, pas de serveur média à opérer.
+
+- **STUN** : `stun:stun.l.google.com:19302` (gratuit, suffisant pour la majorité des NAT).
+- **TURN** : optionnel pour la v1. Si présent (secret `TURN_URL`, `TURN_USERNAME`, `TURN_CREDENTIAL`), on l'ajoute aux `iceServers`. Sans TURN, ~15 % des appels mobiles peuvent échouer — on l'indique dans le toast d'erreur et on documente l'ajout d'un service Twilio/Metered plus tard.
+- **Limite mesh** : 6 participants audio simultanés maximum (au-delà, qualité dégradée). Bandeau d'avertissement si le groupe a > 6 membres actifs : « Appel limité aux 6 premiers participants ».
 
 ## 1. Base de données (une seule migration)
 
-### `group_message_reads` — accusés de lecture serveur
-- Colonnes : `user_id`, `group_id`, `last_read_at timestamptz`. PK composite `(user_id, group_id)`.
-- RPC `mark_group_read(p_group_id uuid)` : upsert `last_read_at = now()` pour l'utilisateur courant si membre actif.
-- Remplace le hack `localStorage[chat-last-seen:*]` : non-lus partagés entre appareils.
-- Realtime activé (publication `supabase_realtime`).
+### Étendre `call_requests`
+- Pas de nouvelle colonne nécessaire : `status` couvre déjà `pending|accepted|declined|cancelled|missed|ended`, `started_at` / `ended_at` existent.
 
-### `group_messages` — pièces jointes
-- Ajouter colonnes nullables : `attachment_url text`, `attachment_type text` (`image/png`, `application/pdf`…), `attachment_name text`, `attachment_size int`.
-- Contrainte : `(body <> '' OR attachment_url is not null)` au lieu de l'actuel `length(trim(body))>0` (migration : drop puis recreate).
+### Nouvelle table `call_participants`
+- Colonnes : `call_id uuid references call_requests`, `user_id uuid`, `joined_at timestamptz`, `left_at timestamptz null`, `is_muted boolean default false`. PK `(call_id, user_id)`.
+- GRANT (authenticated, service_role), RLS : lecture/écriture si membre actif du groupe parent.
+- Realtime activé → tous les pairs voient instantanément qui rejoint / quitte.
 
-### `call_requests` — appels vocaux (UI seulement, canal off)
-- Colonnes : `group_id`, `requested_by uuid`, `topic text`, `scheduled_at timestamptz null`, `status` (`pending|accepted|declined|cancelled|missed`), `started_at`, `ended_at`, `created_at`.
-- RPC `request_group_call(p_group_id, p_topic, p_scheduled_at)`, `respond_call_request(p_id, p_status)`.
-- Realtime activé. RLS : visible aux membres actifs du groupe.
+### Nouvelles RPC
+- `join_call(p_call_id uuid)` : marque le user comme participant, passe `call_requests.status` à `accepted` et fixe `started_at` si premier participant.
+- `leave_call(p_call_id uuid)` : met `left_at = now()`. Si plus aucun participant actif, set `status='ended'`, `ended_at=now()`.
+- `mute_call_participant(p_call_id, p_muted)` : self-mute, refresh broadcast.
 
-### `user_call_presence` — état disponible / occupé / ne pas déranger
-- Colonnes : `user_id pk`, `status` enum `available|busy|dnd`, `updated_at`.
-- RLS : lecture par membres partageant un groupe, update self uniquement.
+### `user_call_presence`
+- Auto bascule en `busy` à `join_call`, retour à `available` à `leave_call` (déclencheur SQL).
 
-### Stockage
-- Bucket `chat-attachments` (privé) créé via `supabase--storage_create_bucket`.
-- Policy `storage.objects` : upload/read autorisés aux membres du groupe (chemin `{group_id}/{user_id}/{uuid}.{ext}`).
+## 2. Signalisation WebRTC
 
-### GRANTs / RLS — appliqués à chaque table conformément à la doctrine.
+Canal Realtime Broadcast `call:{call_id}` avec events :
+- `peer-join { user_id }`
+- `offer { from, to, sdp }`
+- `answer { from, to, sdp }`
+- `ice { from, to, candidate }`
+- `peer-leave { user_id }`
 
-## 2. Typing indicator (sans table — Realtime broadcast)
+Chaque client crée un `RTCPeerConnection` par pair (mesh). Politique « celui dont l'`user_id` est lexicographiquement le plus petit » crée l'offre, l'autre répond — évite les collisions.
 
-- Canal Supabase Realtime `group_typing:{groupId}` avec presence/broadcast.
-- Client envoie un broadcast `{ user_id, name }` à chaque keystroke (throttle 1.5 s), stop après 3 s d'inactivité.
-- Affiché sous la conversation : « Alice écrit… », « Alice et Bob écrivent… », « 3 personnes écrivent… ».
+## 3. Composants UI
 
-## 3. Notifications in-app pour autres conversations
+### `CallRoom.tsx` (nouveau, plein écran modal)
+- Header : nom du groupe, durée d'appel (`tabular-nums`, format `mm:ss`), badge « En direct » sarcelle pulsant.
+- Grille de participants : avatar + nom + indicateur niveau audio (anneau sarcelle dynamique via `AnalyserNode`), pastille micro coupé.
+- Barre d'actions (bas, centrée, une action primaire) :
+  - **Quitter** (gros bouton or, primary destructive)
+  - Boutons secondaires icônes : `Mic` / `MicOff`, `Volume2` / `VolumeX` (sortie locale), `Users` (liste).
+- Empty state : « En attente d'autres participants… » + skeleton de tuiles.
+- Erreurs ICE : toast + bouton « Réessayer la connexion ».
 
-- `useChatToasts()` (hook global monté dans `AppShell`) : souscrit à `group_messages` insert sur tous les groupes du user.
-- Filtre : si auteur ≠ moi ET (route ≠ `/discussions/{group_id}`) → toast Sonner cliquable :
-  - Avatar groupe + nom + extrait du message.
-  - Clic → `navigate(/discussions/{group_id})`.
-- Mise à jour de la query `["conversations"]` + badge sidebar/bottom-nav.
-- Pas de double notification si la conversation est ouverte.
+### `IncomingCallSheet.tsx` (nouveau, monté dans `AppShell`)
+- Écoute les inserts `call_requests` (statut `pending`) sur tous les groupes du user via `useChatToasts` étendu.
+- Bottom-sheet (mobile) / dialog (desktop) : avatar groupe, nom demandeur, sujet, deux boutons : **Rejoindre** (sarcelle, primary) / **Refuser** (ghost).
+- Sonnerie discrète (oscillator WebAudio, 2 bips) — pas de mp3 externe.
+- Auto-dismiss si l'appel passe à `ended`, `declined`, `cancelled`.
 
-## 4. Pièces jointes (images + PDF)
+### Évolutions
+- `CallRequestDialog.tsx` : sur succès, le demandeur est dirigé vers `CallRoom` directement (il devient premier participant).
+- `CallHistoryDrawer.tsx` : nouvelle colonne « Participants » (count), bouton « Rejoindre » actif si appel `pending`/`accepted` en cours.
+- `ConversationHeader.tsx` : si un appel est en cours pour ce groupe, bandeau sarcelle sticky « Appel en cours · 3 participants — Rejoindre ».
 
-- Composant `AttachmentPicker` dans le composer (bouton `Paperclip`) :
-  - Accept : `image/png,image/jpeg,image/webp,application/pdf`.
-  - Limite : 8 Mo.
-  - Upload → bucket privé → renvoie path + signed URL (1 h).
-- Prévisualisation avant envoi (vignette image ou icône PDF + nom + taille).
-- Affichage dans le message :
-  - Images : thumbnail max 240×240, clic = lightbox plein écran.
-  - PDF : carte avec icône `FileText`, nom, taille, bouton "Télécharger" / "Aperçu" qui ouvre dans nouvel onglet.
-- Body texte facultatif si pièce jointe présente.
+## 4. Hooks
 
-## 5. Accusés de lecture (vu / non vu) — UI
+- `useWebRTCCall(callId)` : gère `RTCPeerConnection`s, attache `getUserMedia({audio:true})`, écoute signalisation, expose `{ participants, localStream, toggleMute, leave, status }`.
+- `useIncomingCalls()` : remonte la prochaine demande pending visible pour l'utilisateur.
+- `useCallTimer(startedAt)` : renvoie durée formatée.
 
-- Liste conversations : badge or `unread_count` (déjà en place) calculé désormais via `last_read_at` côté serveur.
-- Dans la conversation :
-  - Sur mes messages : pictogramme `Check` (envoyé) → `CheckCheck` muted (livré) → `CheckCheck` sarcelle (lu par ≥1 autre membre).
-  - Ligne « 95 messages non lus » au-dessus du premier message non lu à l'ouverture (comme WhatsApp).
-- À l'ouverture / scroll en bas → RPC `mark_group_read` (debounced 1 s).
+## 5. Permissions & erreurs
 
-## 6. Architecture UI appel vocal
+- Demande explicite du micro avant join (`navigator.mediaDevices.getUserMedia`).
+- Refus → toast clair : « Autorisez l'accès au micro dans votre navigateur pour rejoindre l'appel. »
+- HTTPS requis (déjà le cas en preview/prod Lovable). En localhost ok.
+- Navigateurs non supportés (vieux Safari) → message dédié et désactivation des boutons.
 
-- Bouton **« Demander un appel »** actif dans `ConversationHeader` (remplace l'icône `Phone` désactivée).
-- Modal `CallRequestDialog` : sujet + maintenant / programmer (date/heure) + envoyer.
-- Statut **disponible/occupé** dans le menu utilisateur (sidebar bas) : sélecteur 3 états.
-- Pastille de présence sur l'avatar du groupe (vert si ≥1 membre disponible, ambre si tous occupés/DND, gris sinon).
-- Nouveau panneau **Historique des appels** dans la conversation (drawer accessible via bouton `Clock` du header) :
-  - Liste des `call_requests` : demandeur, sujet, état, date.
-  - Boutons "Accepter" / "Refuser" sur les demandes pending qui me sont visibles.
-  - Sur acceptation : bandeau d'appel "Appel demandé pour 14:30 — module audio bientôt disponible".
-- Sur la fiche conversation, badge "Demande d'appel en attente" si `pending` existe.
-- **Aucun WebRTC** : tous les boutons "Rejoindre l'appel" affichent un tooltip "Canal audio bientôt disponible" et un toast info.
+## 6. Fichiers à créer
 
-## 7. Refonte de la page conversation
+- `supabase/migrations/<ts>_call_participants.sql`
+- `src/lib/api/calls.ts` → ajouter `joinCall`, `leaveCall`, `setMute`, `listCallParticipants`, `subscribeCallParticipants`.
+- `src/hooks/useWebRTCCall.ts`
+- `src/hooks/useIncomingCalls.ts`
+- `src/hooks/useCallTimer.ts`
+- `src/components/messages/CallRoom.tsx`
+- `src/components/messages/CallParticipantTile.tsx`
+- `src/components/messages/IncomingCallSheet.tsx`
+- `src/components/messages/OngoingCallBanner.tsx`
 
-- `GroupChat` étendu pour gérer : pièces jointes, typing, séparateur "non lus", accusés de lecture, scroll auto vers premier non lu à l'ouverture.
-- Header sticky : avatar + nom + nb membres + pastille présence + boutons `Phone` (actif → modal), `History` (drawer appels), `Info` (route groupe).
-- Composer : `Paperclip` + textarea autosize + bouton `Send` (sarcelle), Enter envoie, Shift+Enter saut de ligne.
-- Loading : skeletons (pas de spinner), respect doctrine.
-- Empty : `EmptyState` "Aucun message — soyez le premier à écrire".
+## 7. Fichiers à modifier
 
-## 8. Fichiers créés
+- `src/components/messages/CallRequestDialog.tsx` → redirige vers `CallRoom`.
+- `src/components/messages/CallHistoryDrawer.tsx` → bouton « Rejoindre » actif + retire « bientôt disponible ».
+- `src/components/messages/ConversationHeader.tsx` → bandeau d'appel en cours, retire les tooltips « bientôt disponible » sur `Phone`.
+- `src/components/layout/AppShell.tsx` → monte `IncomingCallSheet`.
+- `src/lib/api/presence.ts` → helpers pour set busy/available auto.
 
-- `supabase/migrations/<ts>_chat_v2_reads_attachments_calls.sql`
-- `src/lib/api/chatReads.ts` (mark/get reads)
-- `src/lib/api/chatAttachments.ts` (upload + signed URL)
-- `src/lib/api/calls.ts` (request/respond/list)
-- `src/lib/api/presence.ts` (état utilisateur)
-- `src/hooks/useChatToasts.ts`
-- `src/hooks/useTypingChannel.ts`
-- `src/hooks/useGroupCallRequests.ts`
-- `src/components/messages/MessageBubble.tsx` (refactor)
-- `src/components/messages/MessageComposer.tsx`
-- `src/components/messages/AttachmentPicker.tsx`
-- `src/components/messages/AttachmentPreview.tsx`
-- `src/components/messages/TypingIndicator.tsx`
-- `src/components/messages/UnreadSeparator.tsx`
-- `src/components/messages/ReadReceipts.tsx`
-- `src/components/messages/CallRequestDialog.tsx`
-- `src/components/messages/CallHistoryDrawer.tsx`
-- `src/components/messages/PresenceDot.tsx`
-- `src/components/messages/PresencePicker.tsx`
+## 8. Hors périmètre v1 (à signaler)
 
-## 9. Fichiers modifiés
+- **Vidéo** : reste désactivée, tooltip conservé.
+- **TURN managé** : non inclus ; si la connectivité échoue derrière NAT strict, plan v1.1 = brancher Twilio Network Traversal via connector (5 min de setup, ~0,40 USD/Go).
+- **Enregistrement d'appel** : non implémenté.
+- **Notifications push hors-app** : reposent sur les notifs Lovable existantes (in-app uniquement pour le moment).
 
-- `src/components/group/GroupChat.tsx` → refactor en utilisant les nouveaux composants.
-- `src/components/messages/ConversationHeader.tsx` → boutons appel actifs, drawer historique, présence.
-- `src/components/messages/ConversationItem.tsx` → unread_count basé serveur.
-- `src/components/messages/ConversationsList.tsx` → idem.
-- `src/lib/api/chat.ts` → `listConversationsForUser` lit `group_message_reads`, types étendus avec attachments.
-- `src/pages/Messages.tsx` → mark_group_read on open, intégration drawer.
-- `src/components/layout/AppShell.tsx` → monte `useChatToasts`.
-- `src/components/layout/DesktopSidebar.tsx` → badge non-lus, sélecteur de présence dans la carte user.
+## 9. Validation
 
-## 10. Validation
-
-1. **Realtime** : Alice envoie un message → Bob (autre session) le voit apparaître < 1 s, sans refresh ; toast in-app si Bob est ailleurs ; badge non-lus de la conversation et de la sidebar incrémenté.
-2. **Lecture** : Bob ouvre la conversation → badge tombe à 0 (Alice le voit aussi : `CheckCheck` sarcelle sur son message dans la même seconde).
-3. **Pièces jointes** : envoi d'une image → thumbnail + lightbox ; envoi d'un PDF → carte téléchargeable ; refus si > 8 Mo ou type non autorisé.
-4. **Typing** : Alice tape → "Alice écrit…" chez Bob ; disparaît 3 s après l'arrêt.
-5. **Appels** : Bob clique "Demander un appel" → modal → envoi → Alice voit une demande pending + toast ; drawer historique liste toutes les demandes ; bouton "Rejoindre" affiche tooltip "bientôt disponible" — aucune erreur réseau.
-6. **Présence** : Bob bascule en "occupé" → pastille de l'avatar du groupe passe à l'ambre chez Alice en realtime.
-7. **Doctrine** : aucune couleur hardcodée, montants/tabular-nums respectés, skeletons (pas de spinner), une seule action primaire par écran, viewport 712px et 1280px OK.
+1. Alice clique « Demander un appel » → modal → envoi → entre dans `CallRoom` seule, statut « En attente ».
+2. Bob (autre session) reçoit `IncomingCallSheet` < 1 s, clique « Rejoindre » → flux audio bidirectionnel établi en < 3 s sur réseau classique.
+3. Charlie rejoint → mesh à 3, chacun entend les 2 autres.
+4. Bob mute → pastille micro coupé visible chez Alice et Charlie en < 500 ms.
+5. Présence : pendant l'appel, pastille des 3 passe à `busy` chez les autres membres ; revient à `available` après `Quitter`.
+6. Dernier participant quitte → appel passe `ended`, `ended_at` rempli, historique mis à jour.
+7. Refus de permission micro → message d'erreur explicite, aucune entrée fantôme dans `call_participants`.
+8. Doctrine : aucune couleur hardcodée, `mm:ss` en tabular-nums, une seule action primaire (Quitter), skeletons.
