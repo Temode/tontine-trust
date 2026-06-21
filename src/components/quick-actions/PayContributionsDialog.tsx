@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { AlertTriangle, ArrowRight, ArrowUpRight, Loader2, Receipt, ShieldCheck } from "lucide-react";
@@ -12,7 +12,7 @@ import {
 import { cn } from "@/lib/utils";
 import { formatGNF, formatRelativeDays } from "@/lib/format";
 import { listMyContributionsDue, type DbContributionDue } from "@/lib/api/contributions";
-import { DjomyPaymentModal } from "@/components/payment/DjomyPaymentModal";
+import { launchDjomyCheckout } from "@/lib/payment/launchDjomyCheckout";
 
 export function PayContributionsDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
   const navigate = useNavigate();
@@ -28,8 +28,6 @@ export function PayContributionsDialog({ open, onOpenChange }: { open: boolean; 
     [dues],
   );
   const totalDue = useMemo(() => sorted.reduce((s, d) => s + d.amount, 0), [sorted]);
-
-  const [payingDue, setPayingDue] = useState<DbContributionDue | null>(null);
 
   return (
     <>
@@ -108,7 +106,14 @@ export function PayContributionsDialog({ open, onOpenChange }: { open: boolean; 
             ) : (
               <ul className="divide-y divide-hairline">
                 {sorted.map((d) => (
-                  <DueRow key={d.contribution_id} due={d} onPay={() => setPayingDue(d)} />
+                  <DueRow
+                    key={d.contribution_id}
+                    due={d}
+                    onPay={() => {
+                      onOpenChange(false);
+                      void launchDjomyCheckout(d.contribution_id);
+                    }}
+                  />
                 ))}
               </ul>
             )}
@@ -136,18 +141,6 @@ export function PayContributionsDialog({ open, onOpenChange }: { open: boolean; 
           </footer>
         </DialogContent>
       </Dialog>
-
-      {payingDue && (
-        <DjomyPaymentModal
-          open={!!payingDue}
-          onOpenChange={(v) => {
-            if (!v) setPayingDue(null);
-          }}
-          contributionId={payingDue.contribution_id}
-          groupName={payingDue.group_name}
-          amount={payingDue.amount}
-        />
-      )}
     </>
   );
 }
