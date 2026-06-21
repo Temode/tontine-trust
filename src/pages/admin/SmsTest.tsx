@@ -125,20 +125,20 @@ export default function AdminSmsTest() {
         </button>
       </form>
 
-      {result &&
-        (result.ok ? (
-          <div className="rounded-lg border p-4 border-emerald-500/30 bg-emerald-500/5 text-emerald-200">
-            <p className="font-medium">SMS envoyé avec succès</p>
-            <p className="text-xs mt-1 opacity-80">
-              ID : {result.messageId ?? "—"} · Coût : {result.cost ?? "—"} segment(s)
-            </p>
-          </div>
-        ) : (
-          <div className="rounded-lg border p-4 border-red-500/30 bg-red-500/5 text-red-200">
-            <p className="font-medium">Échec</p>
-            <p className="text-xs mt-1 opacity-80">{result.error}</p>
-          </div>
-        ))}
+      {result && result.ok && (
+        <div className="rounded-lg border p-4 border-emerald-500/30 bg-emerald-500/5 text-emerald-200">
+          <p className="font-medium">SMS envoyé avec succès</p>
+          <p className="text-xs mt-1 opacity-80">
+            ID : {result.messageId ?? "—"} · Coût : {result.cost ?? "—"} segment(s)
+          </p>
+        </div>
+      )}
+      {result && !result.ok && (
+        <div className="rounded-lg border p-4 border-red-500/30 bg-red-500/5 text-red-200">
+          <p className="font-medium">Échec</p>
+          <p className="text-xs mt-1 opacity-80">{result.error}</p>
+        </div>
+      )}
     </div>
   );
 }
