@@ -11,13 +11,35 @@ Deno.serve(async (req) => {
 
   const rawBody = await req.text();
   const sigHeader = req.headers.get("x-webhook-signature") ?? req.headers.get("X-Webhook-Signature") ?? "";
-  const secret = Deno.env.get("DJOMY_WEBHOOK_SECRET") ?? Deno.env.get("DJOMY_CLIENT_SECRET");
-  if (!secret) return json({ error: "WEBHOOK_SECRET_MISSING" }, 500);
+  const webhookSecret = Deno.env.get("DJOMY_WEBHOOK_SECRET") ?? "";
+  const clientSecret = Deno.env.get("DJOMY_CLIENT_SECRET") ?? "";
+  if (!webhookSecret && !clientSecret) return json({ error: "WEBHOOK_SECRET_MISSING" }, 500);
 
-  // format attendu : v1:<hex>
-  const provided = sigHeader.includes(":") ? sigHeader.split(":").slice(-1)[0] : sigHeader;
-  const expected = await hmacSha256Hex(secret, rawBody);
-  const signatureValid = provided.length > 0 && provided.toLowerCase() === expected.toLowerCase();
+  // Format Djomy : `X-Webhook-Signature: v1:<hex>` — HMAC-SHA256(payload) avec
+  // la clé secrète marchand. On accepte aussi un header brut sans préfixe.
+  const provided = (sigHeader.includes(":") ? sigHeader.split(":").slice(-1)[0] : sigHeader).trim().toLowerCase();
+  let signatureValid = false;
+  let matchedKey: "webhook" | "client" | null = null;
+  for (const key of [webhookSecret, clientSecret].filter(Boolean) as string[]) {
+    const expected = (await hmacSha256Hex(key, rawBody)).toLowerCase();
+    if (provided.length > 0 && provided === expected) {
+      signatureValid = true;
+      matchedKey = key === webhookSecret ? "webhook" : "client";
+      break;
+    }
+  }
+  if (!signatureValid) {
+    const expectedWebhook = webhookSecret ? (await hmacSha256Hex(webhookSecret, rawBody)).slice(0, 12) : "n/a";
+    const expectedClient = clientSecret ? (await hmacSha256Hex(clientSecret, rawBody)).slice(0, 12) : "n/a";
+    console.warn("[djomy-webhook] signature diag", {
+      provided_prefix: provided.slice(0, 12),
+      expected_with_webhook_secret_prefix: expectedWebhook,
+      expected_with_client_secret_prefix: expectedClient,
+      body_length: rawBody.length,
+    });
+  } else {
+    console.log("[djomy-webhook] signature OK via", matchedKey);
+  }
 
   let payload: Record<string, unknown> = {};
   try { payload = JSON.parse(rawBody); } catch { return json({ error: "INVALID_JSON" }, 400); }
@@ -47,7 +69,6 @@ Deno.serve(async (req) => {
   }
 
   if (!signatureValid) {
-    console.warn("[djomy-webhook] invalid signature, ignoring");
     return json({ ok: true, ignored: "invalid_signature" }, 200);
   }
 
