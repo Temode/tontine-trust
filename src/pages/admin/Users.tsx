@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
@@ -10,10 +11,17 @@ const ALL_ROLES: AppRole[] = ["super_admin", "admin", "organisateur", "participa
 
 export default function AdminUsers() {
   const qc = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const focusId = searchParams.get("focus");
   const [search, setSearch] = useState("");
   const [committed, setCommitted] = useState("");
 
   const q = useQuery({ queryKey: ["admin-users", committed], queryFn: () => listAdminUsers(committed) });
+
+  const rows = useMemo(() => {
+    if (!focusId || !q.data) return q.data ?? [];
+    return q.data.filter((u: any) => u.id === focusId);
+  }, [q.data, focusId]);
 
   const roleM = useMutation({
     mutationFn: ({ id, role, grant }: { id: string; role: AppRole; grant: boolean }) =>
@@ -57,12 +65,21 @@ export default function AdminUsers() {
           </thead>
           <tbody>
             {q.isLoading && <tr><td colSpan={6} className="px-3 py-6 text-center text-slate-500">Chargement…</td></tr>}
-            {q.data?.length === 0 && <tr><td colSpan={6} className="px-3 py-6 text-center text-slate-500">Aucun utilisateur</td></tr>}
-            {q.data?.map((u) => {
+            {rows.length === 0 && !q.isLoading && (
+              <tr>
+                <td colSpan={6} className="px-3 py-6 text-center text-slate-500">
+                  {focusId ? `Aucun utilisateur avec l'id ${focusId.slice(0, 8)}…` : "Aucun utilisateur"}
+                </td>
+              </tr>
+            )}
+            {rows.map((u) => {
               const roles = u.roles ?? [];
               const suspended = !!u.suspended_at;
               return (
-                <tr key={u.id} className="border-t border-slate-800 hover:bg-slate-900/50">
+                <tr
+                  key={u.id}
+                  className={`border-t border-slate-800 hover:bg-slate-900/50 ${u.id === focusId ? "bg-amber-500/5 ring-1 ring-amber-500/30" : ""}`}
+                >
                   <td className="px-3 py-2">
                     <div className="font-medium text-white">{u.full_name}</div>
                     <div className="text-xs text-slate-400">{u.email ?? "—"}</div>
