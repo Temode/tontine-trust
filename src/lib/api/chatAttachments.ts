@@ -7,6 +7,11 @@ export const ALLOWED_ATTACHMENT_TYPES = [
   "image/jpg",
   "image/webp",
   "application/pdf",
+  "audio/webm",
+  "audio/mp4",
+  "audio/mpeg",
+  "audio/ogg",
+  "audio/wav",
 ];
 
 export interface UploadedAttachment {
