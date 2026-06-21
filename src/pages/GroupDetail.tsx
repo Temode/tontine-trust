@@ -491,21 +491,52 @@ export default function GroupDetail() {
         )}
 
         {paymentsBlocked && (
-          <div className="mt-5 flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-50/60 p-4 dark:bg-amber-500/10">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-500 text-white">
-              <ShieldCheck className="h-4 w-4" />
-            </div>
-            <div>
-              <p className="font-display text-sm font-bold text-foreground">
-                {isPaused ? "Cycle en pause" : "Cycle clôturé"}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                {isPaused
-                  ? "Les paiements sont suspendus jusqu'à la reprise du cycle par l'organisateur."
-                  : "Ce groupe est archivé : aucun nouveau paiement ne peut être effectué."}
-              </p>
-            </div>
-          </div>
+          <PausedPaymentsBanner
+            isPaused={isPaused}
+            grp={grp}
+            organizerName={organizerProfileQ.data ?? null}
+            myDue={myDueForGroup}
+            myPendingRequest={
+              myDueForGroup
+                ? (pauseRequestsQ.data ?? []).find(
+                    (r) =>
+                      r.contribution_id === myDueForGroup.contribution_id &&
+                      r.requested_by === user?.id &&
+                      r.status === "pending",
+                  ) ?? null
+                : null
+            }
+            myApprovedRequest={
+              myDueForGroup
+                ? (pauseRequestsQ.data ?? []).find(
+                    (r) =>
+                      r.contribution_id === myDueForGroup.contribution_id &&
+                      r.requested_by === user?.id &&
+                      r.status === "approved" &&
+                      new Date(r.expires_at).getTime() > Date.now(),
+                  ) ?? null
+                : null
+            }
+            myLastRejected={
+              myDueForGroup
+                ? (pauseRequestsQ.data ?? []).find(
+                    (r) =>
+                      r.contribution_id === myDueForGroup.contribution_id &&
+                      r.requested_by === user?.id &&
+                      r.status === "rejected",
+                  ) ?? null
+                : null
+            }
+            isOrganizer={isOrganizer}
+            pendingRequests={(pauseRequestsQ.data ?? []).filter((r) => r.status === "pending")}
+            onRequest={() =>
+              myDueForGroup && requestPaymentM.mutate(myDueForGroup.contribution_id)
+            }
+            requestPending={requestPaymentM.isPending}
+            onDecide={(requestId, approve) => decideRequestM.mutate({ requestId, approve })}
+            decidePending={decideRequestM.isPending}
+            onPay={() => myDueForGroup && void launchDjomyCheckout(myDueForGroup.contribution_id)}
+          />
         )}
 
         {myDueForGroup && !paymentsBlocked && (
