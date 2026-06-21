@@ -1,54 +1,48 @@
-## Constat
+## Cause racine identifiée
 
-La documentation Djomy confirme que notre code est conforme :
-- Signature : `HMAC_SHA256(message=clientId, key=clientSecret)` ✅
-- Header : `X-API-KEY: <clientId>:<signature_hex>` ✅
-- Endpoint : `POST /v1/auth` avec body `{}` ✅
-- URL `https://prod-api.djomy.africa` répond bien (le 401 prouve qu'on parle au bon serveur)
+En comparant avec le projet Paxefy (qui utilise Djomy avec succès), 3 écarts expliquent les échecs :
 
-Pourtant l'auth retourne 401 alors que tu confirmes :
-- Clés issues de la **section Production** du dashboard Djomy
-- Compte marchand **activé**
+| Élément | Notre code | Paxefy (qui marche) |
+|---|---|---|
+| URL production | `https://prod-api.djomy.africa` ❌ | `https://api.djomy.africa` ✅ |
+| Valeur `DJOMY_ENV` pour la prod | `prod` | `production` |
+| Header obligatoire | absent | `X-PARTNER-DOMAIN: dcaa27935b4920eb5e7c2c9a1d35a5040493b177bed92d9b69966c46eca6a627` |
 
-Il reste 3 causes plausibles, qu'on ne peut pas distinguer sans tester :
-1. Un caractère parasite (espace, retour à la ligne, guillemet) a été copié dans la valeur d'un secret
-2. Les clés affichées comme « Production » correspondent en fait à l'API Sandbox côté Djomy
-3. Une restriction côté Djomy (IP whitelisting, activation API distincte de l'activation compte)
+Test manuel précédent : `https://api.djomy.africa/v1/auth` renvoyait 403 quand on l'appelait sans `X-PARTNER-DOMAIN` → ça confirme.
 
-## Ce que je vais faire
+La signature HMAC (`hmacSha256(message=clientId, key=clientSecret)`) est déjà correcte de notre côté, rien à changer là-dessus.
 
-### 1. Améliorer `djomy-validate-credentials` pour tester **les deux environnements en parallèle**
+## Corrections à apporter
 
-À chaque clic sur « Tester maintenant », la fonction appellera :
-- `POST https://prod-api.djomy.africa/v1/auth`
-- `POST https://sandbox-api.djomy.africa/v1/auth`
+### 1. `supabase/functions/_shared/djomy.ts`
+- URL prod → `https://api.djomy.africa`
+- Accepter `prod` ET `production` comme valeur de `DJOMY_ENV` (rétrocompatible avec le secret actuel)
+- Ajouter la constante `DJOMY_PARTNER_DOMAIN = "dcaa27935b4920eb5e7c2c9a1d35a5040493b177bed92d9b69966c46eca6a627"`
+- Ajouter automatiquement le header `X-PARTNER-DOMAIN` dans :
+  - `getDjomyBearer()` (appel `/v1/auth`)
+  - `djomyFetch()` (tous les autres appels Djomy)
 
-…avec les mêmes secrets et renverra les deux résultats. Cela permet de savoir immédiatement si les clés sont en réalité des clés Sandbox malgré l'étiquette « Production ».
+### 2. `supabase/functions/djomy-validate-credentials/index.ts`
+- Mettre à jour les URLs sondées : `https://api.djomy.africa` pour prod (sandbox inchangée)
+- Ajouter `X-PARTNER-DOMAIN` aux deux probes
+- Garder l'affichage Prod/Sandbox côte à côte
 
-Ajouts au payload de réponse :
-- `clientIdHasWhitespace` (bool) et `clientSecretHasWhitespace` (bool) pour détecter les copier-coller fautifs
-- `clientIdTrimmedLength` vs `clientIdLength` (pour signaler un trim qui changerait la valeur)
-- Corps brut de la réponse Djomy (utile pour voir les codes d'erreur explicites comme `INVALID_CLIENT`, `UNKNOWN_MERCHANT`, etc.)
+### 3. UI `src/pages/admin/DjomySettings.tsx`
+- Aucune modif fonctionnelle nécessaire
+- Mettre à jour la note sur `DJOMY_ENV` pour mentionner `production` (au lieu de `prod`)
 
-### 2. Mettre à jour `src/pages/admin/DjomySettings.tsx`
+### 4. Vérifier `djomy-webhook` et autres fonctions Djomy
+Lecture seule pour confirmer qu'elles passent toutes par `_shared/djomy.ts` — si oui, le fix est automatiquement propagé. Sinon, ajouter le header là où elles appellent Djomy directement.
 
-Afficher côte à côte les deux résultats (Prod / Sandbox) avec un badge vert/rouge, le code HTTP, la latence, le corps de réponse Djomy, et un avertissement explicite si :
-- Sandbox ✅ et Prod ❌ → « Vos clés sont des clés Sandbox. Bascule `DJOMY_ENV=sandbox` ou récupère des clés Production. »
-- Whitespace détecté → « Une valeur de secret contient des espaces / sauts de ligne. Recolle-la sans espace. »
-- Les deux ❌ → « Identifiants invalides côté Djomy. Contacte le support Djomy avec le `clientIdPreview` affiché. »
+## Hors-scope
 
-### 3. Aucune modification de l'intégration paiement réelle
+- Pas de modification de secrets (les clés Djomy déjà collées sont bonnes)
+- Pas de modification des flux paiement / webhook côté logique métier
+- Pas de migration DB
 
-Ce diagnostic est purement en lecture, il ne touche ni `djomy-init-payment`, ni `djomy-webhook`, ni les autres flux.
+## Validation
 
-## Détails techniques
-
-Fichiers modifiés :
-- `supabase/functions/djomy-validate-credentials/index.ts` — appel parallèle Prod + Sandbox, ajout des champs de diagnostic
-- `src/pages/admin/DjomySettings.tsx` — affichage double colonne + verdict automatique
-
-Aucune migration, aucun nouveau secret, aucune dépendance ajoutée.
-
-## Résultat attendu
-
-Après un seul clic sur « Tester maintenant » tu sauras avec certitude laquelle des 3 causes est la bonne, et l'écran t'indiquera l'action à faire.
+Après les changements, cliquer sur « Tester maintenant » dans Admin → Identifiants Djomy doit retourner :
+- Prod ✅ HTTP 201 avec un Bearer token
+- Sandbox ❌ (normal, ce sont des clés prod)
+- Verdict : `OK_PROD` (ou éventuellement `WRONG_ENV_SHOULD_BE_PROD` si le secret `DJOMY_ENV` est encore à `sandbox`, auquel cas l'UI te dira de le changer en `production`).
