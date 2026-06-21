@@ -54,6 +54,8 @@ const STATUS_TABS: { key: StatusFilter; label: string }[] = [
 export default function MyContributions() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const qc = useQueryClient();
+  const [reconciling, setReconciling] = useState(false);
   const { data: dues = [], isLoading } = useQuery({
     queryKey: ["contributions", "due"],
     queryFn: listMyContributionsDue,
@@ -62,6 +64,42 @@ export default function MyContributions() {
     queryKey: ["payments", "history"],
     queryFn: listMyPaymentsHistory,
   });
+
+  // Réconciliation immédiate au montage (utile si l'utilisateur revient via
+  // la flèche du navigateur sans passer par /paiement/retour).
+  useEffect(() => {
+    if (!user?.id) return;
+    void reconcileDjomyPayments(user.id).then((res) => {
+      if (res.updated > 0) {
+        qc.invalidateQueries({ queryKey: ["contributions"] });
+        qc.invalidateQueries({ queryKey: ["payments"] });
+      }
+    });
+  }, [user?.id, qc]);
+
+  const handleManualReconcile = async () => {
+    if (!user?.id || reconciling) return;
+    setReconciling(true);
+    try {
+      const res = await reconcileDjomyPayments(user.id, { force: true });
+      if (res.checked === 0) {
+        toast.info("Aucun paiement en attente.");
+      } else if (res.updated > 0) {
+        toast.success(
+          `${res.updated} paiement${res.updated > 1 ? "s" : ""} mis à jour.`,
+          { description: "Vos cotisations sont à jour." },
+        );
+        qc.invalidateQueries({ queryKey: ["contributions"] });
+        qc.invalidateQueries({ queryKey: ["payments"] });
+      } else {
+        toast(`${res.checked} paiement${res.checked > 1 ? "s" : ""} encore en attente côté Djomy.`);
+      }
+    } catch (e) {
+      toast.error("Vérification impossible", { description: (e as Error).message });
+    } finally {
+      setReconciling(false);
+    }
+  };
 
   const [disputingDue, setDisputingDue] = useState<DbContributionDue | null>(null);
   const [search, setSearch] = useState("");
