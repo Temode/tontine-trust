@@ -568,6 +568,28 @@ function Meta({ label, value }: { label: string; value: string }) {
   );
 }
 
+function HeroMetric({ label, value, sub }: { label: string; value: string; sub?: string }) {
+  return (
+    <div className="rounded-xl border border-primary-foreground/15 bg-primary-foreground/10 px-3 py-2.5 backdrop-blur">
+      <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-primary-foreground/70">
+        {label}
+      </p>
+      <p className="mt-1 font-display text-base font-bold text-primary-foreground num">{value}</p>
+      {sub && <p className="mt-0.5 text-[11px] text-primary-foreground/70">{sub}</p>}
+    </div>
+  );
+}
+
+function avgReliabilityLabel(rows: DbGroupReliabilityRow[]): string {
+  if (!rows.length) return "—";
+  const scores = rows
+    .map((r) => (typeof r.score === "number" ? r.score : null))
+    .filter((s): s is number => s !== null);
+  if (!scores.length) return "—";
+  const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
+  return `${Math.round(avg)}/100`;
+}
+
 function OverviewTab({ nextTurn, payout }: { nextTurn: DbNextTurn | null; payout: number }) {
   if (!nextTurn) {
     return (
