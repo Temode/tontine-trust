@@ -563,7 +563,8 @@ function DueContributionCard({ due, onPay }: CardProps) {
         <button
           type="button"
           onClick={onPay}
-          className="mt-auto inline-flex h-11 w-full items-center justify-center gap-1.5 whitespace-nowrap rounded-md bg-primary px-5 text-sm font-semibold text-primary-foreground shadow-primary transition hover:bg-primary-700"
+          aria-label={`Payer ${formatGNF(due.amount)} GNF pour ${due.group_name}, tour ${due.turn_number}`}
+          className="mt-auto inline-flex h-12 w-full items-center justify-center gap-1.5 whitespace-nowrap rounded-md bg-primary px-5 text-sm font-semibold text-primary-foreground shadow-primary transition hover:bg-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
         >
           <ShieldCheck className="h-4 w-4" />
           Payer maintenant
