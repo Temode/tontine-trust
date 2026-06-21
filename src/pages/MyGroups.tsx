@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { AlertTriangle, Plus } from "lucide-react";
@@ -8,6 +8,7 @@ import { GroupsGrid } from "@/components/groups/GroupsGrid";
 import { GroupsHero } from "@/components/groups/GroupsHero";
 import { GroupsTable } from "@/components/groups/GroupsTable";
 import { GroupsToolbar } from "@/components/groups/GroupsToolbar";
+import { Pagination } from "@/components/groups/Pagination";
 import type { GroupsFilter, SortDir, SortKey, ViewMode } from "@/components/groups/types";
 import { listMyGroups } from "@/lib/api/groups";
 import { listMyApplications, cancelMyApplication } from "@/lib/api/groups";
@@ -94,6 +95,8 @@ export default function MyGroups() {
   const [sort, setSort] = useState<SortKey>("deadline");
   const [sortDir, setSortDir] = useState<SortDir>(STATUS_DEFAULT_DIRS.deadline);
   const [view, setView] = useState<ViewMode>("grid");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState<number>(12);
 
   const { data: rows = [], isLoading, isError, error, refetch } = useQuery({
     queryKey: ["groups", "mine"],
@@ -169,6 +172,24 @@ export default function MyGroups() {
     return [...result].sort((a, b) => compareGroups(a, b, sort, sortDir));
   }, [allGroups, query, filter, sort, sortDir]);
 
+  // Reset page on filter / search / sort / view changes
+  useEffect(() => {
+    setPage(1);
+  }, [query, filter, sort, sortDir, view]);
+
+  // Adjust default page size when switching view
+  useEffect(() => {
+    setPageSize(view === "table" ? 20 : 12);
+  }, [view]);
+
+  const totalItems = filteredGroups.length;
+  const pageCount = Math.max(1, Math.ceil(totalItems / pageSize));
+  const safePage = Math.min(page, pageCount);
+  const pagedGroups = useMemo(
+    () => filteredGroups.slice((safePage - 1) * pageSize, safePage * pageSize),
+    [filteredGroups, safePage, pageSize],
+  );
+
   const handleSortChange = (key: SortKey) => {
     if (key === sort) {
       setSortDir((d) => (d === "asc" ? "desc" : "asc"));
@@ -230,14 +251,7 @@ export default function MyGroups() {
         />
 
         {isLoading ? (
-          <div className="space-y-4" aria-busy="true" aria-live="polite">
-            <div className="h-12 animate-pulse rounded-2xl bg-secondary/60" />
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="h-56 animate-pulse rounded-xl bg-secondary/60" />
-              ))}
-            </div>
-          </div>
+          <LoadingSkeleton view={view} />
         ) : isError ? (
           <div className="flex flex-col items-start gap-4 rounded-2xl border border-destructive/30 bg-destructive/[0.04] p-6 sm:flex-row sm:items-center">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-destructive/10 text-destructive">
@@ -265,19 +279,75 @@ export default function MyGroups() {
               setQuery("");
             }}
           />
-        ) : view === "table" ? (
-          <GroupsTable groups={filteredGroups} sort={sort} sortDir={sortDir} onSortChange={handleSortChange} />
         ) : (
-          <GroupsGrid groups={filteredGroups} />
+          <>
+            {view === "table" ? (
+              <GroupsTable groups={pagedGroups} sort={sort} sortDir={sortDir} onSortChange={handleSortChange} />
+            ) : (
+              <GroupsGrid groups={pagedGroups} />
+            )}
+            {pageCount > 1 && (
+              <Pagination
+                page={safePage}
+                pageCount={pageCount}
+                pageSize={pageSize}
+                totalItems={totalItems}
+                onPageChange={setPage}
+                onPageSizeChange={setPageSize}
+                pageSizeOptions={view === "table" ? [10, 20, 50] : [6, 12, 24]}
+              />
+            )}
+          </>
         )}
 
         <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-muted-foreground">
           <span>
-            <span className="num">{filteredGroups.length}</span>{" "}
-            {filteredGroups.length > 1 ? "groupes affichés" : "groupe affiché"}
+            <span className="num">{totalItems}</span>{" "}
+            {totalItems > 1 ? "groupes filtrés" : "groupe filtré"}
+            {totalItems > 0 && (
+              <>
+                {" "}· <span className="num">{pagedGroups.length}</span> sur cette page
+              </>
+            )}
           </span>
           <span>Données en direct · Tontine Digitale</span>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function LoadingSkeleton({ view }: { view: ViewMode }) {
+  if (view === "table") {
+    return (
+      <div className="space-y-4" aria-busy="true" aria-live="polite">
+        <div className="h-12 animate-pulse rounded-2xl bg-secondary/60" />
+        <div className="overflow-hidden rounded-xl border border-hairline bg-card">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div
+              key={i}
+              className="flex items-center gap-3 border-b border-hairline px-5 py-3 last:border-b-0"
+            >
+              <div className="h-9 w-9 animate-pulse rounded-md bg-secondary/70" />
+              <div className="flex-1 space-y-2">
+                <div className="h-3 w-1/3 animate-pulse rounded bg-secondary/70" />
+                <div className="h-2.5 w-1/4 animate-pulse rounded bg-secondary/50" />
+              </div>
+              <div className="hidden h-3 w-16 animate-pulse rounded bg-secondary/60 sm:block" />
+              <div className="h-7 w-20 animate-pulse rounded-md bg-secondary/70" />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="space-y-4" aria-busy="true" aria-live="polite">
+      <div className="h-12 animate-pulse rounded-2xl bg-secondary/60" />
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="h-56 animate-pulse rounded-xl bg-secondary/60" />
+        ))}
       </div>
     </div>
   );
