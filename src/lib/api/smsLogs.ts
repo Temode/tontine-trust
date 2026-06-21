@@ -16,6 +16,8 @@ export interface SmsLog {
   provider_cost: number | null;
   error: string | null;
   triggered_by: string | null;
+  group?: { id: string; name: string } | null;
+  profile?: { id: string; full_name: string | null } | null;
 }
 
 export interface SmsLogsFilters {
@@ -29,7 +31,7 @@ export async function listSmsLogs(filters: SmsLogsFilters = {}): Promise<SmsLog[
   let q = supabase
     .from("sms_logs")
     .select(
-      "id, created_at, user_id, group_id, turn_id, recipient, recipient_normalized, body, kind, status, provider, provider_message_id, provider_cost, error, triggered_by",
+      "id, created_at, user_id, group_id, turn_id, recipient, recipient_normalized, body, kind, status, provider, provider_message_id, provider_cost, error, triggered_by, group:groups(id, name), profile:profiles(id, full_name)",
     )
     .order("created_at", { ascending: false })
     .limit(filters.limit ?? 100);
