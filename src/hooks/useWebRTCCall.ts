@@ -23,6 +23,9 @@ export interface RemotePeer {
   signalingState?: RTCSignalingState;
   retries?: number;
   lastError?: string | null;
+  micMuted?: boolean;
+  camOff?: boolean;
+  screenSharing?: boolean;
 }
 
 export interface WebRTCDiagEvent {
