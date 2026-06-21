@@ -9,7 +9,7 @@ import { CallRoom } from "./CallRoom";
 
 export function IncomingCallSheet() {
   const { current, dismiss } = useIncomingCalls();
-  const [joined, setJoined] = useState<{ callId: string; groupName: string } | null>(null);
+  const [joined, setJoined] = useState<{ callId: string; groupName: string; groupId: string } | null>(null);
 
   const decline = useMutation({
     mutationFn: (id: string) => respondCallRequest(id, "declined"),
@@ -43,7 +43,7 @@ export function IncomingCallSheet() {
               type="button"
               onClick={() => {
                 if (!current) return;
-                setJoined({ callId: current.id, groupName: current.group_name });
+                setJoined({ callId: current.id, groupName: current.group_name, groupId: current.group_id });
                 dismiss();
               }}
               className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-md bg-primary text-sm font-semibold text-primary-foreground shadow-primary hover:bg-primary-700"
@@ -59,6 +59,7 @@ export function IncomingCallSheet() {
         open={!!joined}
         onOpenChange={(v) => !v && setJoined(null)}
         callId={joined?.callId ?? null}
+        groupId={joined?.groupId}
         groupName={joined?.groupName}
       />
     </>

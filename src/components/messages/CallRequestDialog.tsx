@@ -135,6 +135,7 @@ export function CallRequestDialog({ open, onOpenChange, groupId, groupName, onDo
       open={!!activeCall}
       onOpenChange={(v) => !v && setActiveCall(null)}
       callId={activeCall}
+      groupId={groupId}
       groupName={groupName}
     />
     </>

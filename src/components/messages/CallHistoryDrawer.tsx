@@ -186,6 +186,7 @@ export function CallHistoryDrawer({ open, onOpenChange, groupId }: Props) {
         open={!!joinCallId}
         onOpenChange={(v) => !v && setJoinCallId(null)}
         callId={joinCallId}
+        groupId={groupId}
       />
     </Sheet>
   );
