@@ -119,6 +119,115 @@ export type Database = {
         }
         Relationships: []
       }
+      contribution_disputes: {
+        Row: {
+          contribution_id: string
+          created_at: string
+          evidence_url: string | null
+          group_id: string
+          id: string
+          organizer_response: string | null
+          raised_by: string
+          reason: string
+          resolved_at: string | null
+          resolved_by: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          contribution_id: string
+          created_at?: string
+          evidence_url?: string | null
+          group_id: string
+          id?: string
+          organizer_response?: string | null
+          raised_by: string
+          reason: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          contribution_id?: string
+          created_at?: string
+          evidence_url?: string | null
+          group_id?: string
+          id?: string
+          organizer_response?: string | null
+          raised_by?: string
+          reason?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contribution_disputes_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
+            referencedRelation: "contributions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contribution_disputes_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
+            referencedRelation: "group_defaulters"
+            referencedColumns: ["contribution_id"]
+          },
+          {
+            foreignKeyName: "contribution_disputes_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
+            referencedRelation: "group_payments_history"
+            referencedColumns: ["contribution_id"]
+          },
+          {
+            foreignKeyName: "contribution_disputes_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
+            referencedRelation: "my_contributions_due"
+            referencedColumns: ["contribution_id"]
+          },
+          {
+            foreignKeyName: "contribution_disputes_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
+            referencedRelation: "my_late_contributions"
+            referencedColumns: ["contribution_id"]
+          },
+          {
+            foreignKeyName: "contribution_disputes_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
+            referencedRelation: "turn_assignment_audit"
+            referencedColumns: ["contribution_id"]
+          },
+          {
+            foreignKeyName: "contribution_disputes_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "admin_group_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contribution_disputes_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contribution_disputes_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "my_groups_overview"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contributions: {
         Row: {
           amount: number
@@ -3480,6 +3589,8 @@ export type Database = {
           expected_penalty: number | null
           group_id: string | null
           group_name: string | null
+          late_penalty_after_days: number | null
+          late_penalty_percent: number | null
           status: Database["public"]["Enums"]["contribution_status"] | null
           turn_id: string | null
           turn_number: number | null
@@ -4413,6 +4524,37 @@ export type Database = {
         Args: { _freq: Database["public"]["Enums"]["group_frequency"] }
         Returns: number
       }
+      get_default_report_audit: {
+        Args: { _report_id: string }
+        Returns: {
+          action: string
+          actor_name: string
+          actor_role: string
+          actor_user_id: string
+          created_at: string
+          id: string
+          metadata: Json
+        }[]
+      }
+      get_user_default_history: {
+        Args: { _user_id?: string }
+        Returns: {
+          amount: number
+          contribution_id: string
+          default_days: number
+          defaulted_at: string
+          dispute_status: string
+          due_date: string
+          group_id: string
+          group_name: string
+          notifications_count: number
+          paid_at: string
+          penalty_amount: number
+          report_status: string
+          status: Database["public"]["Enums"]["contribution_status"]
+          turn_number: number
+        }[]
+      }
       grant_admin_permissions: {
         Args: { _group_id: string; _perms: Json; _user_id: string }
         Returns: undefined
@@ -4460,6 +4602,24 @@ export type Database = {
         Args: { _member_id: string; _reason?: string }
         Returns: undefined
       }
+      list_group_disputes: {
+        Args: { _group_id: string }
+        Returns: {
+          amount: number
+          contribution_id: string
+          created_at: string
+          due_date: string
+          evidence_url: string
+          id: string
+          organizer_response: string
+          raised_by: string
+          raised_by_name: string
+          reason: string
+          resolved_at: string
+          status: string
+          turn_number: number
+        }[]
+      }
       log_audit: {
         Args: {
           _action: string
@@ -4502,6 +4662,14 @@ export type Database = {
       }
       preview_group_by_code: { Args: { _code: string }; Returns: Json }
       purge_audit_log: { Args: never; Returns: number }
+      raise_contribution_dispute: {
+        Args: {
+          _contribution_id: string
+          _evidence_url?: string
+          _reason: string
+        }
+        Returns: string
+      }
       reactivate_member: { Args: { _member_id: string }; Returns: undefined }
       recompute_reliability: {
         Args: { _user_id?: string }
@@ -4556,6 +4724,10 @@ export type Database = {
       request_turn_swap: {
         Args: { _from_turn: string; _reason?: string; _to_turn: string }
         Returns: string
+      }
+      resolve_contribution_dispute: {
+        Args: { _dispute_id: string; _response?: string; _status: string }
+        Returns: undefined
       }
       resolve_tontine_alert: { Args: { _alert_id: string }; Returns: undefined }
       respond_turn_swap: {
@@ -4636,15 +4808,26 @@ export type Database = {
         Args: { _group_id: string; _new_owner_user_id: string }
         Returns: undefined
       }
-      update_defaulter_report: {
-        Args: {
-          _internal_notes?: string
-          _report_id: string
-          _resolution_note?: string
-          _status?: string
-        }
-        Returns: undefined
-      }
+      update_defaulter_report:
+        | {
+            Args: {
+              _internal_notes?: string
+              _report_id: string
+              _resolution_note?: string
+              _status?: string
+            }
+            Returns: undefined
+          }
+        | {
+            Args: {
+              _internal_notes?: string
+              _note_only?: boolean
+              _report_id: string
+              _resolution_note?: string
+              _status?: string
+            }
+            Returns: undefined
+          }
       update_group_settings: {
         Args: { _group_id: string; _payload: Json }
         Returns: undefined
@@ -4767,6 +4950,8 @@ export type Database = {
         | "contribution_defaulted"
         | "defaulter_reported"
         | "defaulter_report_resolved"
+        | "dispute_raised"
+        | "dispute_resolved"
       payment_method_external:
         | "cash"
         | "bank_transfer"
@@ -5028,6 +5213,8 @@ export const Constants = {
         "contribution_defaulted",
         "defaulter_reported",
         "defaulter_report_resolved",
+        "dispute_raised",
+        "dispute_resolved",
       ],
       payment_method_external: [
         "cash",
