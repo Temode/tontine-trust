@@ -1,10 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import {
   Camera,
+  CheckCircle2,
+  CircleAlert,
+  CircleHelp,
   Mic,
   MicOff,
   MonitorOff,
   MonitorUp,
+  Smartphone,
+  Monitor as MonitorIcon,
   ShieldCheck,
   Video,
   VideoOff,
@@ -25,6 +30,18 @@ interface Props {
 
 const LS_KEY = "tontine.mic.granted";
 
+type CheckStatus = "ok" | "warn" | "fail" | "pending";
+interface CheckRow {
+  label: string;
+  status: CheckStatus;
+  detail?: string;
+}
+
+function isMobileUA() {
+  if (typeof navigator === "undefined") return false;
+  return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+}
+
 export function MicPermissionGate({ onGranted, onCancel, withVideo = true }: Props) {
   const [requesting, setRequesting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -35,6 +52,8 @@ export function MicPermissionGate({ onGranted, onCancel, withVideo = true }: Pro
   const [screenShare, setScreenShare] = useState(false);
   const [micLevel, setMicLevel] = useState(0); // 0..1
   const [previewStream, setPreviewStream] = useState<MediaStream | null>(null);
+  const [screenTestStatus, setScreenTestStatus] = useState<CheckStatus>("pending");
+  const [screenTestDetail, setScreenTestDetail] = useState<string>("");
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const rafRef = useRef<number | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
