@@ -257,48 +257,118 @@ export default function GroupDetail() {
       </header>
 
       <div className="px-5 py-6 lg:px-8 lg:py-8">
-        <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
-          <article className="relative overflow-hidden rounded-xl bg-primary p-6 text-primary-foreground lg:col-span-2">
-            <div aria-hidden className="pointer-events-none absolute inset-0 opacity-15">
-              <div className="absolute -right-20 -top-20 h-56 w-56 rounded-full bg-primary-foreground/15 blur-3xl" />
-            </div>
-            <div className="relative">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <p className="text-[11px] uppercase tracking-[0.14em] text-primary-100/80">Cagnotte du tour</p>
-                  <p className="mt-2 font-display text-4xl font-bold leading-none num">
-                    {formatGNF(totalPayout)}
-                    <span className="ml-2 text-lg font-medium text-primary-100/70">GNF</span>
-                  </p>
-                  <p className="mt-3 text-sm text-primary-100/85">
-                    {turns.length > 0
-                      ? `Tour ${nextTurn?.turn_number ?? completedTurns} sur ${turns.length}`
-                      : `${activeMembers.length} membres actifs`}
-                    {" · "}
-                    {frequency.toLowerCase()} · cotisation {formatGNF(grp.contribution_amount, { withCurrency: true })}
-                  </p>
-                </div>
-                <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-primary-foreground/10">
-                  <Wallet className="h-5 w-5" />
-                </div>
-              </div>
-              <div className="mt-6">
-                <div className="mb-1.5 flex items-center justify-between text-[11px] uppercase tracking-wider text-primary-100/70">
-                  <span>Progression</span>
-                  <span className="num">{progress}%</span>
-                </div>
-                <div className="h-1.5 overflow-hidden rounded-full bg-primary-foreground/15">
-                  <div className="h-full rounded-full bg-primary-foreground/80" style={{ width: `${progress}%` }} />
-                </div>
-              </div>
-            </div>
-          </article>
-
-          <div className="grid grid-cols-3 gap-3 rounded-xl border border-hairline bg-card p-3 lg:grid-cols-1 lg:p-2">
-            <Meta label="Cotisation" value={formatGNF(grp.contribution_amount, { withCurrency: true })} />
-            <Meta label="Fréquence" value={frequency} />
-            <Meta label="Statut" value={statusLabel(grp.status)} />
+        {/* Hero billion-dollar : dégradé sarcelle profond + halo doré */}
+        <article className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-primary-700 p-6 text-primary-foreground shadow-[0_24px_60px_-30px_hsl(var(--primary)/0.7)] lg:p-8">
+          <div aria-hidden className="pointer-events-none absolute inset-0">
+            <div className="absolute -right-24 -top-24 h-72 w-72 rounded-full bg-accent/30 blur-3xl" />
+            <div className="absolute -left-20 bottom-0 h-48 w-48 rounded-full bg-primary-foreground/10 blur-3xl" />
           </div>
+          <div className="relative">
+            <div className="flex flex-wrap items-center gap-2 text-[11px]">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-primary-foreground/15 px-2.5 py-1 font-medium uppercase tracking-[0.12em] text-primary-foreground/90 backdrop-blur">
+                {statusLabel(grp.status)}
+              </span>
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-accent/25 px-2.5 py-1 font-medium uppercase tracking-[0.12em] text-accent-foreground">
+                {frequency}
+              </span>
+              {grp.category && (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-primary-foreground/10 px-2.5 py-1 font-medium text-primary-foreground/85">
+                  {grp.category}
+                </span>
+              )}
+            </div>
+            <h2 className="mt-3 font-display text-3xl font-bold leading-tight lg:text-4xl">
+              {grp.name}
+            </h2>
+            <p className="mt-2 max-w-2xl text-sm text-primary-foreground/85">
+              Cagnotte par tour ·{" "}
+              <span className="font-display text-base font-semibold text-primary-foreground num">
+                {formatGNF(totalPayout)} GNF
+              </span>
+              {nextTurn && (
+                <>
+                  {" · "}prochain tour le{" "}
+                  <span className="font-medium text-primary-foreground">
+                    {new Date(nextTurn.due_date).toLocaleDateString("fr-FR", { day: "numeric", month: "long" })}
+                  </span>
+                </>
+              )}
+            </p>
+
+            {/* 4 métriques */}
+            <dl className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <HeroMetric
+                label="Cotisation"
+                value={`${formatGNF(grp.contribution_amount)} GNF`}
+              />
+              <HeroMetric
+                label="Prochain tour"
+                value={nextTurn ? `#${nextTurn.turn_number}` : "—"}
+                sub={nextTurn ? statusTurnLabel(nextTurn.status) : "À démarrer"}
+              />
+              <HeroMetric
+                label="Membres"
+                value={`${activeMembers.length} / ${grp.max_members}`}
+              />
+              <HeroMetric
+                label="Fiabilité"
+                value={avgReliabilityLabel(reliabilityQ.data ?? [])}
+              />
+            </dl>
+
+            {/* Progression */}
+            <div className="mt-6">
+              <div className="mb-1.5 flex items-center justify-between text-[11px] uppercase tracking-wider text-primary-foreground/70">
+                <span>Progression du cycle</span>
+                <span className="num">{progress}%</span>
+              </div>
+              <div className="h-1.5 overflow-hidden rounded-full bg-primary-foreground/15">
+                <div className="h-full rounded-full bg-accent" style={{ width: `${progress}%` }} />
+              </div>
+            </div>
+          </div>
+        </article>
+
+        {/* Barre d'actions billion-dollar */}
+        <div className="mt-4 flex flex-wrap items-center gap-2 rounded-2xl border border-hairline bg-card/80 p-2 shadow-[0_6px_20px_-12px_hsl(var(--primary)/0.25)] backdrop-blur">
+          <Link
+            to={`/groupes/${grp.id}/membres`}
+            className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-primary px-4 text-xs font-semibold text-primary-foreground shadow-sm transition hover:bg-primary-700"
+          >
+            <Users className="h-4 w-4" />
+            Voir membres
+          </Link>
+          <button
+            type="button"
+            onClick={() => {
+              if (myDueForGroup) setPayNow(true);
+            }}
+            disabled={!myDueForGroup}
+            className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-hairline bg-card px-4 text-xs font-semibold text-foreground transition hover:bg-secondary disabled:opacity-50"
+          >
+            <HandCoins className="h-4 w-4" />
+            Gérer contributions
+          </button>
+          {isOrganizer && (
+            <button
+              type="button"
+              onClick={() => {
+                const el = document.getElementById(INVITE_PANEL_ID);
+                el?.scrollIntoView({ behavior: "smooth", block: "start" });
+              }}
+              className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-hairline bg-card px-4 text-xs font-semibold text-foreground transition hover:bg-secondary"
+            >
+              <UserPlus className="h-4 w-4" />
+              Inviter
+            </button>
+          )}
+          <Link
+            to={`/groupes/${grp.id}/parametres`}
+            className="ml-auto inline-flex h-10 items-center gap-1.5 rounded-xl border border-hairline bg-card px-4 text-xs font-medium text-muted-foreground transition hover:text-foreground"
+          >
+            <ChevronRight className="h-4 w-4" />
+            Paramètres
+          </Link>
         </div>
 
         {canStart && (
