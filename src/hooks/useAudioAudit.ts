@@ -95,9 +95,10 @@ export function useAudioAudit(active: boolean): AudioAuditStats {
         if (ctx.state === "suspended") {
           try {
             await ctx.resume();
+            const newState = ctx.state as AudioContextState;
             safeSet({
-              contextState: ctx.state,
-              autoplay: ctx.state === "running" ? "allowed" : "blocked",
+              contextState: newState,
+              autoplay: newState === "running" ? "allowed" : "blocked",
             });
           } catch {
             safeSet({ autoplay: "blocked" });
