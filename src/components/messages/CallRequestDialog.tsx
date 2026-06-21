@@ -11,18 +11,21 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { requestGroupCall } from "@/lib/api/calls";
+import { CallRoom } from "./CallRoom";
 
 interface Props {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   groupId: string;
+  groupName?: string;
   onDone?: () => void;
 }
 
-export function CallRequestDialog({ open, onOpenChange, groupId, onDone }: Props) {
+export function CallRequestDialog({ open, onOpenChange, groupId, groupName, onDone }: Props) {
   const [topic, setTopic] = useState("");
   const [mode, setMode] = useState<"now" | "schedule">("now");
   const [datetime, setDatetime] = useState("");
+  const [activeCall, setActiveCall] = useState<string | null>(null);
 
   const mut = useMutation({
     mutationFn: () =>
@@ -31,20 +34,22 @@ export function CallRequestDialog({ open, onOpenChange, groupId, onDone }: Props
         topic,
         mode === "schedule" && datetime ? new Date(datetime).toISOString() : null,
       ),
-    onSuccess: () => {
-      toast.success("Demande envoyée", {
-        description: "Les membres recevront la notification.",
+    onSuccess: (callId) => {
+      toast.success("Appel lancé", {
+        description: "Les membres reçoivent la notification.",
       });
       setTopic("");
       setDatetime("");
       onOpenChange(false);
       onDone?.();
+      if (mode === "now") setActiveCall(callId);
     },
     onError: (e: Error) =>
       toast.error("Demande impossible", { description: e.message }),
   });
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
@@ -127,5 +132,12 @@ export function CallRequestDialog({ open, onOpenChange, groupId, onDone }: Props
         </DialogFooter>
       </DialogContent>
     </Dialog>
+    <CallRoom
+      open={!!activeCall}
+      onOpenChange={(v) => !v && setActiveCall(null)}
+      callId={activeCall}
+      groupName={groupName}
+    />
+    </>
   );
 }
