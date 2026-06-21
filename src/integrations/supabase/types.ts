@@ -119,6 +119,81 @@ export type Database = {
         }
         Relationships: []
       }
+      call_requests: {
+        Row: {
+          created_at: string
+          ended_at: string | null
+          group_id: string
+          id: string
+          requested_by: string
+          scheduled_at: string | null
+          started_at: string | null
+          status: Database["public"]["Enums"]["call_request_status"]
+          topic: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          ended_at?: string | null
+          group_id: string
+          id?: string
+          requested_by: string
+          scheduled_at?: string | null
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["call_request_status"]
+          topic?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          ended_at?: string | null
+          group_id?: string
+          id?: string
+          requested_by?: string
+          scheduled_at?: string | null
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["call_request_status"]
+          topic?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "call_requests_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "admin_group_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "call_requests_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "call_requests_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "my_groups_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "call_requests_requested_by_fkey"
+            columns: ["requested_by"]
+            isOneToOne: false
+            referencedRelation: "admin_user_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "call_requests_requested_by_fkey"
+            columns: ["requested_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contribution_disputes: {
         Row: {
           contribution_id: string
@@ -979,8 +1054,69 @@ export type Database = {
           },
         ]
       }
+      group_message_reads: {
+        Row: {
+          group_id: string
+          last_read_at: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          group_id: string
+          last_read_at?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          group_id?: string
+          last_read_at?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_message_reads_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "admin_group_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_message_reads_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_message_reads_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "my_groups_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_message_reads_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "admin_user_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_message_reads_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       group_messages: {
         Row: {
+          attachment_name: string | null
+          attachment_size: number | null
+          attachment_type: string | null
+          attachment_url: string | null
           author_user_id: string
           body: string
           created_at: string
@@ -990,6 +1126,10 @@ export type Database = {
           id: string
         }
         Insert: {
+          attachment_name?: string | null
+          attachment_size?: number | null
+          attachment_type?: string | null
+          attachment_url?: string | null
           author_user_id: string
           body: string
           created_at?: string
@@ -999,6 +1139,10 @@ export type Database = {
           id?: string
         }
         Update: {
+          attachment_name?: string | null
+          attachment_size?: number | null
+          attachment_type?: string | null
+          attachment_url?: string | null
           author_user_id?: string
           body?: string
           created_at?: string
@@ -2920,6 +3064,39 @@ export type Database = {
           },
         ]
       }
+      user_call_presence: {
+        Row: {
+          status: Database["public"]["Enums"]["call_presence_status"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          status?: Database["public"]["Enums"]["call_presence_status"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          status?: Database["public"]["Enums"]["call_presence_status"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_call_presence_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "admin_user_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_call_presence_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_reliability_scores: {
         Row: {
           avg_delay_days: number
@@ -4738,6 +4915,7 @@ export type Database = {
       }
       mark_all_notifications_read: { Args: never; Returns: number }
       mark_defaulted_contributions: { Args: never; Returns: number }
+      mark_group_read: { Args: { p_group_id: string }; Returns: undefined }
       mark_notification_read: { Args: { _id: string }; Returns: undefined }
       mask_phone: { Args: { _phone: string }; Returns: string }
       member_can: {
@@ -4823,6 +5001,10 @@ export type Database = {
         Args: { _contribution_id: string; _reason?: string }
         Returns: string
       }
+      request_group_call: {
+        Args: { p_group_id: string; p_scheduled_at: string; p_topic: string }
+        Returns: string
+      }
       request_group_deletion: {
         Args: { _group_id: string; _reason: string }
         Returns: string
@@ -4840,6 +5022,13 @@ export type Database = {
         Returns: undefined
       }
       resolve_tontine_alert: { Args: { _alert_id: string }; Returns: undefined }
+      respond_call_request: {
+        Args: {
+          p_id: string
+          p_status: Database["public"]["Enums"]["call_request_status"]
+        }
+        Returns: undefined
+      }
       respond_turn_swap: {
         Args: { _accept: boolean; _request_id: string }
         Returns: undefined
@@ -4965,6 +5154,14 @@ export type Database = {
     Enums: {
       app_role: "admin" | "organisateur" | "participant" | "super_admin"
       bid_status: "active" | "won" | "lost" | "cancelled"
+      call_presence_status: "available" | "busy" | "dnd"
+      call_request_status:
+        | "pending"
+        | "accepted"
+        | "declined"
+        | "cancelled"
+        | "missed"
+        | "ended"
       contribution_status:
         | "pending"
         | "submitted"
@@ -5225,6 +5422,15 @@ export const Constants = {
     Enums: {
       app_role: ["admin", "organisateur", "participant", "super_admin"],
       bid_status: ["active", "won", "lost", "cancelled"],
+      call_presence_status: ["available", "busy", "dnd"],
+      call_request_status: [
+        "pending",
+        "accepted",
+        "declined",
+        "cancelled",
+        "missed",
+        "ended",
+      ],
       contribution_status: [
         "pending",
         "submitted",
