@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { CalendarClock, Play, ExternalLink, User } from "lucide-react";
@@ -42,20 +42,55 @@ type PreviewResponse = {
   };
 };
 
+const TIMEZONES = [
+  "Africa/Conakry",
+  "UTC",
+  "Europe/Paris",
+  "Africa/Dakar",
+  "Africa/Abidjan",
+  "America/New_York",
+];
+
+/** Renvoie la date du jour (YYYY-MM-DD) dans la timezone donnée. */
+function todayInTz(tz: string): string {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: tz,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
+  return `${get("year")}-${get("month")}-${get("day")}`;
+}
+
 export default function AdminCronPreview() {
-  const today = new Date().toISOString().slice(0, 10);
-  const [date, setDate] = useState(today);
+  const browserTz = useMemo(
+    () => Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+    [],
+  );
+  const tzOptions = useMemo(
+    () => Array.from(new Set([browserTz, ...TIMEZONES])),
+    [browserTz],
+  );
+  const [tz, setTz] = useState<string>(browserTz);
+  const [date, setDate] = useState<string>(() => todayInTz(browserTz));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<PreviewResponse | null>(null);
+
+  function onTzChange(newTz: string) {
+    setTz(newTz);
+    setDate(todayInTz(newTz));
+  }
 
   async function run() {
     setLoading(true);
     setError(null);
     try {
+      const { data: auth } = await supabase.auth.getUser();
       const { data: res, error: err } = await supabase.functions.invoke<PreviewResponse>(
         "send-tontine-reminders",
-        { body: { dry_run: true, date } },
+        { body: { dry_run: true, date, triggered_by: auth.user?.id ?? null } },
       );
       if (err) throw err;
       setData(res!);
@@ -82,6 +117,26 @@ export default function AdminCronPreview() {
       <div className="flex flex-wrap items-end gap-3 bg-slate-900 border border-slate-800 rounded-lg p-4">
         <div className="flex flex-col">
           <label className="text-xs uppercase tracking-wider text-slate-400 mb-1">
+            Fuseau horaire
+          </label>
+          <select
+            value={tz}
+            onChange={(e) => onTzChange(e.target.value)}
+            className="bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-sm text-white min-w-[180px]"
+          >
+            {tzOptions.map((t) => (
+              <option key={t} value={t}>
+                {t}
+                {t === browserTz ? " (local)" : ""}
+              </option>
+            ))}
+          </select>
+          <span className="text-[11px] text-slate-500 mt-1">
+            Aujourd'hui en {tz} : {todayInTz(tz)}
+          </span>
+        </div>
+        <div className="flex flex-col">
+          <label className="text-xs uppercase tracking-wider text-slate-400 mb-1">
             Date de référence (« aujourd'hui »)
           </label>
           <input
@@ -105,6 +160,12 @@ export default function AdminCronPreview() {
           </div>
         )}
       </div>
+
+      <p className="text-xs text-slate-500">
+        Chaque exécution en aperçu est journalisée dans <code>sms_logs</code> avec le type
+        <code className="mx-1">preview_j2</code>/<code>preview_j1</code> (statut « ignoré »), pour
+        garder une trace de qui aurait été ciblé.
+      </p>
 
       {error && (
         <p className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-md p-3">
