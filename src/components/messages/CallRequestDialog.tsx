@@ -95,17 +95,29 @@ export function CallRequestDialog({ open, onOpenChange, groupId, groupName, onDo
 
   return (
     <>
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        if (!v) {
+          setShowPreCall(false);
+          pendingPrefsRef.current = null;
+        }
+        onOpenChange(v);
+      }}
+    >
       <DialogContent className="sm:max-w-md">
         {showPreCall ? (
-          <MicPermissionGate
-            onGranted={(prefs) => {
-              pendingPrefsRef.current = prefs;
-              setShowPreCall(false);
-              mut.mutate();
-            }}
-            onCancel={() => setShowPreCall(false)}
-          />
+          <>
+            <DialogTitle className="sr-only">Préparer l'appel</DialogTitle>
+            <MicPermissionGate
+              onGranted={(prefs) => {
+                pendingPrefsRef.current = prefs;
+                setShowPreCall(false);
+                mut.mutate();
+              }}
+              onCancel={() => setShowPreCall(false)}
+            />
+          </>
         ) : (
           <>
         <DialogHeader>
@@ -114,7 +126,7 @@ export function CallRequestDialog({ open, onOpenChange, groupId, groupName, onDo
             Demander un appel
           </DialogTitle>
           <DialogDescription>
-            Proposez un appel vocal aux membres actifs du groupe.
+            Proposez un appel vidéo aux membres actifs du groupe.
           </DialogDescription>
         </DialogHeader>
 
