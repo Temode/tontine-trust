@@ -33,6 +33,7 @@ const PrivacySettings = lazy(() => import("@/pages/PrivacySettings"));
 const DeleteAccount = lazy(() => import("@/pages/DeleteAccount"));
 const PaymentReturn = lazy(() => import("@/pages/PaymentReturn"));
 const PaymentCancel = lazy(() => import("@/pages/PaymentCancel"));
+const PaymentReceipt = lazy(() => import("@/pages/PaymentReceipt"));
 const AdminOverview = lazy(() => import("@/pages/admin/Overview"));
 const AdminDeletions = lazy(() => import("@/pages/admin/Deletions"));
 const AdminUsers = lazy(() => import("@/pages/admin/Users"));
@@ -131,6 +132,7 @@ const App = () => (
                     <Route path="/profil/suppression" element={<RouteBoundary name="Supprimer mon compte"><DeleteAccount /></RouteBoundary>} />
                     <Route path="/payment/return" element={<RouteBoundary name="Retour paiement"><PaymentReturn /></RouteBoundary>} />
                     <Route path="/payment/cancel" element={<RouteBoundary name="Paiement annulé"><PaymentCancel /></RouteBoundary>} />
+                    <Route path="/paiement/:paymentId/recu" element={<RouteBoundary name="Preuve de paiement"><PaymentReceipt /></RouteBoundary>} />
                   </Route>
                   <Route
                     element={
