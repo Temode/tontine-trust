@@ -25,7 +25,7 @@ async function fetchPaymentReceipt(id: string): Promise<PaymentReceiptRow | null
   const { data, error } = await supabase
     .from("payments")
     .select(
-      "id, amount, status, provider, payment_method, djomy_transaction_id, initiated_at, settled_at, payer_phone, groups(name), contributions(turns(turn_number, due_date, beneficiary:profiles!turns_beneficiary_user_id_fkey(full_name)))",
+      "id, amount, status, provider, payment_method, djomy_transaction_id, initiated_at, settled_at, payer_phone, groups(name), contributions(turns(turn_number, due_date))",
     )
     .eq("id", id)
     .maybeSingle();
@@ -45,7 +45,7 @@ async function fetchPaymentReceipt(id: string): Promise<PaymentReceiptRow | null
     group_name: d.groups?.name ?? "—",
     turn_number: d.contributions?.turns?.turn_number ?? null,
     due_date: d.contributions?.turns?.due_date ?? null,
-    beneficiary_name: d.contributions?.turns?.beneficiary?.full_name ?? null,
+    beneficiary_name: null,
   };
 }
 
