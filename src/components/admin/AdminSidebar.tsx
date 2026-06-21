@@ -8,6 +8,7 @@ import {
   CreditCard,
   ArrowLeftCircle,
   ShieldAlert,
+  KeyRound,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -19,6 +20,7 @@ const ITEMS = [
   { to: "/admin/paiements", label: "Paiements", icon: CreditCard },
   { to: "/admin/audit", label: "Audit", icon: ScrollText },
   { to: "/admin/integrite", label: "Intégrité tontine", icon: ShieldAlert },
+  { to: "/admin/djomy", label: "Identifiants Djomy", icon: KeyRound },
 ];
 
 export function AdminSidebar() {
