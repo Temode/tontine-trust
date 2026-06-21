@@ -1,8 +1,8 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-import { corsHeaders, djomyEnv, buildApiKeyHeader, json } from "../_shared/djomy.ts";
+import { corsHeaders, djomyEnv, buildApiKeyHeader, json, DJOMY_PARTNER_DOMAIN } from "../_shared/djomy.ts";
 
 const BASE_URLS = {
-  prod: "https://prod-api.djomy.africa",
+  prod: "https://api.djomy.africa",
   sandbox: "https://sandbox-api.djomy.africa",
 } as const;
 
@@ -12,7 +12,11 @@ async function probe(baseUrl: string, apiKey: string) {
   try {
     const res = await fetch(authUrl, {
       method: "POST",
-      headers: { "X-API-KEY": apiKey, "Content-Type": "application/json" },
+      headers: {
+        "X-API-KEY": apiKey,
+        "X-PARTNER-DOMAIN": DJOMY_PARTNER_DOMAIN,
+        "Content-Type": "application/json",
+      },
       body: "{}",
     });
     const latencyMs = Date.now() - started;

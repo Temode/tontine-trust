@@ -4,16 +4,19 @@
 
 const BASE_URLS = {
   sandbox: "https://sandbox-api.djomy.africa",
-  prod: "https://prod-api.djomy.africa",
+  prod: "https://api.djomy.africa",
 } as const;
 
+export const DJOMY_PARTNER_DOMAIN =
+  "dcaa27935b4920eb5e7c2c9a1d35a5040493b177bed92d9b69966c46eca6a627";
+
 export function djomyBaseUrl(): string {
-  const env = (Deno.env.get("DJOMY_ENV") ?? "sandbox").toLowerCase();
-  return env === "prod" ? BASE_URLS.prod : BASE_URLS.sandbox;
+  return djomyEnv() === "prod" ? BASE_URLS.prod : BASE_URLS.sandbox;
 }
 
 export function djomyEnv(): "sandbox" | "prod" {
-  return (Deno.env.get("DJOMY_ENV") ?? "sandbox").toLowerCase() === "prod" ? "prod" : "sandbox";
+  const v = (Deno.env.get("DJOMY_ENV") ?? "sandbox").toLowerCase();
+  return v === "prod" || v === "production" || v === "live" ? "prod" : "sandbox";
 }
 
 function hex(buf: ArrayBuffer): string {
@@ -52,7 +55,11 @@ export async function getDjomyBearer(): Promise<string> {
   console.log("[djomy] AUTH URL =", authUrl, "ENV=", Deno.env.get("DJOMY_ENV"));
   const res = await fetch(authUrl, {
     method: "POST",
-    headers: { "X-API-KEY": apiKey, "Content-Type": "application/json" },
+    headers: {
+      "X-API-KEY": apiKey,
+      "X-PARTNER-DOMAIN": DJOMY_PARTNER_DOMAIN,
+      "Content-Type": "application/json",
+    },
     body: "{}",
   });
   const raw = await res.text();
@@ -77,6 +84,7 @@ export async function djomyFetch(
     method: init.method ?? "GET",
     headers: {
       "X-API-KEY": apiKey,
+      "X-PARTNER-DOMAIN": DJOMY_PARTNER_DOMAIN,
       Authorization: `Bearer ${bearer}`,
       "Content-Type": "application/json",
     },
