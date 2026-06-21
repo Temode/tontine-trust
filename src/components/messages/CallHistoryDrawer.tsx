@@ -81,8 +81,7 @@ export function CallHistoryDrawer({ open, onOpenChange, groupId }: Props) {
             Historique des appels
           </SheetTitle>
           <SheetDescription>
-            Demandes d'appel passées et à venir. Le canal audio sera disponible
-            prochainement.
+            Demandes d'appel passées et en cours. Cliquez sur « Rejoindre » pour entrer dans un appel actif.
           </SheetDescription>
         </SheetHeader>
 
