@@ -18,6 +18,7 @@ interface NavEntry {
   icon: LucideIcon;
   badge?: string | number;
   dot?: boolean;
+  tourId?: string;
 }
 
 interface NavSection {
@@ -29,9 +30,9 @@ const sections: NavSection[] = [
   {
     label: "Essentiel",
     items: [
-      { to: "/dashboard", label: "Accueil", icon: LayoutDashboard },
-      { to: "/groupes", label: "Mes tontines", icon: Users },
-      { to: "/cotisations", label: "Payer", icon: Wallet },
+      { to: "/dashboard", label: "Accueil", icon: LayoutDashboard, tourId: "nav-accueil" },
+      { to: "/groupes", label: "Mes tontines", icon: Users, tourId: "nav-tontines" },
+      { to: "/cotisations", label: "Payer", icon: Wallet, tourId: "nav-payer" },
       { to: "/recus", label: "Historique & reçus", icon: FileCheck2 },
       { to: "/profil", label: "Mon profil", icon: User },
     ],
@@ -56,7 +57,7 @@ export function DesktopSidebar() {
     <aside className="fixed inset-y-0 left-0 z-40 hidden w-72 flex-col border-r border-hairline bg-sidebar lg:flex">
       {/* Brand */}
       <div className="border-b border-hairline px-6 py-5">
-        <Link to="/dashboard" className="flex items-center gap-3">
+        <Link to="/dashboard" className="flex items-center gap-3" data-tour="brand">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-primary">
             <Logo size={22} className="text-primary-foreground" />
           </div>
@@ -87,6 +88,7 @@ export function DesktopSidebar() {
                     <Link
                       to={item.to}
                       aria-current={active ? "page" : undefined}
+                      data-tour={item.tourId}
                       className={cn(
                         "group relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
                         active
