@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { Mic, MicOff, VideoOff, Wifi, WifiOff } from "lucide-react";
+import { Mic, MicOff, MonitorUp, VideoOff, Wifi, WifiOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getInitials } from "@/lib/format";
 
@@ -12,6 +12,7 @@ interface Props {
   isCamOff?: boolean;
   connectionState?: RTCPeerConnectionState;
   speaking?: boolean;
+  isScreenSharing?: boolean;
 }
 
 export function CallParticipantTile({
@@ -23,6 +24,7 @@ export function CallParticipantTile({
   isCamOff,
   connectionState = "connected",
   speaking,
+  isScreenSharing,
 }: Props) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -86,6 +88,12 @@ export function CallParticipantTile({
           <p className="line-clamp-1 text-sm font-semibold">
             {name}
             {isLocal && <span className="ml-1 text-xs text-primary-foreground/60">(moi)</span>}
+            {isScreenSharing && (
+              <span className="ml-1 inline-flex items-center gap-0.5 rounded-full bg-primary/80 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider">
+                <MonitorUp className="h-2.5 w-2.5" />
+                Écran
+              </span>
+            )}
           </p>
           <p className="flex items-center gap-1 text-[10px] text-primary-foreground/70">
             {bad ? (
