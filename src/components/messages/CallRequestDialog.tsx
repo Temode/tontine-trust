@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { Phone } from "lucide-react";
 import { toast } from "sonner";
@@ -10,7 +10,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { requestGroupCall } from "@/lib/api/calls";
+import {
+  requestGroupCall,
+  listCallParticipants,
+  subscribeCallParticipants,
+} from "@/lib/api/calls";
 import { CallRoom } from "./CallRoom";
 
 interface Props {
@@ -26,6 +30,41 @@ export function CallRequestDialog({ open, onOpenChange, groupId, groupName, onDo
   const [mode, setMode] = useState<"now" | "schedule">("now");
   const [datetime, setDatetime] = useState("");
   const [activeCall, setActiveCall] = useState<string | null>(null);
+  const [ringStatus, setRingStatus] = useState<{ joined: number } | null>(null);
+
+  // Tant que l'appel est en cours, on suit combien de membres ont rejoint
+  // pour donner un feedback "sonnerie reçue" à l'émetteur.
+  useEffect(() => {
+    if (!activeCall) {
+      setRingStatus(null);
+      return;
+    }
+    let cancelled = false;
+    const refresh = async () => {
+      try {
+        const parts = await listCallParticipants(activeCall);
+        if (cancelled) return;
+        const joinedCount = parts.filter((p) => !p.left_at).length;
+        setRingStatus({ joined: joinedCount });
+      } catch {
+        /* ignore */
+      }
+    };
+    void refresh();
+    const ch = subscribeCallParticipants(activeCall, refresh);
+    return () => {
+      cancelled = true;
+      void ch.unsubscribe();
+    };
+  }, [activeCall]);
+
+  // Toast de progression côté émetteur
+  useEffect(() => {
+    if (!activeCall || !ringStatus) return;
+    if (ringStatus.joined > 1) {
+      toast.success(`${ringStatus.joined - 1} membre(s) ont rejoint`);
+    }
+  }, [activeCall, ringStatus?.joined, ringStatus]);
 
   const mut = useMutation({
     mutationFn: () =>
