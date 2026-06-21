@@ -119,7 +119,7 @@ function TourOverlay({ onClose }: { onClose: () => void }) {
   const isFirst = stepIndex === 0;
 
   const popW = 320;
-  const popH = 200;
+  const popH = 240;
   const popPos = rect
     ? computePopoverPos(rect, step.placement, popW, popH)
     : { top: window.innerHeight / 2 - popH / 2, left: window.innerWidth / 2 - popW / 2, placement: "bottom" as const };
@@ -188,6 +188,9 @@ function TourOverlay({ onClose }: { onClose: () => void }) {
             {stepIndex + 1}
           </div>
           <div className="min-w-0 flex-1">
+            <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-primary">
+              Étape {stepIndex + 1} sur {TOUR_STEPS.length}
+            </p>
             <h3
               id="tour-title"
               className="font-display text-base font-bold leading-tight text-foreground"
