@@ -119,7 +119,7 @@ function TourOverlay({ onClose }: { onClose: () => void }) {
   const isFirst = stepIndex === 0;
 
   const popW = 320;
-  const popH = 200;
+  const popH = 240;
   const popPos = rect
     ? computePopoverPos(rect, step.placement, popW, popH)
     : { top: window.innerHeight / 2 - popH / 2, left: window.innerWidth / 2 - popW / 2, placement: "bottom" as const };
@@ -188,6 +188,9 @@ function TourOverlay({ onClose }: { onClose: () => void }) {
             {stepIndex + 1}
           </div>
           <div className="min-w-0 flex-1">
+            <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-primary">
+              Étape {stepIndex + 1} sur {TOUR_STEPS.length}
+            </p>
             <h3
               id="tour-title"
               className="font-display text-base font-bold leading-tight text-foreground"
@@ -235,7 +238,7 @@ function TourOverlay({ onClose }: { onClose: () => void }) {
                 onClick={() => setStepIndex((i) => Math.min(TOUR_STEPS.length - 1, i + 1))}
                 className="inline-flex h-8 items-center gap-1 rounded-md bg-primary px-3 text-xs font-semibold text-primary-foreground shadow-primary transition hover:bg-primary-700"
               >
-                Suivant
+                Étape suivante
                 <ChevronRight className="h-3.5 w-3.5" />
               </button>
             ) : (
@@ -244,7 +247,7 @@ function TourOverlay({ onClose }: { onClose: () => void }) {
                 onClick={handleClose}
                 className="inline-flex h-8 items-center rounded-md bg-primary px-3 text-xs font-semibold text-primary-foreground shadow-primary transition hover:bg-primary-700"
               >
-                Terminer
+                J'ai compris, c'est parti
               </button>
             )}
           </div>
@@ -256,7 +259,7 @@ function TourOverlay({ onClose }: { onClose: () => void }) {
             onClick={handleClose}
             className="absolute -bottom-7 left-0 text-[11px] font-medium text-muted-foreground/80 hover:text-foreground"
           >
-            Passer la visite
+            Passer la visite guidée
           </button>
         )}
       </div>

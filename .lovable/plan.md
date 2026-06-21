@@ -1,105 +1,75 @@
 ## Objectif
 
-1. **Visite guidée** qui prend le nouvel utilisateur par la main en 5 étapes : logo + menu, Accueil, Mes tontines, Payer, cloche notifications.
-2. **Passe de polish « niveau Paxefy »** sur les 4 pages membre clés, sans toucher aux couleurs (sarcelle #0D7377 + or #E8AA14 conservés).
+Atteindre le niveau de polish de Paxefy en travaillant **une page à la fois** (revue UX ciblée, validée avant de passer à la suivante), tout en conservant la palette Tontine (sarcelle #0D7377 + or #E8AA14). En parallèle, rendre les popovers d'onboarding plus **pédagogiques et orientés action**.
 
-## Partie 1 — Visite guidée
+---
 
-### Comportement
-- **Auto-démarrage** à la première connexion (flag `localStorage: tt_tour_done_v1`).
-- **Relançable** à tout moment via une icône « ? » discrète dans le TopBar (à côté de la cloche).
-- 5 étapes, navigation Suivant / Précédent / Passer.
-- L'utilisateur peut fermer à tout moment, le flag est posé.
+## Partie A — Onboarding plus pédagogique (fait dans la foulée)
 
-### Étapes (sur n'importe quelle page authentifiée)
+Réécriture des 5 étapes dans `src/components/tour/steps.ts` selon le schéma :
+**Titre orienté action** → **Où regarder** (pointeur visuel) → **Quoi faire** → **Et ensuite**.
 
-| # | Cible (élément) | Message |
-|---|-----------------|---------|
-| 1 | Logo + sidebar header | « Bienvenue sur Tontine Digital. Voici votre espace personnel. » |
-| 2 | Lien `Accueil` (sidebar) | « Votre tableau de bord : ce que vous devez payer, votre prochain tour, vos tontines actives. » |
-| 3 | Lien `Mes tontines` | « Toutes vos tontines, leurs membres, leurs cycles. » |
-| 4 | Lien `Payer` | « Régler une cotisation en Orange Money, MTN Money ou carte, en quelques secondes. » |
-| 5 | Cloche notifications (TopBar) | « Annonces, demandes d'adhésion, rappels — tout arrive ici. » |
+Exemple pour l'étape « Accueil » :
+- Avant : *« Votre tableau de bord : ce que vous devez payer, votre prochain tour, vos tontines actives. »*
+- Après :
+  > **Commencez ici chaque jour**
+  > 👉 Cliquez sur **Accueil** dans le menu de gauche.
+  > Vous y verrez en haut **ce que vous devez payer aujourd'hui**, puis vos tontines actives.
+  > *Astuce : si une carte rouge s'affiche, c'est une cotisation à régler en priorité.*
 
-### Choix technique
-Composant **maison** basé sur shadcn `Popover` + un overlay SVG « spotlight » qui découpe un trou autour de la cible. Pas de dépendance externe (react-joyride, driver.js) — c'est ~200 lignes et ça reste 100 % cohérent avec le design system (radius, tokens, animations Tontine).
+Même structure appliquée aux 5 étapes (Bienvenue, Accueil, Mes tontines, Payer, Notifications) + ajout d'un libellé bouton plus clair : « Suivant → » devient **« Étape suivante »**, « Passer » devient **« Passer la visite »**. Ajout d'un compteur « Étape 2 / 5 » déjà présent — on le rendra plus visible.
 
-Fichiers à créer :
-- `src/components/tour/GuidedTour.tsx` — orchestration, état, overlay
-- `src/components/tour/TourStep.tsx` — popover stylé tokens Tontine
-- `src/components/tour/useTour.ts` — hook avec `start()`, `stop()`, `hasSeen`
-- `src/components/tour/steps.ts` — définition des 5 étapes (sélecteurs + textes)
+Aucune modif de la mécanique du tour, uniquement le contenu (`steps.ts`) et 2-3 libellés dans `GuidedTour.tsx`.
 
-Fichiers à modifier :
-- `src/components/layout/AppShell.tsx` — monter `<GuidedTour />` + déclenchement auto
-- `src/components/layout/TopBar.tsx` — bouton « ? » qui appelle `start()`
-- `src/components/layout/DesktopSidebar.tsx` — `data-tour="nav-accueil"`, etc. sur les 3 liens
-- `src/components/notifications/NotificationBell.tsx` — `data-tour="notifications"`
+---
 
-## Partie 2 — Polish « niveau Paxefy »
+## Partie B — Revue UX page par page
 
-Périmètre : **4 pages membre clés** uniquement (Accueil, Mes tontines, Payer, Historique & reçus). Pas d'admin, pas de couleurs touchées.
+Ordre proposé selon l'usage réel (du plus consulté au plus rare) :
 
-### 2.1 En-têtes de page (TopBar enrichi)
-Aujourd'hui le TopBar est plat : juste titre + sous-titre. Paxefy a des en-têtes denses qui contextualisent (chips de statut, fil d'Ariane sur les pages internes).
+```text
+1. Accueil (/dashboard)          ← on commence ici
+2. Mes tontines (/groupes)
+3. Payer (/cotisations)
+4. Historique & reçus (/recus)
+5. Mon profil (/profil)
+6. Détail d'un groupe (/groupes/:id)
+```
 
-- Ajouter slot `breadcrumb?` (optionnel) au TopBar pour les pages de détail
-- Ajouter slot `chips?` (optionnel) pour afficher des badges contextuels (ex. « 3 cotisations en attente » sur la page Payer)
-- Renforcer la hiérarchie typographique : titre 24px bold + sous-titre 13px muted (déjà bon), ajouter une fine ligne de séparation `border-b border-hairline` (déjà là)
+**Règle du jeu** : on traite **une seule page par tour**. À chaque page :
 
-### 2.2 Cohérence des cartes
-Audit rapide : aujourd'hui certaines cartes ont `rounded-xl border-hairline`, d'autres `rounded-lg shadow-sm`. Standardiser :
+1. Je liste les frictions UX observées (hiérarchie, densité, vides, états de chargement, libellés, mobile).
+2. Je propose 3-5 corrections concrètes (avant/après textuel + composants impactés).
+3. Tu valides → j'implémente → tu vois le résultat → on passe à la page suivante.
 
-- **Toute carte de contenu** : `rounded-xl border border-hairline bg-card` (pas d'ombre, pattern Linear/Notion)
-- **Carte cliquable / KPI actionnable** : ajout d'un `hover:border-primary/40 hover:shadow-primary-sm transition` pour signaler l'interactivité
-- **Carte critique (paiement dû urgent)** : bordure gauche `border-l-4 border-l-destructive` au lieu d'un fond rouge agressif
+### Étape 1 — Page Accueil (`src/pages/Dashboard.tsx`)
 
-Cibles : `SectionCard.tsx`, `KpiTile` (Dashboard), `ContributionRow` (Payer), `GroupRow` (Dashboard).
+Axes de revue prévus :
+- **Hiérarchie verticale** : la première chose vue doit être « as-tu quelque chose à payer aujourd'hui ? » (zéro scroll).
+- **Empty state** quand l'utilisateur n'a aucune tontine (aujourd'hui : carte vide peu engageante) → CTA double « Créer une tontine » + « Rejoindre via code ».
+- **Carte de cotisation due** : passage au style Paxefy (bord gauche accent, montant en gros, date relative « dans 2 jours », bouton primaire « Payer maintenant »).
+- **Skeletons** pendant le chargement plutôt que spinners.
+- **Mobile** : vérifier que les cartes ne débordent pas à 360px, que le bouton de paiement reste accessible au pouce.
+- **Formatage des montants** : `120 000 GNF` (espace insécable) partout.
 
-### 2.3 Empty states unifiés
-Actuellement chaque page a son propre empty state. Créer un composant unique :
+Livrables Étape 1 :
+- Modification de `src/pages/Dashboard.tsx`
+- Création de `src/components/ui/EmptyState.tsx` (réutilisable pour les pages suivantes)
+- Création de `src/components/dashboard/DueCard.tsx` (carte cotisation due)
+- Ajustements mineurs dans `src/lib/format.ts` si besoin (montants, dates relatives)
 
-- `src/components/ui/EmptyState.tsx` avec : icône en cercle pastel, titre, description courte, CTA primaire + CTA secondaire optionnel
-- Appliquer sur : `MyContributions` (dues vides + historique vide), `Dashboard` (préview tontines vide), `Receipts` (vide), `MyGroups` (déjà fait, harmoniser)
+Aucun changement de palette, de typo, de routes, ni de backend.
 
-### 2.4 Détails « Paxefy-grade »
-- Skeleton loaders au lieu de « Chargement… » texte brut (pages : Dashboard, MyContributions, MyGroups, Receipts)
-- Format des montants : harmoniser sur `120 000 GNF` (espaces fines) partout via `formatGNF` (vérifier qu'aucun composant n'affiche `120000 GNF`)
-- Format dates relatives : « il y a 3 jours » / « dans 5 jours » via `formatRelativeDays` partout
-- Micro-animations : `animate-fade-in` à l'entrée de page (déjà partiellement là), `transition-colors` sur les liens sidebar (déjà là), `active:scale-95` sur boutons primaires
+---
 
-### 2.5 TopBar mobile
-Aujourd'hui sur mobile (≤lg) le TopBar montre titre+sous-titre mais la zone droite est compressée. Réorganiser :
-- Mobile : titre seul + 1 bouton icône action (Plus) + cloche + menu burger pour profil
-- Desktop : version actuelle (search + action + cloche + profil + logout)
+## Ce qui n'est PAS dans ce plan
 
-## Hors-scope (assumé)
+- Les étapes 2 à 6 (autres pages) : seront chacune un nouveau plan validé séparément.
+- Couleurs, fonts, logique métier, base de données, Djomy, admin.
+- Refonte de la sidebar / topbar (déjà faite à l'itération précédente).
 
-- **Couleurs** : on garde sarcelle #0D7377 + or #E8AA14, aucune modification du token system
-- **Typographie** : on garde la police actuelle (font-display + font-body déjà définis)
-- **Pages admin** (`/admin/*`) : aucune modification
-- **Backend / DB / Edge Functions** : aucune modification
-- **Flux Djomy** : aucune modification
+---
 
-## Fichiers touchés (récap)
+## Question implicite
 
-Création :
-- `src/components/tour/GuidedTour.tsx`
-- `src/components/tour/TourStep.tsx`
-- `src/components/tour/useTour.ts`
-- `src/components/tour/steps.ts`
-- `src/components/ui/EmptyState.tsx`
-- `src/components/ui/Skeleton.tsx` (si absent — vérifier shadcn)
-
-Modification :
-- `src/components/layout/AppShell.tsx`, `TopBar.tsx`, `DesktopSidebar.tsx`, `BottomNav.tsx`
-- `src/components/notifications/NotificationBell.tsx`
-- `src/pages/Dashboard.tsx`, `MyContributions.tsx`, `MyGroups.tsx`, `Receipts.tsx`
-- `src/components/dashboard/SectionCard.tsx`
-
-## Validation
-
-1. Premier login (vider localStorage) → tour démarre tout seul, les 5 étapes s'enchaînent sans bug, le spotlight cible bien chaque élément.
-2. Clic sur « ? » dans TopBar → tour redémarre.
-3. Capture comparative avant / après des 4 pages clés pour vérifier la cohérence.
-4. Test responsive : tour s'adapte sur mobile (popover repositionné).
+Je démarre par **(A) la réécriture pédagogique des popovers + (B) la revue UX de la page Accueil** dans le même tour. Si tu préfères les séparer (juste A d'abord, ou juste B d'abord), dis-le moi avant d'approuver.

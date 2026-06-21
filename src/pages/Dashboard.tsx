@@ -1,10 +1,12 @@
 import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Plus, UserPlus, Users, Calendar as CalendarIcon, Wallet } from "lucide-react";
+import { Plus, UserPlus, Users, Calendar as CalendarIcon, Wallet, CheckCircle2 } from "lucide-react";
 import { TopBar } from "@/components/layout/TopBar";
 import { SectionCard } from "@/components/dashboard/SectionCard";
 import { GroupRow } from "@/components/dashboard/GroupRow";
+import { DueCard } from "@/components/dashboard/DueCard";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { useAuth } from "@/hooks/useAuth";
 import { listMyGroups } from "@/lib/api/groups";
 import { overviewToTontine } from "@/lib/api/types";
@@ -47,7 +49,7 @@ export default function Dashboard() {
     queryKey: ["turns", "mine", "next"],
     queryFn: listMyNextTurns,
   });
-  const { data: dues = [] } = useQuery({
+  const { data: dues = [], isLoading: isLoadingDues } = useQuery({
     queryKey: ["contributions", "due"],
     queryFn: listMyContributionsDue,
   });
@@ -65,6 +67,11 @@ export default function Dashboard() {
     : "Aucun cycle actif";
 
   const totalDue = dues.reduce((s, d) => s + d.amount, 0);
+  const sortedDues = useMemo(
+    () => [...dues].sort((a, b) => a.days_to_due - b.days_to_due),
+    [dues],
+  );
+  const topDues = sortedDues.slice(0, 3);
 
   const firstName =
     (user?.user_metadata?.full_name as string | undefined)?.split(" ")[0] ??
@@ -84,13 +91,74 @@ export default function Dashboard() {
       />
 
       <div className="space-y-6 px-5 py-6 lg:px-8 lg:py-8">
-        {/* KPI strip */}
+        {/* Cotisations à payer — priorité absolue, zéro scroll */}
+        <section aria-label="Cotisations à payer">
+          <div className="mb-3 flex items-end justify-between gap-3">
+            <div>
+              <h2 className="font-display text-lg font-semibold text-foreground">
+                À payer
+              </h2>
+              <p className="text-xs text-muted-foreground">
+                {isLoadingDues
+                  ? "Vérification de vos cotisations…"
+                  : dues.length === 0
+                  ? "Aucune cotisation en attente. Bravo, vous êtes à jour."
+                  : `${dues.length} cotisation${dues.length > 1 ? "s" : ""} en attente`}
+              </p>
+            </div>
+            {dues.length > topDues.length && (
+              <button
+                type="button"
+                onClick={() => navigate("/cotisations")}
+                className="text-xs font-semibold text-primary hover:underline"
+              >
+                Voir tout ({dues.length})
+              </button>
+            )}
+          </div>
+
+          {isLoadingDues ? (
+            <div className="space-y-3">
+              {[0, 1].map((i) => (
+                <div
+                  key={i}
+                  className="h-24 animate-pulse rounded-xl border border-hairline bg-card"
+                />
+              ))}
+            </div>
+          ) : dues.length === 0 ? (
+            <div className="rounded-xl border border-hairline bg-card">
+              <EmptyState
+                icon={CheckCircle2}
+                title="Vous êtes à jour 🎉"
+                description="Aucune cotisation à régler pour l'instant. On vous préviendra dès qu'un nouveau tour démarre."
+              />
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {topDues.map((d) => (
+                <DueCard
+                  key={d.contribution_id}
+                  contributionId={d.contribution_id}
+                  groupName={d.group_name}
+                  amount={d.amount}
+                  daysToDue={d.days_to_due}
+                  beneficiaryName={d.beneficiary_name}
+                  turnNumber={d.turn_number}
+                  expectedPenalty={d.expected_penalty}
+                />
+              ))}
+            </div>
+          )}
+        </section>
+
+        {/* KPI strip — vue d'ensemble */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <KpiTile
             icon={Wallet}
-            label="À payer"
+            label="Total à payer"
             value={totalDue > 0 ? `${formatGNF(totalDue)} GNF` : "—"}
-            hint={dues.length > 0 ? `${dues.length} cotisation${dues.length > 1 ? "s" : ""} en attente` : "Vous êtes à jour"}
+            hint={dues.length > 0 ? "Cumul des cotisations en attente" : "Vous êtes à jour"}
           />
           <KpiTile
             icon={CalendarIcon}
@@ -114,27 +182,31 @@ export default function Dashboard() {
           bare
         >
           {isLoading ? (
-            <p className="px-5 py-6 text-sm text-muted-foreground lg:px-6">Chargement…</p>
-          ) : preview.length === 0 ? (
-            <div className="px-5 py-10 text-center lg:px-6">
-              <p className="text-sm text-muted-foreground">Vous n'avez encore aucune tontine.</p>
-              <div className="mt-4 flex flex-wrap justify-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => navigate("/nouveau")}
-                  className="inline-flex h-9 items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-semibold text-primary-foreground transition hover:bg-primary-700"
-                >
-                  <Plus className="h-4 w-4" /> Créer une tontine
-                </button>
-                <button
-                  type="button"
-                  onClick={() => navigate("/rejoindre")}
-                  className="inline-flex h-9 items-center gap-1.5 rounded-md border border-hairline bg-card px-3 text-sm font-semibold text-foreground transition hover:bg-secondary"
-                >
-                  <UserPlus className="h-4 w-4" /> Rejoindre avec un code
-                </button>
-              </div>
+            <div className="space-y-px p-2">
+              {[0, 1, 2].map((i) => (
+                <div key={i} className="h-16 animate-pulse rounded-md bg-secondary/40" />
+              ))}
             </div>
+          ) : preview.length === 0 ? (
+            <EmptyState
+              icon={Users}
+              title="Créez votre première tontine"
+              description="Une tontine regroupe quelques proches qui cotisent à tour de rôle. Lancez la vôtre en 2 minutes, ou rejoignez celle d'un ami avec son code d'invitation."
+              actions={[
+                {
+                  label: "Créer une tontine",
+                  onClick: () => navigate("/nouveau"),
+                  icon: <Plus className="h-4 w-4" />,
+                  variant: "primary",
+                },
+                {
+                  label: "Rejoindre avec un code",
+                  onClick: () => navigate("/rejoindre"),
+                  icon: <UserPlus className="h-4 w-4" />,
+                  variant: "secondary",
+                },
+              ]}
+            />
           ) : (
             <ul className="divide-y divide-border/60">
               {preview.map((g) => (
