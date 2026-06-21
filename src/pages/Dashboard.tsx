@@ -19,7 +19,7 @@ import { overviewToTontine } from "@/lib/api/types";
 import { listMyNextTurns } from "@/lib/api/turns";
 import { listMyContributionsDue } from "@/lib/api/contributions";
 import { formatGNF } from "@/lib/format";
-import { Compass, Receipt } from "lucide-react";
+import { Receipt } from "lucide-react";
 
 export default function Dashboard() {
   const navigate = useNavigate();
