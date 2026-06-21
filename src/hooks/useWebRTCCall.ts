@@ -113,6 +113,25 @@ export function useWebRTCCall({
     });
   }, []);
 
+  const mediaStateRef = useRef({
+    micMuted: initialMuted,
+    camOff: initialCamOff,
+    screenSharing: false,
+  });
+
+  const broadcastMediaState = useCallback(
+    (patch?: Partial<typeof mediaStateRef.current>) => {
+      if (patch) Object.assign(mediaStateRef.current, patch);
+      if (!channelRef.current || !myId) return;
+      channelRef.current.send({
+        type: "broadcast",
+        event: "media-state",
+        payload: { from: myId, ...mediaStateRef.current },
+      });
+    },
+    [myId],
+  );
+
   const updatePeer = useCallback((id: string, patch: Partial<RemotePeer>) => {
     setPeers((prev) => ({
       ...prev,
