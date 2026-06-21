@@ -46,6 +46,7 @@ import { AuctionPanel } from "@/components/group/AuctionPanel";
 import { ReviewsPanel } from "@/components/group/ReviewsPanel";
 import { TestModePanel } from "@/components/group/TestModePanel";
 import { InvitationsHistoryPanel } from "@/components/groups/InvitationsHistoryPanel";
+import { GroupDefaultersSection } from "@/components/group/GroupDefaultersSection";
 
 type Section =
   | "overview"
