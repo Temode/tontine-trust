@@ -58,8 +58,7 @@ export function CallRequestDialog({ open, onOpenChange, groupId, groupName, onDo
             Demander un appel
           </DialogTitle>
           <DialogDescription>
-            Proposez un appel vocal aux membres actifs. Le canal audio sera disponible
-            prochainement.
+            Proposez un appel vocal aux membres actifs du groupe.
           </DialogDescription>
         </DialogHeader>
 
