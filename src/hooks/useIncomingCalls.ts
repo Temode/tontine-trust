@@ -21,21 +21,51 @@ export type IncomingCallsStatus =
   | "timeout"
   | "closed";
 
+export interface DiagEvent {
+  ts: number;
+  type:
+    | "status"
+    | "insert"
+    | "update"
+    | "hydrate"
+    | "poll"
+    | "poll_fallback"
+    | "error"
+    | "online";
+  detail?: string;
+}
+
 export function useIncomingCalls(): {
   current: IncomingCall | null;
   dismiss: () => void;
   status: IncomingCallsStatus;
   groupCount: number;
   lastEventAt: number | null;
+  pendingCount: number;
+  events: DiagEvent[];
 } {
   const { user } = useAuth();
   const [current, setCurrent] = useState<IncomingCall | null>(null);
   const [status, setStatus] = useState<IncomingCallsStatus>("idle");
   const [groupCount, setGroupCount] = useState(0);
   const [lastEventAt, setLastEventAt] = useState<number | null>(null);
+  const [pendingCount, setPendingCount] = useState(0);
+  const [events, setEvents] = useState<DiagEvent[]>([]);
   const dismissedRef = useRef<Set<string>>(new Set());
   const currentRef = useRef<IncomingCall | null>(null);
   currentRef.current = current;
+  const statusRef = useRef<IncomingCallsStatus>("idle");
+  statusRef.current = status;
+  const groupIdsRef = useRef<string[]>([]);
+  const userIdRef = useRef<string | null>(null);
+  userIdRef.current = user?.id ?? null;
+
+  const pushEvent = (type: DiagEvent["type"], detail?: string) => {
+    setEvents((prev) => {
+      const next = [...prev, { ts: Date.now(), type, detail }];
+      return next.length > 100 ? next.slice(-100) : next;
+    });
+  };
 
   useEffect(() => {
     if (!user?.id) return;
@@ -75,6 +105,7 @@ export function useIncomingCalls(): {
 
     const setup = async () => {
       setStatus("connecting");
+      pushEvent("status", "connecting");
       const { data: members } = await supabase
         .from("group_members")
         .select("group_id")
@@ -82,9 +113,11 @@ export function useIncomingCalls(): {
         .eq("status", "active");
       if (cancelled) return;
       groupIds = (members ?? []).map((m) => m.group_id as string);
+      groupIdsRef.current = groupIds;
       setGroupCount(groupIds.length);
       if (groupIds.length === 0) {
         setStatus("no_groups");
+        pushEvent("status", "no_groups");
         return;
       }
 
@@ -110,6 +143,7 @@ export function useIncomingCalls(): {
           { event: "INSERT", schema: "public", table: "call_requests" },
           async (payload) => {
             setLastEventAt(Date.now());
+            pushEvent("insert", payload.new && (payload.new as { id: string }).id);
             const row = payload.new as {
               id: string;
               group_id: string;
@@ -129,6 +163,10 @@ export function useIncomingCalls(): {
           { event: "UPDATE", schema: "public", table: "call_requests" },
           (payload) => {
             setLastEventAt(Date.now());
+            pushEvent(
+              "update",
+              `${(payload.new as { id: string }).id} → ${(payload.new as { status: string }).status}`,
+            );
             const row = payload.new as { id: string; status: string };
             if (currentRef.current?.id === row.id && row.status !== "pending") {
               setCurrent(null);
@@ -140,20 +178,79 @@ export function useIncomingCalls(): {
           else if (s === "CHANNEL_ERROR") setStatus("error");
           else if (s === "TIMED_OUT") setStatus("timeout");
           else if (s === "CLOSED") setStatus("closed");
+          pushEvent("status", s);
         });
     };
 
     void setup();
 
     const onOnline = () => {
+      pushEvent("online");
       // Reconnexion réseau → on relance setup pour récupérer un appel manqué
       void setup();
     };
     window.addEventListener("online", onOnline);
 
+    // ---- Polling adaptatif (fallback Realtime) ----
+    // - subscribed     : 60s (filet de sécurité)
+    // - connecting     : 5s
+    // - error/timeout/closed : 3s (mode dégradé)
+    // - no_groups      : aucun poll
+    let pollTimer: number | null = null;
+    const scheduleNextPoll = () => {
+      if (cancelled) return;
+      const st = statusRef.current;
+      let delay: number | null = 60_000;
+      if (st === "no_groups" || st === "idle") delay = null;
+      else if (st === "subscribed") delay = 60_000;
+      else if (st === "connecting") delay = 5_000;
+      else delay = 3_000; // error / timeout / closed
+      if (delay === null) return;
+      pollTimer = window.setTimeout(runPoll, delay);
+    };
+    const runPoll = async () => {
+      if (cancelled || !userIdRef.current) return;
+      const ids = groupIdsRef.current;
+      if (ids.length === 0) {
+        scheduleNextPoll();
+        return;
+      }
+      try {
+        const { data: pending, count } = await supabase
+          .from("call_requests")
+          .select("id, group_id, requested_by, topic, created_at, status", {
+            count: "exact",
+          })
+          .in("group_id", ids)
+          .eq("status", "pending")
+          .neq("requested_by", userIdRef.current)
+          .order("created_at", { ascending: false })
+          .limit(5);
+        if (cancelled) return;
+        setPendingCount(count ?? (pending?.length ?? 0));
+        pushEvent("poll", `pending=${count ?? 0}`);
+        // Si Realtime n'est pas opérationnel et qu'un appel existe, on hydrate
+        const degraded =
+          statusRef.current !== "subscribed" &&
+          statusRef.current !== "no_groups";
+        if (pending && pending[0]) {
+          if (degraded || !currentRef.current) {
+            pushEvent("poll_fallback", pending[0].id);
+            void hydrate(pending[0] as never);
+          }
+        }
+      } catch (e) {
+        pushEvent("error", (e as Error).message);
+      } finally {
+        scheduleNextPoll();
+      }
+    };
+    pollTimer = window.setTimeout(runPoll, 2_000); // 1er poll après 2s
+
     return () => {
       cancelled = true;
       window.removeEventListener("online", onOnline);
+      if (pollTimer) window.clearTimeout(pollTimer);
       if (channel) supabase.removeChannel(channel);
     };
   }, [user?.id]);
@@ -165,5 +262,13 @@ export function useIncomingCalls(): {
     }
   };
 
-  return { current, dismiss, status, groupCount, lastEventAt };
+  return {
+    current,
+    dismiss,
+    status,
+    groupCount,
+    lastEventAt,
+    pendingCount,
+    events,
+  };
 }
