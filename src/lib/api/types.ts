@@ -1,7 +1,7 @@
 import type { Frequency, TontineGroup } from "@/lib/types";
 
 export type DbFrequency = "quotidienne" | "hebdomadaire" | "quinzaine" | "mensuelle";
-export type DbGroupStatus = "draft" | "open" | "active" | "completed" | "cancelled";
+export type DbGroupStatus = "draft" | "open" | "active" | "paused" | "completed" | "cancelled";
 export type DbMemberRole = "organisateur" | "membre";
 export type DbMemberStatus = "active" | "invited" | "removed" | "left" | "pending" | "suspended";
 export type DbInvitationStatus = "pending" | "accepted" | "revoked" | "expired";
@@ -42,6 +42,9 @@ export interface DbGroup {
   created_by: string;
   created_at: string;
   updated_at: string;
+  paused_at?: string | null;
+  archived_at?: string | null;
+  deleted_at?: string | null;
 }
 
 export interface DbGroupMember {
