@@ -61,12 +61,11 @@ Deno.test("sendMessage — 201 OK via fetch mocké", async () => {
   Deno.env.set("NIMBA_SECRET_TOKEN", "tok");
   Deno.env.delete("SMS_ENABLED");
 
-  // @ts-expect-error monkey-patch pour test
-  globalThis.fetch = async () =>
+  globalThis.fetch = (async () =>
     new Response(
       JSON.stringify({ messageid: "msg-1", message_cost: 1 }),
       { status: 201, headers: { "Content-Type": "application/json" } },
-    );
+    )) as typeof fetch;
 
   try {
     const r = await sendMessage({ to: "224620900001", body: "Bonjour" });
@@ -87,14 +86,13 @@ Deno.test("sendMessage — 400 (erreur client) pas de retry", async () => {
   Deno.env.delete("SMS_ENABLED");
 
   let calls = 0;
-  // @ts-expect-error monkey-patch pour test
-  globalThis.fetch = async () => {
+  globalThis.fetch = (async () => {
     calls += 1;
     return new Response(JSON.stringify({ detail: "bad recipient" }), {
       status: 400,
       headers: { "Content-Type": "application/json" },
     });
-  };
+  }) as typeof fetch;
 
   try {
     const r = await sendMessage({ to: "224620900001", body: "hi" });
