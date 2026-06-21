@@ -1,81 +1,104 @@
-## Objectif
 
-Réécrire `src/pages/MyContributions.tsx` (route `/payer`) pour atteindre le niveau "infrastructure financière" défini dans `docs/DESIGN_DOCTRINE.md` — calme, autorité, clarté, zéro scroll pour l'info critique. Aucun changement de logique métier, de schéma, ou d'API : uniquement présentation, hiérarchie et composition.
+# Gestion des cotisations défaillantes — workflow professionnel
 
-## Diagnostic de l'écran actuel
+Aujourd'hui, si un membre ne paie pas à l'échéance : la cotisation reste `pending`, le tour est gelé indéfiniment (`release_payout` refuse), et seul son prochain paiement (s'il a lieu) appliquera une pénalité. Aucune alerte automatique, aucune transparence pour le groupe, aucun canal d'escalade vers l'équipe Tontine. À corriger.
 
-- Hero bleu/or correct mais générique (trois tuiles équivalentes → aucune action primaire visible).
-- Barre de filtres dense, sans titre, dominée par la recherche — viole la règle "une seule action primaire" et "hiérarchie typo stricte".
-- Trois sections empilées (Récap / À régler / Historique) toutes au même poids visuel → l'utilisateur ne voit pas *quoi payer maintenant*.
-- Ligne de cotisation à régler : CTA "Payer via Djomy" en bas à droite, petit, secondaire visuellement par rapport au montant.
-- `DueCard` existe déjà dans le dashboard avec l'accent latéral d'urgence (pattern de référence de la doctrine) mais n'est pas utilisé ici.
+## Politique retenue
 
-## Direction de redesign (les 4 règles d'or appliquées)
+- **Délai de grâce : J+1.** Dès le lendemain de l'échéance, la cotisation passe automatiquement en `defaulted`.
+- **Transparence groupe :** tous les membres voient qui n'a pas payé (pas de retard "privé").
+- **Escalade Tontine :** l'organisateur peut signaler officiellement le compte → équipe Tontine prend le relais (appel direct, mise en demeure, voie judiciaire), justifié par le KYC obligatoire (pièce d'identité, certificat de résidence).
+- **Pas de vote d'exclusion automatique** : la responsabilité est portée par la plateforme, pas par le groupe.
+- **Impact fiabilité automatique :** le score baisse dès J+1, sans attendre un paiement.
 
-### 1. Hero "Cockpit de paiement" — une seule action primaire
-Refondre le hero en cockpit asymétrique 2/3 + 1/3 :
-- **Colonne gauche (focus)** : libellé `À régler maintenant` (uppercase tracking-wider, opacity 75), montant XXL display bold en `num` + unité GNF séparée, sous-ligne `{n} cotisations · {n} en retard` discrète. CTA primaire **unique** "Payer la plus urgente" (whitespace-nowrap, déclenche `DjomyPaymentModal` sur la prochaine échéance) + lien ghost "Tout voir".
-- **Colonne droite** : mini-timeline verticale des 3 prochaines échéances (date compacte + nom tontine tronqué + montant en `tabular-nums`), rien de cliquable hormis chevron discret.
-- Halo accent or très diffus en arrière-plan (déjà présent), pas de gradient violet. Aucune tuile KPI redondante : les compteurs "En retard / Payées" descendent dans une bande KPI fine sous le hero.
+## Ce qui sera construit
 
-### 2. Bande KPI minimale (pattern doctrine)
-Trois KPI tiles plates inline sous le hero : `Total dû`, `En retard`, `Payées ce cycle`. Icône dans `bg-primary-50`, label uppercase tracking-wider, valeur display bold, hint discret. Pas de fond coloré, juste `border-hairline`.
+### 1. Statut `defaulted` automatique (cron quotidien)
 
-### 3. Filtres dégonflés
-- Les filtres ne dominent plus : barre compacte alignée à droite (`h-9`, `w-64` recherche, deux selects `h-9` étroits), aucun fond `card/80`, juste un séparateur. Titre de section "Cotisations" à gauche.
-- Filtre statut par segmented control (Tous / À régler / Retard / Payées) à la place des selects pour les statuts → plus lisible, une seule décision.
+Nouveau cron `mark_defaulted_contributions` exécuté chaque jour à 06:00 UTC, juste avant le cron de rappels :
+- Toute `contribution` en `pending` dont `turn.due_date < current_date` passe à `status = 'defaulted'`.
+- Champs ajoutés : `defaulted_at`, `default_days` (recalculé à chaque passage).
+- Notification automatique au payeur (« Cotisation en défaut ») et **à tous les organisateurs** du groupe (`group_admin_permissions`).
+- Entrée `audit_log` + `tontine_alerts` (sévérité `high`) pour la supervision plateforme.
+- Recalcule `user_reliability_scores` du défaillant immédiatement.
 
-### 4. Section "À régler" en cartes DueCard
-Remplacer la liste plate par une grille responsive de `DueCard` (composant déjà utilisé dans le dashboard) :
-- Accent latéral coloré selon urgence (retard = `destructive`, ≤3j = `warning`, sinon `primary`).
-- Montant XL, date relative ("dans 2 jours", "il y a 4 jours"), nom tontine, tour, bénéficiaire.
-- Un seul CTA "Payer maintenant" pleine largeur en bas de carte (whitespace-nowrap).
-- Grille `grid-cols-1 md:grid-cols-2 xl:grid-cols-3`, `gap-4`.
-- Si plus de 6 cartes : pagination "Voir tout (n)" plutôt que scroll infini.
+### 2. Transparence groupe
 
-### 5. Récapitulatif par tontine → repli secondaire
-Le récap par tontine devient une carte unique, repliée par défaut (`<details>` ou Accordion shadcn), titre "Vue par tontine ({n})". Reste accessible mais ne concurrence plus l'action principale.
+- Vue `group_defaulters` (security_invoker, accessible aux membres du groupe) : liste des défaillants en cours avec nom, tour, montant dû, jours de retard. **N'expose pas** d'infos personnelles au-delà du nom déjà visible dans le groupe.
+- Sur la page de détail du groupe (`/groupes/:id`), nouvelle section **« Cotisations en retard »** avec badge rouge sur chaque membre concerné.
+- Notification dans le fil du groupe : « X n'a pas réglé sa cotisation du tour #N (échéance dépassée de 3 jours) ».
 
-### 6. Historique
-Garder la liste actuelle (pattern propre) mais :
-- Titre `Historique des paiements` + sous-titre date du dernier paiement.
-- Limite affichée 10 (au lieu de 50) + bouton ghost "Voir tout l'historique" → route `/recus` (déjà existante).
-- Montants en `tabular-nums`, séparateur de groupe en `divide-border/60` (déjà OK).
+### 3. Signalement officiel à l'équipe Tontine
 
-### 7. États vides & chargement
-- Skeletons (jamais de spinner) pour hero, KPI, cartes — formes proches du rendu final (carte avec accent latéral fantôme).
-- Empty state "À régler" = composant `EmptyState` avec icône `ShieldCheck`, titre "Vous êtes à jour", description "Aucune cotisation en attente.", CTA secondaire "Voir mes tontines".
+Nouvelle table `member_default_reports` :
+- `id`, `group_id`, `reported_user_id`, `reported_by` (organisateur), `contribution_id`, `reason`, `status` (`open` / `in_review` / `resolved` / `legal_action`), `tontine_handler_id`, `internal_notes`, `created_at`, `resolved_at`.
+- RPC `report_defaulter(_contribution_id, _reason)` : réservé aux admins du groupe avec permission `can_report_defaulter` (nouveau flag). Crée le signalement, notifie tous les super-admins plateforme via `tontine_alerts` (sévérité `critical`).
+- Bouton **« Signaler à Tontine »** sur la fiche du défaillant (visible organisateurs uniquement).
 
-## Détails de mise en œuvre (technique)
+### 4. Back-office super-admin
 
-- Fichier touché : **uniquement** `src/pages/MyContributions.tsx`. Aucune modification d'API, de hook, de modèle, ou d'edge function.
-- Réutiliser :
-  - `DueCard` (`src/components/dashboard/DueCard.tsx`) pour les cartes à régler.
-  - `EmptyState` (`src/components/ui/EmptyState.tsx`).
-  - `SectionCard` pour les sections secondaires.
-  - `formatGNF`, `formatRelativeDays` (déjà importés).
-  - Tokens sémantiques existants (`primary`, `accent`, `destructive`, `warning`, `success`, `hairline`, `primary-50`, `primary-700`) — zéro couleur hardcodée.
-- Ajouter un Accordion shadcn si le récap passe en repli (`@/components/ui/accordion`).
-- Segmented control = simple groupe de boutons stylé (pas de nouveau composant), aria-pressed correct.
-- `DjomyPaymentModal` ouvert : 
-  - depuis le CTA hero (= `dues[0]` triée par `due_date asc` puis `days_to_due asc`).
-  - depuis chaque `DueCard`.
-- Vérifier rendu à 1280×800 et 712×800 (cibles doctrine) avec Playwright après implémentation : capture avant/après, contrôle qu'aucun CTA ne wrap, que l'info critique tient au-dessus de la ligne de flottaison.
+Nouvelle page `/admin/defaulters` :
+- Liste tous les `member_default_reports` ouverts, triés par criticité (montant × jours de retard).
+- Détail défaillant : profil + KYC + historique de cotisations + score fiabilité + groupes affectés.
+- Actions super-admin : changer `status`, ajouter `internal_notes`, déclencher un appel (lien `tel:`), envoyer SMS personnalisé via Nimba (sender `ImmoConnect`), marquer `legal_action`.
+- Lien direct vers les pièces KYC du défaillant (préparé pour la phase KYC à venir — voir §6).
 
-## Checklist doctrine avant livraison
+### 5. Impact score fiabilité automatique
 
-- [ ] Une seule action primaire visible (CTA hero "Payer la plus urgente").
-- [ ] Info critique (montant dû + CTA) visible sans scroll à 1280×800 et 712×800.
-- [ ] Tous les CTA sur une ligne, `whitespace-nowrap`.
-- [ ] Montants en `tabular-nums` + `formatGNF` + unité séparée.
-- [ ] Skeletons, pas de spinner.
-- [ ] Empty states via `EmptyState`.
-- [ ] Cluster filtres séparé du CTA principal (`gap-3` minimum).
-- [ ] Aucune couleur hardcodée — tokens uniquement.
-- [ ] Responsive vérifié à 712px.
+- Le cron `mark_defaulted_contributions` appelle `recompute_reliability(payer_user_id)` pour chaque nouveau défaillant.
+- `recompute_reliability` mis à jour : compte aussi `defaulted` (pas seulement `confirmed`) → `v_total_due` inclut les défauts, le ratio paiement plonge dès J+1.
+- Nouveau seuil `reliability_tier = 'blocked'` si ≥ 2 défauts non régularisés OU 1 signalement `legal_action`.
 
-## Hors scope
+### 6. KYC — préparation seulement (out of scope)
 
-- Pas de changement du flux Djomy ni du modal de paiement.
-- Pas de nouvelle table, edge function ou migration.
-- Pas de modification de `Dashboard`, `Receipts`, ou des composants partagés (sauf import).
+La vraie intégration KYC (pièce d'identité, certificat de résidence, vérification documentaire) est un chantier à part. Dans ce plan, on :
+- ajoute les colonnes `profiles.kyc_status` (`none` / `pending` / `verified` / `rejected`), `kyc_verified_at` ;
+- ajoute la table `kyc_documents` (id, user_id, type, storage_path, status, reviewed_by, reviewed_at) avec bucket privé `kyc-documents` ;
+- expose dans le back-office défaillants un encart « KYC : non vérifié » avec CTA « Demander vérification ».
+Le formulaire d'upload utilisateur et la review documentaire feront l'objet d'un plan dédié.
+
+### 7. Côté UI utilisateur
+
+- `/cotisations` : les contributions `defaulted` apparaissent dans un nouvel onglet rouge **« En défaut »** avec bandeau explicite « Votre compte a été signalé. Régularisez sous 48h pour éviter une mise en demeure. »
+- Le paiement reste possible (le RPC `record_mock_payment` accepte maintenant `defaulted` en plus de `pending/submitted/rejected`) → régularise + applique pénalité figée + ferme automatiquement le signalement avec un commentaire système.
+
+## Détails techniques
+
+```text
+db/52_defaulted_status.sql
+  - enum contribution_status: + 'defaulted'
+  - contributions: + defaulted_at, default_days
+  - function mark_defaulted_contributions() (security definer)
+  - cron 'tontine_mark_defaulters' à 06:00 UTC quotidien
+
+db/53_defaulter_reports.sql
+  - table member_default_reports + GRANT + RLS
+  - permission group_admin_permissions.can_report_defaulter
+  - RPC report_defaulter(contribution_id, reason)
+  - RPC update_defaulter_report(id, status, internal_notes) — super-admin
+  - view group_defaulters (security_invoker)
+
+db/54_reliability_includes_defaults.sql
+  - recompute_reliability: intègre 'defaulted' dans v_total_due
+  - reliability_tier: + 'blocked'
+
+db/55_kyc_scaffolding.sql
+  - profiles.kyc_status, kyc_verified_at
+  - table kyc_documents + bucket privé + RLS
+
+UI:
+  - src/pages/admin/Defaulters.tsx  (nouveau)
+  - src/pages/MyContributions.tsx   (onglet "En défaut")
+  - src/pages/GroupDetail.tsx       (section "Retards")
+  - src/components/group/DefaulterBadge.tsx (badge rouge réutilisable)
+  - src/components/group/ReportDefaulterDialog.tsx
+  - Route admin /admin/defaulters dans App.tsx + lien dans AdminLayout
+```
+
+## Hors scope de ce plan
+
+- Upload utilisateur KYC, OCR pièces d'identité, intégration vérification tierce (Sumsub / Onfido).
+- Génération automatique de mise en demeure PDF.
+- Intégration appel sortant automatisé (Twilio Voice).
+
+Ces points feront l'objet de plans dédiés une fois la base défaillants en production.

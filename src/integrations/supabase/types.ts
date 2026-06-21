@@ -125,6 +125,8 @@ export type Database = {
           confirmed_at: string | null
           confirmed_by: string | null
           created_at: string
+          default_days: number
+          defaulted_at: string | null
           group_id: string
           id: string
           payer_user_id: string
@@ -147,6 +149,8 @@ export type Database = {
           confirmed_at?: string | null
           confirmed_by?: string | null
           created_at?: string
+          default_days?: number
+          defaulted_at?: string | null
           group_id: string
           id?: string
           payer_user_id: string
@@ -169,6 +173,8 @@ export type Database = {
           confirmed_at?: string | null
           confirmed_by?: string | null
           created_at?: string
+          default_days?: number
+          defaulted_at?: string | null
           group_id?: string
           id?: string
           payer_user_id?: string
@@ -375,6 +381,13 @@ export type Database = {
             foreignKeyName: "external_payment_proofs_contribution_id_fkey"
             columns: ["contribution_id"]
             isOneToOne: false
+            referencedRelation: "group_defaulters"
+            referencedColumns: ["contribution_id"]
+          },
+          {
+            foreignKeyName: "external_payment_proofs_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
             referencedRelation: "group_payments_history"
             referencedColumns: ["contribution_id"]
           },
@@ -430,6 +443,7 @@ export type Database = {
           can_kick_member: boolean
           can_manage_invitations: boolean
           can_pause_cycle: boolean
+          can_report_defaulter: boolean
           can_send_announcements: boolean
           can_suspend_member: boolean
           can_waive_penalty: boolean
@@ -446,6 +460,7 @@ export type Database = {
           can_kick_member?: boolean
           can_manage_invitations?: boolean
           can_pause_cycle?: boolean
+          can_report_defaulter?: boolean
           can_send_announcements?: boolean
           can_suspend_member?: boolean
           can_waive_penalty?: boolean
@@ -462,6 +477,7 @@ export type Database = {
           can_kick_member?: boolean
           can_manage_invitations?: boolean
           can_pause_cycle?: boolean
+          can_report_defaulter?: boolean
           can_send_announcements?: boolean
           can_suspend_member?: boolean
           can_waive_penalty?: boolean
@@ -1080,6 +1096,45 @@ export type Database = {
         }
         Relationships: []
       }
+      kyc_documents: {
+        Row: {
+          created_at: string
+          doc_type: string
+          id: string
+          review_note: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          storage_path: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          doc_type: string
+          id?: string
+          review_note?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          storage_path: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          doc_type?: string
+          id?: string
+          review_note?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          storage_path?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       ledger_entries: {
         Row: {
           amount: number
@@ -1139,6 +1194,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "contributions"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ledger_entries_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
+            referencedRelation: "group_defaulters"
+            referencedColumns: ["contribution_id"]
           },
           {
             foreignKeyName: "ledger_entries_contribution_id_fkey"
@@ -1299,6 +1361,118 @@ export type Database = {
           },
           {
             foreignKeyName: "manual_reminders_log_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "my_groups_overview"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      member_default_reports: {
+        Row: {
+          contribution_id: string | null
+          created_at: string
+          group_id: string
+          id: string
+          internal_notes: string | null
+          reason: string | null
+          reported_by: string
+          reported_user_id: string
+          resolution_note: string | null
+          resolved_at: string | null
+          status: string
+          tontine_handler_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          contribution_id?: string | null
+          created_at?: string
+          group_id: string
+          id?: string
+          internal_notes?: string | null
+          reason?: string | null
+          reported_by: string
+          reported_user_id: string
+          resolution_note?: string | null
+          resolved_at?: string | null
+          status?: string
+          tontine_handler_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          contribution_id?: string | null
+          created_at?: string
+          group_id?: string
+          id?: string
+          internal_notes?: string | null
+          reason?: string | null
+          reported_by?: string
+          reported_user_id?: string
+          resolution_note?: string | null
+          resolved_at?: string | null
+          status?: string
+          tontine_handler_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "member_default_reports_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
+            referencedRelation: "contributions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_default_reports_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
+            referencedRelation: "group_defaulters"
+            referencedColumns: ["contribution_id"]
+          },
+          {
+            foreignKeyName: "member_default_reports_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
+            referencedRelation: "group_payments_history"
+            referencedColumns: ["contribution_id"]
+          },
+          {
+            foreignKeyName: "member_default_reports_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
+            referencedRelation: "my_contributions_due"
+            referencedColumns: ["contribution_id"]
+          },
+          {
+            foreignKeyName: "member_default_reports_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
+            referencedRelation: "my_late_contributions"
+            referencedColumns: ["contribution_id"]
+          },
+          {
+            foreignKeyName: "member_default_reports_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
+            referencedRelation: "turn_assignment_audit"
+            referencedColumns: ["contribution_id"]
+          },
+          {
+            foreignKeyName: "member_default_reports_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "admin_group_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_default_reports_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_default_reports_group_id_fkey"
             columns: ["group_id"]
             isOneToOne: false
             referencedRelation: "my_groups_overview"
@@ -1549,6 +1723,13 @@ export type Database = {
             foreignKeyName: "payment_links_contribution_id_fkey"
             columns: ["contribution_id"]
             isOneToOne: false
+            referencedRelation: "group_defaulters"
+            referencedColumns: ["contribution_id"]
+          },
+          {
+            foreignKeyName: "payment_links_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
             referencedRelation: "group_payments_history"
             referencedColumns: ["contribution_id"]
           },
@@ -1666,6 +1847,13 @@ export type Database = {
             foreignKeyName: "payments_contribution_id_fkey"
             columns: ["contribution_id"]
             isOneToOne: false
+            referencedRelation: "group_defaulters"
+            referencedColumns: ["contribution_id"]
+          },
+          {
+            foreignKeyName: "payments_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
             referencedRelation: "group_payments_history"
             referencedColumns: ["contribution_id"]
           },
@@ -1721,6 +1909,8 @@ export type Database = {
           deletion_reason: string | null
           full_name: string
           id: string
+          kyc_status: Database["public"]["Enums"]["kyc_status"]
+          kyc_verified_at: string | null
           phone_number: string | null
           phone_visible_in_groups: boolean
           reliability_score: number
@@ -1736,6 +1926,8 @@ export type Database = {
           deletion_reason?: string | null
           full_name: string
           id: string
+          kyc_status?: Database["public"]["Enums"]["kyc_status"]
+          kyc_verified_at?: string | null
           phone_number?: string | null
           phone_visible_in_groups?: boolean
           reliability_score?: number
@@ -1751,6 +1943,8 @@ export type Database = {
           deletion_reason?: string | null
           full_name?: string
           id?: string
+          kyc_status?: Database["public"]["Enums"]["kyc_status"]
+          kyc_verified_at?: string | null
           phone_number?: string | null
           phone_visible_in_groups?: boolean
           reliability_score?: number
@@ -1945,6 +2139,13 @@ export type Database = {
             foreignKeyName: "reminder_log_contribution_id_fkey"
             columns: ["contribution_id"]
             isOneToOne: false
+            referencedRelation: "group_defaulters"
+            referencedColumns: ["contribution_id"]
+          },
+          {
+            foreignKeyName: "reminder_log_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
             referencedRelation: "group_payments_history"
             referencedColumns: ["contribution_id"]
           },
@@ -2122,6 +2323,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "contributions"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tontine_alerts_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
+            referencedRelation: "group_defaulters"
+            referencedColumns: ["contribution_id"]
           },
           {
             foreignKeyName: "tontine_alerts_contribution_id_fkey"
@@ -2887,6 +3095,72 @@ export type Database = {
           },
         ]
       }
+      group_defaulters: {
+        Row: {
+          amount: number | null
+          contribution_id: string | null
+          default_days: number | null
+          defaulted_at: string | null
+          due_date: string | null
+          group_id: string | null
+          has_open_report: boolean | null
+          payer_name: string | null
+          payer_user_id: string | null
+          turn_id: string | null
+          turn_number: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contributions_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "admin_group_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contributions_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contributions_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "my_groups_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contributions_turn_id_fkey"
+            columns: ["turn_id"]
+            isOneToOne: false
+            referencedRelation: "next_turn_per_group"
+            referencedColumns: ["turn_id"]
+          },
+          {
+            foreignKeyName: "contributions_turn_id_fkey"
+            columns: ["turn_id"]
+            isOneToOne: false
+            referencedRelation: "turn_assignment_audit"
+            referencedColumns: ["turn_id"]
+          },
+          {
+            foreignKeyName: "contributions_turn_id_fkey"
+            columns: ["turn_id"]
+            isOneToOne: false
+            referencedRelation: "turn_settlement"
+            referencedColumns: ["turn_id"]
+          },
+          {
+            foreignKeyName: "contributions_turn_id_fkey"
+            columns: ["turn_id"]
+            isOneToOne: false
+            referencedRelation: "turns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       group_ledger_view: {
         Row: {
           amount: number | null
@@ -3200,6 +3474,8 @@ export type Database = {
           beneficiary_user_id: string | null
           contribution_id: string | null
           days_to_due: number | null
+          default_days: number | null
+          defaulted_at: string | null
           due_date: string | null
           expected_penalty: number | null
           group_id: string | null
@@ -3433,6 +3709,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "contributions"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
+            referencedRelation: "group_defaulters"
+            referencedColumns: ["contribution_id"]
           },
           {
             foreignKeyName: "payments_contribution_id_fkey"
@@ -4188,6 +4471,7 @@ export type Database = {
         Returns: string
       }
       mark_all_notifications_read: { Args: never; Returns: number }
+      mark_defaulted_contributions: { Args: never; Returns: number }
       mark_notification_read: { Args: { _id: string }; Returns: undefined }
       mask_phone: { Args: { _phone: string }; Returns: string }
       member_can: {
@@ -4259,6 +4543,10 @@ export type Database = {
           _provider?: Database["public"]["Enums"]["payment_provider"]
           _turn_id: string
         }
+        Returns: string
+      }
+      report_defaulter: {
+        Args: { _contribution_id: string; _reason?: string }
         Returns: string
       }
       request_group_deletion: {
@@ -4348,6 +4636,15 @@ export type Database = {
         Args: { _group_id: string; _new_owner_user_id: string }
         Returns: undefined
       }
+      update_defaulter_report: {
+        Args: {
+          _internal_notes?: string
+          _report_id: string
+          _resolution_note?: string
+          _status?: string
+        }
+        Returns: undefined
+      }
       update_group_settings: {
         Args: { _group_id: string; _payload: Json }
         Returns: undefined
@@ -4375,7 +4672,12 @@ export type Database = {
     Enums: {
       app_role: "admin" | "organisateur" | "participant" | "super_admin"
       bid_status: "active" | "won" | "lost" | "cancelled"
-      contribution_status: "pending" | "submitted" | "confirmed" | "rejected"
+      contribution_status:
+        | "pending"
+        | "submitted"
+        | "confirmed"
+        | "rejected"
+        | "defaulted"
       deletion_request_status:
         | "pending_members"
         | "pending_admin"
@@ -4398,6 +4700,7 @@ export type Database = {
         | "paused"
       group_visibility: "private" | "public-link" | "directory"
       invitation_status: "pending" | "accepted" | "revoked" | "expired"
+      kyc_status: "none" | "pending" | "verified" | "rejected"
       ledger_entry_type:
         | "contribution_in"
         | "payout_out"
@@ -4461,6 +4764,9 @@ export type Database = {
         | "group_deletion_pending_admin"
         | "group_deletion_approved"
         | "group_deletion_refused"
+        | "contribution_defaulted"
+        | "defaulter_reported"
+        | "defaulter_report_resolved"
       payment_method_external:
         | "cash"
         | "bank_transfer"
@@ -4480,7 +4786,13 @@ export type Database = {
         | "failed"
         | "cancelled"
         | "refunded"
-      reliability_tier: "nouveau" | "risque" | "moyen" | "bon" | "excellent"
+      reliability_tier:
+        | "nouveau"
+        | "risque"
+        | "moyen"
+        | "bon"
+        | "excellent"
+        | "blocked"
       reminder_channel: "in_app" | "sms" | "whatsapp" | "email"
       rotation_order: "random" | "fixed" | "choice" | "auction"
       swap_policy: "none" | "with_consent" | "organizer_only"
@@ -4615,7 +4927,13 @@ export const Constants = {
     Enums: {
       app_role: ["admin", "organisateur", "participant", "super_admin"],
       bid_status: ["active", "won", "lost", "cancelled"],
-      contribution_status: ["pending", "submitted", "confirmed", "rejected"],
+      contribution_status: [
+        "pending",
+        "submitted",
+        "confirmed",
+        "rejected",
+        "defaulted",
+      ],
       deletion_request_status: [
         "pending_members",
         "pending_admin",
@@ -4641,6 +4959,7 @@ export const Constants = {
       ],
       group_visibility: ["private", "public-link", "directory"],
       invitation_status: ["pending", "accepted", "revoked", "expired"],
+      kyc_status: ["none", "pending", "verified", "rejected"],
       ledger_entry_type: [
         "contribution_in",
         "payout_out",
@@ -4706,6 +5025,9 @@ export const Constants = {
         "group_deletion_pending_admin",
         "group_deletion_approved",
         "group_deletion_refused",
+        "contribution_defaulted",
+        "defaulter_reported",
+        "defaulter_report_resolved",
       ],
       payment_method_external: [
         "cash",
@@ -4729,7 +5051,14 @@ export const Constants = {
         "cancelled",
         "refunded",
       ],
-      reliability_tier: ["nouveau", "risque", "moyen", "bon", "excellent"],
+      reliability_tier: [
+        "nouveau",
+        "risque",
+        "moyen",
+        "bon",
+        "excellent",
+        "blocked",
+      ],
       reminder_channel: ["in_app", "sms", "whatsapp", "email"],
       rotation_order: ["random", "fixed", "choice", "auction"],
       swap_policy: ["none", "with_consent", "organizer_only"],

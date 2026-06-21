@@ -13,6 +13,7 @@ import {
   ChevronRight,
   Clock,
   Receipt,
+  AlertOctagon,
 } from "lucide-react";
 import { TopBar } from "@/components/layout/TopBar";
 import { SectionCard } from "@/components/dashboard/SectionCard";
@@ -78,6 +79,10 @@ export default function MyContributions() {
   );
   const lateCount = useMemo(
     () => dues.filter((d) => d.days_to_due < 0).length,
+    [dues],
+  );
+  const defaultedDues = useMemo(
+    () => dues.filter((d) => d.status === "defaulted"),
     [dues],
   );
   const mostUrgent = sortedDues[0] ?? null;
@@ -270,6 +275,33 @@ export default function MyContributions() {
         </div>
 
         <InFlightPaymentsCard userId={user?.id ?? null} />
+
+        {defaultedDues.length > 0 && (
+          <article
+            role="alert"
+            className="flex flex-col gap-3 rounded-xl border-2 border-destructive/40 bg-destructive/5 p-4 sm:flex-row sm:items-center"
+          >
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-destructive/15 text-destructive">
+              <AlertOctagon className="h-5 w-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="font-display text-sm font-bold text-destructive">
+                {defaultedDues.length} cotisation{defaultedDues.length > 1 ? "s" : ""} en défaut officiel
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Votre compte peut être signalé à l'équipe Tontine. Régularisez sous 48h pour éviter
+                tout appel ou procédure de recouvrement.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => defaultedDues[0] && setPayingDue(defaultedDues[0])}
+              className="inline-flex h-10 items-center justify-center gap-2 whitespace-nowrap rounded-md bg-destructive px-4 text-sm font-semibold text-destructive-foreground hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive focus-visible:ring-offset-2"
+            >
+              Régulariser maintenant
+            </button>
+          </article>
+        )}
 
         {/* Cotisations + filtres */}
         <section id="section-dues" className="space-y-4">
@@ -509,6 +541,7 @@ interface CardProps {
 }
 
 function DueContributionCard({ due, onPay }: CardProps) {
+  const isDefaulted = due.status === "defaulted";
   const isOverdue = due.days_to_due < 0;
   const isUrgent = due.days_to_due >= 0 && due.days_to_due <= 3;
   return (
@@ -517,12 +550,17 @@ function DueContributionCard({ due, onPay }: CardProps) {
         "group relative flex flex-col overflow-hidden rounded-xl border bg-card transition hover:border-primary/40 hover:shadow-[0_18px_40px_-24px_hsl(var(--primary)/0.35)]",
         "border-hairline",
         isOverdue && "border-l-4 border-l-destructive",
+        isDefaulted && "border-2 border-destructive bg-destructive/[0.03]",
         isUrgent && "border-l-4 border-l-accent",
       )}
     >
       <div className="flex flex-1 flex-col gap-4 p-5">
         <div className="flex items-start gap-2">
-          {isOverdue ? (
+          {isDefaulted ? (
+            <span className="inline-flex items-center gap-1 rounded-full bg-destructive px-2 py-0.5 text-[11px] font-semibold text-destructive-foreground">
+              <AlertCircle className="h-3 w-3" /> En défaut
+            </span>
+          ) : isOverdue ? (
             <span className="inline-flex items-center gap-1 rounded-full bg-destructive/10 px-2 py-0.5 text-[11px] font-semibold text-destructive">
               <AlertCircle className="h-3 w-3" /> En retard
             </span>
