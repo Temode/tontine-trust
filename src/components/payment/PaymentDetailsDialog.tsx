@@ -88,7 +88,6 @@ export function PaymentDetailsDialog({
   }, [q.data?.djomy_transaction_id, q.data?.status, open]);
 
   const d = q.data;
-  const meta = d ? STATUS[d.status] ?? STATUS.pending : null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -102,12 +101,15 @@ export function PaymentDetailsDialog({
           <div className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" /> Chargement…
           </div>
-        ) : (
+        ) : (() => {
+          const meta = STATUS[d.status] ?? STATUS.pending;
+          const Icon = meta.Icon;
+          return (
           <div className="space-y-4">
             <div className={cn("flex items-center gap-3 rounded-lg p-3", meta!.cls)}>
-              <meta.Icon className={cn("h-5 w-5", (d.status === "initiated" || d.status === "pending") && "animate-spin")} />
+              <Icon className={cn("h-5 w-5", (d.status === "initiated" || d.status === "pending") && "animate-spin")} />
               <div className="flex-1">
-                <p className="text-sm font-semibold">{meta!.label}</p>
+                <p className="text-sm font-semibold">{meta.label}</p>
                 <p className="text-[11px] opacity-80">Mise à jour en direct dès confirmation Djomy.</p>
               </div>
               <p className="font-semibold num">{formatGNF(d.amount)} GNF</p>
@@ -136,7 +138,8 @@ export function PaymentDetailsDialog({
               </Link>
             )}
           </div>
-        )}
+          );
+        })()}
       </DialogContent>
     </Dialog>
   );
