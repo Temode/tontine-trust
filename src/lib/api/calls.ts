@@ -20,6 +20,10 @@ export interface CallRequest {
   ended_at: string | null;
   created_at: string;
   requester?: { full_name: string | null; avatar_url: string | null } | null;
+  recording_url?: string | null;
+  recording_size?: number | null;
+  recording_duration_seconds?: number | null;
+  recording_consent_user_ids?: string[];
 }
 
 export async function listCallRequests(groupId: string): Promise<CallRequest[]> {
