@@ -1,89 +1,105 @@
-## Diagnostic
+## Objectif
 
-1. **Cache navigateur** : ta capture montre un sidebar plus ancien que ce qui est dans le code. Un `Ctrl + Shift + R` sur ton onglet localhost le rafraîchira (déjà une nette simplification).
-2. **Mais le fond reste vrai** : depuis le MVP simplifié de mai, le dashboard et le menu ont regrossi. On va revenir à un état clair, MVP-ready.
+1. **Visite guidée** qui prend le nouvel utilisateur par la main en 5 étapes : logo + menu, Accueil, Mes tontines, Payer, cloche notifications.
+2. **Passe de polish « niveau Paxefy »** sur les 4 pages membre clés, sans toucher aux couleurs (sarcelle #0D7377 + or #E8AA14 conservés).
 
-## Principe directeur
+## Partie 1 — Visite guidée
 
-Un utilisateur n'a besoin de répondre qu'à **trois questions** en ouvrant l'app :
-1. Combien je dois et à qui ?
-2. Quand est mon prochain tour ?
-3. Où en sont mes tontines ?
+### Comportement
+- **Auto-démarrage** à la première connexion (flag `localStorage: tt_tour_done_v1`).
+- **Relançable** à tout moment via une icône « ? » discrète dans le TopBar (à côté de la cloche).
+- 5 étapes, navigation Suivant / Précédent / Passer.
+- L'utilisateur peut fermer à tout moment, le flag est posé.
 
-Tout le reste est secondaire et doit s'effacer.
+### Étapes (sur n'importe quelle page authentifiée)
 
-## 1. Sidebar simplifié — 5 entrées au lieu de 8
+| # | Cible (élément) | Message |
+|---|-----------------|---------|
+| 1 | Logo + sidebar header | « Bienvenue sur Tontine Digital. Voici votre espace personnel. » |
+| 2 | Lien `Accueil` (sidebar) | « Votre tableau de bord : ce que vous devez payer, votre prochain tour, vos tontines actives. » |
+| 3 | Lien `Mes tontines` | « Toutes vos tontines, leurs membres, leurs cycles. » |
+| 4 | Lien `Payer` | « Régler une cotisation en Orange Money, MTN Money ou carte, en quelques secondes. » |
+| 5 | Cloche notifications (TopBar) | « Annonces, demandes d'adhésion, rappels — tout arrive ici. » |
 
-```
-Accueil        → /dashboard      (vue d'ensemble + actions)
-Mes tontines   → /groupes        (liste + créer/rejoindre depuis l'empty state)
-Payer          → /cotisations    (cotisations à régler)
-Historique     → /recus          (paiements passés + reçus)
-Mon profil     → /profil         (sous-menu : notifications, confidentialité)
-```
+### Choix technique
+Composant **maison** basé sur shadcn `Popover` + un overlay SVG « spotlight » qui découpe un trou autour de la cible. Pas de dépendance externe (react-joyride, driver.js) — c'est ~200 lignes et ça reste 100 % cohérent avec le design system (radius, tokens, animations Tontine).
 
-Supprimé du menu (les fonctionnalités restent accessibles, juste plus dans la nav principale) :
-- « Notifications » → déplacée en **icône cloche dans le TopBar** (déjà présente)
-- « Créer une tontine » + « Rejoindre une tontine » → bouton **« + Nouvelle tontine »** dans le TopBar et CTA dans l'empty state de /groupes
-- Section « Actions rapides » → supprimée (redondante)
+Fichiers à créer :
+- `src/components/tour/GuidedTour.tsx` — orchestration, état, overlay
+- `src/components/tour/TourStep.tsx` — popover stylé tokens Tontine
+- `src/components/tour/useTour.ts` — hook avec `start()`, `stop()`, `hasSeen`
+- `src/components/tour/steps.ts` — définition des 5 étapes (sélecteurs + textes)
 
-## 2. Dashboard recentré — 3 blocs au lieu de 6+
+Fichiers à modifier :
+- `src/components/layout/AppShell.tsx` — monter `<GuidedTour />` + déclenchement auto
+- `src/components/layout/TopBar.tsx` — bouton « ? » qui appelle `start()`
+- `src/components/layout/DesktopSidebar.tsx` — `data-tour="nav-accueil"`, etc. sur les 3 liens
+- `src/components/notifications/NotificationBell.tsx` — `data-tour="notifications"`
 
-```
-┌────────────────────────────────────────────────────────────┐
-│  Bonjour Moussa 👋                                          │
-│  Voici ce qui demande ton attention aujourd'hui.            │
-├────────────────────────────────────────────────────────────┤
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐    │
-│  │  À PAYER     │  │ PROCHAIN TOUR│  │   FIABILITÉ  │    │
-│  │  100 000 GNF │  │   12 juil.   │  │     98 %     │    │
-│  │  [Payer]     │  │  Aïssatou    │  │   Très bon   │    │
-│  └──────────────┘  └──────────────┘  └──────────────┘    │
-├────────────────────────────────────────────────────────────┤
-│  MES TONTINES (3 actives)                  [Voir tout →]  │
-│  • Famille Diallo · prochain : 12 juil.                    │
-│  • Collègues bureau · prochain : 20 juil.                  │
-│  • Investissement 2026 · à initier                         │
-└────────────────────────────────────────────────────────────┘
-```
+## Partie 2 — Polish « niveau Paxefy »
 
-Supprimés du dashboard :
-- KPI redondants (« Paiements réussis », « Provider Djomy/OM/MTN/Carte »)
-- `RecentAnnouncementsCard` (déplacée dans la cloche notifications)
-- `DuesCard` + `UpcomingTurnsCard` séparées (fusionnées dans les 3 KPI cliquables)
+Périmètre : **4 pages membre clés** uniquement (Accueil, Mes tontines, Payer, Historique & reçus). Pas d'admin, pas de couleurs touchées.
 
-Si tu cliques sur **« À payer »** → tu arrives directement sur `/cotisations` filtré sur les cotisations dues. Plus de double affichage.
+### 2.1 En-têtes de page (TopBar enrichi)
+Aujourd'hui le TopBar est plat : juste titre + sous-titre. Paxefy a des en-têtes denses qui contextualisent (chips de statut, fil d'Ariane sur les pages internes).
 
-## 3. Page « Payer » (/cotisations) — nettoyage
+- Ajouter slot `breadcrumb?` (optionnel) au TopBar pour les pages de détail
+- Ajouter slot `chips?` (optionnel) pour afficher des badges contextuels (ex. « 3 cotisations en attente » sur la page Payer)
+- Renforcer la hiérarchie typographique : titre 24px bold + sous-titre 13px muted (déjà bon), ajouter une fine ligne de séparation `border-b border-hairline` (déjà là)
 
-- Garder uniquement les **cotisations dues** (par défaut)
-- Onglet secondaire « En cours » montrant les paiements initiés non confirmés (avec un bouton **« Reprendre »** ou **« Annuler »** pour les 3 résidus de test que tu as actuellement)
-- Retirer les triples KPI en haut (À payer / Paiements réussis / Provider) — déjà dans le dashboard
-- Garder le titre + sous-titre, c'est tout
+### 2.2 Cohérence des cartes
+Audit rapide : aujourd'hui certaines cartes ont `rounded-xl border-hairline`, d'autres `rounded-lg shadow-sm`. Standardiser :
 
-## 4. Bonus : nettoyer les paiements de test orphelins
+- **Toute carte de contenu** : `rounded-xl border border-hairline bg-card` (pas d'ombre, pattern Linear/Notion)
+- **Carte cliquable / KPI actionnable** : ajout d'un `hover:border-primary/40 hover:shadow-primary-sm transition` pour signaler l'interactivité
+- **Carte critique (paiement dû urgent)** : bordure gauche `border-l-4 border-l-destructive` au lieu d'un fond rouge agressif
 
-Tu as 3 paiements `initiated` jamais confirmés (issus de nos tests Djomy). On ajoute un job ou une RPC qui les passe en `cancelled` automatiquement après 30 min, ET tu peux les annuler manuellement depuis l'onglet « En cours ».
+Cibles : `SectionCard.tsx`, `KpiTile` (Dashboard), `ContributionRow` (Payer), `GroupRow` (Dashboard).
 
-## Hors-scope
+### 2.3 Empty states unifiés
+Actuellement chaque page a son propre empty state. Créer un composant unique :
 
-- Aucun changement sur le back-office admin (`/admin/*`)
-- Aucun changement sur les flux paiement Djomy (qui marchent maintenant)
-- Aucun changement sur le design system / couleurs / typo — on garde le visuel actuel, on retire seulement du contenu
-- Aucune migration DB
+- `src/components/ui/EmptyState.tsx` avec : icône en cercle pastel, titre, description courte, CTA primaire + CTA secondaire optionnel
+- Appliquer sur : `MyContributions` (dues vides + historique vide), `Dashboard` (préview tontines vide), `Receipts` (vide), `MyGroups` (déjà fait, harmoniser)
 
-## Fichiers à modifier
+### 2.4 Détails « Paxefy-grade »
+- Skeleton loaders au lieu de « Chargement… » texte brut (pages : Dashboard, MyContributions, MyGroups, Receipts)
+- Format des montants : harmoniser sur `120 000 GNF` (espaces fines) partout via `formatGNF` (vérifier qu'aucun composant n'affiche `120000 GNF`)
+- Format dates relatives : « il y a 3 jours » / « dans 5 jours » via `formatRelativeDays` partout
+- Micro-animations : `animate-fade-in` à l'entrée de page (déjà partiellement là), `transition-colors` sur les liens sidebar (déjà là), `active:scale-95` sur boutons primaires
 
-- `src/components/layout/DesktopSidebar.tsx` — 5 entrées au lieu de 8
-- `src/components/layout/BottomNav.tsx` — alignement mobile
-- `src/components/layout/TopBar.tsx` — ajouter bouton « + Nouvelle tontine »
-- `src/pages/Dashboard.tsx` — passer de 6 cartes à 3 KPI + 1 liste tontines
-- `src/pages/MyContributions.tsx` — retirer les 3 KPI redondants, ajouter onglet « En cours »
-- `src/pages/MyGroups.tsx` — empty state avec les CTA Créer/Rejoindre
+### 2.5 TopBar mobile
+Aujourd'hui sur mobile (≤lg) le TopBar montre titre+sous-titre mais la zone droite est compressée. Réorganiser :
+- Mobile : titre seul + 1 bouton icône action (Plus) + cloche + menu burger pour profil
+- Desktop : version actuelle (search + action + cloche + profil + logout)
+
+## Hors-scope (assumé)
+
+- **Couleurs** : on garde sarcelle #0D7377 + or #E8AA14, aucune modification du token system
+- **Typographie** : on garde la police actuelle (font-display + font-body déjà définis)
+- **Pages admin** (`/admin/*`) : aucune modification
+- **Backend / DB / Edge Functions** : aucune modification
+- **Flux Djomy** : aucune modification
+
+## Fichiers touchés (récap)
+
+Création :
+- `src/components/tour/GuidedTour.tsx`
+- `src/components/tour/TourStep.tsx`
+- `src/components/tour/useTour.ts`
+- `src/components/tour/steps.ts`
+- `src/components/ui/EmptyState.tsx`
+- `src/components/ui/Skeleton.tsx` (si absent — vérifier shadcn)
+
+Modification :
+- `src/components/layout/AppShell.tsx`, `TopBar.tsx`, `DesktopSidebar.tsx`, `BottomNav.tsx`
+- `src/components/notifications/NotificationBell.tsx`
+- `src/pages/Dashboard.tsx`, `MyContributions.tsx`, `MyGroups.tsx`, `Receipts.tsx`
+- `src/components/dashboard/SectionCard.tsx`
 
 ## Validation
 
-Après les changements :
-- Le menu de gauche tient sur **5 lignes**
-- Le dashboard tient sans scroll sur un écran 13"
-- Tu peux aller de l'accueil au paiement en **2 clics maximum**
+1. Premier login (vider localStorage) → tour démarre tout seul, les 5 étapes s'enchaînent sans bug, le spotlight cible bien chaque élément.
+2. Clic sur « ? » dans TopBar → tour redémarre.
+3. Capture comparative avant / après des 4 pages clés pour vérifier la cohérence.
+4. Test responsive : tour s'adapte sur mobile (popover repositionné).
