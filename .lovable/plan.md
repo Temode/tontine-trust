@@ -1,75 +1,55 @@
-## Objectif
+# Refonte du TopBar — esprit "Paxefy / Billion-Dollar"
 
-Atteindre le niveau de polish de Paxefy en travaillant **une page à la fois** (revue UX ciblée, validée avant de passer à la suivante), tout en conservant la palette Tontine (sarcelle #0D7377 + or #E8AA14). En parallèle, rendre les popovers d'onboarding plus **pédagogiques et orientés action**.
+## Constat sur la capture actuelle
 
----
+Le top de la page Accueil empile trop d'éléments hétérogènes sur une seule ligne (titre + sous-titre + recherche large + cloche + aide + CTA vert qui retourne sur 2 lignes + badge PARTICIPANT en majuscules + bouton logout). Résultat : ça ne respire pas, le CTA "Nouvelle tontine" casse en deux lignes, le badge `PARTICIPANT` ressemble à un tag de debug, la barre de recherche prend la place du titre. Ce n'est pas l'image d'une infrastructure financière sérieuse.
 
-## Partie A — Onboarding plus pédagogique (fait dans la foulée)
+## Doctrine (ce qu'on vise)
 
-Réécriture des 5 étapes dans `src/components/tour/steps.ts` selon le schéma :
-**Titre orienté action** → **Où regarder** (pointeur visuel) → **Quoi faire** → **Et ensuite**.
+Inspiration Paxefy / Stripe / Wise / Linear : **ultra-propre, beaucoup d'air, typographie confiante, une seule action primaire visible, hiérarchie claire**. Les couleurs Tontine Digitale (bleu sarcelle #0D7377 + or #E8AA14) restent intactes — on ne touche qu'à la composition, la densité et le rythme.
 
-Exemple pour l'étape « Accueil » :
-- Avant : *« Votre tableau de bord : ce que vous devez payer, votre prochain tour, vos tontines actives. »*
-- Après :
-  > **Commencez ici chaque jour**
-  > 👉 Cliquez sur **Accueil** dans le menu de gauche.
-  > Vous y verrez en haut **ce que vous devez payer aujourd'hui**, puis vos tontines actives.
-  > *Astuce : si une carte rouge s'affiche, c'est une cotisation à régler en priorité.*
+## Livrables
 
-Même structure appliquée aux 5 étapes (Bienvenue, Accueil, Mes tontines, Payer, Notifications) + ajout d'un libellé bouton plus clair : « Suivant → » devient **« Étape suivante »**, « Passer » devient **« Passer la visite »**. Ajout d'un compteur « Étape 2 / 5 » déjà présent — on le rendra plus visible.
+### 1. Fichier de doctrine `docs/DESIGN_DOCTRINE.md` (nouveau)
 
-Aucune modif de la mécanique du tour, uniquement le contenu (`steps.ts`) et 2-3 libellés dans `GuidedTour.tsx`.
+Court (≈ 1 page), pour que les prochaines itérations restent alignées. Sections :
+- **L'effet "Billion-Dollar"** : on conçoit Tontine Digitale comme une infrastructure financière, pas comme une app locale. Référence Paxefy / Stripe / Wise.
+- **Les 4 règles d'or** : (1) une seule action primaire par écran, (2) beaucoup d'air (padding généreux, jamais d'élément collé), (3) typographie hiérarchisée (display bold pour le titre, regular muted pour le contexte), (4) couleurs Tontine sarcelle + or, jamais d'autre accent.
+- **Ce qu'on bannit** : CTA qui retournent à la ligne, badges ALL CAPS criards, barres de recherche qui dominent un titre, empilement d'icônes sans regroupement, ombres lourdes, gradients violets génériques.
+- **Checklist avant de livrer une page** : 6-8 points (zéro scroll pour l'info clé, skeletons et pas spinners, montants en `tabular-nums`, espace ≥ gap-3 entre groupes d'icônes, etc.).
 
----
+### 2. Refonte de `src/components/layout/TopBar.tsx`
 
-## Partie B — Revue UX page par page
-
-Ordre proposé selon l'usage réel (du plus consulté au plus rare) :
+Composition cible (desktop) :
 
 ```text
-1. Accueil (/dashboard)          ← on commence ici
-2. Mes tontines (/groupes)
-3. Payer (/cotisations)
-4. Historique & reçus (/recus)
-5. Mon profil (/profil)
-6. Détail d'un groupe (/groupes/:id)
+┌──────────────────────────────────────────────────────────────────────┐
+│  Bonjour, Moussa                          [search]  [🔔] [?]  [+ Nouvelle tontine]  │  ⋮ avatar│
+│  Voici ce qui demande votre attention                                                 │
+└──────────────────────────────────────────────────────────────────────┘
 ```
 
-**Règle du jeu** : on traite **une seule page par tour**. À chaque page :
+Changements précis :
+- **Hauteur** unifiée à `h-16` (64px), padding `px-8`, `gap-4` entre groupes.
+- **Titre** : on garde `font-display` mais on passe à `text-[22px]` + `tracking-tight` ; sous-titre `text-[13px]` muted.
+- **Recherche** : largeur fixe `w-64`, hauteur `h-9`, fond `bg-secondary/40`, focus ring sarcelle léger — elle ne doit jamais rivaliser avec le titre.
+- **CTA "Nouvelle tontine"** : `h-9`, `px-4`, `whitespace-nowrap`, libellé raccourci à **"Nouvelle tontine"** sur ≥lg et **"Nouvelle"** sur md ; plus jamais de retour à la ligne. Ombre subtile `shadow-sm` (pas l'ombre lourde actuelle).
+- **Icônes utilitaires** (cloche, aide) regroupées dans un cluster avec `gap-1`, séparées du CTA par `gap-3` et un `divider` vertical fin optionnel.
+- **Rôle "PARTICIPANT"** : on supprime le badge ALL CAPS criard du TopBar. Le rôle reste accessible via le menu profil / sidebar. Si on veut le garder visible, on le remet en `text-[11px] text-muted-foreground` *sans* fond ni bordure, à côté du nom dans un futur menu avatar.
+- **Logout** : déplacé dans un **menu avatar** (dropdown) avec initiales de l'utilisateur dans un cercle 32px — pas d'icône logout nue à côté du CTA principal (ça crée 2 actions concurrentes).
+- **Bordure basse** : `border-b border-hairline` conservée, mais on retire le `backdrop-blur` qui n'apporte rien sur fond opaque et on passe à `bg-card`.
 
-1. Je liste les frictions UX observées (hiérarchie, densité, vides, états de chargement, libellés, mobile).
-2. Je propose 3-5 corrections concrètes (avant/après textuel + composants impactés).
-3. Tu valides → j'implémente → tu vois le résultat → on passe à la page suivante.
+### 3. Mobile
 
-### Étape 1 — Page Accueil (`src/pages/Dashboard.tsx`)
+- Sous `md` : titre seul + cluster `[🔔] [avatar]` à droite. Recherche masquée (déjà le cas). CTA "+" en bouton icône rond `h-9 w-9` à droite du titre, pas dans la barre d'icônes.
 
-Axes de revue prévus :
-- **Hiérarchie verticale** : la première chose vue doit être « as-tu quelque chose à payer aujourd'hui ? » (zéro scroll).
-- **Empty state** quand l'utilisateur n'a aucune tontine (aujourd'hui : carte vide peu engageante) → CTA double « Créer une tontine » + « Rejoindre via code ».
-- **Carte de cotisation due** : passage au style Paxefy (bord gauche accent, montant en gros, date relative « dans 2 jours », bouton primaire « Payer maintenant »).
-- **Skeletons** pendant le chargement plutôt que spinners.
-- **Mobile** : vérifier que les cartes ne débordent pas à 360px, que le bouton de paiement reste accessible au pouce.
-- **Formatage des montants** : `120 000 GNF` (espace insécable) partout.
+## Hors-scope (à faire dans des passes suivantes)
 
-Livrables Étape 1 :
-- Modification de `src/pages/Dashboard.tsx`
-- Création de `src/components/ui/EmptyState.tsx` (réutilisable pour les pages suivantes)
-- Création de `src/components/dashboard/DueCard.tsx` (carte cotisation due)
-- Ajustements mineurs dans `src/lib/format.ts` si besoin (montants, dates relatives)
+- La sidebar, le contenu de la page Accueil (déjà traité au tour précédent), les autres pages du menu, la palette, les polices, le backend, les routes. On ne touche **que** le TopBar et on ajoute **un seul** fichier `.md`.
 
-Aucun changement de palette, de typo, de routes, ni de backend.
+## Détails techniques
 
----
-
-## Ce qui n'est PAS dans ce plan
-
-- Les étapes 2 à 6 (autres pages) : seront chacune un nouveau plan validé séparément.
-- Couleurs, fonts, logique métier, base de données, Djomy, admin.
-- Refonte de la sidebar / topbar (déjà faite à l'itération précédente).
-
----
-
-## Question implicite
-
-Je démarre par **(A) la réécriture pédagogique des popovers + (B) la revue UX de la page Accueil** dans le même tour. Si tu préfères les séparer (juste A d'abord, ou juste B d'abord), dis-le moi avant d'approuver.
+- Fichiers modifiés : `src/components/layout/TopBar.tsx` uniquement.
+- Fichiers créés : `docs/DESIGN_DOCTRINE.md`, et éventuellement `src/components/layout/UserMenu.tsx` pour isoler le dropdown avatar (utilise `@/components/ui/dropdown-menu` déjà présent).
+- Pas de nouvelle dépendance, pas de migration DB, pas de changement de tokens couleurs.
+- Vérification : après build, lancer Playwright sur `/` connecté pour capturer le nouveau TopBar et confirmer (a) que "Nouvelle tontine" tient sur une ligne à 1280px et 712px, (b) que le badge PARTICIPANT a disparu du TopBar, (c) que le menu avatar ouvre Déconnexion.
