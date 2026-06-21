@@ -176,6 +176,72 @@ export default function GroupDetail() {
     queryKey: ["contributions", "due"],
     queryFn: listMyContributionsDue,
   });
+
+  // ---------- Pause: organizer profile + authorization requests + realtime ----------
+  const organizerProfileQ = useQuery({
+    queryKey: ["group", id, "organizer-profile", groupQ.data?.created_by],
+    enabled: !!groupQ.data?.created_by,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("profiles")
+        .select("full_name")
+        .eq("id", groupQ.data!.created_by)
+        .maybeSingle();
+      return (data?.full_name as string | null) ?? null;
+    },
+  });
+
+  const pauseRequestsQ = useQuery({
+    queryKey: ["group", id, "pause-requests"],
+    queryFn: () => listGroupPauseRequests(id as string),
+    enabled: !!id && groupQ.data?.status === "paused",
+  });
+
+  const requestPaymentM = useMutation({
+    mutationFn: (contributionId: string) => requestPaymentDuringPause(contributionId),
+    onSuccess: () => {
+      toast.success("Demande envoyée", { description: "L'organisateur a été notifié." });
+      queryClient.invalidateQueries({ queryKey: ["group", id, "pause-requests"] });
+    },
+    onError: (e: Error) => toast.error("Demande impossible", { description: e.message }),
+  });
+
+  const decideRequestM = useMutation({
+    mutationFn: ({ requestId, approve }: { requestId: string; approve: boolean }) =>
+      decidePaymentPauseRequest(requestId, approve),
+    onSuccess: (_data, vars) => {
+      toast.success(vars.approve ? "Autorisation accordée" : "Demande refusée");
+      queryClient.invalidateQueries({ queryKey: ["group", id, "pause-requests"] });
+    },
+    onError: (e: Error) => toast.error("Action impossible", { description: e.message }),
+  });
+
+  useEffect(() => {
+    if (!id) return;
+    const channel = supabase
+      .channel(`group-${id}-pause`)
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "groups", filter: `id=eq.${id}` },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ["group", id] });
+          queryClient.invalidateQueries({ queryKey: ["contributions", "due"] });
+          queryClient.invalidateQueries({ queryKey: ["group", id, "pause-requests"] });
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "payment_pause_requests", filter: `group_id=eq.${id}` },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ["group", id, "pause-requests"] });
+        },
+      )
+      .subscribe();
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [id, queryClient]);
+
   if (groupQ.isLoading) {
     return <div className="px-6 py-12 text-sm text-muted-foreground">Chargement…</div>;
   }
