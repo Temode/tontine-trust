@@ -19,6 +19,7 @@ import { overviewToTontine } from "@/lib/api/types";
 import { listMyNextTurns } from "@/lib/api/turns";
 import { listMyContributionsDue } from "@/lib/api/contributions";
 import { formatGNF } from "@/lib/format";
+import { Compass, Receipt } from "lucide-react";
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -95,31 +96,31 @@ export default function Dashboard() {
           {/* filet sarcelle latéral, signature visuelle Tontine */}
           <div aria-hidden className="absolute inset-y-0 left-0 w-1 bg-primary" />
 
-          <div className="relative flex flex-col gap-6 p-6 lg:flex-row lg:items-center lg:justify-between lg:p-8">
-            <div className="min-w-0">
+          <div className="relative flex flex-col gap-5 p-5 sm:p-6 lg:flex-row lg:items-center lg:justify-between lg:gap-8 lg:p-8">
+            <div className="min-w-0 flex-1">
               <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
                 {dues.length === 0 ? "Statut du compte" : "Solde à régler"}
               </p>
 
               {isLoadingDues ? (
-                <div className="mt-3 h-10 w-56 animate-pulse rounded-md bg-secondary/60" />
+                <div className="mt-3 h-9 w-48 animate-pulse rounded-md bg-secondary/60 sm:h-10 sm:w-56" />
               ) : dues.length === 0 ? (
                 <div className="mt-2 flex items-center gap-2">
-                  <ShieldCheck className="h-6 w-6 text-primary" strokeWidth={2} />
-                  <p className="font-display text-3xl font-bold leading-none tracking-tight text-foreground">
+                  <ShieldCheck className="h-5 w-5 shrink-0 text-primary sm:h-6 sm:w-6" strokeWidth={2} />
+                  <p className="font-display text-2xl font-bold leading-none tracking-tight text-foreground sm:text-3xl">
                     Vous êtes à jour
                   </p>
                 </div>
               ) : (
-                <p className="mt-2 font-display text-[40px] font-bold leading-none tracking-tight text-foreground num lg:text-[44px]">
+                <p className="mt-2 break-words font-display text-[28px] font-bold leading-[1.05] tracking-tight text-foreground num sm:text-[36px] lg:text-[44px]">
                   {formatGNF(totalDue)}
-                  <span className="ml-2 align-baseline text-lg font-semibold text-muted-foreground">
+                  <span className="ml-2 align-baseline text-sm font-semibold text-muted-foreground sm:text-base lg:text-lg">
                     GNF
                   </span>
                 </p>
               )}
 
-              <p className="mt-3 text-sm text-muted-foreground">
+              <p className="mt-3 text-[13px] leading-relaxed text-muted-foreground sm:text-sm">
                 {isLoadingDues
                   ? "Vérification de vos cotisations…"
                   : dues.length === 0
@@ -132,7 +133,7 @@ export default function Dashboard() {
               <button
                 type="button"
                 onClick={() => navigate("/cotisations")}
-                className="group inline-flex h-12 shrink-0 items-center justify-center gap-2 self-start rounded-lg bg-primary px-6 text-sm font-semibold text-primary-foreground shadow-sm transition hover:bg-primary-700 lg:self-auto"
+                className="group inline-flex h-11 w-full shrink-0 items-center justify-center gap-2 self-start rounded-lg bg-primary px-5 text-sm font-semibold text-primary-foreground shadow-sm transition hover:bg-primary-700 sm:h-12 sm:w-auto sm:px-6 lg:self-auto"
               >
                 Régler maintenant
                 <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
@@ -141,40 +142,91 @@ export default function Dashboard() {
           </div>
 
           {/* Bandeau métriques institutionnelles, intégré au hero */}
-          <div className="relative grid grid-cols-2 divide-x divide-hairline border-t border-hairline bg-card/60 sm:grid-cols-3">
-            <div className="px-6 py-4">
+          <div className="relative grid grid-cols-1 border-t border-hairline bg-card/60 divide-y divide-hairline sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+            <div className="min-w-0 px-5 py-3.5 sm:px-6 sm:py-4">
               <p className="text-[10px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
                 Prochain tour
               </p>
-              <p className="mt-1 font-display text-lg font-semibold text-foreground num">
+              <p className="mt-1 font-display text-base font-semibold leading-tight text-foreground num sm:text-lg">
                 {nextTurnLabel}
               </p>
               <p className="mt-0.5 truncate text-xs text-muted-foreground">{nextTurnHint}</p>
             </div>
-            <div className="px-6 py-4">
+            <div className="min-w-0 px-5 py-3.5 sm:px-6 sm:py-4">
               <p className="text-[10px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
                 Tontines actives
               </p>
-              <p className="mt-1 font-display text-lg font-semibold text-foreground num">
+              <p className="mt-1 font-display text-base font-semibold leading-tight text-foreground num sm:text-lg">
                 {activeCount}
               </p>
-              <p className="mt-0.5 text-xs text-muted-foreground">
+              <p className="mt-0.5 truncate text-xs text-muted-foreground">
                 {groups.length} au total
               </p>
             </div>
-            <div className="col-span-2 border-t border-hairline px-6 py-4 sm:col-span-1 sm:border-t-0">
+            <div className="min-w-0 px-5 py-3.5 sm:px-6 sm:py-4">
               <p className="text-[10px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
                 Cotisations en attente
               </p>
-              <p className="mt-1 font-display text-lg font-semibold text-foreground num">
+              <p className="mt-1 font-display text-base font-semibold leading-tight text-foreground num sm:text-lg">
                 {dues.length}
               </p>
-              <p className="mt-0.5 text-xs text-muted-foreground">
+              <p className="mt-0.5 truncate text-xs text-muted-foreground">
                 {dues.length === 0 ? "Aucune action requise" : "À traiter cette semaine"}
               </p>
             </div>
           </div>
         </section>
+
+        {/* Barre d'actions — même doctrine que le hero (rounded-2xl, hairline, shadow-sm) */}
+        <nav
+          aria-label="Actions rapides"
+          className="grid grid-cols-1 gap-2 rounded-2xl border border-hairline bg-card p-2 shadow-sm sm:grid-cols-3"
+        >
+          <button
+            type="button"
+            onClick={() => navigate("/nouveau")}
+            className="group flex items-center gap-3 rounded-xl px-4 py-3 text-left transition hover:bg-secondary/60"
+          >
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <Plus className="h-4 w-4" strokeWidth={2.25} />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-semibold text-foreground">Nouvelle tontine</span>
+              <span className="block truncate text-xs text-muted-foreground">Lancez en 2 minutes</span>
+            </span>
+            <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-foreground" />
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate("/rejoindre")}
+            className="group flex items-center gap-3 rounded-xl px-4 py-3 text-left transition hover:bg-secondary/60"
+          >
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent/15 text-accent-foreground">
+              <UserPlus className="h-4 w-4" strokeWidth={2.25} />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-semibold text-foreground">Rejoindre</span>
+              <span className="block truncate text-xs text-muted-foreground">Avec un code d'invitation</span>
+            </span>
+            <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-foreground" />
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate("/cotisations")}
+            className="group flex items-center gap-3 rounded-xl px-4 py-3 text-left transition hover:bg-secondary/60"
+          >
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-secondary text-foreground">
+              <Receipt className="h-4 w-4" strokeWidth={2.25} />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-semibold text-foreground">Mes cotisations</span>
+              <span className="block truncate text-xs text-muted-foreground">
+                {dues.length === 0 ? "Tout est à jour" : `${dues.length} en attente`}
+              </span>
+            </span>
+            <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-foreground" />
+          </button>
+        </nav>
 
         {/* Liste des cotisations à payer (détail) */}
         {!isLoadingDues && dues.length > 0 && (
