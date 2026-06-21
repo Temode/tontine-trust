@@ -204,6 +204,9 @@ export default function GroupDetail() {
   const nextTurn =
     turns.find((t) => t.status === "collecting") ?? turns.find((t) => t.status === "upcoming") ?? null;
   const completedTurns = turns.filter((t) => t.status === "paid").length;
+  const isPaused = grp.status === "paused";
+  const isArchived = !!grp.archived_at || grp.status === "completed" || grp.status === "cancelled";
+  const paymentsBlocked = isPaused || isArchived;
   const progress = turns.length > 0 ? Math.round((completedTurns / turns.length) * 100) : 0;
 
   const tabs: Array<{ id: Section; label: string }> = [
@@ -351,9 +354,9 @@ export default function GroupDetail() {
           <button
             type="button"
             onClick={() => {
-              if (myDueForGroup) void launchDjomyCheckout(myDueForGroup.contribution_id);
+              if (myDueForGroup && !paymentsBlocked) void launchDjomyCheckout(myDueForGroup.contribution_id);
             }}
-            disabled={!myDueForGroup}
+            disabled={!myDueForGroup || paymentsBlocked}
             className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-hairline bg-card px-4 text-xs font-semibold text-foreground transition hover:bg-secondary disabled:opacity-50"
           >
             <HandCoins className="h-4 w-4" />
@@ -413,7 +416,25 @@ export default function GroupDetail() {
           </div>
         )}
 
-        {myDueForGroup && (
+        {paymentsBlocked && (
+          <div className="mt-5 flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-50/60 p-4 dark:bg-amber-500/10">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-500 text-white">
+              <ShieldCheck className="h-4 w-4" />
+            </div>
+            <div>
+              <p className="font-display text-sm font-bold text-foreground">
+                {isPaused ? "Cycle en pause" : "Cycle clôturé"}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {isPaused
+                  ? "Les paiements sont suspendus jusqu'à la reprise du cycle par l'organisateur."
+                  : "Ce groupe est archivé : aucun nouveau paiement ne peut être effectué."}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {myDueForGroup && !paymentsBlocked && (
           <div className="mt-5 flex flex-col gap-3 rounded-xl border border-primary/20 bg-primary-50/60 p-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-start gap-3">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">

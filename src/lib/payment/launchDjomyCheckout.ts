@@ -58,7 +58,19 @@ export async function launchDjomyCheckout(contributionId: string): Promise<void>
     window.location.assign(data.redirectUrl);
   } catch (e) {
     toast.dismiss(t);
-    const msg = (e as Error).message ?? "Erreur inconnue";
-    toast.error("Paiement impossible", { description: msg, duration: 8000 });
+    const raw = (e as Error).message ?? "Erreur inconnue";
+    const friendly =
+      raw.includes("GROUP_PAUSED")
+        ? "Ce groupe est en pause : les paiements sont suspendus jusqu'à la reprise du cycle."
+        : raw.includes("GROUP_ARCHIVED")
+        ? "Ce groupe est archivé : les paiements ne sont plus acceptés."
+        : raw.includes("GROUP_DELETED")
+        ? "Ce groupe a été supprimé."
+        : raw.includes("GROUP_NOT_ACTIVE")
+        ? "Le cycle de ce groupe est terminé : aucun nouveau paiement n'est accepté."
+        : raw.includes("ALREADY_PAID")
+        ? "Cette cotisation est déjà confirmée."
+        : raw;
+    toast.error("Paiement impossible", { description: friendly, duration: 8000 });
   }
 }
