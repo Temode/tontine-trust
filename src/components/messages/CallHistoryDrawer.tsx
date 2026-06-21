@@ -140,12 +140,15 @@ export function CallHistoryDrawer({ open, onOpenChange, groupId }: Props) {
                     {!mine && (
                       <button
                         type="button"
-                        onClick={() => respond.mutate({ id: c.id, status: "accepted" })}
+                        onClick={() => {
+                          respond.mutate({ id: c.id, status: "accepted" });
+                          setJoinCallId(c.id);
+                        }}
                         disabled={respond.isPending}
                         className="inline-flex h-8 flex-1 items-center justify-center gap-1.5 rounded-md bg-primary px-3 text-xs font-semibold text-primary-foreground hover:bg-primary-700"
                       >
                         <Phone className="h-3.5 w-3.5" />
-                        Accepter
+                        Rejoindre
                       </button>
                     )}
                     <button
