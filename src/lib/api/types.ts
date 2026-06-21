@@ -43,6 +43,7 @@ export interface DbGroup {
   created_at: string;
   updated_at: string;
   paused_at?: string | null;
+  paused_reason?: string | null;
   archived_at?: string | null;
   deleted_at?: string | null;
 }

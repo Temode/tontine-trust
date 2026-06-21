@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
@@ -47,6 +47,13 @@ import { ReviewsPanel } from "@/components/group/ReviewsPanel";
 import { InvitationsHistoryPanel } from "@/components/groups/InvitationsHistoryPanel";
 import { GroupDefaultersSection } from "@/components/group/GroupDefaultersSection";
 import { GroupDisputesSection } from "@/components/group/GroupDisputesSection";
+import {
+  decidePaymentPauseRequest,
+  listGroupPauseRequests,
+  requestPaymentDuringPause,
+  type PausePaymentRequest,
+} from "@/lib/api/pauseRequests";
+import { supabase } from "@/integrations/supabase/client";
 
 type Section =
   | "overview"
@@ -70,6 +77,7 @@ function statusLabel(s: DbGroup["status"]): string {
     case "draft": return "Brouillon";
     case "open": return "Ouvert";
     case "active": return "Actif";
+    case "paused": return "En pause";
     case "completed": return "Terminé";
     case "cancelled": return "Annulé";
   }
@@ -168,6 +176,72 @@ export default function GroupDetail() {
     queryKey: ["contributions", "due"],
     queryFn: listMyContributionsDue,
   });
+
+  // ---------- Pause: organizer profile + authorization requests + realtime ----------
+  const organizerProfileQ = useQuery({
+    queryKey: ["group", id, "organizer-profile", groupQ.data?.created_by],
+    enabled: !!groupQ.data?.created_by,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("profiles")
+        .select("full_name")
+        .eq("id", groupQ.data!.created_by)
+        .maybeSingle();
+      return (data?.full_name as string | null) ?? null;
+    },
+  });
+
+  const pauseRequestsQ = useQuery({
+    queryKey: ["group", id, "pause-requests"],
+    queryFn: () => listGroupPauseRequests(id as string),
+    enabled: !!id && groupQ.data?.status === "paused",
+  });
+
+  const requestPaymentM = useMutation({
+    mutationFn: (contributionId: string) => requestPaymentDuringPause(contributionId),
+    onSuccess: () => {
+      toast.success("Demande envoyée", { description: "L'organisateur a été notifié." });
+      queryClient.invalidateQueries({ queryKey: ["group", id, "pause-requests"] });
+    },
+    onError: (e: Error) => toast.error("Demande impossible", { description: e.message }),
+  });
+
+  const decideRequestM = useMutation({
+    mutationFn: ({ requestId, approve }: { requestId: string; approve: boolean }) =>
+      decidePaymentPauseRequest(requestId, approve),
+    onSuccess: (_data, vars) => {
+      toast.success(vars.approve ? "Autorisation accordée" : "Demande refusée");
+      queryClient.invalidateQueries({ queryKey: ["group", id, "pause-requests"] });
+    },
+    onError: (e: Error) => toast.error("Action impossible", { description: e.message }),
+  });
+
+  useEffect(() => {
+    if (!id) return;
+    const channel = supabase
+      .channel(`group-${id}-pause`)
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "groups", filter: `id=eq.${id}` },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ["group", id] });
+          queryClient.invalidateQueries({ queryKey: ["contributions", "due"] });
+          queryClient.invalidateQueries({ queryKey: ["group", id, "pause-requests"] });
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "payment_pause_requests", filter: `group_id=eq.${id}` },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ["group", id, "pause-requests"] });
+        },
+      )
+      .subscribe();
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [id, queryClient]);
+
   if (groupQ.isLoading) {
     return <div className="px-6 py-12 text-sm text-muted-foreground">Chargement…</div>;
   }
@@ -417,21 +491,52 @@ export default function GroupDetail() {
         )}
 
         {paymentsBlocked && (
-          <div className="mt-5 flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-50/60 p-4 dark:bg-amber-500/10">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-500 text-white">
-              <ShieldCheck className="h-4 w-4" />
-            </div>
-            <div>
-              <p className="font-display text-sm font-bold text-foreground">
-                {isPaused ? "Cycle en pause" : "Cycle clôturé"}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                {isPaused
-                  ? "Les paiements sont suspendus jusqu'à la reprise du cycle par l'organisateur."
-                  : "Ce groupe est archivé : aucun nouveau paiement ne peut être effectué."}
-              </p>
-            </div>
-          </div>
+          <PausedPaymentsBanner
+            isPaused={isPaused}
+            grp={grp}
+            organizerName={organizerProfileQ.data ?? null}
+            myDue={myDueForGroup}
+            myPendingRequest={
+              myDueForGroup
+                ? (pauseRequestsQ.data ?? []).find(
+                    (r) =>
+                      r.contribution_id === myDueForGroup.contribution_id &&
+                      r.requested_by === user?.id &&
+                      r.status === "pending",
+                  ) ?? null
+                : null
+            }
+            myApprovedRequest={
+              myDueForGroup
+                ? (pauseRequestsQ.data ?? []).find(
+                    (r) =>
+                      r.contribution_id === myDueForGroup.contribution_id &&
+                      r.requested_by === user?.id &&
+                      r.status === "approved" &&
+                      new Date(r.expires_at).getTime() > Date.now(),
+                  ) ?? null
+                : null
+            }
+            myLastRejected={
+              myDueForGroup
+                ? (pauseRequestsQ.data ?? []).find(
+                    (r) =>
+                      r.contribution_id === myDueForGroup.contribution_id &&
+                      r.requested_by === user?.id &&
+                      r.status === "rejected",
+                  ) ?? null
+                : null
+            }
+            isOrganizer={isOrganizer}
+            pendingRequests={(pauseRequestsQ.data ?? []).filter((r) => r.status === "pending")}
+            onRequest={() =>
+              myDueForGroup && requestPaymentM.mutate(myDueForGroup.contribution_id)
+            }
+            requestPending={requestPaymentM.isPending}
+            onDecide={(requestId, approve) => decideRequestM.mutate({ requestId, approve })}
+            decidePending={decideRequestM.isPending}
+            onPay={() => myDueForGroup && void launchDjomyCheckout(myDueForGroup.contribution_id)}
+          />
         )}
 
         {myDueForGroup && !paymentsBlocked && (
@@ -867,6 +972,154 @@ function RotationTab({
         </ul>
       </SectionCard>
     )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// PausedPaymentsBanner — explique pourquoi le paiement est bloqué et permet
+// de demander/accorder une autorisation exceptionnelle pendant la pause.
+// ---------------------------------------------------------------------------
+interface PausedPaymentsBannerProps {
+  isPaused: boolean;
+  grp: DbGroup;
+  organizerName: string | null;
+  myDue: { contribution_id: string; amount: number; turn_number: number; due_date: string } | undefined;
+  myPendingRequest: PausePaymentRequest | null;
+  myApprovedRequest: PausePaymentRequest | null;
+  myLastRejected: PausePaymentRequest | null;
+  isOrganizer: boolean;
+  pendingRequests: PausePaymentRequest[];
+  onRequest: () => void;
+  requestPending: boolean;
+  onDecide: (requestId: string, approve: boolean) => void;
+  decidePending: boolean;
+  onPay: () => void;
+}
+
+function PausedPaymentsBanner(props: PausedPaymentsBannerProps) {
+  const {
+    isPaused, grp, organizerName, myDue,
+    myPendingRequest, myApprovedRequest, myLastRejected,
+    isOrganizer, pendingRequests,
+    onRequest, requestPending, onDecide, decidePending, onPay,
+  } = props;
+
+  const pausedDate = grp.paused_at
+    ? new Date(grp.paused_at).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })
+    : null;
+  const orgLabel = organizerName?.trim() || "l'organisateur";
+
+  return (
+    <div className="mt-5 space-y-3 rounded-xl border border-amber-500/30 bg-amber-50/60 p-4 dark:bg-amber-500/10">
+      <div className="flex items-start gap-3">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-500 text-white">
+          <ShieldCheck className="h-4 w-4" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="font-display text-sm font-bold text-foreground">
+            {isPaused ? "Cycle en pause — paiements suspendus" : "Cycle clôturé"}
+          </p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            {isPaused ? (
+              <>
+                {orgLabel} a mis ce cycle en pause
+                {pausedDate ? ` le ${pausedDate}` : ""}
+                {grp.paused_reason ? ` — motif : « ${grp.paused_reason} »` : ""}. Aucune cotisation ne peut être réglée tant que le cycle n'a pas repris.
+              </>
+            ) : (
+              "Ce groupe est archivé : aucun nouveau paiement ne peut être effectué."
+            )}
+          </p>
+        </div>
+      </div>
+
+      {/* Côté membre — workflow d'autorisation */}
+      {isPaused && !isOrganizer && myDue && (
+        <div className="rounded-lg border border-hairline bg-card/80 p-3">
+          {myApprovedRequest ? (
+            <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+              <p className="text-xs text-foreground">
+                <CheckCircle2 className="mr-1 inline h-3.5 w-3.5 text-primary" />
+                {orgLabel} vous a autorisé(e) à régler votre cotisation malgré la pause.
+              </p>
+              <button
+                type="button"
+                onClick={onPay}
+                className="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-primary px-4 text-xs font-semibold text-primary-foreground transition hover:bg-primary-700"
+              >
+                <ShieldCheck className="h-3.5 w-3.5" />
+                Payer via Djomy
+              </button>
+            </div>
+          ) : myPendingRequest ? (
+            <p className="text-xs text-muted-foreground">
+              Votre demande d'autorisation est en attente de réponse de {orgLabel}. Vous serez notifié(e) dès qu'une décision sera prise.
+            </p>
+          ) : (
+            <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+              <div className="min-w-0">
+                <p className="text-xs text-foreground">
+                  Vous pouvez demander une autorisation exceptionnelle pour régler votre tour #{myDue.turn_number} ({formatGNF(myDue.amount, { withCurrency: true })}).
+                </p>
+                {myLastRejected && (
+                  <p className="mt-1 text-[11px] text-destructive">
+                    Précédente demande refusée{myLastRejected.decision_reason ? ` — motif : « ${myLastRejected.decision_reason} »` : ""}.
+                  </p>
+                )}
+              </div>
+              <button
+                type="button"
+                disabled={requestPending}
+                onClick={onRequest}
+                className="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-primary/40 bg-primary/10 px-4 text-xs font-semibold text-primary transition hover:bg-primary/15 disabled:opacity-60"
+              >
+                {requestPending ? "Envoi…" : "Demander l'autorisation de payer"}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Côté organisateur — liste des demandes en attente */}
+      {isPaused && isOrganizer && pendingRequests.length > 0 && (
+        <div className="rounded-lg border border-hairline bg-card/80 p-3">
+          <p className="mb-2 text-[11px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
+            Demandes d'autorisation ({pendingRequests.length})
+          </p>
+          <ul className="space-y-2">
+            {pendingRequests.map((r) => (
+              <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                <span className="min-w-0 truncate text-foreground">
+                  {r.requester_name?.trim() || "Membre"}
+                  <span className="ml-2 text-muted-foreground">
+                    · demandé le {new Date(r.created_at).toLocaleDateString("fr-FR")}
+                  </span>
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    disabled={decidePending}
+                    onClick={() => onDecide(r.id, false)}
+                    className="inline-flex h-8 items-center rounded-md border border-hairline bg-card px-3 text-xs font-medium text-muted-foreground transition hover:bg-secondary disabled:opacity-60"
+                  >
+                    Refuser
+                  </button>
+                  <button
+                    type="button"
+                    disabled={decidePending}
+                    onClick={() => onDecide(r.id, true)}
+                    className="inline-flex h-8 items-center gap-1 rounded-md bg-primary px-3 text-xs font-semibold text-primary-foreground transition hover:bg-primary-700 disabled:opacity-60"
+                  >
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                    Autoriser
+                  </button>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }

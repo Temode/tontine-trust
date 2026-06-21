@@ -1886,6 +1886,112 @@ export type Database = {
           },
         ]
       }
+      payment_pause_requests: {
+        Row: {
+          contribution_id: string
+          created_at: string
+          decided_at: string | null
+          decided_by: string | null
+          decision_reason: string | null
+          expires_at: string
+          group_id: string
+          id: string
+          requested_by: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          contribution_id: string
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          decision_reason?: string | null
+          expires_at?: string
+          group_id: string
+          id?: string
+          requested_by: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          contribution_id?: string
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          decision_reason?: string | null
+          expires_at?: string
+          group_id?: string
+          id?: string
+          requested_by?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_pause_requests_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
+            referencedRelation: "contributions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_pause_requests_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
+            referencedRelation: "group_defaulters"
+            referencedColumns: ["contribution_id"]
+          },
+          {
+            foreignKeyName: "payment_pause_requests_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
+            referencedRelation: "group_payments_history"
+            referencedColumns: ["contribution_id"]
+          },
+          {
+            foreignKeyName: "payment_pause_requests_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
+            referencedRelation: "my_contributions_due"
+            referencedColumns: ["contribution_id"]
+          },
+          {
+            foreignKeyName: "payment_pause_requests_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
+            referencedRelation: "my_late_contributions"
+            referencedColumns: ["contribution_id"]
+          },
+          {
+            foreignKeyName: "payment_pause_requests_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
+            referencedRelation: "turn_assignment_audit"
+            referencedColumns: ["contribution_id"]
+          },
+          {
+            foreignKeyName: "payment_pause_requests_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "admin_group_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_pause_requests_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_pause_requests_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "my_groups_overview"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payments: {
         Row: {
           amount: number
@@ -4509,6 +4615,10 @@ export type Database = {
         Returns: undefined
       }
       create_group_with_invitation: { Args: { _payload: Json }; Returns: Json }
+      decide_payment_pause_request: {
+        Args: { _approve: boolean; _reason?: string; _request_id: string }
+        Returns: undefined
+      }
       delete_account: { Args: { _reason?: string }; Returns: undefined }
       enqueue_payment_reminders: { Args: never; Returns: number }
       explain_contribution: {
@@ -4715,6 +4825,10 @@ export type Database = {
       }
       request_group_deletion: {
         Args: { _group_id: string; _reason: string }
+        Returns: string
+      }
+      request_payment_during_pause: {
+        Args: { _contribution_id: string }
         Returns: string
       }
       request_turn_swap: {
@@ -4948,6 +5062,9 @@ export type Database = {
         | "defaulter_report_resolved"
         | "dispute_raised"
         | "dispute_resolved"
+        | "payment_pause_request_created"
+        | "payment_pause_request_approved"
+        | "payment_pause_request_rejected"
       payment_method_external:
         | "cash"
         | "bank_transfer"
@@ -5211,6 +5328,9 @@ export const Constants = {
         "defaulter_report_resolved",
         "dispute_raised",
         "dispute_resolved",
+        "payment_pause_request_created",
+        "payment_pause_request_approved",
+        "payment_pause_request_rejected",
       ],
       payment_method_external: [
         "cash",
