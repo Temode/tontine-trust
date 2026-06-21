@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
 import { AlertTriangle, Plus } from "lucide-react";
 import { TopBar } from "@/components/layout/TopBar";
 import { EmptyState } from "@/components/groups/EmptyState";
@@ -89,7 +88,6 @@ function toCsv(groups: TontineGroup[]): string {
 }
 
 export default function MyGroups() {
-  const navigate = useNavigate();
   const { openCreate } = useQuickActions();
 
   const [query, setQuery] = useState("");
