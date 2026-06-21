@@ -3583,14 +3583,10 @@ export type Database = {
           beneficiary_user_id: string | null
           contribution_id: string | null
           days_to_due: number | null
-          default_days: number | null
-          defaulted_at: string | null
           due_date: string | null
           expected_penalty: number | null
           group_id: string | null
           group_name: string | null
-          late_penalty_after_days: number | null
-          late_penalty_percent: number | null
           status: Database["public"]["Enums"]["contribution_status"] | null
           turn_id: string | null
           turn_number: number | null
