@@ -43,6 +43,7 @@ const AdminIntegrity = lazy(() => import("@/pages/admin/Integrity"));
 const AdminDjomySettings = lazy(() => import("@/pages/admin/DjomySettings"));
 const AdminSmsTest = lazy(() => import("@/pages/admin/SmsTest"));
 const AdminSmsLogs = lazy(() => import("@/pages/admin/SmsLogs"));
+const AdminCronPreview = lazy(() => import("@/pages/admin/CronPreview"));
 import { AdminShell } from "@/components/admin/AdminShell";
 
 const queryClient = new QueryClient({
@@ -149,6 +150,7 @@ const App = () => (
                     <Route path="/admin/djomy" element={<RouteBoundary name="Identifiants Djomy"><AdminDjomySettings /></RouteBoundary>} />
                     <Route path="/admin/sms-test" element={<RouteBoundary name="Test SMS"><AdminSmsTest /></RouteBoundary>} />
                     <Route path="/admin/sms-logs" element={<RouteBoundary name="Journal SMS"><AdminSmsLogs /></RouteBoundary>} />
+                    <Route path="/admin/cron-preview" element={<RouteBoundary name="Aperçu cron rappels"><AdminCronPreview /></RouteBoundary>} />
                   </Route>
                 </Route>
                 <Route path="*" element={<RouteBoundary name="Page introuvable"><NotFound /></RouteBoundary>} />
