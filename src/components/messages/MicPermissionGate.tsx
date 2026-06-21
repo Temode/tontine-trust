@@ -1,9 +1,19 @@
 import { useEffect, useRef, useState } from "react";
-import { Camera, Mic, MicOff, ShieldCheck, Video, VideoOff } from "lucide-react";
+import {
+  Camera,
+  Mic,
+  MicOff,
+  MonitorOff,
+  MonitorUp,
+  ShieldCheck,
+  Video,
+  VideoOff,
+} from "lucide-react";
 
 export interface PreCallDevicePrefs {
   micMuted: boolean;
   camOff: boolean;
+  screenShare: boolean;
 }
 
 interface Props {
@@ -22,6 +32,7 @@ export function MicPermissionGate({ onGranted, onCancel, withVideo = true }: Pro
   const [hasCam, setHasCam] = useState(false);
   const [micMuted, setMicMuted] = useState(false);
   const [camOff, setCamOff] = useState(false);
+  const [screenShare, setScreenShare] = useState(false);
   const [micLevel, setMicLevel] = useState(0); // 0..1
   const [previewStream, setPreviewStream] = useState<MediaStream | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -161,7 +172,7 @@ export function MicPermissionGate({ onGranted, onCancel, withVideo = true }: Pro
   const accept = () => {
     window.localStorage.setItem(LS_KEY, "1");
     stopPreview();
-    onGranted({ micMuted, camOff: camOff || !hasCam });
+    onGranted({ micMuted, camOff: camOff || !hasCam, screenShare });
   };
 
   // Skip gate entirely if already granted in a previous session.
@@ -277,6 +288,22 @@ export function MicPermissionGate({ onGranted, onCancel, withVideo = true }: Pro
           >
             {camOff || !hasCam ? <VideoOff className="h-4 w-4" /> : <Video className="h-4 w-4" />}
             {camOff || !hasCam ? "Caméra coupée" : "Caméra ouverte"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setScreenShare((v) => !v)}
+            className={`col-span-2 flex h-12 items-center justify-center gap-2 rounded-md border text-xs font-semibold transition ${
+              screenShare
+                ? "border-primary/40 bg-primary/10 text-primary"
+                : "border-hairline bg-card text-foreground hover:bg-secondary"
+            }`}
+            aria-pressed={screenShare}
+            title="Le partage démarrera dès l'entrée dans l'appel (le navigateur demandera la fenêtre à partager)."
+          >
+            {screenShare ? <MonitorUp className="h-4 w-4" /> : <MonitorOff className="h-4 w-4" />}
+            {screenShare
+              ? "Partager mon écran à l'entrée"
+              : "Pas de partage d'écran"}
           </button>
         </div>
       )}

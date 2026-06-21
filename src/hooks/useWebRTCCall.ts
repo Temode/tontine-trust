@@ -57,6 +57,7 @@ interface UseWebRTCCallOpts {
   video?: boolean;
   initialMuted?: boolean;
   initialCamOff?: boolean;
+  initialScreenShare?: boolean;
 }
 
 export function useWebRTCCall({
@@ -67,6 +68,7 @@ export function useWebRTCCall({
   video = true,
   initialMuted = false,
   initialCamOff = false,
+  initialScreenShare = false,
 }: UseWebRTCCallOpts) {
   const { user } = useAuth();
   const myId = user?.id ?? null;
@@ -77,12 +79,16 @@ export function useWebRTCCall({
   const [peers, setPeers] = useState<Record<string, RemotePeer>>({});
   const [isMuted, setMuted] = useState(initialMuted);
   const [isCamOff, setCamOff] = useState(initialCamOff);
+  const [isScreenSharing, setScreenSharing] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [turnAvailable, setTurnAvailable] = useState(false);
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [diagEvents, setDiagEvents] = useState<WebRTCDiagEvent[]>([]);
 
   const localStreamRef = useRef<MediaStream | null>(null);
+  const cameraTrackRef = useRef<MediaStreamTrack | null>(null);
+  const screenStreamRef = useRef<MediaStream | null>(null);
+  const screenAutoStartedRef = useRef(false);
   const participantsRef = useRef<CallParticipant[]>([]);
   const pcsRef = useRef<Record<string, RTCPeerConnection>>({});
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
@@ -466,11 +472,21 @@ export function useWebRTCCall({
           })
           .subscribe(async (state) => {
             if (state === "SUBSCRIBED") {
-              channel.send({
-                type: "broadcast",
-                event: "peer-join",
-                payload: { user_id: myId },
-              });
+              const announce = () =>
+                channel.send({
+                  type: "broadcast",
+                  event: "peer-join",
+                  payload: { user_id: myId },
+                });
+              // Re-broadcast a few times to defeat race conditions where a peer
+              // is still wiring its own listeners when we first announce.
+              announce();
+              window.setTimeout(announce, 800);
+              window.setTimeout(announce, 2500);
+              window.setTimeout(() => {
+                void refreshParticipants();
+                announce();
+              }, 5000);
               const activePeers = participantsRef.current
                 .filter((p) => !p.left_at && p.user_id !== myId)
                 .map((p) => p.user_id);
@@ -602,6 +618,101 @@ export function useWebRTCCall({
     if (stream) stream.getVideoTracks().forEach((t) => (t.enabled = !next));
   }, [isCamOff]);
 
+  const stopScreenShare = useCallback(async () => {
+    const stream = localStreamRef.current;
+    const screen = screenStreamRef.current;
+    if (!stream || !screen) {
+      setScreenSharing(false);
+      return;
+    }
+    const camTrack = cameraTrackRef.current;
+    // Replace screen track with original camera track in every sender
+    Object.values(pcsRef.current).forEach((pc) => {
+      pc.getSenders().forEach((s) => {
+        if (s.track && s.track.kind === "video") {
+          void s.replaceTrack(camTrack ?? null);
+        }
+      });
+    });
+    // Update local stream
+    screen.getTracks().forEach((t) => {
+      stream.removeTrack(t);
+      t.stop();
+    });
+    if (camTrack && !stream.getVideoTracks().includes(camTrack)) {
+      stream.addTrack(camTrack);
+      camTrack.enabled = !isCamOff;
+    }
+    screenStreamRef.current = null;
+    cameraTrackRef.current = null;
+    setLocalStream(new MediaStream(stream.getTracks()));
+    setScreenSharing(false);
+    logDiag({ type: "info", detail: "screen share stopped" });
+  }, [isCamOff, logDiag]);
+
+  const startScreenShare = useCallback(async () => {
+    if (screenStreamRef.current) return;
+    const stream = localStreamRef.current;
+    if (!stream) throw new Error("Flux local non prêt.");
+    let screen: MediaStream;
+    try {
+      screen = await navigator.mediaDevices.getDisplayMedia({
+        video: { frameRate: 15 },
+        audio: false,
+      });
+    } catch (e) {
+      const err = e as DOMException;
+      logDiag({ type: "error", detail: `screen share: ${err.name}` });
+      throw e;
+    }
+    const screenTrack = screen.getVideoTracks()[0];
+    if (!screenTrack) throw new Error("Aucune piste vidéo dans le partage d'écran.");
+    // Save current camera track and remove from stream
+    const existingCam = stream.getVideoTracks()[0] ?? null;
+    cameraTrackRef.current = existingCam;
+    if (existingCam) stream.removeTrack(existingCam);
+    stream.addTrack(screenTrack);
+    screenStreamRef.current = screen;
+    // Replace track in every peer connection — no re-negotiation needed
+    Object.values(pcsRef.current).forEach((pc) => {
+      const sender = pc.getSenders().find((s) => s.track?.kind === "video");
+      if (sender) {
+        void sender.replaceTrack(screenTrack);
+      } else {
+        pc.addTrack(screenTrack, stream);
+      }
+    });
+    screenTrack.onended = () => {
+      void stopScreenShare();
+    };
+    setLocalStream(new MediaStream(stream.getTracks()));
+    setScreenSharing(true);
+    logDiag({ type: "info", detail: "screen share started" });
+  }, [logDiag, stopScreenShare]);
+
+  const toggleScreenShare = useCallback(async () => {
+    if (screenStreamRef.current) {
+      await stopScreenShare();
+    } else {
+      await startScreenShare();
+    }
+  }, [startScreenShare, stopScreenShare]);
+
+  // Auto-start screen share once the call is live if requested pre-call.
+  useEffect(() => {
+    if (
+      status === "live" &&
+      initialScreenShare &&
+      !screenAutoStartedRef.current &&
+      !screenStreamRef.current
+    ) {
+      screenAutoStartedRef.current = true;
+      startScreenShare().catch((e) => {
+        console.warn("auto screen-share failed", e);
+      });
+    }
+  }, [status, initialScreenShare, startScreenShare]);
+
   const startRecording = useCallback(async () => {
     if (recorderRef.current) return;
     const local = localStreamRef.current;
@@ -696,6 +807,8 @@ export function useWebRTCCall({
     toggleMute,
     isCamOff,
     toggleCam,
+    isScreenSharing,
+    toggleScreenShare,
     leave: leaveWithStop,
     isRecording,
     startRecording,

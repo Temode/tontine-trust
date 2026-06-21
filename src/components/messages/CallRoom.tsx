@@ -5,6 +5,8 @@ import {
   Circle,
   Mic,
   MicOff,
+  MonitorUp,
+  MonitorX,
   PhoneOff,
   ShieldAlert,
   Square,
@@ -38,6 +40,7 @@ export function CallRoom({ open, onOpenChange, callId, groupName, groupId, initi
   const [preCallPrefs, setPreCallPrefs] = useState<PreCallDevicePrefs>({
     micMuted: false,
     camOff: false,
+    screenShare: false,
   });
   const [recordingEnabled, setRecordingEnabled] = useState(false);
   const [showDiag, setShowDiag] = useState(false);
@@ -50,6 +53,8 @@ export function CallRoom({ open, onOpenChange, callId, groupName, groupId, initi
     toggleMute,
     isCamOff,
     toggleCam,
+    isScreenSharing,
+    toggleScreenShare,
     leave,
     isRecording,
     turnAvailable,
@@ -63,6 +68,7 @@ export function CallRoom({ open, onOpenChange, callId, groupName, groupId, initi
     video: true,
     initialMuted: preCallPrefs.micMuted,
     initialCamOff: preCallPrefs.camOff,
+    initialScreenShare: preCallPrefs.screenShare,
   });
 
   const { data: call } = useQuery({
@@ -92,7 +98,7 @@ export function CallRoom({ open, onOpenChange, callId, groupName, groupId, initi
     await leave();
     onOpenChange(false);
     setMicGranted(false);
-    setPreCallPrefs({ micMuted: false, camOff: false });
+    setPreCallPrefs({ micMuted: false, camOff: false, screenShare: false });
     setRecordingEnabled(false);
   };
 
@@ -187,7 +193,7 @@ export function CallRoom({ open, onOpenChange, callId, groupName, groupId, initi
               setMicGranted(true);
             }}
             onCancel={() => {
-              setPreCallPrefs({ micMuted: false, camOff: false });
+              setPreCallPrefs({ micMuted: false, camOff: false, screenShare: false });
               onOpenChange(false);
             }}
           />
@@ -405,6 +411,23 @@ export function CallRoom({ open, onOpenChange, callId, groupName, groupId, initi
             aria-label={isCamOff ? "Réactiver la caméra" : "Couper la caméra"}
           >
             {isCamOff ? <VideoOff className="h-5 w-5" /> : <Video className="h-5 w-5" />}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              void toggleScreenShare().catch((e: Error) => {
+                toast.error("Partage d'écran impossible", { description: e.message });
+              });
+            }}
+            disabled={status !== "live"}
+            className={cn(
+              "inline-flex h-12 w-12 items-center justify-center rounded-full border border-hairline transition hover:bg-secondary disabled:opacity-50",
+              isScreenSharing && "border-primary/40 bg-primary/10 text-primary",
+            )}
+            aria-label={isScreenSharing ? "Arrêter le partage d'écran" : "Partager mon écran"}
+            title={isScreenSharing ? "Arrêter le partage" : "Partager mon écran"}
+          >
+            {isScreenSharing ? <MonitorX className="h-5 w-5" /> : <MonitorUp className="h-5 w-5" />}
           </button>
           <button
             type="button"

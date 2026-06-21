@@ -85,7 +85,9 @@ export function CallRequestDialog({ open, onOpenChange, groupId, groupName, onDo
       onOpenChange(false);
       onDone?.();
       if (mode === "now") {
-        setActiveCallPrefs(pendingPrefsRef.current ?? { micMuted: false, camOff: false });
+        setActiveCallPrefs(
+          pendingPrefsRef.current ?? { micMuted: false, camOff: false, screenShare: false },
+        );
         setActiveCall(callId);
       }
     },

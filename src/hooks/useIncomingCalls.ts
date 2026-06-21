@@ -138,8 +138,10 @@ export function useIncomingCalls(): {
         void hydrate(pending[0] as never);
       }
 
+      const channelSuffix =
+        globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
       channel = supabase
-        .channel(`incoming-calls:${userId}`)
+        .channel(`incoming-calls:${userId}:${channelSuffix}`)
         .on(
           "postgres_changes",
           { event: "INSERT", schema: "public", table: "call_requests" },
