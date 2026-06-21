@@ -129,7 +129,7 @@ export function useIncomingCalls(): {
         .from("call_requests")
         .select("id, group_id, requested_by, topic, created_at, status")
         .in("group_id", groupIds)
-        .eq("status", "pending")
+        .in("status", ["pending", "accepted"])
         .neq("requested_by", userId)
         .gte("created_at", new Date(Date.now() - 60_000).toISOString())
         .order("created_at", { ascending: false })
@@ -169,9 +169,24 @@ export function useIncomingCalls(): {
               "update",
               `${(payload.new as { id: string }).id} → ${(payload.new as { status: string }).status}`,
             );
-            const row = payload.new as { id: string; status: string };
-            if (currentRef.current?.id === row.id && row.status !== "pending") {
+            const row = payload.new as {
+              id: string;
+              group_id: string;
+              requested_by: string;
+              topic: string | null;
+              status: string;
+              created_at: string;
+            };
+            const terminal = ["declined", "cancelled", "missed", "ended"].includes(row.status);
+            if (currentRef.current?.id === row.id && terminal) {
               setCurrent(null);
+            }
+            if (
+              ["pending", "accepted"].includes(row.status) &&
+              groupIds.includes(row.group_id) &&
+              row.requested_by !== userId
+            ) {
+              void hydrate(row);
             }
           },
         )
@@ -224,7 +239,7 @@ export function useIncomingCalls(): {
             count: "exact",
           })
           .in("group_id", ids)
-          .eq("status", "pending")
+          .in("status", ["pending", "accepted"])
           .neq("requested_by", userIdRef.current)
           .order("created_at", { ascending: false })
           .limit(5);

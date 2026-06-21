@@ -1,8 +1,13 @@
 import { useEffect, useRef, useState } from "react";
-import { Camera, Mic, ShieldCheck, VideoOff } from "lucide-react";
+import { Camera, Mic, MicOff, ShieldCheck, Video, VideoOff } from "lucide-react";
+
+export interface PreCallDevicePrefs {
+  micMuted: boolean;
+  camOff: boolean;
+}
 
 interface Props {
-  onGranted: () => void;
+  onGranted: (prefs: PreCallDevicePrefs) => void;
   onCancel: () => void;
   /** Also request and preview the camera (default true). */
   withVideo?: boolean;
@@ -15,6 +20,8 @@ export function MicPermissionGate({ onGranted, onCancel, withVideo = true }: Pro
   const [error, setError] = useState<string | null>(null);
   const [hasMic, setHasMic] = useState(false);
   const [hasCam, setHasCam] = useState(false);
+  const [micMuted, setMicMuted] = useState(false);
+  const [camOff, setCamOff] = useState(false);
   const [micLevel, setMicLevel] = useState(0); // 0..1
   const [previewStream, setPreviewStream] = useState<MediaStream | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -48,6 +55,20 @@ export function MicPermissionGate({ onGranted, onCancel, withVideo = true }: Pro
       videoRef.current.srcObject = previewStream;
     }
   }, [previewStream]);
+
+  useEffect(() => {
+    if (!previewStream) return;
+    previewStream.getAudioTracks().forEach((track) => {
+      track.enabled = !micMuted;
+    });
+  }, [micMuted, previewStream]);
+
+  useEffect(() => {
+    if (!previewStream) return;
+    previewStream.getVideoTracks().forEach((track) => {
+      track.enabled = !camOff;
+    });
+  }, [camOff, previewStream]);
 
   const explain = (err: DOMException, kind: string) => {
     if (err.name === "NotAllowedError")
@@ -140,7 +161,7 @@ export function MicPermissionGate({ onGranted, onCancel, withVideo = true }: Pro
   const accept = () => {
     window.localStorage.setItem(LS_KEY, "1");
     stopPreview();
-    onGranted();
+    onGranted({ micMuted, camOff: camOff || !hasCam });
   };
 
   // Skip gate entirely if already granted in a previous session.
@@ -228,6 +249,38 @@ export function MicPermissionGate({ onGranted, onCancel, withVideo = true }: Pro
         </div>
       </div>
 
+      {hasMic && (
+        <div className="grid grid-cols-2 gap-3">
+          <button
+            type="button"
+            onClick={() => setMicMuted((v) => !v)}
+            className={`flex h-12 items-center justify-center gap-2 rounded-md border text-xs font-semibold transition ${
+              micMuted
+                ? "border-destructive/40 bg-destructive/10 text-destructive"
+                : "border-hairline bg-card text-foreground hover:bg-secondary"
+            }`}
+            aria-pressed={micMuted}
+          >
+            {micMuted ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+            {micMuted ? "Micro coupé" : "Micro ouvert"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setCamOff((v) => !v)}
+            disabled={!hasCam}
+            className={`flex h-12 items-center justify-center gap-2 rounded-md border text-xs font-semibold transition disabled:opacity-50 ${
+              camOff || !hasCam
+                ? "border-destructive/40 bg-destructive/10 text-destructive"
+                : "border-hairline bg-card text-foreground hover:bg-secondary"
+            }`}
+            aria-pressed={camOff || !hasCam}
+          >
+            {camOff || !hasCam ? <VideoOff className="h-4 w-4" /> : <Video className="h-4 w-4" />}
+            {camOff || !hasCam ? "Caméra coupée" : "Caméra ouverte"}
+          </button>
+        </div>
+      )}
+
       {error && (
         <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-xs leading-relaxed text-destructive">
           {error}
@@ -271,7 +324,7 @@ export function MicPermissionGate({ onGranted, onCancel, withVideo = true }: Pro
             onClick={accept}
             className="h-11 flex-1 whitespace-nowrap rounded-md bg-primary text-sm font-semibold text-primary-foreground shadow-primary hover:bg-primary-700"
           >
-            Rejoindre l'appel
+            Continuer vers l'appel
           </button>
         )}
       </div>

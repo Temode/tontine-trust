@@ -18,7 +18,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useWebRTCCall } from "@/hooks/useWebRTCCall";
 import { useCallTimer } from "@/hooks/useCallTimer";
 import { CallParticipantTile } from "./CallParticipantTile";
-import { MicPermissionGate } from "./MicPermissionGate";
+import { MicPermissionGate, type PreCallDevicePrefs } from "./MicPermissionGate";
 import { getInitials } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { giveCallRecordingConsent } from "@/lib/api/calls";
@@ -29,11 +29,16 @@ interface Props {
   callId: string | null;
   groupName?: string;
   groupId?: string;
+  initialPrefs?: PreCallDevicePrefs | null;
 }
 
-export function CallRoom({ open, onOpenChange, callId, groupName, groupId }: Props) {
+export function CallRoom({ open, onOpenChange, callId, groupName, groupId, initialPrefs }: Props) {
   const { user } = useAuth();
   const [micGranted, setMicGranted] = useState(false);
+  const [preCallPrefs, setPreCallPrefs] = useState<PreCallDevicePrefs>({
+    micMuted: false,
+    camOff: false,
+  });
   const [recordingEnabled, setRecordingEnabled] = useState(false);
   const [showDiag, setShowDiag] = useState(false);
   const {
@@ -56,6 +61,8 @@ export function CallRoom({ open, onOpenChange, callId, groupName, groupId }: Pro
     groupId,
     recordingEnabled,
     video: true,
+    initialMuted: preCallPrefs.micMuted,
+    initialCamOff: preCallPrefs.camOff,
   });
 
   const { data: call } = useQuery({
@@ -75,10 +82,17 @@ export function CallRoom({ open, onOpenChange, callId, groupName, groupId }: Pro
 
   const duration = useCallTimer(call?.started_at ?? null);
 
+  useEffect(() => {
+    if (!open || !initialPrefs || micGranted) return;
+    setPreCallPrefs(initialPrefs);
+    setMicGranted(true);
+  }, [initialPrefs, micGranted, open]);
+
   const handleLeave = async () => {
     await leave();
     onOpenChange(false);
     setMicGranted(false);
+    setPreCallPrefs({ micMuted: false, camOff: false });
     setRecordingEnabled(false);
   };
 
@@ -168,8 +182,14 @@ export function CallRoom({ open, onOpenChange, callId, groupName, groupId }: Pro
         <DialogContent className="sm:max-w-md">
           <DialogTitle className="sr-only">Autorisation micro</DialogTitle>
           <MicPermissionGate
-            onGranted={() => setMicGranted(true)}
-            onCancel={() => onOpenChange(false)}
+            onGranted={(prefs) => {
+              setPreCallPrefs(prefs);
+              setMicGranted(true);
+            }}
+            onCancel={() => {
+              setPreCallPrefs({ micMuted: false, camOff: false });
+              onOpenChange(false);
+            }}
           />
         </DialogContent>
       </Dialog>

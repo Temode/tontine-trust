@@ -16,6 +16,7 @@ import {
   subscribeCallParticipants,
 } from "@/lib/api/calls";
 import { CallRoom } from "./CallRoom";
+import { MicPermissionGate, type PreCallDevicePrefs } from "./MicPermissionGate";
 
 interface Props {
   open: boolean;
@@ -30,7 +31,10 @@ export function CallRequestDialog({ open, onOpenChange, groupId, groupName, onDo
   const [mode, setMode] = useState<"now" | "schedule">("now");
   const [datetime, setDatetime] = useState("");
   const [activeCall, setActiveCall] = useState<string | null>(null);
+  const [activeCallPrefs, setActiveCallPrefs] = useState<PreCallDevicePrefs | null>(null);
+  const [showPreCall, setShowPreCall] = useState(false);
   const knownJoinersRef = useRef<Set<string>>(new Set());
+  const pendingPrefsRef = useRef<PreCallDevicePrefs | null>(null);
 
   // Accusé de réception : chaque nouvel arrivant déclenche un toast nominatif
   // qui prouve à l'émetteur que Realtime fonctionne côté réception.
@@ -80,7 +84,10 @@ export function CallRequestDialog({ open, onOpenChange, groupId, groupName, onDo
       setDatetime("");
       onOpenChange(false);
       onDone?.();
-      if (mode === "now") setActiveCall(callId);
+      if (mode === "now") {
+        setActiveCallPrefs(pendingPrefsRef.current ?? { micMuted: false, camOff: false });
+        setActiveCall(callId);
+      }
     },
     onError: (e: Error) =>
       toast.error("Demande impossible", { description: e.message }),
@@ -88,15 +95,38 @@ export function CallRequestDialog({ open, onOpenChange, groupId, groupName, onDo
 
   return (
     <>
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        if (!v) {
+          setShowPreCall(false);
+          pendingPrefsRef.current = null;
+        }
+        onOpenChange(v);
+      }}
+    >
       <DialogContent className="sm:max-w-md">
+        {showPreCall ? (
+          <>
+            <DialogTitle className="sr-only">Préparer l'appel</DialogTitle>
+            <MicPermissionGate
+              onGranted={(prefs) => {
+                pendingPrefsRef.current = prefs;
+                setShowPreCall(false);
+                mut.mutate();
+              }}
+              onCancel={() => setShowPreCall(false)}
+            />
+          </>
+        ) : (
+          <>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Phone className="h-4 w-4 text-primary" />
             Demander un appel
           </DialogTitle>
           <DialogDescription>
-            Proposez un appel vocal aux membres actifs du groupe.
+            Proposez un appel vidéo aux membres actifs du groupe.
           </DialogDescription>
         </DialogHeader>
 
@@ -160,13 +190,22 @@ export function CallRequestDialog({ open, onOpenChange, groupId, groupName, onDo
           </button>
           <button
             type="button"
-            onClick={() => mut.mutate()}
+            onClick={() => {
+              if (mode === "now") {
+                setShowPreCall(true);
+              } else {
+                pendingPrefsRef.current = null;
+                mut.mutate();
+              }
+            }}
             disabled={mut.isPending || (mode === "schedule" && !datetime)}
             className="h-10 rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-primary transition hover:bg-primary-700 disabled:opacity-50"
           >
-            {mut.isPending ? "Envoi…" : "Envoyer la demande"}
+            {mut.isPending ? "Envoi…" : mode === "now" ? "Tester puis lancer" : "Envoyer la demande"}
           </button>
         </DialogFooter>
+          </>
+        )}
       </DialogContent>
     </Dialog>
     <CallRoom
@@ -175,6 +214,7 @@ export function CallRequestDialog({ open, onOpenChange, groupId, groupName, onDo
       callId={activeCall}
       groupId={groupId}
       groupName={groupName}
+      initialPrefs={activeCallPrefs}
     />
     </>
   );

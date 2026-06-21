@@ -55,6 +55,8 @@ interface UseWebRTCCallOpts {
   groupId?: string;
   recordingEnabled?: boolean;
   video?: boolean;
+  initialMuted?: boolean;
+  initialCamOff?: boolean;
 }
 
 export function useWebRTCCall({
@@ -63,6 +65,8 @@ export function useWebRTCCall({
   groupId,
   recordingEnabled,
   video = true,
+  initialMuted = false,
+  initialCamOff = false,
 }: UseWebRTCCallOpts) {
   const { user } = useAuth();
   const myId = user?.id ?? null;
@@ -71,14 +75,15 @@ export function useWebRTCCall({
   const [error, setError] = useState<string | null>(null);
   const [participants, setParticipants] = useState<CallParticipant[]>([]);
   const [peers, setPeers] = useState<Record<string, RemotePeer>>({});
-  const [isMuted, setMuted] = useState(false);
-  const [isCamOff, setCamOff] = useState(false);
+  const [isMuted, setMuted] = useState(initialMuted);
+  const [isCamOff, setCamOff] = useState(initialCamOff);
   const [isRecording, setIsRecording] = useState(false);
   const [turnAvailable, setTurnAvailable] = useState(false);
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [diagEvents, setDiagEvents] = useState<WebRTCDiagEvent[]>([]);
 
   const localStreamRef = useRef<MediaStream | null>(null);
+  const participantsRef = useRef<CallParticipant[]>([]);
   const pcsRef = useRef<Record<string, RTCPeerConnection>>({});
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const startedRef = useRef(false);
@@ -296,6 +301,7 @@ export function useWebRTCCall({
     if (!callId) return;
     try {
       const list = await listCallParticipants(callId);
+        participantsRef.current = list;
       setParticipants(list);
     } catch (e) {
       console.error("listCallParticipants", e);
@@ -335,6 +341,14 @@ export function useWebRTCCall({
           return;
         }
         localStreamRef.current = stream;
+        stream.getAudioTracks().forEach((track) => {
+          track.enabled = !initialMuted;
+        });
+        stream.getVideoTracks().forEach((track) => {
+          track.enabled = !initialCamOff;
+        });
+        setMuted(initialMuted);
+        setCamOff(initialCamOff || stream.getVideoTracks().length === 0);
         setLocalStream(stream);
         logDiag({
           type: "info",
@@ -355,6 +369,13 @@ export function useWebRTCCall({
           logDiag({ type: "error", detail: "fetchIceServers failed, fallback STUN" });
         }
         await joinCall(callId);
+        if (initialMuted) {
+          try {
+            await setCallMute(callId, true);
+          } catch (e) {
+            console.warn("set initial mute", e);
+          }
+        }
         await refreshParticipants();
 
         const channel = supabase.channel(`call:${callId}`, {
@@ -450,6 +471,25 @@ export function useWebRTCCall({
                 event: "peer-join",
                 payload: { user_id: myId },
               });
+              const activePeers = participantsRef.current
+                .filter((p) => !p.left_at && p.user_id !== myId)
+                .map((p) => p.user_id);
+              for (const peerId of activePeers) {
+                if (myId >= peerId || pcsRef.current[peerId]) continue;
+                try {
+                  const pc = createPeerConnection(peerId);
+                  const offer = await pc.createOffer();
+                  await pc.setLocalDescription(offer);
+                  channel.send({
+                    type: "broadcast",
+                    event: "offer",
+                    payload: { from: myId, to: peerId, sdp: offer },
+                  });
+                  logDiag({ peer: peerId, type: "offer", detail: "existing-peer" });
+                } catch (e) {
+                  logDiag({ peer: peerId, type: "error", detail: (e as Error).message });
+                }
+              }
               setStatus("live");
               logDiag({ type: "info", detail: "signaling channel subscribed" });
             }
@@ -477,7 +517,7 @@ export function useWebRTCCall({
     return () => {
       cancelled = true;
     };
-  }, [enabled, callId, myId, createPeerConnection, removePeer, refreshParticipants, video, logDiag]);
+  }, [enabled, callId, myId, createPeerConnection, removePeer, refreshParticipants, video, initialMuted, initialCamOff, logDiag]);
 
   useEffect(() => {
     if (!enabled || !callId) return;
