@@ -472,11 +472,21 @@ export function useWebRTCCall({
           })
           .subscribe(async (state) => {
             if (state === "SUBSCRIBED") {
-              channel.send({
-                type: "broadcast",
-                event: "peer-join",
-                payload: { user_id: myId },
-              });
+              const announce = () =>
+                channel.send({
+                  type: "broadcast",
+                  event: "peer-join",
+                  payload: { user_id: myId },
+                });
+              // Re-broadcast a few times to defeat race conditions where a peer
+              // is still wiring its own listeners when we first announce.
+              announce();
+              window.setTimeout(announce, 800);
+              window.setTimeout(announce, 2500);
+              window.setTimeout(() => {
+                void refreshParticipants();
+                announce();
+              }, 5000);
               const activePeers = participantsRef.current
                 .filter((p) => !p.left_at && p.user_id !== myId)
                 .map((p) => p.user_id);
