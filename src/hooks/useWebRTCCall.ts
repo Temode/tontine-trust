@@ -83,6 +83,7 @@ export function useWebRTCCall({
   const [diagEvents, setDiagEvents] = useState<WebRTCDiagEvent[]>([]);
 
   const localStreamRef = useRef<MediaStream | null>(null);
+  const participantsRef = useRef<CallParticipant[]>([]);
   const pcsRef = useRef<Record<string, RTCPeerConnection>>({});
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const startedRef = useRef(false);
@@ -300,6 +301,7 @@ export function useWebRTCCall({
     if (!callId) return;
     try {
       const list = await listCallParticipants(callId);
+        participantsRef.current = list;
       setParticipants(list);
     } catch (e) {
       console.error("listCallParticipants", e);
