@@ -178,7 +178,7 @@ export default function MyContributions() {
                     type="button"
                     onClick={() => mostUrgent && setPayingDue(mostUrgent)}
                     disabled={!mostUrgent}
-                    className="inline-flex h-11 items-center gap-2 whitespace-nowrap rounded-md bg-accent px-5 text-sm font-semibold text-accent-foreground shadow-[0_10px_30px_-12px_hsl(var(--accent)/0.7)] transition hover:bg-accent/90 disabled:opacity-50"
+                    className="inline-flex h-12 min-w-[180px] items-center justify-center gap-2 whitespace-nowrap rounded-md bg-accent px-5 text-sm font-semibold text-accent-foreground shadow-[0_10px_30px_-12px_hsl(var(--accent)/0.7)] transition hover:bg-accent/90 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-primary"
                   >
                     <ShieldCheck className="h-4 w-4" />
                     {mostUrgent ? "Payer la plus urgente" : "Tout est à jour"}
@@ -192,7 +192,7 @@ export default function MyContributions() {
                           .getElementById("section-dues")
                           ?.scrollIntoView({ behavior: "smooth", block: "start" });
                       }}
-                      className="inline-flex h-11 items-center gap-1 whitespace-nowrap rounded-md px-3 text-sm font-semibold text-primary-foreground/90 transition hover:bg-primary-foreground/10"
+                      className="inline-flex h-11 items-center gap-1 whitespace-nowrap rounded-md px-3 text-sm font-semibold text-primary-foreground/90 transition hover:bg-primary-foreground/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground focus-visible:ring-offset-2 focus-visible:ring-offset-primary"
                     >
                       Tout voir
                       <ArrowRight className="h-4 w-4" />
@@ -273,7 +273,7 @@ export default function MyContributions() {
 
         {/* Cotisations + filtres */}
         <section id="section-dues" className="space-y-4">
-          <header className="flex flex-wrap items-end justify-between gap-3">
+          <header className="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-end lg:justify-between">
             <div>
               <h2 className="font-display text-xl font-bold tracking-tight text-foreground">
                 Cotisations
@@ -284,19 +284,18 @@ export default function MyContributions() {
                   : `${filteredDues.length} à régler · triées par urgence`}
               </p>
             </div>
-            <div className="flex flex-wrap items-center gap-3">
-              <div role="tablist" aria-label="Filtrer par statut" className="inline-flex h-9 items-center rounded-md border border-hairline bg-card p-0.5">
+            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
+              <div role="group" aria-label="Filtrer par statut" className="inline-flex h-10 w-full items-center rounded-md border border-hairline bg-card p-0.5 sm:h-9 sm:w-auto">
                 {STATUS_TABS.map((t) => {
                   const active = statusFilter === t.key;
                   return (
                     <button
                       key={t.key}
-                      role="tab"
                       aria-pressed={active}
                       type="button"
                       onClick={() => setStatusFilter(t.key)}
                       className={cn(
-                        "h-full whitespace-nowrap rounded-[5px] px-3 text-xs font-semibold transition",
+                        "h-full flex-1 whitespace-nowrap rounded-[5px] px-3 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 sm:flex-none",
                         active
                           ? "bg-primary text-primary-foreground shadow-sm"
                           : "text-muted-foreground hover:text-foreground",
@@ -307,20 +306,22 @@ export default function MyContributions() {
                   );
                 })}
               </div>
-              <div className="relative flex h-9 w-56 items-center">
-                <Search className="absolute left-3 h-4 w-4 text-muted-foreground" />
+              <div className="relative flex h-10 w-full items-center sm:h-9 sm:w-56">
+                <label htmlFor="dues-search" className="sr-only">Rechercher une tontine</label>
+                <Search aria-hidden="true" className="absolute left-3 h-4 w-4 text-muted-foreground" />
                 <input
+                  id="dues-search"
                   type="search"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Rechercher une tontine…"
-                  className="h-full w-full rounded-md border border-hairline bg-card pl-9 pr-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15"
+                  className="h-full w-full rounded-md border border-hairline bg-card pl-9 pr-3 text-sm focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
                 />
               </div>
               <select
                 value={groupFilter}
                 onChange={(e) => setGroupFilter(e.target.value)}
-                className="h-9 rounded-md border border-hairline bg-card px-3 text-xs font-medium text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15"
+                className="h-10 w-full rounded-md border border-hairline bg-card px-3 text-sm font-medium text-foreground focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 sm:h-9 sm:w-auto sm:text-xs"
                 aria-label="Filtrer par tontine"
               >
                 <option value="all">Toutes tontines</option>
@@ -493,6 +494,9 @@ export default function MyContributions() {
           contributionId={payingDue.contribution_id}
           groupName={payingDue.group_name}
           amount={payingDue.amount}
+          turnNumber={payingDue.turn_number}
+          dueDate={payingDue.due_date}
+          beneficiaryName={payingDue.beneficiary_name}
         />
       )}
     </div>
