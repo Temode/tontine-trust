@@ -29,9 +29,10 @@ interface Props {
   callId: string | null;
   groupName?: string;
   groupId?: string;
+  initialPrefs?: PreCallDevicePrefs | null;
 }
 
-export function CallRoom({ open, onOpenChange, callId, groupName, groupId }: Props) {
+export function CallRoom({ open, onOpenChange, callId, groupName, groupId, initialPrefs }: Props) {
   const { user } = useAuth();
   const [micGranted, setMicGranted] = useState(false);
   const [preCallPrefs, setPreCallPrefs] = useState<PreCallDevicePrefs>({
@@ -80,6 +81,12 @@ export function CallRoom({ open, onOpenChange, callId, groupName, groupId }: Pro
   });
 
   const duration = useCallTimer(call?.started_at ?? null);
+
+  useEffect(() => {
+    if (!open || !initialPrefs || micGranted) return;
+    setPreCallPrefs(initialPrefs);
+    setMicGranted(true);
+  }, [initialPrefs, micGranted, open]);
 
   const handleLeave = async () => {
     await leave();
