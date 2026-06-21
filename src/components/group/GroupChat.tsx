@@ -14,6 +14,7 @@ import {
 } from "@/lib/api/chat";
 import { AttachmentPicker } from "@/components/messages/AttachmentPicker";
 import { AttachmentView } from "@/components/messages/AttachmentView";
+import { VoiceRecorder } from "@/components/messages/VoiceRecorder";
 import { TypingIndicator } from "@/components/messages/TypingIndicator";
 import { UnreadSeparator } from "@/components/messages/UnreadSeparator";
 import { useTypingChannel } from "@/hooks/useTypingChannel";
@@ -240,6 +241,25 @@ export function GroupChat({ groupId }: Props) {
           value={attachment}
           onChange={setAttachment}
           disabled={sendM.isPending}
+        />
+        <VoiceRecorder
+          groupId={groupId}
+          disabled={sendM.isPending}
+          onRecorded={(a) => {
+            sendGroupMessageV2(groupId, {
+              body: "",
+              attachment: { url: a.url, type: a.type, name: a.name, size: a.size },
+            })
+              .then((msg) => {
+                qc.setQueryData<DbGroupMessage[]>(["chat", groupId], (prev = []) => {
+                  if (prev.some((m) => m.id === msg.id)) return prev;
+                  return [...prev, msg];
+                });
+              })
+              .catch((e: Error) =>
+                toast.error("Envoi impossible", { description: e.message }),
+              );
+          }}
         />
         <input
           type="text"

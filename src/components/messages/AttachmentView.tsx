@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Download, FileText } from "lucide-react";
 import { getAttachmentSignedUrl } from "@/lib/api/chatAttachments";
+import { VoiceMessagePlayer } from "@/components/messages/VoiceMessagePlayer";
 
 interface Props {
   path: string;
@@ -31,6 +32,11 @@ export function AttachmentView({ path, type, name, size }: Props) {
   }, [path]);
 
   const isImg = type.startsWith("image/");
+  const isAudio = type.startsWith("audio/");
+
+  if (isAudio) {
+    return <VoiceMessagePlayer path={path} type={type} />;
+  }
 
   if (isImg) {
     return (
