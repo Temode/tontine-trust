@@ -93,7 +93,7 @@ export async function listGroupDisputes(groupId: string): Promise<GroupDisputeRo
 }
 
 export async function getUserDefaultHistory(): Promise<UserDefaultHistoryRow[]> {
-  const { data, error } = await supabase.rpc("get_user_default_history", { _user_id: undefined as unknown as string });
+  const { data, error } = await supabase.rpc("get_user_default_history", {});
   if (error) throw error;
   return (data ?? []) as UserDefaultHistoryRow[];
 }
