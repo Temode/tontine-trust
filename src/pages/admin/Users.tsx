@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useMemo, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
@@ -11,7 +11,7 @@ const ALL_ROLES: AppRole[] = ["super_admin", "admin", "organisateur", "participa
 
 export default function AdminUsers() {
   const qc = useQueryClient();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   const focusId = searchParams.get("focus");
   const [search, setSearch] = useState("");
   const [committed, setCommitted] = useState("");
@@ -38,6 +38,16 @@ export default function AdminUsers() {
 
   return (
     <div className="space-y-4">
+      {focusId && (
+        <div className="flex items-center justify-between bg-amber-500/10 border border-amber-500/30 rounded-md px-3 py-2 text-sm">
+          <span className="text-amber-200">
+            Filtré sur l'utilisateur <code className="text-amber-300">{focusId}</code>
+          </span>
+          <Link to="/admin/utilisateurs" className="text-amber-300 hover:text-amber-200 underline text-xs">
+            Retirer le filtre
+          </Link>
+        </div>
+      )}
       <form
         className="flex gap-2 max-w-xl"
         onSubmit={(e) => { e.preventDefault(); setCommitted(search); }}
