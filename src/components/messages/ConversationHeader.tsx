@@ -156,6 +156,7 @@ export function ConversationHeader({ group }: Props) {
       </div>
     </header>
     <CallRequestDialog open={callOpen} onOpenChange={setCallOpen} groupId={group.id} />
+    <CallRequestDialog open={false} onOpenChange={() => {}} groupId={group.id} />
     <CallHistoryDrawer open={historyOpen} onOpenChange={setHistoryOpen} groupId={group.id} />
     </>
   );
