@@ -31,7 +31,7 @@ import {
 import { listGroupTurns } from "@/lib/api/turns";
 import { releasePayout, listGroupLedger } from "@/lib/api/payouts";
 import { listMyContributionsDue } from "@/lib/api/contributions";
-import { DjomyPaymentModal } from "@/components/payment/DjomyPaymentModal";
+import { launchDjomyCheckout } from "@/lib/payment/launchDjomyCheckout";
 import { getGroupReliability, type DbGroupReliabilityRow } from "@/lib/api/reliability";
 import { ReliabilityBadge } from "@/components/reliability/ReliabilityBadge";
 import { useAuth } from "@/hooks/useAuth";
@@ -44,7 +44,6 @@ import { AuditLog } from "@/components/group/AuditLog";
 import { SwapsPanel } from "@/components/group/SwapsPanel";
 import { AuctionPanel } from "@/components/group/AuctionPanel";
 import { ReviewsPanel } from "@/components/group/ReviewsPanel";
-import { TestModePanel } from "@/components/group/TestModePanel";
 import { InvitationsHistoryPanel } from "@/components/groups/InvitationsHistoryPanel";
 import { GroupDefaultersSection } from "@/components/group/GroupDefaultersSection";
 import { GroupDisputesSection } from "@/components/group/GroupDisputesSection";
@@ -58,8 +57,7 @@ type Section =
   | "auctions"
   | "reviews"
   | "chat"
-  | "audit"
-  | "test";
+  | "audit";
 
 const FREQ_LABEL: Record<string, string> = {
   mensuelle: "Mensuelle",
