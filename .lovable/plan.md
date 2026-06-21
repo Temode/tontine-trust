@@ -1,48 +1,89 @@
-## Cause racine identifiée
+## Diagnostic
 
-En comparant avec le projet Paxefy (qui utilise Djomy avec succès), 3 écarts expliquent les échecs :
+1. **Cache navigateur** : ta capture montre un sidebar plus ancien que ce qui est dans le code. Un `Ctrl + Shift + R` sur ton onglet localhost le rafraîchira (déjà une nette simplification).
+2. **Mais le fond reste vrai** : depuis le MVP simplifié de mai, le dashboard et le menu ont regrossi. On va revenir à un état clair, MVP-ready.
 
-| Élément | Notre code | Paxefy (qui marche) |
-|---|---|---|
-| URL production | `https://prod-api.djomy.africa` ❌ | `https://api.djomy.africa` ✅ |
-| Valeur `DJOMY_ENV` pour la prod | `prod` | `production` |
-| Header obligatoire | absent | `X-PARTNER-DOMAIN: dcaa27935b4920eb5e7c2c9a1d35a5040493b177bed92d9b69966c46eca6a627` |
+## Principe directeur
 
-Test manuel précédent : `https://api.djomy.africa/v1/auth` renvoyait 403 quand on l'appelait sans `X-PARTNER-DOMAIN` → ça confirme.
+Un utilisateur n'a besoin de répondre qu'à **trois questions** en ouvrant l'app :
+1. Combien je dois et à qui ?
+2. Quand est mon prochain tour ?
+3. Où en sont mes tontines ?
 
-La signature HMAC (`hmacSha256(message=clientId, key=clientSecret)`) est déjà correcte de notre côté, rien à changer là-dessus.
+Tout le reste est secondaire et doit s'effacer.
 
-## Corrections à apporter
+## 1. Sidebar simplifié — 5 entrées au lieu de 8
 
-### 1. `supabase/functions/_shared/djomy.ts`
-- URL prod → `https://api.djomy.africa`
-- Accepter `prod` ET `production` comme valeur de `DJOMY_ENV` (rétrocompatible avec le secret actuel)
-- Ajouter la constante `DJOMY_PARTNER_DOMAIN = "dcaa27935b4920eb5e7c2c9a1d35a5040493b177bed92d9b69966c46eca6a627"`
-- Ajouter automatiquement le header `X-PARTNER-DOMAIN` dans :
-  - `getDjomyBearer()` (appel `/v1/auth`)
-  - `djomyFetch()` (tous les autres appels Djomy)
+```
+Accueil        → /dashboard      (vue d'ensemble + actions)
+Mes tontines   → /groupes        (liste + créer/rejoindre depuis l'empty state)
+Payer          → /cotisations    (cotisations à régler)
+Historique     → /recus          (paiements passés + reçus)
+Mon profil     → /profil         (sous-menu : notifications, confidentialité)
+```
 
-### 2. `supabase/functions/djomy-validate-credentials/index.ts`
-- Mettre à jour les URLs sondées : `https://api.djomy.africa` pour prod (sandbox inchangée)
-- Ajouter `X-PARTNER-DOMAIN` aux deux probes
-- Garder l'affichage Prod/Sandbox côte à côte
+Supprimé du menu (les fonctionnalités restent accessibles, juste plus dans la nav principale) :
+- « Notifications » → déplacée en **icône cloche dans le TopBar** (déjà présente)
+- « Créer une tontine » + « Rejoindre une tontine » → bouton **« + Nouvelle tontine »** dans le TopBar et CTA dans l'empty state de /groupes
+- Section « Actions rapides » → supprimée (redondante)
 
-### 3. UI `src/pages/admin/DjomySettings.tsx`
-- Aucune modif fonctionnelle nécessaire
-- Mettre à jour la note sur `DJOMY_ENV` pour mentionner `production` (au lieu de `prod`)
+## 2. Dashboard recentré — 3 blocs au lieu de 6+
 
-### 4. Vérifier `djomy-webhook` et autres fonctions Djomy
-Lecture seule pour confirmer qu'elles passent toutes par `_shared/djomy.ts` — si oui, le fix est automatiquement propagé. Sinon, ajouter le header là où elles appellent Djomy directement.
+```
+┌────────────────────────────────────────────────────────────┐
+│  Bonjour Moussa 👋                                          │
+│  Voici ce qui demande ton attention aujourd'hui.            │
+├────────────────────────────────────────────────────────────┤
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐    │
+│  │  À PAYER     │  │ PROCHAIN TOUR│  │   FIABILITÉ  │    │
+│  │  100 000 GNF │  │   12 juil.   │  │     98 %     │    │
+│  │  [Payer]     │  │  Aïssatou    │  │   Très bon   │    │
+│  └──────────────┘  └──────────────┘  └──────────────┘    │
+├────────────────────────────────────────────────────────────┤
+│  MES TONTINES (3 actives)                  [Voir tout →]  │
+│  • Famille Diallo · prochain : 12 juil.                    │
+│  • Collègues bureau · prochain : 20 juil.                  │
+│  • Investissement 2026 · à initier                         │
+└────────────────────────────────────────────────────────────┘
+```
+
+Supprimés du dashboard :
+- KPI redondants (« Paiements réussis », « Provider Djomy/OM/MTN/Carte »)
+- `RecentAnnouncementsCard` (déplacée dans la cloche notifications)
+- `DuesCard` + `UpcomingTurnsCard` séparées (fusionnées dans les 3 KPI cliquables)
+
+Si tu cliques sur **« À payer »** → tu arrives directement sur `/cotisations` filtré sur les cotisations dues. Plus de double affichage.
+
+## 3. Page « Payer » (/cotisations) — nettoyage
+
+- Garder uniquement les **cotisations dues** (par défaut)
+- Onglet secondaire « En cours » montrant les paiements initiés non confirmés (avec un bouton **« Reprendre »** ou **« Annuler »** pour les 3 résidus de test que tu as actuellement)
+- Retirer les triples KPI en haut (À payer / Paiements réussis / Provider) — déjà dans le dashboard
+- Garder le titre + sous-titre, c'est tout
+
+## 4. Bonus : nettoyer les paiements de test orphelins
+
+Tu as 3 paiements `initiated` jamais confirmés (issus de nos tests Djomy). On ajoute un job ou une RPC qui les passe en `cancelled` automatiquement après 30 min, ET tu peux les annuler manuellement depuis l'onglet « En cours ».
 
 ## Hors-scope
 
-- Pas de modification de secrets (les clés Djomy déjà collées sont bonnes)
-- Pas de modification des flux paiement / webhook côté logique métier
-- Pas de migration DB
+- Aucun changement sur le back-office admin (`/admin/*`)
+- Aucun changement sur les flux paiement Djomy (qui marchent maintenant)
+- Aucun changement sur le design system / couleurs / typo — on garde le visuel actuel, on retire seulement du contenu
+- Aucune migration DB
+
+## Fichiers à modifier
+
+- `src/components/layout/DesktopSidebar.tsx` — 5 entrées au lieu de 8
+- `src/components/layout/BottomNav.tsx` — alignement mobile
+- `src/components/layout/TopBar.tsx` — ajouter bouton « + Nouvelle tontine »
+- `src/pages/Dashboard.tsx` — passer de 6 cartes à 3 KPI + 1 liste tontines
+- `src/pages/MyContributions.tsx` — retirer les 3 KPI redondants, ajouter onglet « En cours »
+- `src/pages/MyGroups.tsx` — empty state avec les CTA Créer/Rejoindre
 
 ## Validation
 
-Après les changements, cliquer sur « Tester maintenant » dans Admin → Identifiants Djomy doit retourner :
-- Prod ✅ HTTP 201 avec un Bearer token
-- Sandbox ❌ (normal, ce sont des clés prod)
-- Verdict : `OK_PROD` (ou éventuellement `WRONG_ENV_SHOULD_BE_PROD` si le secret `DJOMY_ENV` est encore à `sandbox`, auquel cas l'UI te dira de le changer en `production`).
+Après les changements :
+- Le menu de gauche tient sur **5 lignes**
+- Le dashboard tient sans scroll sur un écran 13"
+- Tu peux aller de l'accueil au paiement en **2 clics maximum**

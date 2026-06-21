@@ -1,12 +1,9 @@
 import {
   ChevronDown,
-  Bell,
   FileCheck2,
   LayoutDashboard,
   type LucideIcon,
-  PlusCircle,
   User,
-  UserPlus,
   Users,
   Wallet,
 } from "lucide-react";
@@ -35,26 +32,8 @@ const sections: NavSection[] = [
       { to: "/dashboard", label: "Accueil", icon: LayoutDashboard },
       { to: "/groupes", label: "Mes tontines", icon: Users },
       { to: "/cotisations", label: "Payer", icon: Wallet },
-    ],
-  },
-  {
-    label: "Activité",
-    items: [
       { to: "/recus", label: "Historique & reçus", icon: FileCheck2 },
-      { to: "/notifications", label: "Notifications", icon: Bell },
-    ],
-  },
-  {
-    label: "Compte",
-    items: [
       { to: "/profil", label: "Mon profil", icon: User },
-    ],
-  },
-  {
-    label: "Actions rapides",
-    items: [
-      { to: "/nouveau", label: "Créer une tontine", icon: PlusCircle },
-      { to: "/rejoindre", label: "Rejoindre une tontine", icon: UserPlus },
     ],
   },
 ];
