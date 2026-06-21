@@ -266,6 +266,7 @@ export function CallRoom({ open, onOpenChange, callId, groupName, groupId, initi
               isLocal
               isMuted={isMuted}
               isCamOff={isCamOff}
+              isScreenSharing={isScreenSharing}
               connectionState="connected"
             />
             {remoteParticipants.map((p) => {
@@ -275,7 +276,9 @@ export function CallRoom({ open, onOpenChange, callId, groupName, groupId, initi
                   key={p.user_id}
                   name={p.profile?.full_name ?? "Membre"}
                   stream={peer?.stream ?? null}
-                  isMuted={p.is_muted}
+                  isMuted={peer?.micMuted ?? p.is_muted}
+                  isCamOff={peer?.camOff}
+                  isScreenSharing={peer?.screenSharing}
                   connectionState={peer?.connectionState ?? "connecting"}
                 />
               );

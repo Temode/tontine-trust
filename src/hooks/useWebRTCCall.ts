@@ -23,6 +23,9 @@ export interface RemotePeer {
   signalingState?: RTCSignalingState;
   retries?: number;
   lastError?: string | null;
+  micMuted?: boolean;
+  camOff?: boolean;
+  screenSharing?: boolean;
 }
 
 export interface WebRTCDiagEvent {
@@ -109,6 +112,25 @@ export function useWebRTCCall({
       return next.length > 150 ? next.slice(-150) : next;
     });
   }, []);
+
+  const mediaStateRef = useRef({
+    micMuted: initialMuted,
+    camOff: initialCamOff,
+    screenSharing: false,
+  });
+
+  const broadcastMediaState = useCallback(
+    (patch?: Partial<typeof mediaStateRef.current>) => {
+      if (patch) Object.assign(mediaStateRef.current, patch);
+      if (!channelRef.current || !myId) return;
+      channelRef.current.send({
+        type: "broadcast",
+        event: "media-state",
+        payload: { from: myId, ...mediaStateRef.current },
+      });
+    },
+    [myId],
+  );
 
   const updatePeer = useCallback((id: string, patch: Partial<RemotePeer>) => {
     setPeers((prev) => ({
@@ -394,6 +416,8 @@ export function useWebRTCCall({
             const fromId: string = payload.user_id;
             if (!fromId || fromId === myId) return;
             logDiag({ peer: fromId, type: "info", detail: "peer-join" });
+            // Send our current media state to the newcomer immediately.
+            broadcastMediaState();
             if (myId < fromId) {
               const pc = createPeerConnection(fromId);
               const offer = await pc.createOffer();
@@ -470,6 +494,15 @@ export function useWebRTCCall({
             removePeer(payload.user_id);
             logDiag({ peer: payload.user_id, type: "info", detail: "peer-leave" });
           })
+          .on("broadcast", { event: "media-state" }, ({ payload }) => {
+            const fromId = payload.from as string;
+            if (!fromId || fromId === myId) return;
+            updatePeer(fromId, {
+              micMuted: !!payload.micMuted,
+              camOff: !!payload.camOff,
+              screenSharing: !!payload.screenSharing,
+            });
+          })
           .subscribe(async (state) => {
             if (state === "SUBSCRIBED") {
               const announce = () =>
@@ -487,6 +520,9 @@ export function useWebRTCCall({
                 void refreshParticipants();
                 announce();
               }, 5000);
+              // Initial media-state broadcast so others render our mic/cam/screen accurately.
+              broadcastMediaState();
+              window.setTimeout(() => broadcastMediaState(), 1200);
               const activePeers = participantsRef.current
                 .filter((p) => !p.left_at && p.user_id !== myId)
                 .map((p) => p.user_id);
@@ -609,14 +645,16 @@ export function useWebRTCCall({
         console.warn("setCallMute", e);
       }
     }
-  }, [isMuted, callId]);
+    broadcastMediaState({ micMuted: next });
+  }, [isMuted, callId, broadcastMediaState]);
 
   const toggleCam = useCallback(() => {
     const next = !isCamOff;
     setCamOff(next);
     const stream = localStreamRef.current;
     if (stream) stream.getVideoTracks().forEach((t) => (t.enabled = !next));
-  }, [isCamOff]);
+    broadcastMediaState({ camOff: next });
+  }, [isCamOff, broadcastMediaState]);
 
   const stopScreenShare = useCallback(async () => {
     const stream = localStreamRef.current;
@@ -648,7 +686,8 @@ export function useWebRTCCall({
     setLocalStream(new MediaStream(stream.getTracks()));
     setScreenSharing(false);
     logDiag({ type: "info", detail: "screen share stopped" });
-  }, [isCamOff, logDiag]);
+    broadcastMediaState({ screenSharing: false });
+  }, [isCamOff, logDiag, broadcastMediaState]);
 
   const startScreenShare = useCallback(async () => {
     if (screenStreamRef.current) return;
@@ -688,7 +727,8 @@ export function useWebRTCCall({
     setLocalStream(new MediaStream(stream.getTracks()));
     setScreenSharing(true);
     logDiag({ type: "info", detail: "screen share started" });
-  }, [logDiag, stopScreenShare]);
+    broadcastMediaState({ screenSharing: true });
+  }, [logDiag, stopScreenShare, broadcastMediaState]);
 
   const toggleScreenShare = useCallback(async () => {
     if (screenStreamRef.current) {

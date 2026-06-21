@@ -1,10 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import {
   Camera,
+  CheckCircle2,
+  CircleAlert,
+  CircleHelp,
   Mic,
   MicOff,
   MonitorOff,
   MonitorUp,
+  Smartphone,
+  Monitor as MonitorIcon,
   ShieldCheck,
   Video,
   VideoOff,
@@ -25,6 +30,18 @@ interface Props {
 
 const LS_KEY = "tontine.mic.granted";
 
+type CheckStatus = "ok" | "warn" | "fail" | "pending";
+interface CheckRow {
+  label: string;
+  status: CheckStatus;
+  detail?: string;
+}
+
+function isMobileUA() {
+  if (typeof navigator === "undefined") return false;
+  return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+}
+
 export function MicPermissionGate({ onGranted, onCancel, withVideo = true }: Props) {
   const [requesting, setRequesting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -35,6 +52,8 @@ export function MicPermissionGate({ onGranted, onCancel, withVideo = true }: Pro
   const [screenShare, setScreenShare] = useState(false);
   const [micLevel, setMicLevel] = useState(0); // 0..1
   const [previewStream, setPreviewStream] = useState<MediaStream | null>(null);
+  const [screenTestStatus, setScreenTestStatus] = useState<CheckStatus>("pending");
+  const [screenTestDetail, setScreenTestDetail] = useState<string>("");
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const rafRef = useRef<number | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
@@ -314,6 +333,39 @@ export function MicPermissionGate({ onGranted, onCancel, withVideo = true }: Pro
         </div>
       )}
 
+      {/* Diagnostic checklist */}
+      <DiagnosticChecklist
+        hasMic={hasMic}
+        hasCam={hasCam}
+        micLevel={micLevel}
+        screenStatus={screenTestStatus}
+        screenDetail={screenTestDetail}
+        onTestScreen={async () => {
+          setScreenTestStatus("pending");
+          setScreenTestDetail("Sélectionnez une fenêtre à partager…");
+          if (!navigator.mediaDevices?.getDisplayMedia) {
+            setScreenTestStatus("fail");
+            setScreenTestDetail("getDisplayMedia non supporté par ce navigateur.");
+            return;
+          }
+          try {
+            const s = await navigator.mediaDevices.getDisplayMedia({ video: true });
+            const t = s.getVideoTracks()[0];
+            setScreenTestDetail(t?.label || "Partage OK");
+            s.getTracks().forEach((tr) => tr.stop());
+            setScreenTestStatus("ok");
+          } catch (e) {
+            const err = e as DOMException;
+            setScreenTestStatus(err.name === "NotAllowedError" ? "warn" : "fail");
+            setScreenTestDetail(
+              err.name === "NotAllowedError"
+                ? "Partage refusé/annulé."
+                : err.message || "Échec du test.",
+            );
+          }
+        }}
+      />
+
       <ul className="space-y-1.5 text-[11px] text-muted-foreground">
         <li className="flex gap-1.5">
           <ShieldCheck className="mt-0.5 h-3 w-3 shrink-0 text-primary" />
@@ -355,6 +407,119 @@ export function MicPermissionGate({ onGranted, onCancel, withVideo = true }: Pro
           </button>
         )}
       </div>
+    </div>
+  );
+}
+
+function StatusIcon({ status }: { status: CheckStatus }) {
+  if (status === "ok") return <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />;
+  if (status === "warn") return <CircleAlert className="h-3.5 w-3.5 text-amber-500" />;
+  if (status === "fail") return <CircleAlert className="h-3.5 w-3.5 text-destructive" />;
+  return <CircleHelp className="h-3.5 w-3.5 text-muted-foreground" />;
+}
+
+interface ChecklistProps {
+  hasMic: boolean;
+  hasCam: boolean;
+  micLevel: number;
+  screenStatus: CheckStatus;
+  screenDetail: string;
+  onTestScreen: () => Promise<void> | void;
+}
+
+function DiagnosticChecklist({
+  hasMic,
+  hasCam,
+  micLevel,
+  screenStatus,
+  screenDetail,
+  onTestScreen,
+}: ChecklistProps) {
+  const secure =
+    typeof window !== "undefined" &&
+    (window.isSecureContext || location.hostname === "localhost");
+  const hasGUM = typeof navigator !== "undefined" && !!navigator.mediaDevices?.getUserMedia;
+  const hasGDM = typeof navigator !== "undefined" && !!navigator.mediaDevices?.getDisplayMedia;
+  const hasRTC = typeof window !== "undefined" && typeof window.RTCPeerConnection !== "undefined";
+  const mobile = isMobileUA();
+
+  const rows: CheckRow[] = [
+    {
+      label: "Contexte sécurisé (HTTPS)",
+      status: secure ? "ok" : "fail",
+      detail: secure ? "OK" : "L'appel nécessite HTTPS.",
+    },
+    {
+      label: "WebRTC",
+      status: hasRTC ? "ok" : "fail",
+      detail: hasRTC ? "RTCPeerConnection disponible" : "Non supporté par le navigateur.",
+    },
+    {
+      label: "Accès micro (getUserMedia)",
+      status: !hasGUM ? "fail" : hasMic ? "ok" : "pending",
+      detail: hasMic
+        ? micLevel > 0.05
+          ? "Signal détecté"
+          : "Connecté — parlez pour tester le niveau"
+        : hasGUM
+          ? "Cliquez sur Tester"
+          : "Non supporté",
+    },
+    {
+      label: "Caméra",
+      status: hasCam ? "ok" : hasMic ? "warn" : "pending",
+      detail: hasCam ? "Aperçu actif" : "Audio seul possible",
+    },
+    {
+      label: "Partage d'écran (getDisplayMedia)",
+      status: !hasGDM ? (mobile ? "warn" : "fail") : screenStatus,
+      detail: !hasGDM
+        ? mobile
+          ? "Indisponible sur la plupart des mobiles"
+          : "Non supporté"
+        : screenDetail ||
+          (mobile ? "Limité sur mobile — testez si nécessaire" : "Cliquez sur Tester"),
+    },
+    {
+      label: mobile ? "Appareil mobile détecté" : "Appareil desktop détecté",
+      status: "ok",
+      detail: typeof navigator !== "undefined" ? navigator.userAgent.slice(0, 60) : "",
+    },
+  ];
+
+  return (
+    <div className="rounded-lg border border-hairline bg-card/40 p-3 text-xs">
+      <div className="mb-2 flex items-center justify-between">
+        <p className="flex items-center gap-1.5 font-display text-[11px] font-bold uppercase tracking-wider text-foreground">
+          {mobile ? (
+            <Smartphone className="h-3.5 w-3.5 text-primary" />
+          ) : (
+            <MonitorIcon className="h-3.5 w-3.5 text-primary" />
+          )}
+          Checklist diagnostique
+        </p>
+        <button
+          type="button"
+          onClick={() => void onTestScreen()}
+          disabled={!hasGDM}
+          className="rounded-md border border-hairline px-2 py-1 text-[10px] font-semibold text-foreground hover:bg-secondary disabled:opacity-40"
+        >
+          Tester le partage d'écran
+        </button>
+      </div>
+      <ul className="space-y-1.5">
+        {rows.map((r) => (
+          <li key={r.label} className="flex items-start gap-2">
+            <StatusIcon status={r.status} />
+            <div className="min-w-0 flex-1">
+              <p className="font-semibold text-foreground">{r.label}</p>
+              {r.detail && (
+                <p className="truncate text-[10px] text-muted-foreground">{r.detail}</p>
+              )}
+            </div>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
