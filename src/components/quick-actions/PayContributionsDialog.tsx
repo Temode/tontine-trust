@@ -130,11 +130,13 @@ export function PayContributionsDialog({ open, onOpenChange }: { open: boolean; 
 
       {payingDue && (
         <DjomyPaymentModal
-          due={payingDue}
           open={!!payingDue}
           onOpenChange={(v) => {
             if (!v) setPayingDue(null);
           }}
+          contributionId={payingDue.contribution_id}
+          groupName={payingDue.group_name}
+          amount={payingDue.amount}
         />
       )}
     </>

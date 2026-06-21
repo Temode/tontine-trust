@@ -15,7 +15,6 @@ import { cn } from "@/lib/utils";
 import { formatGNF } from "@/lib/format";
 import { createGroup } from "@/lib/api/groups";
 import { DEFAULT_DRAFT, generateInviteCode, type GroupCategory } from "@/components/create-group/types";
-import type { Frequency } from "@/lib/types";
 
 const quickSchema = z.object({
   name: z.string().trim().min(3, "Le nom doit faire au moins 3 caractères.").max(64, "64 caractères max."),
@@ -38,7 +37,9 @@ const CATEGORIES: Array<{ id: GroupCategory; label: string; hint: string }> = [
   { id: "community", label: "Communauté", hint: "Quartier, association" },
 ];
 
-const FREQUENCIES: Array<{ id: Frequency; label: string; sub: string }> = [
+type QuickFreq = QuickInput["frequency"];
+
+const FREQUENCIES: Array<{ id: QuickFreq; label: string; sub: string }> = [
   { id: "Hebdomadaire", label: "Hebdo", sub: "7 j" },
   { id: "Quinzaine", label: "Quinzaine", sub: "14 j" },
   { id: "Mensuelle", label: "Mensuelle", sub: "30 j" },
