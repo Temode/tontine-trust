@@ -8,6 +8,7 @@ import { IncomingCallScreen } from "@/components/messages/IncomingCallScreen";
 import { CallDiagnosticPanel } from "@/components/messages/CallDiagnosticPanel";
 import { IncomingCallsProvider } from "@/hooks/IncomingCallsContext";
 import { usePrimeCallChannel } from "@/hooks/usePrimeCallChannel";
+import { useDjomyPaymentReconciler } from "@/hooks/useDjomyPaymentReconciler";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { GuidedTourProvider } from "@/components/tour/GuidedTour";
 import { QuickActionsProvider } from "@/components/quick-actions/QuickActionsProvider";
@@ -24,6 +25,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   useNotificationsRealtime();
   useChatToasts();
   usePrimeCallChannel();
+  useDjomyPaymentReconciler();
   const location = useLocation();
   return (
     <GuidedTourProvider>

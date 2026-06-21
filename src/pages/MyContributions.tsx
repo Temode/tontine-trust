@@ -1,5 +1,6 @@
-import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useEffect, useMemo, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import {
   ShieldCheck,
@@ -14,6 +15,7 @@ import {
   Clock,
   Receipt,
   AlertOctagon,
+  RefreshCw,
 } from "lucide-react";
 import { TopBar } from "@/components/layout/TopBar";
 import { SectionCard } from "@/components/dashboard/SectionCard";
@@ -32,6 +34,7 @@ import {
 import { listMyPaymentsHistory } from "@/lib/api/payments";
 import { launchDjomyCheckout } from "@/lib/payment/launchDjomyCheckout";
 import { InFlightPaymentsCard } from "@/components/payment/InFlightPaymentsCard";
+import { reconcileDjomyPayments } from "@/hooks/useDjomyPaymentReconciler";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { useAuth } from "@/hooks/useAuth";
 import { PenaltyBreakdown } from "@/components/contribution/PenaltyBreakdown";
@@ -51,6 +54,8 @@ const STATUS_TABS: { key: StatusFilter; label: string }[] = [
 export default function MyContributions() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const qc = useQueryClient();
+  const [reconciling, setReconciling] = useState(false);
   const { data: dues = [], isLoading } = useQuery({
     queryKey: ["contributions", "due"],
     queryFn: listMyContributionsDue,
@@ -59,6 +64,42 @@ export default function MyContributions() {
     queryKey: ["payments", "history"],
     queryFn: listMyPaymentsHistory,
   });
+
+  // Réconciliation immédiate au montage (utile si l'utilisateur revient via
+  // la flèche du navigateur sans passer par /paiement/retour).
+  useEffect(() => {
+    if (!user?.id) return;
+    void reconcileDjomyPayments(user.id).then((res) => {
+      if (res.updated > 0) {
+        qc.invalidateQueries({ queryKey: ["contributions"] });
+        qc.invalidateQueries({ queryKey: ["payments"] });
+      }
+    });
+  }, [user?.id, qc]);
+
+  const handleManualReconcile = async () => {
+    if (!user?.id || reconciling) return;
+    setReconciling(true);
+    try {
+      const res = await reconcileDjomyPayments(user.id, { force: true });
+      if (res.checked === 0) {
+        toast.info("Aucun paiement en attente.");
+      } else if (res.updated > 0) {
+        toast.success(
+          `${res.updated} paiement${res.updated > 1 ? "s" : ""} mis à jour.`,
+          { description: "Vos cotisations sont à jour." },
+        );
+        qc.invalidateQueries({ queryKey: ["contributions"] });
+        qc.invalidateQueries({ queryKey: ["payments"] });
+      } else {
+        toast(`${res.checked} paiement${res.checked > 1 ? "s" : ""} encore en attente côté Djomy.`);
+      }
+    } catch (e) {
+      toast.error("Vérification impossible", { description: (e as Error).message });
+    } finally {
+      setReconciling(false);
+    }
+  };
 
   const [disputingDue, setDisputingDue] = useState<DbContributionDue | null>(null);
   const [search, setSearch] = useState("");
@@ -276,6 +317,27 @@ export default function MyContributions() {
             value={String(history.length)}
             hint="Historique complet"
           />
+        </div>
+
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-hairline bg-card/40 px-4 py-3">
+          <div className="min-w-0">
+            <p className="font-display text-sm font-semibold text-foreground">
+              Synchronisation Djomy
+            </p>
+            <p className="text-[11px] text-muted-foreground">
+              Si vous revenez de Djomy par la flèche du navigateur, cliquez ici pour
+              forcer la vérification de votre paiement.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={handleManualReconcile}
+            disabled={reconciling}
+            className="inline-flex h-10 items-center gap-2 whitespace-nowrap rounded-md border border-primary/30 bg-primary/5 px-4 text-xs font-semibold text-primary transition hover:bg-primary/10 disabled:opacity-60"
+          >
+            <RefreshCw className={cn("h-3.5 w-3.5", reconciling && "animate-spin")} />
+            {reconciling ? "Vérification…" : "Vérifier mes paiements"}
+          </button>
         </div>
 
         <InFlightPaymentsCard userId={user?.id ?? null} />
