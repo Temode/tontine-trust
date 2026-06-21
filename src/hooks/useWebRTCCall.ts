@@ -520,6 +520,9 @@ export function useWebRTCCall({
                 void refreshParticipants();
                 announce();
               }, 5000);
+              // Initial media-state broadcast so others render our mic/cam/screen accurately.
+              broadcastMediaState();
+              window.setTimeout(() => broadcastMediaState(), 1200);
               const activePeers = participantsRef.current
                 .filter((p) => !p.left_at && p.user_id !== myId)
                 .map((p) => p.user_id);
