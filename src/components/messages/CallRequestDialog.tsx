@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { Phone } from "lucide-react";
 import { toast } from "sonner";
@@ -30,13 +30,13 @@ export function CallRequestDialog({ open, onOpenChange, groupId, groupName, onDo
   const [mode, setMode] = useState<"now" | "schedule">("now");
   const [datetime, setDatetime] = useState("");
   const [activeCall, setActiveCall] = useState<string | null>(null);
-  const [ringStatus, setRingStatus] = useState<{ joined: number } | null>(null);
+  const knownJoinersRef = useRef<Set<string>>(new Set());
 
-  // Tant que l'appel est en cours, on suit combien de membres ont rejoint
-  // pour donner un feedback "sonnerie reçue" à l'émetteur.
+  // Accusé de réception : chaque nouvel arrivant déclenche un toast nominatif
+  // qui prouve à l'émetteur que Realtime fonctionne côté réception.
   useEffect(() => {
     if (!activeCall) {
-      setRingStatus(null);
+      knownJoinersRef.current = new Set();
       return;
     }
     let cancelled = false;
@@ -44,8 +44,15 @@ export function CallRequestDialog({ open, onOpenChange, groupId, groupName, onDo
       try {
         const parts = await listCallParticipants(activeCall);
         if (cancelled) return;
-        const joinedCount = parts.filter((p) => !p.left_at).length;
-        setRingStatus({ joined: joinedCount });
+        for (const p of parts) {
+          if (p.left_at) continue;
+          if (knownJoinersRef.current.has(p.user_id)) continue;
+          knownJoinersRef.current.add(p.user_id);
+          const name = p.profile?.full_name ?? "Un membre";
+          toast.success(`✓ ${name} a rejoint l'appel`, {
+            description: "Realtime confirmé · les events arrivent bien chez lui.",
+          });
+        }
       } catch {
         /* ignore */
       }
@@ -57,14 +64,6 @@ export function CallRequestDialog({ open, onOpenChange, groupId, groupName, onDo
       void ch.unsubscribe();
     };
   }, [activeCall]);
-
-  // Toast de progression côté émetteur
-  useEffect(() => {
-    if (!activeCall || !ringStatus) return;
-    if (ringStatus.joined > 1) {
-      toast.success(`${ringStatus.joined - 1} membre(s) ont rejoint`);
-    }
-  }, [activeCall, ringStatus?.joined, ringStatus]);
 
   const mut = useMutation({
     mutationFn: () =>
