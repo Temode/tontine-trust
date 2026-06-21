@@ -522,6 +522,7 @@ export default function GroupDetail() {
 
         <div className="mt-5">
           {section === "overview" && <OverviewTab nextTurn={nextTurn} payout={totalPayout} />}
+          {section === "overview" && <GroupDefaultersSection groupId={grp.id} />}
           {section === "members" && (
             <MembersTab
               members={activeMembers}
