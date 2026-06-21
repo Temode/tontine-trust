@@ -1,41 +1,54 @@
-## Objectif
-Suppression validée ✅ — passons au test réel Djomy production avec un cycle de 1 000 GNF débité sur le 611 59 93 95.
+## Constat
 
-## Étapes
+La documentation Djomy confirme que notre code est conforme :
+- Signature : `HMAC_SHA256(message=clientId, key=clientSecret)` ✅
+- Header : `X-API-KEY: <clientId>:<signature_hex>` ✅
+- Endpoint : `POST /v1/auth` avec body `{}` ✅
+- URL `https://prod-api.djomy.africa` répond bien (le 401 prouve qu'on parle au bon serveur)
 
-### 1. Création du groupe de test (via compte Alice Organisateur)
-- Nom: `Test Djomy Prod 1000`
-- Montant cotisation: **1 000 GNF**
-- Fréquence: hebdomadaire
-- Membres: Alice (organisateur) + Bob (participant)
-- Ordre de rotation: Bob en position 1 (bénéficiaire du 1er cycle) pour qu'Alice paie en premier — OU inverse selon préférence
+Pourtant l'auth retourne 401 alors que tu confirmes :
+- Clés issues de la **section Production** du dashboard Djomy
+- Compte marchand **activé**
 
-### 2. Invitation et acceptation Bob
-- Génération du lien d'invitation depuis le compte Alice
-- Connexion compte Bob, acceptation de l'invitation
-- Vérification du démarrage du cycle 1
+Il reste 3 causes plausibles, qu'on ne peut pas distinguer sans tester :
+1. Un caractère parasite (espace, retour à la ligne, guillemet) a été copié dans la valeur d'un secret
+2. Les clés affichées comme « Production » correspondent en fait à l'API Sandbox côté Djomy
+3. Une restriction côté Djomy (IP whitelisting, activation API distincte de l'activation compte)
 
-### 3. Test paiement réel Djomy (Orange Money)
-- Connexion compte **Alice** (la payeuse du cycle 1)
-- Déclenchement cotisation 1 000 GNF
-- Méthode: **OM** (Orange Money)
-- Numéro: **611 59 93 95**
-- Vérification:
-  - Réception du push USSD sur le téléphone
-  - Validation du PIN OM côté téléphone
-  - Réception du webhook Djomy → mise à jour du statut paiement en base
-  - Affichage `confirmed` dans l'UI
-  - Mise à jour du solde du cycle pour Bob (bénéficiaire)
+## Ce que je vais faire
 
-### 4. Vérifications post-paiement
-- Logs edge function `djomy-payment-init` et `djomy-webhook`
-- Table `payments`: statut, transaction_id Djomy, montant
-- Notification reçue par Bob
-- Score de fiabilité d'Alice mis à jour
+### 1. Améliorer `djomy-validate-credentials` pour tester **les deux environnements en parallèle**
 
-## Question avant exécution
-Confirmez-vous:
-- **Qui paie**: Alice débite son 611 59 93 95 (je crée donc Bob comme bénéficiaire du cycle 1) ? Ou l'inverse (Bob paie depuis le 611) ?
-- **Téléphone prêt** à recevoir le push USSD Orange Money maintenant ?
+À chaque clic sur « Tester maintenant », la fonction appellera :
+- `POST https://prod-api.djomy.africa/v1/auth`
+- `POST https://sandbox-api.djomy.africa/v1/auth`
 
-Dès validation, je passe en build mode et j'exécute les étapes 1→4 via les RPC et edge functions existantes (pas de nouveau code attendu, sauf bug rencontré pendant le test).
+…avec les mêmes secrets et renverra les deux résultats. Cela permet de savoir immédiatement si les clés sont en réalité des clés Sandbox malgré l'étiquette « Production ».
+
+Ajouts au payload de réponse :
+- `clientIdHasWhitespace` (bool) et `clientSecretHasWhitespace` (bool) pour détecter les copier-coller fautifs
+- `clientIdTrimmedLength` vs `clientIdLength` (pour signaler un trim qui changerait la valeur)
+- Corps brut de la réponse Djomy (utile pour voir les codes d'erreur explicites comme `INVALID_CLIENT`, `UNKNOWN_MERCHANT`, etc.)
+
+### 2. Mettre à jour `src/pages/admin/DjomySettings.tsx`
+
+Afficher côte à côte les deux résultats (Prod / Sandbox) avec un badge vert/rouge, le code HTTP, la latence, le corps de réponse Djomy, et un avertissement explicite si :
+- Sandbox ✅ et Prod ❌ → « Vos clés sont des clés Sandbox. Bascule `DJOMY_ENV=sandbox` ou récupère des clés Production. »
+- Whitespace détecté → « Une valeur de secret contient des espaces / sauts de ligne. Recolle-la sans espace. »
+- Les deux ❌ → « Identifiants invalides côté Djomy. Contacte le support Djomy avec le `clientIdPreview` affiché. »
+
+### 3. Aucune modification de l'intégration paiement réelle
+
+Ce diagnostic est purement en lecture, il ne touche ni `djomy-init-payment`, ni `djomy-webhook`, ni les autres flux.
+
+## Détails techniques
+
+Fichiers modifiés :
+- `supabase/functions/djomy-validate-credentials/index.ts` — appel parallèle Prod + Sandbox, ajout des champs de diagnostic
+- `src/pages/admin/DjomySettings.tsx` — affichage double colonne + verdict automatique
+
+Aucune migration, aucun nouveau secret, aucune dépendance ajoutée.
+
+## Résultat attendu
+
+Après un seul clic sur « Tester maintenant » tu sauras avec certitude laquelle des 3 causes est la bonne, et l'écran t'indiquera l'action à faire.
