@@ -174,6 +174,10 @@ export type Database = {
           ended_at: string | null
           group_id: string
           id: string
+          recording_consent_user_ids: string[]
+          recording_duration_seconds: number | null
+          recording_size: number | null
+          recording_url: string | null
           requested_by: string
           scheduled_at: string | null
           started_at: string | null
@@ -186,6 +190,10 @@ export type Database = {
           ended_at?: string | null
           group_id: string
           id?: string
+          recording_consent_user_ids?: string[]
+          recording_duration_seconds?: number | null
+          recording_size?: number | null
+          recording_url?: string | null
           requested_by: string
           scheduled_at?: string | null
           started_at?: string | null
@@ -198,6 +206,10 @@ export type Database = {
           ended_at?: string | null
           group_id?: string
           id?: string
+          recording_consent_user_ids?: string[]
+          recording_duration_seconds?: number | null
+          recording_size?: number | null
+          recording_url?: string | null
           requested_by?: string
           scheduled_at?: string | null
           started_at?: string | null
@@ -4887,6 +4899,10 @@ export type Database = {
           turn_number: number
         }[]
       }
+      give_call_recording_consent: {
+        Args: { p_call_id: string }
+        Returns: undefined
+      }
       grant_admin_permissions: {
         Args: { _group_id: string; _perms: Json; _user_id: string }
         Returns: undefined
@@ -5103,6 +5119,15 @@ export type Database = {
       }
       set_call_mute: {
         Args: { p_call_id: string; p_muted: boolean }
+        Returns: undefined
+      }
+      set_call_recording: {
+        Args: {
+          p_call_id: string
+          p_duration: number
+          p_size: number
+          p_url: string
+        }
         Returns: undefined
       }
       set_member_permissions: {
