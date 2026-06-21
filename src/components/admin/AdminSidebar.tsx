@@ -11,6 +11,7 @@ import {
   KeyRound,
   MessageSquare,
   Send,
+  CalendarClock,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -25,6 +26,7 @@ const ITEMS = [
   { to: "/admin/djomy", label: "Identifiants Djomy", icon: KeyRound },
   { to: "/admin/sms-test", label: "Test SMS", icon: Send },
   { to: "/admin/sms-logs", label: "Journal SMS", icon: MessageSquare },
+  { to: "/admin/cron-preview", label: "Aperçu cron rappels", icon: CalendarClock },
 ];
 
 export function AdminSidebar() {
