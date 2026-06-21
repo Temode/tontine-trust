@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Calendar, Phone, PhoneOff } from "lucide-react";
+import { Calendar, Download, FileAudio, Phone, PhoneOff } from "lucide-react";
 import { toast } from "sonner";
 import { useState } from "react";
 import {
@@ -176,6 +176,28 @@ export function CallHistoryDrawer({ open, onOpenChange, groupId }: Props) {
                     <Phone className="h-3.5 w-3.5" />
                     Rejoindre l'appel
                   </button>
+                )}
+
+                {c.recording_url && (
+                  <a
+                    href={c.recording_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-2 flex items-center justify-between gap-2 rounded-md border border-hairline bg-secondary/40 px-3 py-2 text-xs text-foreground hover:bg-secondary"
+                  >
+                    <span className="flex items-center gap-2">
+                      <FileAudio className="h-3.5 w-3.5 text-primary" />
+                      <span className="font-semibold">Enregistrement</span>
+                      {c.recording_duration_seconds != null && (
+                        <span className="tabular-nums text-muted-foreground">
+                          ·{" "}
+                          {Math.floor(c.recording_duration_seconds / 60)}:
+                          {String(c.recording_duration_seconds % 60).padStart(2, "0")}
+                        </span>
+                      )}
+                    </span>
+                    <Download className="h-3.5 w-3.5 text-muted-foreground" />
+                  </a>
                 )}
               </div>
             );
