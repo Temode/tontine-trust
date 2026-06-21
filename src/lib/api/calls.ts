@@ -73,3 +73,73 @@ export function subscribeCallRequests(
     )
     .subscribe();
 }
+
+// ---------------- Participants (audio call) ----------------
+
+export interface CallParticipant {
+  call_id: string;
+  user_id: string;
+  joined_at: string;
+  left_at: string | null;
+  is_muted: boolean;
+  profile?: { full_name: string | null; avatar_url: string | null } | null;
+}
+
+export async function listCallParticipants(callId: string): Promise<CallParticipant[]> {
+  const { data, error } = await supabase
+    .from("call_participants")
+    .select("*, profile:profiles!call_participants_user_id_fkey(full_name, avatar_url)")
+    .eq("call_id", callId);
+  if (error) throw error;
+  return (data ?? []) as CallParticipant[];
+}
+
+export async function joinCall(callId: string): Promise<void> {
+  const { error } = await supabase.rpc("join_call", { p_call_id: callId });
+  if (error) throw error;
+}
+
+export async function leaveCall(callId: string): Promise<void> {
+  const { error } = await supabase.rpc("leave_call", { p_call_id: callId });
+  if (error) throw error;
+}
+
+export async function setCallMute(callId: string, muted: boolean): Promise<void> {
+  const { error } = await supabase.rpc("set_call_mute", {
+    p_call_id: callId,
+    p_muted: muted,
+  });
+  if (error) throw error;
+}
+
+export function subscribeCallParticipants(
+  callId: string,
+  onChange: () => void,
+): RealtimeChannel {
+  return supabase
+    .channel(`call_participants:${callId}`)
+    .on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "call_participants",
+        filter: `call_id=eq.${callId}`,
+      },
+      () => onChange(),
+    )
+    .subscribe();
+}
+
+export async function getActiveCallForGroup(groupId: string): Promise<{ id: string; status: CallStatus } | null> {
+  const { data, error } = await supabase
+    .from("call_requests")
+    .select("id, status")
+    .eq("group_id", groupId)
+    .in("status", ["pending", "accepted"])
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return (data as { id: string; status: CallStatus } | null) ?? null;
+}
