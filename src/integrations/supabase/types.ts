@@ -119,6 +119,55 @@ export type Database = {
         }
         Relationships: []
       }
+      call_participants: {
+        Row: {
+          call_id: string
+          is_muted: boolean
+          joined_at: string
+          left_at: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          call_id: string
+          is_muted?: boolean
+          joined_at?: string
+          left_at?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          call_id?: string
+          is_muted?: boolean
+          joined_at?: string
+          left_at?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "call_participants_call_id_fkey"
+            columns: ["call_id"]
+            isOneToOne: false
+            referencedRelation: "call_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "call_participants_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "admin_user_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "call_participants_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       call_requests: {
         Row: {
           created_at: string
@@ -4872,6 +4921,7 @@ export type Database = {
       }
       is_rpc_context: { Args: never; Returns: boolean }
       is_super_admin: { Args: { _uid: string }; Returns: boolean }
+      join_call: { Args: { p_call_id: string }; Returns: undefined }
       join_group_with_code: {
         Args: {
           _accepted_terms_version: string
@@ -4885,6 +4935,7 @@ export type Database = {
         Args: { _member_id: string; _reason?: string }
         Returns: undefined
       }
+      leave_call: { Args: { p_call_id: string }; Returns: undefined }
       list_group_disputes: {
         Args: { _group_id: string }
         Returns: {
@@ -5049,6 +5100,10 @@ export type Database = {
           _message?: string
         }
         Returns: string
+      }
+      set_call_mute: {
+        Args: { p_call_id: string; p_muted: boolean }
+        Returns: undefined
       }
       set_member_permissions: {
         Args: { _member_id: string; _perms: Json }
