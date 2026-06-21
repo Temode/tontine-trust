@@ -68,8 +68,9 @@ export function subscribeCallRequests(
   groupId: string,
   onChange: () => void,
 ): RealtimeChannel {
+  const channelId = `call_requests:${groupId}:${crypto.randomUUID()}`;
   return supabase
-    .channel(`call_requests:${groupId}`)
+    .channel(channelId)
     .on(
       "postgres_changes",
       { event: "*", schema: "public", table: "call_requests", filter: `group_id=eq.${groupId}` },
@@ -120,8 +121,9 @@ export function subscribeCallParticipants(
   callId: string,
   onChange: () => void,
 ): RealtimeChannel {
+  const channelId = `call_participants:${callId}:${crypto.randomUUID()}`;
   return supabase
-    .channel(`call_participants:${callId}`)
+    .channel(channelId)
     .on(
       "postgres_changes",
       {
