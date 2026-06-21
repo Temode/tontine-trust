@@ -60,7 +60,6 @@ export default function MyContributions() {
     queryFn: listMyPaymentsHistory,
   });
 
-  const [payingDue, setPayingDue] = useState<DbContributionDue | null>(null);
   const [disputingDue, setDisputingDue] = useState<DbContributionDue | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
@@ -186,7 +185,7 @@ export default function MyContributions() {
                 <div className="mt-auto flex flex-wrap items-center gap-3 pt-6">
                   <button
                     type="button"
-                    onClick={() => mostUrgent && setPayingDue(mostUrgent)}
+                    onClick={() => mostUrgent && void launchDjomyCheckout(mostUrgent.contribution_id)}
                     disabled={!mostUrgent}
                     className="inline-flex h-12 min-w-[180px] items-center justify-center gap-2 whitespace-nowrap rounded-md bg-accent px-5 text-sm font-semibold text-accent-foreground shadow-[0_10px_30px_-12px_hsl(var(--accent)/0.7)] transition hover:bg-accent/90 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-primary"
                   >
@@ -300,7 +299,7 @@ export default function MyContributions() {
             </div>
             <button
               type="button"
-              onClick={() => defaultedDues[0] && setPayingDue(defaultedDues[0])}
+              onClick={() => defaultedDues[0] && void launchDjomyCheckout(defaultedDues[0].contribution_id)}
               className="inline-flex h-10 items-center justify-center gap-2 whitespace-nowrap rounded-md bg-destructive px-4 text-sm font-semibold text-destructive-foreground hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive focus-visible:ring-offset-2"
             >
               Régulariser maintenant
@@ -400,7 +399,7 @@ export default function MyContributions() {
                   <DueContributionCard
                     key={d.contribution_id}
                     due={d}
-                    onPay={() => setPayingDue(d)}
+                    onPay={() => void launchDjomyCheckout(d.contribution_id)}
                     onDispute={() => setDisputingDue(d)}
                   />
                 ))}
@@ -527,18 +526,6 @@ export default function MyContributions() {
 
         <DefaultHistorySection />
       </div>
-      {payingDue && (
-        <DjomyPaymentModal
-          open={!!payingDue}
-          onOpenChange={(o) => !o && setPayingDue(null)}
-          contributionId={payingDue.contribution_id}
-          groupName={payingDue.group_name}
-          amount={payingDue.amount}
-          turnNumber={payingDue.turn_number}
-          dueDate={payingDue.due_date}
-          beneficiaryName={payingDue.beneficiary_name}
-        />
-      )}
       {disputingDue && (
         <DisputeDialog
           open={!!disputingDue}
