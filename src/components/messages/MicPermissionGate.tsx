@@ -333,6 +333,39 @@ export function MicPermissionGate({ onGranted, onCancel, withVideo = true }: Pro
         </div>
       )}
 
+      {/* Diagnostic checklist */}
+      <DiagnosticChecklist
+        hasMic={hasMic}
+        hasCam={hasCam}
+        micLevel={micLevel}
+        screenStatus={screenTestStatus}
+        screenDetail={screenTestDetail}
+        onTestScreen={async () => {
+          setScreenTestStatus("pending");
+          setScreenTestDetail("Sélectionnez une fenêtre à partager…");
+          if (!navigator.mediaDevices?.getDisplayMedia) {
+            setScreenTestStatus("fail");
+            setScreenTestDetail("getDisplayMedia non supporté par ce navigateur.");
+            return;
+          }
+          try {
+            const s = await navigator.mediaDevices.getDisplayMedia({ video: true });
+            const t = s.getVideoTracks()[0];
+            setScreenTestDetail(t?.label || "Partage OK");
+            s.getTracks().forEach((tr) => tr.stop());
+            setScreenTestStatus("ok");
+          } catch (e) {
+            const err = e as DOMException;
+            setScreenTestStatus(err.name === "NotAllowedError" ? "warn" : "fail");
+            setScreenTestDetail(
+              err.name === "NotAllowedError"
+                ? "Partage refusé/annulé."
+                : err.message || "Échec du test.",
+            );
+          }
+        }}
+      />
+
       <ul className="space-y-1.5 text-[11px] text-muted-foreground">
         <li className="flex gap-1.5">
           <ShieldCheck className="mt-0.5 h-3 w-3 shrink-0 text-primary" />
