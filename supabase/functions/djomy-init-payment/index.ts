@@ -4,7 +4,7 @@ import { corsHeaders, djomyFetch, json, normalizePhone } from "../_shared/djomy.
 
 interface Body {
   contributionId: string;
-  method: "OM" | "MOMO" | "CARD";
+  method?: "OM" | "MOMO" | "CARD";
   payerPhone: string;
   returnUrl: string;
   cancelUrl?: string;
@@ -32,10 +32,10 @@ Deno.serve(async (req) => {
     let body: Body;
     try { body = await req.json(); } catch { return json({ error: "INVALID_JSON" }, 400); }
 
-    if (!body.contributionId || !body.method || !body.payerPhone || !body.returnUrl) {
+    if (!body.contributionId || !body.payerPhone || !body.returnUrl) {
       return json({ error: "MISSING_FIELDS" }, 400);
     }
-    if (!["OM", "MOMO", "CARD"].includes(body.method)) {
+    if (body.method && !["OM", "MOMO", "CARD"].includes(body.method)) {
       return json({ error: "INVALID_METHOD" }, 400);
     }
     if (!/^https:\/\//.test(body.returnUrl)) {
@@ -55,10 +55,11 @@ Deno.serve(async (req) => {
 
     const phone = normalizePhone(body.payerPhone);
 
-    // 1. Crée le payment "initiated" via RPC (vérifie ownership + status)
+    // 1. Crée le payment "initiated" via RPC (vérifie ownership + status).
+    //    method peut être NULL : le payeur le choisira sur le portail Djomy.
     const { data: paymentId, error: rpcErr } = await userClient.rpc("start_djomy_payment", {
       _contribution_id: body.contributionId,
-      _method: body.method,
+      _method: body.method ?? null,
       _payer_phone: phone,
     });
     if (rpcErr) return json({ error: rpcErr.message }, 400);
@@ -72,14 +73,23 @@ Deno.serve(async (req) => {
       .single();
     if (!payment) return json({ error: "PAYMENT_NOT_FOUND" }, 500);
 
+    // Djomy : amount = nombre positif en GNF (pas de centimes).
+    // Cf. https://developers.djomy.africa/ — schéma /v1/payments/gateway.
+    const amount = Number(payment.amount);
+    console.log("[djomy-init-payment] amount", { paymentId: payment.id, amount, raw: payment.amount });
+
+    // Méthodes affichées sur le portail : par défaut, on laisse l'utilisateur
+    // choisir entre OM, MoMo et carte bancaire directement chez Djomy.
+    const allowedPaymentMethods = body.method ? [body.method] : ["OM", "MOMO", "CARD"];
+
     // 3. Appelle Djomy /v1/payments/gateway
     const djomyRes = await djomyFetch("/v1/payments/gateway", {
       method: "POST",
       body: {
-        amount: Number(payment.amount),
+        amount,
         countryCode: "GN",
         payerNumber: phone,
-        allowedPaymentMethods: [body.method],
+        allowedPaymentMethods,
         description: `Cotisation tontine (payment ${payment.id})`,
         merchantPaymentReference: payment.id,
         returnUrl: body.returnUrl,
@@ -92,6 +102,7 @@ Deno.serve(async (req) => {
         },
       },
     });
+    console.log("[djomy-init-payment] djomy response", { status: djomyRes.status, raw: djomyRes.raw.slice(0, 800) });
 
     if (!djomyRes.ok) {
       await admin.from("payments")
