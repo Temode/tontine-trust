@@ -975,3 +975,151 @@ function RotationTab({
     </div>
   );
 }
+
+// ---------------------------------------------------------------------------
+// PausedPaymentsBanner — explique pourquoi le paiement est bloqué et permet
+// de demander/accorder une autorisation exceptionnelle pendant la pause.
+// ---------------------------------------------------------------------------
+interface PausedPaymentsBannerProps {
+  isPaused: boolean;
+  grp: DbGroup;
+  organizerName: string | null;
+  myDue: { contribution_id: string; amount: number; turn_number: number; due_date: string } | undefined;
+  myPendingRequest: PausePaymentRequest | null;
+  myApprovedRequest: PausePaymentRequest | null;
+  myLastRejected: PausePaymentRequest | null;
+  isOrganizer: boolean;
+  pendingRequests: PausePaymentRequest[];
+  onRequest: () => void;
+  requestPending: boolean;
+  onDecide: (requestId: string, approve: boolean) => void;
+  decidePending: boolean;
+  onPay: () => void;
+}
+
+function PausedPaymentsBanner(props: PausedPaymentsBannerProps) {
+  const {
+    isPaused, grp, organizerName, myDue,
+    myPendingRequest, myApprovedRequest, myLastRejected,
+    isOrganizer, pendingRequests,
+    onRequest, requestPending, onDecide, decidePending, onPay,
+  } = props;
+
+  const pausedDate = grp.paused_at
+    ? new Date(grp.paused_at).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })
+    : null;
+  const orgLabel = organizerName?.trim() || "l'organisateur";
+
+  return (
+    <div className="mt-5 space-y-3 rounded-xl border border-amber-500/30 bg-amber-50/60 p-4 dark:bg-amber-500/10">
+      <div className="flex items-start gap-3">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-500 text-white">
+          <ShieldCheck className="h-4 w-4" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="font-display text-sm font-bold text-foreground">
+            {isPaused ? "Cycle en pause — paiements suspendus" : "Cycle clôturé"}
+          </p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            {isPaused ? (
+              <>
+                {orgLabel} a mis ce cycle en pause
+                {pausedDate ? ` le ${pausedDate}` : ""}
+                {grp.paused_reason ? ` — motif : « ${grp.paused_reason} »` : ""}. Aucune cotisation ne peut être réglée tant que le cycle n'a pas repris.
+              </>
+            ) : (
+              "Ce groupe est archivé : aucun nouveau paiement ne peut être effectué."
+            )}
+          </p>
+        </div>
+      </div>
+
+      {/* Côté membre — workflow d'autorisation */}
+      {isPaused && !isOrganizer && myDue && (
+        <div className="rounded-lg border border-hairline bg-card/80 p-3">
+          {myApprovedRequest ? (
+            <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+              <p className="text-xs text-foreground">
+                <CheckCircle2 className="mr-1 inline h-3.5 w-3.5 text-primary" />
+                {orgLabel} vous a autorisé(e) à régler votre cotisation malgré la pause.
+              </p>
+              <button
+                type="button"
+                onClick={onPay}
+                className="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-primary px-4 text-xs font-semibold text-primary-foreground transition hover:bg-primary-700"
+              >
+                <ShieldCheck className="h-3.5 w-3.5" />
+                Payer via Djomy
+              </button>
+            </div>
+          ) : myPendingRequest ? (
+            <p className="text-xs text-muted-foreground">
+              Votre demande d'autorisation est en attente de réponse de {orgLabel}. Vous serez notifié(e) dès qu'une décision sera prise.
+            </p>
+          ) : (
+            <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+              <div className="min-w-0">
+                <p className="text-xs text-foreground">
+                  Vous pouvez demander une autorisation exceptionnelle pour régler votre tour #{myDue.turn_number} ({formatGNF(myDue.amount, { withCurrency: true })}).
+                </p>
+                {myLastRejected && (
+                  <p className="mt-1 text-[11px] text-destructive">
+                    Précédente demande refusée{myLastRejected.decision_reason ? ` — motif : « ${myLastRejected.decision_reason} »` : ""}.
+                  </p>
+                )}
+              </div>
+              <button
+                type="button"
+                disabled={requestPending}
+                onClick={onRequest}
+                className="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-primary/40 bg-primary/10 px-4 text-xs font-semibold text-primary transition hover:bg-primary/15 disabled:opacity-60"
+              >
+                {requestPending ? "Envoi…" : "Demander l'autorisation de payer"}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Côté organisateur — liste des demandes en attente */}
+      {isPaused && isOrganizer && pendingRequests.length > 0 && (
+        <div className="rounded-lg border border-hairline bg-card/80 p-3">
+          <p className="mb-2 text-[11px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
+            Demandes d'autorisation ({pendingRequests.length})
+          </p>
+          <ul className="space-y-2">
+            {pendingRequests.map((r) => (
+              <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                <span className="min-w-0 truncate text-foreground">
+                  {r.requester_name?.trim() || "Membre"}
+                  <span className="ml-2 text-muted-foreground">
+                    · demandé le {new Date(r.created_at).toLocaleDateString("fr-FR")}
+                  </span>
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    disabled={decidePending}
+                    onClick={() => onDecide(r.id, false)}
+                    className="inline-flex h-8 items-center rounded-md border border-hairline bg-card px-3 text-xs font-medium text-muted-foreground transition hover:bg-secondary disabled:opacity-60"
+                  >
+                    Refuser
+                  </button>
+                  <button
+                    type="button"
+                    disabled={decidePending}
+                    onClick={() => onDecide(r.id, true)}
+                    className="inline-flex h-8 items-center gap-1 rounded-md bg-primary px-3 text-xs font-semibold text-primary-foreground transition hover:bg-primary-700 disabled:opacity-60"
+                  >
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                    Autoriser
+                  </button>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
