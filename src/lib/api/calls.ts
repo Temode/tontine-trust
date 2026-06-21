@@ -143,3 +143,70 @@ export async function getActiveCallForGroup(groupId: string): Promise<{ id: stri
   if (error) throw error;
   return (data as { id: string; status: CallStatus } | null) ?? null;
 }
+
+// ---------------- Recording ----------------
+
+export async function giveCallRecordingConsent(callId: string): Promise<void> {
+  const { error } = await supabase.rpc("give_call_recording_consent", { p_call_id: callId });
+  if (error) throw error;
+}
+
+export async function setCallRecording(
+  callId: string,
+  url: string,
+  size: number,
+  durationSeconds: number,
+): Promise<void> {
+  const { error } = await supabase.rpc("set_call_recording", {
+    p_call_id: callId,
+    p_url: url,
+    p_size: size,
+    p_duration: durationSeconds,
+  });
+  if (error) throw error;
+}
+
+export async function uploadCallRecording(
+  groupId: string,
+  callId: string,
+  blob: Blob,
+): Promise<{ path: string; signedUrl: string }> {
+  const ext = blob.type.includes("ogg") ? "ogg" : blob.type.includes("mp4") ? "mp4" : "webm";
+  const path = `${groupId}/${callId}/${Date.now()}.${ext}`;
+  const { error: upErr } = await supabase.storage
+    .from("call-recordings")
+    .upload(path, blob, { contentType: blob.type, upsert: false });
+  if (upErr) throw upErr;
+  const { data, error } = await supabase.storage
+    .from("call-recordings")
+    .createSignedUrl(path, 60 * 60 * 24 * 7); // 7 days
+  if (error) throw error;
+  return { path, signedUrl: data.signedUrl };
+}
+
+export async function getRecordingSignedUrl(path: string): Promise<string> {
+  const { data, error } = await supabase.storage
+    .from("call-recordings")
+    .createSignedUrl(path, 60 * 60);
+  if (error) throw error;
+  return data.signedUrl;
+}
+
+// ---------------- ICE servers (STUN + optional TURN) ----------------
+
+export async function fetchIceServers(): Promise<{ iceServers: RTCIceServer[]; turn: boolean }> {
+  try {
+    const { data, error } = await supabase.functions.invoke("get-ice-servers");
+    if (error || !data) throw error ?? new Error("no data");
+    return data as { iceServers: RTCIceServer[]; turn: boolean };
+  } catch (e) {
+    console.warn("fetchIceServers fallback to STUN", e);
+    return {
+      iceServers: [
+        { urls: "stun:stun.l.google.com:19302" },
+        { urls: "stun:stun1.l.google.com:19302" },
+      ],
+      turn: false,
+    };
+  }
+}
