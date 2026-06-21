@@ -36,7 +36,7 @@ const columns: Column[] = [
 export function GroupsTable({ groups, sort, sortDir, onSortChange }: GroupsTableProps) {
   return (
     <div className="overflow-x-auto rounded-xl border border-hairline bg-card">
-      <table className="w-full text-sm">
+      <table className="w-full min-w-[680px] text-sm">
         <thead className="bg-secondary/40">
           <tr className="text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
             {columns.map((col) => {
