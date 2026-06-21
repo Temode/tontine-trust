@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { Mic, MicOff, Wifi, WifiOff } from "lucide-react";
+import { Mic, MicOff, VideoOff, Wifi, WifiOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getInitials } from "@/lib/format";
 
@@ -9,6 +9,7 @@ interface Props {
   stream?: MediaStream | null;
   isLocal?: boolean;
   isMuted?: boolean;
+  isCamOff?: boolean;
   connectionState?: RTCPeerConnectionState;
   speaking?: boolean;
 }
@@ -19,16 +20,19 @@ export function CallParticipantTile({
   stream,
   isLocal,
   isMuted,
+  isCamOff,
   connectionState = "connected",
   speaking,
 }: Props) {
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+
+  const hasVideo = !!stream && stream.getVideoTracks().some((t) => t.enabled);
 
   useEffect(() => {
-    if (audioRef.current && stream && !isLocal) {
-      audioRef.current.srcObject = stream;
+    if (videoRef.current && stream) {
+      videoRef.current.srcObject = stream;
     }
-  }, [stream, isLocal]);
+  }, [stream]);
 
   const ini = initials ?? getInitials(name) ?? "··";
   const bad =
@@ -37,37 +41,74 @@ export function CallParticipantTile({
     connectionState === "closed";
 
   return (
-    <div className="flex flex-col items-center gap-2 rounded-xl border border-hairline bg-card p-4">
-      <div
-        className={cn(
-          "relative flex h-20 w-20 items-center justify-center rounded-full bg-primary text-lg font-bold text-primary-foreground transition",
-          speaking && "ring-4 ring-primary/40",
-        )}
-      >
-        {ini}
-        <span className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full border border-hairline bg-card">
+    <div
+      className={cn(
+        "group relative overflow-hidden rounded-2xl border border-hairline bg-black/90 shadow-sm",
+        "aspect-video w-full",
+        speaking && "ring-2 ring-accent/70",
+      )}
+    >
+      {/* Video / placeholder */}
+      {hasVideo && !isCamOff ? (
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted={isLocal}
+          className={cn("h-full w-full object-cover", isLocal && "scale-x-[-1]")}
+        />
+      ) : (
+        <div className="flex h-full w-full flex-col items-center justify-center gap-2 bg-primary-900/90 text-primary-foreground">
+          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary-foreground/10 font-display text-xl font-bold">
+            {ini}
+          </div>
+          {(isCamOff || !hasVideo) && (
+            <span className="flex items-center gap-1 text-[10px] uppercase tracking-wider text-primary-foreground/60">
+              <VideoOff className="h-3 w-3" />
+              Caméra coupée
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Hidden audio sink for remote audio (also covered by video element on remotes) */}
+      {!isLocal && stream && !hasVideo && (
+        <audio ref={videoRef as unknown as React.RefObject<HTMLAudioElement>} autoPlay playsInline />
+      )}
+
+      {/* Overlay : name + status */}
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-end justify-between bg-gradient-to-t from-black/75 via-black/30 to-transparent p-3 text-primary-foreground">
+        <div className="min-w-0">
+          <p className="line-clamp-1 text-sm font-semibold">
+            {name}
+            {isLocal && <span className="ml-1 text-xs text-primary-foreground/60">(moi)</span>}
+          </p>
+          <p className="flex items-center gap-1 text-[10px] text-primary-foreground/70">
+            {bad ? (
+              <>
+                <WifiOff className="h-3 w-3" /> Connexion instable
+              </>
+            ) : (
+              <>
+                <Wifi className="h-3 w-3" />
+                {connectionState === "connected" ? "Connecté" : "Connexion…"}
+              </>
+            )}
+          </p>
+        </div>
+        <span
+          className={cn(
+            "flex h-7 w-7 items-center justify-center rounded-full border border-white/15 backdrop-blur",
+            isMuted ? "bg-destructive/80" : "bg-black/40",
+          )}
+        >
           {isMuted ? (
-            <MicOff className="h-3 w-3 text-destructive" />
+            <MicOff className="h-3.5 w-3.5" />
           ) : (
-            <Mic className="h-3 w-3 text-emerald-600" />
+            <Mic className="h-3.5 w-3.5" />
           )}
         </span>
       </div>
-      <p className="line-clamp-1 max-w-[140px] text-center text-sm font-semibold text-foreground">
-        {name} {isLocal && <span className="text-xs text-muted-foreground">(moi)</span>}
-      </p>
-      <p className="flex items-center gap-1 text-[10px] text-muted-foreground">
-        {bad ? (
-          <>
-            <WifiOff className="h-3 w-3" /> Connexion instable
-          </>
-        ) : (
-          <>
-            <Wifi className="h-3 w-3" /> {connectionState === "connected" ? "Connecté" : "Connexion…"}
-          </>
-        )}
-      </p>
-      {!isLocal && <audio ref={audioRef} autoPlay playsInline />}
     </div>
   );
 }
