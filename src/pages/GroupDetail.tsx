@@ -381,6 +381,14 @@ export default function GroupDetail() {
             <ChevronRight className="h-4 w-4" />
             Paramètres
           </Link>
+          <Link
+            to="/parametres/notifications"
+            className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-hairline bg-card px-4 text-xs font-medium text-muted-foreground transition hover:text-foreground"
+            title="Régler vos rappels (prochain tour, cotisations dues) — in-app et email"
+          >
+            <Bell className="h-4 w-4" />
+            Rappels
+          </Link>
         </div>
 
         {canStart && (
