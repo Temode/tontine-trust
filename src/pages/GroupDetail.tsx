@@ -44,8 +44,19 @@ import { SwapsPanel } from "@/components/group/SwapsPanel";
 import { AuctionPanel } from "@/components/group/AuctionPanel";
 import { ReviewsPanel } from "@/components/group/ReviewsPanel";
 import { TestModePanel } from "@/components/group/TestModePanel";
+import { InvitationsHistoryPanel } from "@/components/groups/InvitationsHistoryPanel";
 
-type Section = "overview" | "members" | "rotation" | "swaps" | "auctions" | "reviews" | "chat" | "audit" | "test";
+type Section =
+  | "overview"
+  | "members"
+  | "rotation"
+  | "invitations"
+  | "swaps"
+  | "auctions"
+  | "reviews"
+  | "chat"
+  | "audit"
+  | "test";
 
 const FREQ_LABEL: Record<string, string> = {
   mensuelle: "Mensuelle",
@@ -200,6 +211,7 @@ export default function GroupDetail() {
     { id: "overview", label: "Aperçu" },
     { id: "members", label: "Membres" },
     { id: "rotation", label: "Rotation" },
+    ...(isOrganizer ? [{ id: "invitations" as Section, label: "Invitations" }] : []),
     { id: "swaps", label: "Échanges" },
     ...(grp.rotation_order_kind === "auction" ? [{ id: "auctions" as Section, label: "Enchères" }] : []),
     ...(grp.status === "completed" ? [{ id: "reviews" as Section, label: "Avis" }] : []),
@@ -520,6 +532,9 @@ export default function GroupDetail() {
             />
           )}
           {section === "chat" && <GroupChat groupId={grp.id} />}
+          {section === "invitations" && isOrganizer && (
+            <InvitationsHistoryPanel groupId={grp.id} canManage={isOrganizer} />
+          )}
           {section === "swaps" && (
             <SwapsPanel
               groupId={grp.id}
