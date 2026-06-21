@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { ArrowLeft, Clock, Info, Phone, Video } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { toast } from "sonner";
 import { getInitials } from "@/lib/format";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { DbGroupOverview } from "@/lib/api/types";
@@ -133,18 +132,14 @@ export function ConversationHeader({ group }: Props) {
           <TooltipTrigger asChild>
             <button
               type="button"
-              onClick={() =>
-                toast.info("Réunions vidéo — bientôt disponible", {
-                  description: "Cette fonction sera activée prochainement.",
-                })
-              }
-              className="inline-flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground/70 transition hover:bg-secondary hover:text-foreground"
-              aria-label="Appel vidéo"
+              onClick={() => setCallOpen(true)}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-md text-foreground transition hover:bg-secondary"
+              aria-label="Lancer un appel vidéo"
             >
               <Video className="h-4 w-4" />
             </button>
           </TooltipTrigger>
-          <TooltipContent>Réunions vidéo — bientôt disponible</TooltipContent>
+          <TooltipContent>Lancer un appel vidéo</TooltipContent>
         </Tooltip>
         <Link
           to={`/groupes/${group.id}`}
