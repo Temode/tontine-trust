@@ -106,7 +106,7 @@ export function PaymentDetailsDialog({
           const Icon = meta.Icon;
           return (
           <div className="space-y-4">
-            <div className={cn("flex items-center gap-3 rounded-lg p-3", meta!.cls)}>
+            <div className={cn("flex items-center gap-3 rounded-lg p-3", meta.cls)}>
               <Icon className={cn("h-5 w-5", (d.status === "initiated" || d.status === "pending") && "animate-spin")} />
               <div className="flex-1">
                 <p className="text-sm font-semibold">{meta.label}</p>
