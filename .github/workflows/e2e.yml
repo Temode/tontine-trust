@@ -46,6 +46,9 @@ jobs:
       - name: Seed deterministic fixtures (Famille Alice)
         run: bun run tests/e2e/fixtures/famille-alice.ts
 
+      - name: Seed deterministic fixtures (RLS quick actions)
+        run: bun run tests/e2e/fixtures/rls-quick-actions.ts
+
       - name: Start Vite preview
         run: |
           bun run dev &
