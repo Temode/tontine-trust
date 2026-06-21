@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
@@ -47,6 +47,13 @@ import { ReviewsPanel } from "@/components/group/ReviewsPanel";
 import { InvitationsHistoryPanel } from "@/components/groups/InvitationsHistoryPanel";
 import { GroupDefaultersSection } from "@/components/group/GroupDefaultersSection";
 import { GroupDisputesSection } from "@/components/group/GroupDisputesSection";
+import {
+  decidePaymentPauseRequest,
+  listGroupPauseRequests,
+  requestPaymentDuringPause,
+  type PausePaymentRequest,
+} from "@/lib/api/pauseRequests";
+import { supabase } from "@/integrations/supabase/client";
 
 type Section =
   | "overview"
@@ -70,6 +77,7 @@ function statusLabel(s: DbGroup["status"]): string {
     case "draft": return "Brouillon";
     case "open": return "Ouvert";
     case "active": return "Actif";
+    case "paused": return "En pause";
     case "completed": return "Terminé";
     case "cancelled": return "Annulé";
   }
