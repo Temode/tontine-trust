@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowRight, ArrowUpRight, CheckCircle2, Loader2, PlusCircle, ShieldCheck, X } from "lucide-react";
+import { ArrowUpRight, Loader2, PlusCircle, ShieldCheck } from "lucide-react";
 import { z } from "zod";
 import { toast } from "sonner";
 import {
@@ -15,17 +15,15 @@ import { cn } from "@/lib/utils";
 import { formatGNF } from "@/lib/format";
 import { createGroup } from "@/lib/api/groups";
 import { DEFAULT_DRAFT, generateInviteCode, type GroupCategory } from "@/components/create-group/types";
+import { contributionSchema, membersSchema } from "@/lib/validation/policy";
+import { InviteSuccessPanel } from "./InviteSuccessPanel";
 
 const quickSchema = z.object({
   name: z.string().trim().min(3, "Le nom doit faire au moins 3 caractères.").max(64, "64 caractères max."),
   category: z.enum(["family", "professional", "business", "community"]),
   frequency: z.enum(["Hebdomadaire", "Quinzaine", "Mensuelle"]),
-  contribution: z
-    .number({ invalid_type_error: "Cotisation requise." })
-    .int()
-    .min(1000, "Minimum 1 000 GNF.")
-    .max(50_000_000, "Maximum 50 000 000 GNF."),
-  members: z.number({ invalid_type_error: "Nombre requis." }).int().min(2, "Au moins 2 membres.").max(50, "50 max."),
+  contribution: contributionSchema,
+  members: membersSchema,
 });
 
 type QuickInput = z.infer<typeof quickSchema>;
@@ -59,7 +57,7 @@ export function CreateGroupDialog({ open, onOpenChange }: { open: boolean; onOpe
   const [errors, setErrors] = useState<Partial<Record<keyof QuickInput, string>>>({});
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<{ id: string; code: string } | null>(null);
+  const [success, setSuccess] = useState<{ id: string; code: string; name: string } | null>(null);
 
   const cagnotte = useMemo(() => form.contribution * form.members, [form.contribution, form.members]);
 
@@ -108,7 +106,7 @@ export function CreateGroupDialog({ open, onOpenChange }: { open: boolean; onOpe
         members: parsed.data.members,
         inviteCode: code,
       });
-      setSuccess({ id: result.group.id, code: result.inviteCode });
+      setSuccess({ id: result.group.id, code: result.inviteCode, name: parsed.data.name });
       toast.success("Tontine créée", { description: parsed.data.name });
       await queryClient.invalidateQueries({ queryKey: ["groups", "mine"] });
     } catch (err) {
@@ -123,17 +121,14 @@ export function CreateGroupDialog({ open, onOpenChange }: { open: boolean; onOpe
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-2xl gap-0 overflow-hidden p-0">
         {success ? (
-          <SuccessView
+          <InviteSuccessPanel
             groupId={success.id}
-            inviteCode={success.code}
+            groupName={success.name}
+            initialCode={success.code}
             onClose={() => handleOpenChange(false)}
-            onNavigate={() => {
+            onViewGroup={() => {
               handleOpenChange(false);
               navigate(`/groupes/${success.id}`);
-            }}
-            onInvite={() => {
-              handleOpenChange(false);
-              navigate(`/inviter?group=${success.id}`);
             }}
           />
         ) : (
@@ -311,66 +306,6 @@ function Field({
       </label>
       <div className="mt-1.5">{children}</div>
       {error && <p className="mt-1 text-xs text-destructive">{error}</p>}
-    </div>
-  );
-}
-
-function SuccessView({
-  groupId,
-  inviteCode,
-  onClose,
-  onNavigate,
-  onInvite,
-}: {
-  groupId: string;
-  inviteCode: string;
-  onClose: () => void;
-  onNavigate: () => void;
-  onInvite: () => void;
-}) {
-  return (
-    <div className="relative">
-      <button
-        type="button"
-        onClick={onClose}
-        aria-label="Fermer"
-        className="absolute right-4 top-4 inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition hover:bg-secondary hover:text-foreground"
-      >
-        <X className="h-4 w-4" />
-      </button>
-      <div className="px-6 pb-6 pt-10 text-center">
-        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
-          <CheckCircle2 className="h-6 w-6" />
-        </div>
-        <h3 className="mt-4 font-display text-xl font-bold text-foreground">
-          Tontine créée avec succès.
-        </h3>
-        <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
-          Partagez le code d'invitation à vos membres pour démarrer le cycle.
-        </p>
-        <div className="mx-auto mt-5 inline-flex items-center gap-2 rounded-lg border border-hairline bg-secondary/40 px-4 py-2">
-          <span className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">Code</span>
-          <span className="font-display text-base font-bold tracking-wider text-foreground">{inviteCode}</span>
-        </div>
-        <div className="mt-6 flex flex-col-reverse items-stretch gap-2 sm:flex-row sm:justify-center">
-          <button
-            type="button"
-            onClick={onInvite}
-            className="inline-flex h-10 items-center justify-center gap-1.5 rounded-lg border border-hairline bg-card px-4 text-sm font-medium text-foreground transition hover:bg-secondary"
-          >
-            Inviter des membres
-          </button>
-          <button
-            type="button"
-            onClick={onNavigate}
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-primary px-5 text-sm font-semibold text-primary-foreground shadow-sm transition hover:bg-primary-700"
-          >
-            Voir la tontine
-            <ArrowRight className="h-4 w-4" />
-          </button>
-        </div>
-        <p className="mt-3 text-[11px] text-muted-foreground">ID : {groupId.slice(0, 8)}…</p>
-      </div>
     </div>
   );
 }

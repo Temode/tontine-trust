@@ -1,79 +1,91 @@
-## Audit doctrine — page « Mes tontines »
+## Objectif
 
-Confronté à `docs/DESIGN_DOCTRINE.md`, l'écran enfreint plusieurs règles d'or :
+Finaliser le lot « Mes tontines » avec : modales plus performantes, flux d'invitation post-création complet, validations renforcées (client + API), audit RLS des modales, et nouvelle page de détail tontine avec hero billion-dollar.
 
-| # | Problème observé | Règle enfreinte |
-|---|---|---|
-| 1 | 4 KPI tiles alignés sans hiérarchie : aucun « hero » qui dit *où vous en êtes* | R1 — une seule action/info primaire ; R4 — info critique sans scroll |
-| 2 | `StatusBadge` en `uppercase tracking-wider` (Actif, Votre tour, Inscription) | Bannis : « badges ALL CAPS criards » |
-| 3 | Mini-badge rôle (Organisateur/Participant) aussi ALL CAPS dans grid + table | Idem |
-| 4 | Toolbar : barre de recherche `h-10` qui domine, sélecteur de tri visible en permanence, toggle vue + export collés sans `gap-3` | « Barres de recherche qui dominent » ; « empilement d'icônes sans regroupement » |
-| 5 | État chargement = texte nu « Chargement… » | Bannis : « spinners/texte au lieu de skeletons » |
-| 6 | Erreur réseau : bouton « Réessayer » directement à côté du titre, pas de cluster | Hiérarchie / air |
-| 7 | Pied de page « X groupes affichés · Données en direct… » mélange métrique + signature | Hiérarchie typographique |
-| 8 | Vue par défaut = `table` dense → premier coup d'œil = grille de chiffres, pas une infrastructure calme | Esprit doctrine (« calme, autorité ») |
-| 9 | Mobile 712px : KPI strip passe en 2×2 puis 1×4, toolbar wrap brouillon | Responsive doctrine |
+## Lot A — Performance des modales
 
-## Refonte proposée (frontend uniquement, couleurs Tontine inchangées)
+**React Query cache + skeletons précis**
+- Introduire `@tanstack/react-query` (déjà présent) pour cacher :
+  - `previewByCode(code)` avec `staleTime: 30s`, `gcTime: 5min`, clé `["invitation-preview", code]`
+  - `listMyDues()` dans `PayContributionsDialog` avec `staleTime: 15s`
+  - `listMyGroups()` partagé entre Dashboard / MyGroups
+- Debounce déjà en place dans `JoinGroupDialog` (350ms) — conservé, mais lookup délégué à React Query.
+- Skeletons dédiés par état :
+  - JoinDialog : skeleton « preview card » (avatar + 3 stats) pendant le lookup, distinct de l'état vide.
+  - PayDialog : skeleton « liste de dues » (3 lignes avec montant + date) au lieu du spinner global.
+  - CreateDialog : skeleton du panneau « cagnotte preview » pendant le recalcul si async.
+- Préchargement : sur ouverture de `PayContributionsDialog`, `prefetchQuery(["my-dues"])` côté provider pour que la modale ouvre déjà remplie.
 
-### 1. Hero portefeuille (remplace le KPI strip 4-tiles)
-Bandeau identique en esprit au hero Dashboard :
-- `rounded-2xl border border-hairline bg-card` + dégradé sarcelle très subtil + filet vertical `bg-primary`.
-- Bloc gauche : libellé `Capital engagé restant`, montant XL `font-display tabular-nums` + suffixe `GNF` petit, sous-ligne « Réparti sur N tontines actives ».
-- Bloc droit (CTA) : si `upcomingTurn` existe → **« Préparer ma cagnotte »** (primaire, `whitespace-nowrap`) avec ligne « Vous recevez ~X GNF dans Y j sur *Groupe* ». Sinon état serein avec `ShieldCheck` « Aucun tour imminent ».
-- Bandeau métriques bas (3 colonnes `divide-x divide-hairline` desktop / `divide-y` mobile) :
-  - **Portefeuille** — `N groupes` · `X actifs`
-  - **Cagnottes en circulation** — montant compact GNF
-  - **Score moyen** — `XX %` + petite barre primary
+## Lot B — Flux Invitation post-création
 
-Le composant `GroupsKpiStrip` actuel est remplacé par `GroupsHero` (nouveau composant). On garde la fonction `computePortfolio` telle quelle, donc les valeurs restent synchronisées avec les vraies données.
+**Nouveau composant `InviteSuccessPanel`** (réutilisé dans `CreateGroupDialog` + page d'invitation) :
+- Affiche le code généré (gros, monospace, copiable).
+- Lien d'invitation court : `https://<domain>/rejoindre?code=TD-XXXX-XXXX` + bouton copier.
+- Bouton « Partager via WhatsApp / SMS / Email » (via Web Share API si dispo, sinon fallbacks `wa.me` / `mailto:` / `sms:`).
+- QR code (réutilise `QrCodeSvg`).
+- Gestion d'erreurs :
+  - Si code expiré → bouton « Générer un nouveau code » → appel `createInvitation()`.
+  - Si code révoqué/épuisé → message contextuel + CTA régénérer.
+  - Affichage du compteur d'utilisations restantes + date d'expiration.
+- Intégration dans `CreateGroupDialog` : après succès, l'écran de confirmation devient ce panneau (au lieu des deux boutons actuels).
 
-### 2. Refonte `StatusBadge`
-- Suppression de `uppercase tracking-wider`.
-- Capitalisation naturelle (« Actif », « Votre tour », « Terminé », « En cours d'inscription »).
-- Padding élargi (`px-2.5 py-1`), `text-[11px] font-medium`, pastille colorée conservée.
+## Lot C — Validation client + API
 
-### 3. Badge rôle (grid + table)
-Remplacement du mini-bloc ALL CAPS par un libellé discret `text-[11px] text-muted-foreground` préfixé d'une icône `Crown` (organisateur) ou `Users` (participant), sans fond bruyant.
+**Politique projet (constants `src/lib/validation/group.ts`)** :
+- Cotisation : min 1 000 GNF, max 10 000 000 GNF, multiple de 1 000.
+- Membres : 2 à 50.
+- Fréquences autorisées : `quotidienne`, `hebdomadaire`, `quinzaine`, `mensuelle`.
+- Code invitation : regex `^TD-[A-Z0-9]{4}-[A-Z0-9]{4}$` (déjà en place).
 
-### 4. Toolbar reconstruite
-- Bloc unique `rounded-2xl border border-hairline bg-card shadow-sm` qui suit la doctrine.
-- Ligne 1 : recherche compacte `h-9` à gauche `flex-1 max-w-md` (ne domine plus), à droite cluster `gap-3` : segmented filter (chips Tous/Actifs/Votre tour/En cours/Terminés), puis `gap-3` séparateur visuel `border-l border-hairline`, puis toggle vue (List/Grid) + bouton Exporter ghost.
-- Sélecteur de tri rangé dans un `DropdownMenu` (icône `ArrowUpDown` + label « Trier ») au lieu d'être affiché en permanence — réduit le bruit visuel.
-- Mobile : recherche pleine largeur en ligne 1, cluster filtres en ligne 2 scrollable, cluster vue/tri/export en ligne 3 aligné à droite.
+**Client** : Zod schema partagé importé par `CreateGroupDialog`, `JoinGroupDialog`, page CreateGroup.
 
-### 5. États
-- **Chargement** : 3 skeletons (`h-24` hero + `h-12` toolbar + `h-64` table/grid) en `bg-secondary/60 animate-pulse`.
-- **Erreur** : carte `rounded-2xl border border-destructive/30 bg-destructive/[0.04] p-6` avec icône `AlertTriangle`, titre, description et CTA Réessayer en bouton secondaire (`border border-hairline`), pas en primary rouge.
-- **Empty filtré** & **empty initial** : déjà couverts par `EmptyState`, on l'aligne sur le radius `rounded-2xl`.
+**API (migration Postgres)** : ajout de `CHECK` constraints sur `groups.contribution_amount` et `groups.max_members`, et garde-fou dans `create_group_with_invitation` + `join_group_with_code` pour refuser :
+- Montants hors politique → `INVALID_CONTRIBUTION_BOUNDS`
+- Membres hors politique → `INVALID_MAX_MEMBERS_BOUNDS`
+- Fréquence inconnue → `INVALID_FREQUENCY`
 
-### 6. Vue par défaut
-Bascule par défaut sur `grid` (cartes calmes) plutôt que `table`. La table reste accessible en un clic. (Décision réversible si vous préférez garder la table par défaut.)
+Erreurs traduites dans `src/lib/api/groups.ts` et `src/lib/api/invitations.ts`.
 
-### 7. Pied de page
-Une seule ligne discrète : `tabular-nums` pour le nombre, puis · `Données en direct` aligné à droite via `flex justify-between`, en `text-[11px] text-muted-foreground`.
+## Lot D — Audit RLS des modales
 
-### 8. Responsive 712px (tablette portrait)
-- Hero : titre + montant restent visibles sans scroll, CTA passe `w-full` sous le bloc texte.
-- Bandeau métriques : `grid-cols-1` avec `divide-y` puis `sm:grid-cols-3 sm:divide-x sm:divide-y-0`.
-- Toolbar : recherche pleine largeur, cluster vue/tri à droite reste sur une ligne.
+Vérification ciblée (lecture seule, aucun changement sauf si écart) :
+- `CreateGroupDialog` → `create_group_with_invitation` (SECURITY DEFINER, déjà OK).
+- `JoinGroupDialog` → `preview_group_by_code` (requiert auth, déjà OK) + `join_group_with_code`.
+- `PayContributionsDialog` → vue `my_dues` / `my_groups_overview` filtrée par `auth.uid()`.
 
-## Fichiers touchés
+Si une vue expose des colonnes au-delà du périmètre de l'utilisateur connecté, on resserre via `security_invoker=on` ou policy `USING (user_id = auth.uid())`. Action concrète seulement si l'audit révèle un écart — sinon rapport « conforme ».
 
-```
-src/pages/MyGroups.tsx           # remplace KpiStrip → GroupsHero, skeletons, footer
-src/components/groups/GroupsHero.tsx       # NOUVEAU — hero portefeuille doctrine
-src/components/groups/GroupsKpiStrip.tsx   # SUPPRIMÉ (ou conservé non utilisé)
-src/components/groups/GroupsToolbar.tsx    # refonte cluster + tri en dropdown
-src/components/groups/StatusBadge.tsx      # suppression ALL CAPS
-src/components/groups/GroupsGrid.tsx       # badge rôle nettoyé
-src/components/groups/GroupsTable.tsx      # badge rôle nettoyé + entêtes calmes
-src/components/groups/EmptyState.tsx       # rounded-2xl
-```
+## Lot E — Page de détail tontine `/tontines/:id`
 
-Aucune modification de business logic, d'API ou de schéma. Les KPI restent calculés par `computePortfolio` à partir des vraies données `listMyGroups`.
+Le fichier `src/pages/GroupDetail.tsx` existe : on le refonte pour appliquer la doctrine billion-dollar.
 
-## Validation
+**Hero**
+- Bandeau gradient sarcelle → fond profond, halo doré subtil.
+- Titre (nom du groupe) en font-display 3xl, catégorie en chip, statut (`StatusBadge`).
+- Sous-titre : organisateur + date de création + visibilité.
+- 4 métriques alignées : Cagnotte par tour, Prochain tour (date + bénéficiaire), Membres actifs / max, Score moyen de fiabilité.
 
-- Re-lecture de la checklist doctrine sur 1280×800 et 712×800 (Playwright screenshots).
-- Vérifier qu'aucune classe couleur n'est hardcodée et que tous les montants utilisent `tabular-nums` + `formatGNF`.
+**Barre d'actions** (même doctrine que le hero du Dashboard) :
+- « Voir membres » → `/groupes/:id/membres`
+- « Gérer contributions » → ouvre `PayContributionsDialog` filtré sur ce groupe
+- « Inviter » → ouvre `InviteSuccessPanel` avec code actif
+- Menu kebab : Paramètres, Annonces, Chat, Historique paiements, Supprimer
+
+**Corps**
+- Tabs (Vue d'ensemble / Membres / Tours / Paiements / Annonces / Chat) — réutilisent les panneaux existants (`MembersAdminPanel`, `TurnsTimeline`, `PaymentsHistoryPanel`, `AnnouncementsPanel`, `GroupChat`).
+- Vue d'ensemble : 2 colonnes desktop (timeline des tours + annonces récentes), empilé mobile.
+
+## Implementation order
+
+1. Lot C (validation) — fondations partagées.
+2. Lot B (InviteSuccessPanel) — réutilisé en E.
+3. Lot A (React Query + skeletons).
+4. Lot D (audit RLS).
+5. Lot E (page de détail).
+
+## Technical notes
+
+- React Query : `QueryClient` déjà initialisé dans `App.tsx` (à vérifier, sinon l'ajouter).
+- Migration SQL minimale : ajout de `CHECK` + raise dans 2 RPC. Pas de changement de schéma destructif.
+- Aucun changement d'auth ou de provider.
+- Tous les nouveaux composants restent dans `src/components/groups/` ou `src/components/quick-actions/`.

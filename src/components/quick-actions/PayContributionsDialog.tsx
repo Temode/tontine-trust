@@ -20,6 +20,7 @@ export function PayContributionsDialog({ open, onOpenChange }: { open: boolean; 
     queryKey: ["contributions", "due"],
     queryFn: listMyContributionsDue,
     enabled: open,
+    staleTime: 15_000,
   });
 
   const sorted = useMemo(
@@ -62,11 +63,19 @@ export function PayContributionsDialog({ open, onOpenChange }: { open: boolean; 
 
           <div className="max-h-[60vh] overflow-y-auto">
             {isLoading ? (
-              <div className="space-y-2 p-6">
+              <ul className="divide-y divide-hairline">
                 {Array.from({ length: 3 }).map((_, i) => (
-                  <div key={i} className="h-16 animate-pulse rounded-xl bg-secondary/60" />
+                  <li key={i} className="flex items-center gap-3 px-6 py-3.5">
+                    <div className="h-10 w-1 shrink-0 rounded-full bg-secondary" />
+                    <div className="min-w-0 flex-1 space-y-2">
+                      <div className="h-3.5 w-1/2 animate-pulse rounded bg-secondary" />
+                      <div className="h-2.5 w-1/3 animate-pulse rounded bg-secondary/70" />
+                    </div>
+                    <div className="h-4 w-20 animate-pulse rounded bg-secondary" />
+                    <div className="h-9 w-16 animate-pulse rounded-lg bg-secondary" />
+                  </li>
                 ))}
-              </div>
+              </ul>
             ) : isError ? (
               <div className="flex flex-col items-start gap-3 p-6 sm:flex-row sm:items-center">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-destructive/10 text-destructive">

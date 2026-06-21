@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowRight, Loader2, ShieldCheck, UserPlus, Users } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { ArrowRight, ShieldCheck, UserPlus, Users } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -9,9 +10,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { formatGNF } from "@/lib/format";
-import { previewByCode, type InvitationPreview } from "@/lib/api/invitations";
+import { previewByCode } from "@/lib/api/invitations";
+import { INVITE_CODE_REGEX } from "@/lib/validation/policy";
 
-const CODE_RE = /^TD-[A-Z0-9]{4}-[A-Z0-9]{4}$/;
+const CODE_RE = INVITE_CODE_REGEX;
 
 function normalizeCode(raw: string): string {
   // Auto-uppercase + auto-dash : "tdabcd1234" → "TD-ABCD-1234"
@@ -27,9 +29,6 @@ export function JoinGroupDialog({ open, onOpenChange }: { open: boolean; onOpenC
   const navigate = useNavigate();
   const [code, setCode] = useState("");
   const [debouncedCode, setDebouncedCode] = useState("");
-  const [preview, setPreview] = useState<InvitationPreview | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   // Debounce the code lookup
   useEffect(() => {
@@ -37,39 +36,24 @@ export function JoinGroupDialog({ open, onOpenChange }: { open: boolean; onOpenC
     return () => clearTimeout(t);
   }, [code]);
 
-  useEffect(() => {
-    let cancelled = false;
-    if (!CODE_RE.test(debouncedCode)) {
-      setPreview(null);
-      setError(null);
-      return;
-    }
-    setLoading(true);
-    setError(null);
-    previewByCode(debouncedCode)
-      .then((data) => {
-        if (!cancelled) setPreview(data);
-      })
-      .catch((e: Error) => {
-        if (!cancelled) {
-          setPreview(null);
-          setError(e.message || "Code introuvable.");
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [debouncedCode]);
+  const codeValid = CODE_RE.test(debouncedCode);
+  const {
+    data: preview = null,
+    isFetching: loading,
+    error: queryError,
+  } = useQuery({
+    queryKey: ["invitation-preview", debouncedCode],
+    queryFn: () => previewByCode(debouncedCode),
+    enabled: open && codeValid,
+    staleTime: 30_000,
+    gcTime: 5 * 60_000,
+    retry: false,
+  });
+  const error = queryError instanceof Error ? queryError.message : queryError ? "Code introuvable." : null;
 
   const reset = () => {
     setCode("");
     setDebouncedCode("");
-    setPreview(null);
-    setError(null);
-    setLoading(false);
   };
 
   const handleOpenChange = (v: boolean) => {
@@ -82,8 +66,6 @@ export function JoinGroupDialog({ open, onOpenChange }: { open: boolean; onOpenC
     handleOpenChange(false);
     navigate(`/rejoindre?code=${encodeURIComponent(debouncedCode)}`);
   };
-
-  const codeValid = CODE_RE.test(debouncedCode);
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -115,9 +97,7 @@ export function JoinGroupDialog({ open, onOpenChange }: { open: boolean; onOpenC
           {/* Preview / error / loading */}
           <div className="min-h-[112px]">
             {loading ? (
-              <div className="flex h-28 items-center justify-center rounded-xl border border-hairline bg-secondary/30">
-                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-              </div>
+              <PreviewSkeleton />
             ) : error ? (
               <div className="rounded-xl border border-destructive/30 bg-destructive/[0.04] px-4 py-3 text-sm text-destructive">
                 {error}
@@ -184,4 +164,26 @@ function Stat({ label, value }: { label: string; value: string }) {
 
 function capitalize(s: string): string {
   return s ? s[0].toUpperCase() + s.slice(1) : s;
+}
+
+function PreviewSkeleton() {
+  return (
+    <article className="rounded-xl border border-hairline bg-card p-4">
+      <div className="flex items-start gap-3">
+        <div className="h-10 w-10 shrink-0 animate-pulse rounded-lg bg-secondary" />
+        <div className="min-w-0 flex-1 space-y-2">
+          <div className="h-4 w-2/3 animate-pulse rounded bg-secondary" />
+          <div className="h-3 w-1/3 animate-pulse rounded bg-secondary/70" />
+        </div>
+      </div>
+      <div className="mt-4 grid grid-cols-3 gap-3">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div key={i} className="space-y-1.5">
+            <div className="h-2.5 w-12 animate-pulse rounded bg-secondary/70" />
+            <div className="h-4 w-16 animate-pulse rounded bg-secondary" />
+          </div>
+        ))}
+      </div>
+    </article>
+  );
 }
