@@ -1,6 +1,7 @@
 // redeploy-trigger: 2026-06-16
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders, hmacSha256Hex, json } from "../_shared/djomy.ts";
+import { sendMessageBg, fmtSms, normalizeGNPhone } from "../_shared/nimbasms.ts";
 
 // PUBLIC endpoint : signature HMAC requise. verify_jwt = false dans config.toml.
 
@@ -86,6 +87,61 @@ Deno.serve(async (req) => {
   if (rpcErr) {
     console.error("[djomy-webhook] rpc error", rpcErr);
     return json({ ok: false, error: rpcErr.message }, 500);
+  }
+
+  // SMS de confirmation au payeur lorsqu'un paiement est validé
+  if (newStatus === "succeeded") {
+    try {
+      const { data: pay } = await admin
+        .from("payments")
+        .select("user_id, contribution_id")
+        .eq("id", paymentId)
+        .maybeSingle();
+      if (pay?.user_id) {
+        const { data: prof } = await admin
+          .from("profiles")
+          .select("phone_number")
+          .eq("id", pay.user_id)
+          .maybeSingle();
+        const phone = normalizeGNPhone(prof?.phone_number ?? null);
+
+        const { data: pref } = await admin
+          .from("notification_preferences")
+          .select("enabled")
+          .eq("user_id", pay.user_id)
+          .eq("notif_type", "contribution_confirmed")
+          .eq("channel", "sms")
+          .maybeSingle();
+        const optedIn = pref?.enabled !== false; // défaut ON
+
+        if (phone && optedIn && pay.contribution_id) {
+          const { data: ctx } = await admin
+            .from("contributions")
+            .select("amount, group_id, turn_id, groups(name), turns(turn_number, due_date)")
+            .eq("id", pay.contribution_id)
+            .maybeSingle();
+          const groupName = (ctx as any)?.groups?.name ?? "Tontine";
+          const turnNumber = (ctx as any)?.turns?.turn_number ?? "";
+          const amount = Number((ctx as any)?.amount ?? data.paidAmount ?? 0);
+          const date = new Date().toLocaleDateString("fr-FR");
+          const body =
+            `Tontine ${groupName}: paiement de ${fmtSms(amount)} GNF ` +
+            `confirmé le ${date} (tour #${turnNumber}). Merci!`;
+          sendMessageBg({
+            to: phone,
+            body,
+            logContext: {
+              userId: pay.user_id,
+              groupId: (ctx as any)?.group_id ?? null,
+              turnId: (ctx as any)?.turn_id ?? null,
+              kind: "payment_confirmed",
+            },
+          });
+        }
+      }
+    } catch (e) {
+      console.error("[djomy-webhook] sms hook failed:", e);
+    }
   }
 
   return json({ ok: true, paymentId, status: newStatus });
