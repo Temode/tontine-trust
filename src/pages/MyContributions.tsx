@@ -541,6 +541,7 @@ interface CardProps {
 }
 
 function DueContributionCard({ due, onPay }: CardProps) {
+  const isDefaulted = due.status === "defaulted";
   const isOverdue = due.days_to_due < 0;
   const isUrgent = due.days_to_due >= 0 && due.days_to_due <= 3;
   return (
@@ -549,12 +550,17 @@ function DueContributionCard({ due, onPay }: CardProps) {
         "group relative flex flex-col overflow-hidden rounded-xl border bg-card transition hover:border-primary/40 hover:shadow-[0_18px_40px_-24px_hsl(var(--primary)/0.35)]",
         "border-hairline",
         isOverdue && "border-l-4 border-l-destructive",
+        isDefaulted && "border-2 border-destructive bg-destructive/[0.03]",
         isUrgent && "border-l-4 border-l-accent",
       )}
     >
       <div className="flex flex-1 flex-col gap-4 p-5">
         <div className="flex items-start gap-2">
-          {isOverdue ? (
+          {isDefaulted ? (
+            <span className="inline-flex items-center gap-1 rounded-full bg-destructive px-2 py-0.5 text-[11px] font-semibold text-destructive-foreground">
+              <AlertCircle className="h-3 w-3" /> En défaut
+            </span>
+          ) : isOverdue ? (
             <span className="inline-flex items-center gap-1 rounded-full bg-destructive/10 px-2 py-0.5 text-[11px] font-semibold text-destructive">
               <AlertCircle className="h-3 w-3" /> En retard
             </span>
