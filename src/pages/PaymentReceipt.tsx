@@ -162,7 +162,6 @@ export default function PaymentReceipt() {
             <Field label="Tontine" value={data.group_name} />
             <Field label="Tour" value={data.turn_number ? `#${data.turn_number}` : "—"} />
             <Field label="Échéance" value={data.due_date ? new Date(data.due_date).toLocaleDateString("fr-FR") : "—"} />
-            <Field label="Bénéficiaire" value={data.beneficiary_name ?? "—"} />
             <Field label="Moyen de paiement" value={providerLabel(data.provider, data.payment_method)} />
             <Field label="Numéro payeur" value={data.payer_phone ?? "—"} />
             <Field label="Date" value={issued} />
