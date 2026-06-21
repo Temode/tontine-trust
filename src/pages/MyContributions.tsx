@@ -30,7 +30,7 @@ import {
   type DbContributionDue,
 } from "@/lib/api/contributions";
 import { listMyPaymentsHistory } from "@/lib/api/payments";
-import { DjomyPaymentModal } from "@/components/payment/DjomyPaymentModal";
+import { launchDjomyCheckout } from "@/lib/payment/launchDjomyCheckout";
 import { InFlightPaymentsCard } from "@/components/payment/InFlightPaymentsCard";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { useAuth } from "@/hooks/useAuth";
