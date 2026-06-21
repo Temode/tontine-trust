@@ -18,8 +18,8 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-function addDaysISO(days: number): string {
-  const d = new Date();
+function addDaysISO(days: number, base?: string): string {
+  const d = base ? new Date(`${base}T00:00:00Z`) : new Date();
   d.setUTCDate(d.getUTCDate() + days);
   return d.toISOString().slice(0, 10);
 }
@@ -73,12 +73,26 @@ Deno.serve(async (req) => {
   const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const admin = createClient(url, key);
 
-  const target_turn_date = addDaysISO(2); // J-2 prochain tour
-  const target_due_date = addDaysISO(1); // J-1 cotisation due
+  // Optional: ?dry_run=true&date=YYYY-MM-DD (referenced "today" for preview)
+  const u = new URL(req.url);
+  let dryRun = u.searchParams.get("dry_run") === "true";
+  let baseDate: string | undefined = u.searchParams.get("date") ?? undefined;
+  if (req.method === "POST") {
+    try {
+      const body = await req.json();
+      if (body?.dry_run === true) dryRun = true;
+      if (typeof body?.date === "string") baseDate = body.date;
+    } catch { /* ignore */ }
+  }
+
+  const target_turn_date = addDaysISO(2, baseDate); // J-2 prochain tour
+  const target_due_date = addDaysISO(1, baseDate); // J-1 cotisation due
 
   let sentTurn = 0;
   let sentContribution = 0;
   let skipped = 0;
+  const previewTurn: Array<Record<string, unknown>> = [];
+  const previewContribution: Array<Record<string, unknown>> = [];
 
   // ── 1. Prochain tour J-2 ────────────────────────────────────────────────
   const { data: upcomingTurns, error: tErr } = await admin
@@ -94,12 +108,28 @@ Deno.serve(async (req) => {
 
   for (const t of (upcomingTurns ?? []) as any[]) {
     const phone = turnPhones.get(t.beneficiary_user_id);
-    if (!phone) { skipped++; continue; }
-    if (!optedIn(turnPrefs, t.beneficiary_user_id, "turn_started")) { skipped++; continue; }
+    const reason =
+      !phone ? "no_phone" : !optedIn(turnPrefs, t.beneficiary_user_id, "turn_started") ? "opted_out" : null;
     const groupName = t.groups?.name ?? "Tontine";
     const body =
       `Tontine ${groupName}: votre tour #${t.turn_number} arrive le ${t.due_date}. ` +
       `Cagnotte ≈ ${fmtSms(Number(t.payout_amount))} GNF.`;
+    if (dryRun) {
+      previewTurn.push({
+        turn_id: t.id,
+        group_id: t.group_id,
+        group_name: groupName,
+        turn_number: t.turn_number,
+        due_date: t.due_date,
+        beneficiary_user_id: t.beneficiary_user_id,
+        phone,
+        body,
+        would_send: !reason,
+        skip_reason: reason,
+      });
+      continue;
+    }
+    if (reason) { skipped++; continue; }
     const r = await sendMessage({
       to: phone,
       body,
@@ -132,13 +162,30 @@ Deno.serve(async (req) => {
 
   for (const c of (dueContribs ?? []) as any[]) {
     const phone = duePhones.get(c.payer_user_id);
-    if (!phone) { skipped++; continue; }
-    if (!optedIn(duePrefs, c.payer_user_id, "contribution_due")) { skipped++; continue; }
+    const reason =
+      !phone ? "no_phone" : !optedIn(duePrefs, c.payer_user_id, "contribution_due") ? "opted_out" : null;
     const groupName = c.groups?.name ?? "Tontine";
     const turnNumber = c.turns?.turn_number ?? "";
     const body =
       `Tontine ${groupName}: cotisation de ${fmtSms(Number(c.amount))} GNF ` +
       `due demain (tour #${turnNumber}). Payez via l'app.`;
+    if (dryRun) {
+      previewContribution.push({
+        contribution_id: c.id,
+        group_id: c.group_id,
+        group_name: groupName,
+        turn_id: c.turn_id,
+        turn_number: turnNumber,
+        payer_user_id: c.payer_user_id,
+        amount: Number(c.amount),
+        phone,
+        body,
+        would_send: !reason,
+        skip_reason: reason,
+      });
+      continue;
+    }
+    if (reason) { skipped++; continue; }
     const r = await sendMessage({
       to: phone,
       body,
@@ -155,10 +202,20 @@ Deno.serve(async (req) => {
   return new Response(
     JSON.stringify({
       ok: true,
+      dry_run: dryRun,
+      base_date: baseDate ?? new Date().toISOString().slice(0, 10),
       target_turn_date,
       target_due_date,
       sent: { turn_upcoming_j2: sentTurn, contribution_due_j1: sentContribution },
       skipped,
+      ...(dryRun
+        ? {
+            preview: {
+              turn_upcoming_j2: previewTurn,
+              contribution_due_j1: previewContribution,
+            },
+          }
+        : {}),
     }),
     { headers: { ...corsHeaders, "Content-Type": "application/json" } },
   );
