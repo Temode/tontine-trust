@@ -41,6 +41,8 @@ const AdminPayments = lazy(() => import("@/pages/admin/Payments"));
 const AdminAudit = lazy(() => import("@/pages/admin/Audit"));
 const AdminIntegrity = lazy(() => import("@/pages/admin/Integrity"));
 const AdminDjomySettings = lazy(() => import("@/pages/admin/DjomySettings"));
+const AdminSmsTest = lazy(() => import("@/pages/admin/SmsTest"));
+const AdminSmsLogs = lazy(() => import("@/pages/admin/SmsLogs"));
 import { AdminShell } from "@/components/admin/AdminShell";
 
 const queryClient = new QueryClient({
@@ -145,6 +147,8 @@ const App = () => (
                     <Route path="/admin/audit" element={<RouteBoundary name="Admin audit"><AdminAudit /></RouteBoundary>} />
                     <Route path="/admin/integrite" element={<RouteBoundary name="Intégrité tontine"><AdminIntegrity /></RouteBoundary>} />
                     <Route path="/admin/djomy" element={<RouteBoundary name="Identifiants Djomy"><AdminDjomySettings /></RouteBoundary>} />
+                    <Route path="/admin/sms-test" element={<RouteBoundary name="Test SMS"><AdminSmsTest /></RouteBoundary>} />
+                    <Route path="/admin/sms-logs" element={<RouteBoundary name="Journal SMS"><AdminSmsLogs /></RouteBoundary>} />
                   </Route>
                 </Route>
                 <Route path="*" element={<RouteBoundary name="Page introuvable"><NotFound /></RouteBoundary>} />
