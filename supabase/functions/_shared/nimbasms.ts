@@ -70,7 +70,7 @@ export interface MessageResult {
   error?: string;
 }
 
-async function logSmsAttempt(
+export async function logSmsAttempt(
   ctx: NonNullable<SendMessageParams["logContext"]>,
   recipientsRaw: string[],
   recipients: string[],

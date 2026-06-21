@@ -11,7 +11,7 @@
  * Journalise chaque tentative dans `sms_logs`.
  */
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { fmtSms, normalizeGNPhone, sendMessage } from "../_shared/nimbasms.ts";
+import { fmtSms, logSmsAttempt, normalizeGNPhone, sendMessage } from "../_shared/nimbasms.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -77,11 +77,13 @@ Deno.serve(async (req) => {
   const u = new URL(req.url);
   let dryRun = u.searchParams.get("dry_run") === "true";
   let baseDate: string | undefined = u.searchParams.get("date") ?? undefined;
+  let triggeredBy: string | null = null;
   if (req.method === "POST") {
     try {
       const body = await req.json();
       if (body?.dry_run === true) dryRun = true;
       if (typeof body?.date === "string") baseDate = body.date;
+      if (typeof body?.triggered_by === "string") triggeredBy = body.triggered_by;
     } catch { /* ignore */ }
   }
 
@@ -127,6 +129,19 @@ Deno.serve(async (req) => {
         would_send: !reason,
         skip_reason: reason,
       });
+      await logSmsAttempt(
+        {
+          userId: t.beneficiary_user_id,
+          groupId: t.group_id,
+          turnId: t.id,
+          kind: "preview_j2",
+          triggeredBy,
+        },
+        [phone ?? "—"],
+        [phone ?? "—"],
+        body,
+        { status: "skipped", error: reason ? `dry_run:${reason}` : `dry_run:would_send@${baseDate ?? "today"}` },
+      );
       continue;
     }
     if (reason) { skipped++; continue; }
@@ -183,6 +198,19 @@ Deno.serve(async (req) => {
         would_send: !reason,
         skip_reason: reason,
       });
+      await logSmsAttempt(
+        {
+          userId: c.payer_user_id,
+          groupId: c.group_id,
+          turnId: c.turn_id,
+          kind: "preview_j1",
+          triggeredBy,
+        },
+        [phone ?? "—"],
+        [phone ?? "—"],
+        body,
+        { status: "skipped", error: reason ? `dry_run:${reason}` : `dry_run:would_send@${baseDate ?? "today"}` },
+      );
       continue;
     }
     if (reason) { skipped++; continue; }
