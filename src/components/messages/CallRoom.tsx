@@ -5,6 +5,8 @@ import {
   Circle,
   Mic,
   MicOff,
+  MonitorUp,
+  MonitorX,
   PhoneOff,
   ShieldAlert,
   Square,
@@ -38,6 +40,7 @@ export function CallRoom({ open, onOpenChange, callId, groupName, groupId, initi
   const [preCallPrefs, setPreCallPrefs] = useState<PreCallDevicePrefs>({
     micMuted: false,
     camOff: false,
+    screenShare: false,
   });
   const [recordingEnabled, setRecordingEnabled] = useState(false);
   const [showDiag, setShowDiag] = useState(false);
@@ -50,6 +53,8 @@ export function CallRoom({ open, onOpenChange, callId, groupName, groupId, initi
     toggleMute,
     isCamOff,
     toggleCam,
+    isScreenSharing,
+    toggleScreenShare,
     leave,
     isRecording,
     turnAvailable,
@@ -63,6 +68,7 @@ export function CallRoom({ open, onOpenChange, callId, groupName, groupId, initi
     video: true,
     initialMuted: preCallPrefs.micMuted,
     initialCamOff: preCallPrefs.camOff,
+    initialScreenShare: preCallPrefs.screenShare,
   });
 
   const { data: call } = useQuery({
@@ -92,7 +98,7 @@ export function CallRoom({ open, onOpenChange, callId, groupName, groupId, initi
     await leave();
     onOpenChange(false);
     setMicGranted(false);
-    setPreCallPrefs({ micMuted: false, camOff: false });
+    setPreCallPrefs({ micMuted: false, camOff: false, screenShare: false });
     setRecordingEnabled(false);
   };
 
@@ -187,7 +193,7 @@ export function CallRoom({ open, onOpenChange, callId, groupName, groupId, initi
               setMicGranted(true);
             }}
             onCancel={() => {
-              setPreCallPrefs({ micMuted: false, camOff: false });
+              setPreCallPrefs({ micMuted: false, camOff: false, screenShare: false });
               onOpenChange(false);
             }}
           />
