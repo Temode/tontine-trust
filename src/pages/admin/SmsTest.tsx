@@ -10,11 +10,12 @@ export default function AdminSmsTest() {
   const [phone, setPhone] = useState("");
   const [body, setBody] = useState(DEFAULT_BODY);
   const [sending, setSending] = useState(false);
-  const [result, setResult] = useState<
-    | null
-    | { ok: true; messageId?: string; cost?: number }
-    | { ok: false; error: string }
-  >(null);
+  const [result, setResult] = useState<{
+    ok: boolean;
+    messageId?: string;
+    cost?: number;
+    error?: string;
+  } | null>(null);
 
   const normalized = useMemo(() => normalizeGNPhone(phone), [phone]);
   const pretty = useMemo(() => formatGNPhone(phone), [phone]);
