@@ -319,6 +319,27 @@ export default function MyContributions() {
           />
         </div>
 
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-hairline bg-card/40 px-4 py-3">
+          <div className="min-w-0">
+            <p className="font-display text-sm font-semibold text-foreground">
+              Synchronisation Djomy
+            </p>
+            <p className="text-[11px] text-muted-foreground">
+              Si vous revenez de Djomy par la flèche du navigateur, cliquez ici pour
+              forcer la vérification de votre paiement.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={handleManualReconcile}
+            disabled={reconciling}
+            className="inline-flex h-10 items-center gap-2 whitespace-nowrap rounded-md border border-primary/30 bg-primary/5 px-4 text-xs font-semibold text-primary transition hover:bg-primary/10 disabled:opacity-60"
+          >
+            <RefreshCw className={cn("h-3.5 w-3.5", reconciling && "animate-spin")} />
+            {reconciling ? "Vérification…" : "Vérifier mes paiements"}
+          </button>
+        </div>
+
         <InFlightPaymentsCard userId={user?.id ?? null} />
 
         {defaultedDues.length > 0 && (
