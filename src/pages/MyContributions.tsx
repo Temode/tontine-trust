@@ -13,6 +13,7 @@ import {
   ChevronRight,
   Clock,
   Receipt,
+  AlertOctagon,
 } from "lucide-react";
 import { TopBar } from "@/components/layout/TopBar";
 import { SectionCard } from "@/components/dashboard/SectionCard";
@@ -78,6 +79,10 @@ export default function MyContributions() {
   );
   const lateCount = useMemo(
     () => dues.filter((d) => d.days_to_due < 0).length,
+    [dues],
+  );
+  const defaultedDues = useMemo(
+    () => dues.filter((d) => d.status === "defaulted"),
     [dues],
   );
   const mostUrgent = sortedDues[0] ?? null;
@@ -270,6 +275,33 @@ export default function MyContributions() {
         </div>
 
         <InFlightPaymentsCard userId={user?.id ?? null} />
+
+        {defaultedDues.length > 0 && (
+          <article
+            role="alert"
+            className="flex flex-col gap-3 rounded-xl border-2 border-destructive/40 bg-destructive/5 p-4 sm:flex-row sm:items-center"
+          >
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-destructive/15 text-destructive">
+              <AlertOctagon className="h-5 w-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="font-display text-sm font-bold text-destructive">
+                {defaultedDues.length} cotisation{defaultedDues.length > 1 ? "s" : ""} en défaut officiel
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Votre compte peut être signalé à l'équipe Tontine. Régularisez sous 48h pour éviter
+                tout appel ou procédure de recouvrement.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => defaultedDues[0] && setPayingDue(defaultedDues[0])}
+              className="inline-flex h-10 items-center justify-center gap-2 whitespace-nowrap rounded-md bg-destructive px-4 text-sm font-semibold text-destructive-foreground hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive focus-visible:ring-offset-2"
+            >
+              Régulariser maintenant
+            </button>
+          </article>
+        )}
 
         {/* Cotisations + filtres */}
         <section id="section-dues" className="space-y-4">
