@@ -3,6 +3,7 @@ import { useLocation } from "react-router-dom";
 import { BottomNav } from "./BottomNav";
 import { DesktopSidebar } from "./DesktopSidebar";
 import { useNotificationsRealtime } from "@/hooks/useNotifications";
+import { useChatToasts } from "@/hooks/useChatToasts";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { GuidedTourProvider } from "@/components/tour/GuidedTour";
 import { QuickActionsProvider } from "@/components/quick-actions/QuickActionsProvider";
@@ -17,6 +18,7 @@ function RouteFallback() {
 
 export function AppShell({ children }: { children: ReactNode }) {
   useNotificationsRealtime();
+  useChatToasts();
   const location = useLocation();
   return (
     <GuidedTourProvider>
