@@ -1,94 +1,129 @@
 ## Objectif
 
-Créer une page **Discussions** de premier niveau (style WhatsApp) accessible depuis le menu principal, permettant à un membre de basculer rapidement entre toutes ses tontines et de discuter avec ses cercles. La fonctionnalité chat existe déjà côté backend (`group_messages` + Realtime via `db/19_group_chat.sql`, composant `GroupChat`, API `src/lib/api/chat.ts`) — il s'agit d'une refonte UX/navigation, pas d'un nouveau backend.
+Compléter l'expérience Discussions avec : conversation realtime déjà existante, pièces jointes (images + PDF), indicateurs de saisie, accusés de lecture serveur (vu / non vu), notifications in-app pour les autres conversations, et architecture UI complète des appels vocaux (boutons actifs, état disponible/occupé, historique) — canal audio désactivé. Tout doit respecter `docs/DESIGN_DOCTRINE.md` (sarcelle/or, font-display, tabular-nums, beaucoup d'air, une seule action primaire).
 
-## 1. Nouvelle route & navigation
+## 1. Base de données (une seule migration)
 
-- Ajouter `/discussions` et `/discussions/:groupId` dans `src/App.tsx` (lazy-loaded `Messages.tsx`).
-- **Sidebar desktop** (`DesktopSidebar.tsx`) : ajouter une entrée "Discussions" (icône `MessageCircle`) dans la section Essentiel, juste après "Mes tontines", avec un badge de messages non lus.
-- **Bottom-nav mobile** (`BottomNav.tsx`) : remplacer "Payer" par "Discussions" (5 entrées : Accueil, Tontines, Créer, **Discussions**, Payer reste accessible via le dashboard et `/cotisations`). Alternative à valider : ajouter une 5e entrée. → Retenu : remplacer "Payer" pour rester à 4 entrées + bouton central, car la doctrine demande "une seule action primaire" et "Payer" est déjà sur l'accueil via `DueCard`.
+### `group_message_reads` — accusés de lecture serveur
+- Colonnes : `user_id`, `group_id`, `last_read_at timestamptz`. PK composite `(user_id, group_id)`.
+- RPC `mark_group_read(p_group_id uuid)` : upsert `last_read_at = now()` pour l'utilisateur courant si membre actif.
+- Remplace le hack `localStorage[chat-last-seen:*]` : non-lus partagés entre appareils.
+- Realtime activé (publication `supabase_realtime`).
 
-## 2. Page Messages (`src/pages/Messages.tsx`)
+### `group_messages` — pièces jointes
+- Ajouter colonnes nullables : `attachment_url text`, `attachment_type text` (`image/png`, `application/pdf`…), `attachment_name text`, `attachment_size int`.
+- Contrainte : `(body <> '' OR attachment_url is not null)` au lieu de l'actuel `length(trim(body))>0` (migration : drop puis recreate).
 
-Layout deux-colonnes inspiré WhatsApp, conforme à `docs/DESIGN_DOCTRINE.md` (sarcelle + or, beaucoup d'air, `font-display`, tabular-nums, pas d'emoji décoratif) :
+### `call_requests` — appels vocaux (UI seulement, canal off)
+- Colonnes : `group_id`, `requested_by uuid`, `topic text`, `scheduled_at timestamptz null`, `status` (`pending|accepted|declined|cancelled|missed`), `started_at`, `ended_at`, `created_at`.
+- RPC `request_group_call(p_group_id, p_topic, p_scheduled_at)`, `respond_call_request(p_id, p_status)`.
+- Realtime activé. RLS : visible aux membres actifs du groupe.
 
-```text
-┌──────────────────────┬─────────────────────────────────┐
-│ Discussions          │ [Avatar] Famille Moussa         │
-│ [recherche compacte] │ 12 membres · Cycle actif        │
-│ [Toutes][Actives][Non│─────────────────────────────────│
-│  lues]               │                                 │
-│──────────────────────│        zone messages            │
-│ ● Famille Moussa  3  │       (GroupChat existant)      │
-│   Bob: J'ai payé… 14:│                                 │
-│ ○ Tontine Bureau     │                                 │
-│   Alice: Merci   12: │─────────────────────────────────│
-│ ○ Voisinage          │ [+] [Entrez un message…] [Send] │
-└──────────────────────┴─────────────────────────────────┘
-```
+### `user_call_presence` — état disponible / occupé / ne pas déranger
+- Colonnes : `user_id pk`, `status` enum `available|busy|dnd`, `updated_at`.
+- RLS : lecture par membres partageant un groupe, update self uniquement.
 
-**Colonne gauche — `ConversationsList`** (nouveau composant `src/components/messages/ConversationsList.tsx`) :
-- En-tête : titre `Discussions` (font-display), bouton "Nouveau" (lien vers `/nouveau`).
-- Recherche compacte (`h-9`) filtrant par nom de groupe.
-- Onglets `Toutes / Actives / Non lues` (pills sarcelle, pas ALL CAPS).
-- Liste des tontines du membre, triées par `last_message_at desc` puis `updated_at`. Pour chaque ligne :
-  - Avatar (initiales sur fond sarcelle si pas d'`image_url`),
-  - Nom du groupe (`text-sm font-semibold`),
-  - Dernier message tronqué + auteur (`text-xs text-muted-foreground`),
-  - Heure relative (HH:mm si aujourd'hui, sinon date courte, `tabular-nums`),
-  - Badge or `bg-accent text-accent-foreground` avec compteur de non-lus.
-- État sélectionné : bandeau gauche sarcelle 3px + fond `secondary`, conforme au pattern sidebar existant.
-- Empty state via `EmptyState` réutilisable.
+### Stockage
+- Bucket `chat-attachments` (privé) créé via `supabase--storage_create_bucket`.
+- Policy `storage.objects` : upload/read autorisés aux membres du groupe (chemin `{group_id}/{user_id}/{uuid}.{ext}`).
 
-**Colonne droite — conversation active** :
-- En-tête sticky : avatar groupe, nom, sous-titre (`N membres · Cycle actif|En pause`), cluster icônes `gap-3` : `Phone` (désactivé, tooltip "Bientôt disponible — Appels vocaux"), `Video` (désactivé, même tooltip), bouton info qui ouvre la page du groupe.
-- Corps : réutiliser le composant existant `<GroupChat groupId={…} />` sans le modifier (il gère déjà Realtime + scroll + auteur).
-- Sur mobile (`<lg`) : afficher soit la liste soit la conversation (drilldown via route `/discussions/:groupId`), avec bouton retour `ArrowLeft` en en-tête.
+### GRANTs / RLS — appliqués à chaque table conformément à la doctrine.
 
-**Empty state global** (aucune tontine) : illustration `MessageCircle`, titre "Aucune discussion", CTA "Créer une tontine" + "Rejoindre une tontine".
+## 2. Typing indicator (sans table — Realtime broadcast)
 
-## 3. Compteurs de non-lus & dernier message
+- Canal Supabase Realtime `group_typing:{groupId}` avec presence/broadcast.
+- Client envoie un broadcast `{ user_id, name }` à chaque keystroke (throttle 1.5 s), stop après 3 s d'inactivité.
+- Affiché sous la conversation : « Alice écrit… », « Alice et Bob écrivent… », « 3 personnes écrivent… ».
 
-Ajout d'une nouvelle requête côté client (sans nouvelle migration nécessaire dans cette première itération) :
+## 3. Notifications in-app pour autres conversations
 
-- `src/lib/api/chat.ts` → nouvelle fonction `listConversationsForUser()` qui fait :
-  1. `select id, name, image_url, status, member_count from groups` joint via `group_members where user_id = auth.uid() and status = 'active'`.
-  2. Pour chaque groupe : récupère le dernier `group_messages` (`order by created_at desc limit 1`) avec auteur.
-  3. Calcule `unread_count` côté client en comparant `created_at > localStorage[chat-last-seen:{groupId}]`.
-- À l'ouverture d'une conversation, écrire `localStorage[chat-last-seen:{groupId}] = new Date().toISOString()` et invalider la query.
-- Souscription Realtime globale sur `group_messages` filtrée sur les groupes du user pour rafraîchir la liste sans reload (incrémente le badge, remonte la conversation en tête).
+- `useChatToasts()` (hook global monté dans `AppShell`) : souscrit à `group_messages` insert sur tous les groupes du user.
+- Filtre : si auteur ≠ moi ET (route ≠ `/discussions/{group_id}`) → toast Sonner cliquable :
+  - Avatar groupe + nom + extrait du message.
+  - Clic → `navigate(/discussions/{group_id})`.
+- Mise à jour de la query `["conversations"]` + badge sidebar/bottom-nav.
+- Pas de double notification si la conversation est ouverte.
 
-> Note : un vrai compteur serveur (`group_chat_reads` table + RPC) pourra être ajouté dans une itération suivante si l'UX localStorage devient limitante (multi-appareils). Cette étape n'est pas dans ce ticket pour éviter une migration DB.
+## 4. Pièces jointes (images + PDF)
 
-## 4. Appels vocaux/vidéo — préparation visuelle uniquement
+- Composant `AttachmentPicker` dans le composer (bouton `Paperclip`) :
+  - Accept : `image/png,image/jpeg,image/webp,application/pdf`.
+  - Limite : 8 Mo.
+  - Upload → bucket privé → renvoie path + signed URL (1 h).
+- Prévisualisation avant envoi (vignette image ou icône PDF + nom + taille).
+- Affichage dans le message :
+  - Images : thumbnail max 240×240, clic = lightbox plein écran.
+  - PDF : carte avec icône `FileText`, nom, taille, bouton "Télécharger" / "Aperçu" qui ouvre dans nouvel onglet.
+- Body texte facultatif si pièce jointe présente.
 
-Conformément à la demande "plutard nous aussi on doit integré l'appel vocal" :
-- Boutons `Phone` et `Video` présents dans l'en-tête de conversation mais `disabled` avec tooltip "Appels vocaux — bientôt disponible".
-- Aucun backend ni intégration WebRTC dans ce ticket.
+## 5. Accusés de lecture (vu / non vu) — UI
 
-## 5. Fichiers touchés
+- Liste conversations : badge or `unread_count` (déjà en place) calculé désormais via `last_read_at` côté serveur.
+- Dans la conversation :
+  - Sur mes messages : pictogramme `Check` (envoyé) → `CheckCheck` muted (livré) → `CheckCheck` sarcelle (lu par ≥1 autre membre).
+  - Ligne « 95 messages non lus » au-dessus du premier message non lu à l'ouverture (comme WhatsApp).
+- À l'ouverture / scroll en bas → RPC `mark_group_read` (debounced 1 s).
 
-**Créés**
-- `src/pages/Messages.tsx`
-- `src/components/messages/ConversationsList.tsx`
-- `src/components/messages/ConversationItem.tsx`
-- `src/components/messages/ConversationHeader.tsx`
-- `src/components/messages/EmptyConversation.tsx`
+## 6. Architecture UI appel vocal
 
-**Modifiés**
-- `src/App.tsx` (2 nouvelles routes)
-- `src/components/layout/DesktopSidebar.tsx` (entrée Discussions + badge)
-- `src/components/layout/BottomNav.tsx` (remplacer Payer par Discussions)
-- `src/lib/api/chat.ts` (ajout `listConversationsForUser` + `subscribeUserConversations`)
+- Bouton **« Demander un appel »** actif dans `ConversationHeader` (remplace l'icône `Phone` désactivée).
+- Modal `CallRequestDialog` : sujet + maintenant / programmer (date/heure) + envoyer.
+- Statut **disponible/occupé** dans le menu utilisateur (sidebar bas) : sélecteur 3 états.
+- Pastille de présence sur l'avatar du groupe (vert si ≥1 membre disponible, ambre si tous occupés/DND, gris sinon).
+- Nouveau panneau **Historique des appels** dans la conversation (drawer accessible via bouton `Clock` du header) :
+  - Liste des `call_requests` : demandeur, sujet, état, date.
+  - Boutons "Accepter" / "Refuser" sur les demandes pending qui me sont visibles.
+  - Sur acceptation : bandeau d'appel "Appel demandé pour 14:30 — module audio bientôt disponible".
+- Sur la fiche conversation, badge "Demande d'appel en attente" si `pending` existe.
+- **Aucun WebRTC** : tous les boutons "Rejoindre l'appel" affichent un tooltip "Canal audio bientôt disponible" et un toast info.
 
-**Non modifiés** : `GroupChat.tsx` (réutilisé tel quel), `db/19_group_chat.sql`, schémas, RLS.
+## 7. Refonte de la page conversation
 
-## 6. Validation
+- `GroupChat` étendu pour gérer : pièces jointes, typing, séparateur "non lus", accusés de lecture, scroll auto vers premier non lu à l'ouverture.
+- Header sticky : avatar + nom + nb membres + pastille présence + boutons `Phone` (actif → modal), `History` (drawer appels), `Info` (route groupe).
+- Composer : `Paperclip` + textarea autosize + bouton `Send` (sarcelle), Enter envoie, Shift+Enter saut de ligne.
+- Loading : skeletons (pas de spinner), respect doctrine.
+- Empty : `EmptyState` "Aucun message — soyez le premier à écrire".
 
-1. `/discussions` charge la liste des tontines du user, triée par dernier message.
-2. Cliquer sur une tontine ouvre le chat existant sans recharger.
-3. Sur mobile (712px), la liste seule est visible ; cliquer ouvre `/discussions/:id` plein écran avec retour.
-4. Un nouveau message reçu d'une autre tontine fait remonter celle-ci en tête et incrémente le badge sans refresh.
-5. La sidebar desktop affiche le badge cumulé de non-lus.
-6. Les boutons appel sont visibles mais disabled avec tooltip explicite.
-7. Tokens couleur respectés (sarcelle/or), `tabular-nums` sur les heures, aucune couleur hardcodée.
+## 8. Fichiers créés
+
+- `supabase/migrations/<ts>_chat_v2_reads_attachments_calls.sql`
+- `src/lib/api/chatReads.ts` (mark/get reads)
+- `src/lib/api/chatAttachments.ts` (upload + signed URL)
+- `src/lib/api/calls.ts` (request/respond/list)
+- `src/lib/api/presence.ts` (état utilisateur)
+- `src/hooks/useChatToasts.ts`
+- `src/hooks/useTypingChannel.ts`
+- `src/hooks/useGroupCallRequests.ts`
+- `src/components/messages/MessageBubble.tsx` (refactor)
+- `src/components/messages/MessageComposer.tsx`
+- `src/components/messages/AttachmentPicker.tsx`
+- `src/components/messages/AttachmentPreview.tsx`
+- `src/components/messages/TypingIndicator.tsx`
+- `src/components/messages/UnreadSeparator.tsx`
+- `src/components/messages/ReadReceipts.tsx`
+- `src/components/messages/CallRequestDialog.tsx`
+- `src/components/messages/CallHistoryDrawer.tsx`
+- `src/components/messages/PresenceDot.tsx`
+- `src/components/messages/PresencePicker.tsx`
+
+## 9. Fichiers modifiés
+
+- `src/components/group/GroupChat.tsx` → refactor en utilisant les nouveaux composants.
+- `src/components/messages/ConversationHeader.tsx` → boutons appel actifs, drawer historique, présence.
+- `src/components/messages/ConversationItem.tsx` → unread_count basé serveur.
+- `src/components/messages/ConversationsList.tsx` → idem.
+- `src/lib/api/chat.ts` → `listConversationsForUser` lit `group_message_reads`, types étendus avec attachments.
+- `src/pages/Messages.tsx` → mark_group_read on open, intégration drawer.
+- `src/components/layout/AppShell.tsx` → monte `useChatToasts`.
+- `src/components/layout/DesktopSidebar.tsx` → badge non-lus, sélecteur de présence dans la carte user.
+
+## 10. Validation
+
+1. **Realtime** : Alice envoie un message → Bob (autre session) le voit apparaître < 1 s, sans refresh ; toast in-app si Bob est ailleurs ; badge non-lus de la conversation et de la sidebar incrémenté.
+2. **Lecture** : Bob ouvre la conversation → badge tombe à 0 (Alice le voit aussi : `CheckCheck` sarcelle sur son message dans la même seconde).
+3. **Pièces jointes** : envoi d'une image → thumbnail + lightbox ; envoi d'un PDF → carte téléchargeable ; refus si > 8 Mo ou type non autorisé.
+4. **Typing** : Alice tape → "Alice écrit…" chez Bob ; disparaît 3 s après l'arrêt.
+5. **Appels** : Bob clique "Demander un appel" → modal → envoi → Alice voit une demande pending + toast ; drawer historique liste toutes les demandes ; bouton "Rejoindre" affiche tooltip "bientôt disponible" — aucune erreur réseau.
+6. **Présence** : Bob bascule en "occupé" → pastille de l'avatar du groupe passe à l'ambre chez Alice en realtime.
+7. **Doctrine** : aucune couleur hardcodée, montants/tabular-nums respectés, skeletons (pas de spinner), une seule action primaire par écran, viewport 712px et 1280px OK.

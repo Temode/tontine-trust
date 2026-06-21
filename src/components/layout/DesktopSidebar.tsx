@@ -12,6 +12,7 @@ import { Link, useLocation } from "react-router-dom";
 import { Logo } from "@/components/brand/Logo";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
+import { PresencePicker } from "@/components/messages/PresencePicker";
 
 interface NavEntry {
   to: string;
@@ -120,6 +121,12 @@ export function DesktopSidebar() {
 
       {/* User card */}
       <div className="border-t border-hairline p-3">
+        <div className="mb-2 flex items-center justify-between px-1">
+          <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+            Disponibilité
+          </span>
+          <PresencePicker />
+        </div>
         <button
           type="button"
           className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-secondary"
