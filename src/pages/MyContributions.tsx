@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Wallet, ShieldCheck, Check } from "lucide-react";
+import { ShieldCheck, Check } from "lucide-react";
 import { TopBar } from "@/components/layout/TopBar";
 import { SectionCard } from "@/components/dashboard/SectionCard";
 import { formatGNF, formatRelativeDays } from "@/lib/format";
@@ -29,21 +29,13 @@ export default function MyContributions() {
 
   const [payingDue, setPayingDue] = useState<DbContributionDue | null>(null);
 
-  const totalDue = dues.reduce((sum, d) => sum + d.amount, 0);
-
   return (
     <div className="animate-fade-in">
       <TopBar
-        title="Mes cotisations"
+        title="Payer"
         subtitle="Réglez vos cotisations Mobile Money en quelques secondes."
       />
       <div className="space-y-6 px-5 py-6 lg:px-8 lg:py-8">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <KpiTile label="À payer" value={`${formatGNF(totalDue)} GNF`} hint={`${dues.length} cotisation${dues.length > 1 ? "s" : ""}`} />
-          <KpiTile label="Paiements réussis" value={String(history.filter((p) => p.status === "succeeded").length)} />
-          <KpiTile label="Provider" value="Djomy" hint="OM · MTN · Carte" />
-        </div>
-
         <InFlightPaymentsCard userId={user?.id ?? null} />
 
         <SectionCard title="À régler" subtitle={isLoading ? "Chargement…" : undefined} bare>
@@ -101,19 +93,6 @@ export default function MyContributions() {
         />
       )}
     </div>
-  );
-}
-
-function KpiTile({ label, value, hint }: { label: string; value: string; hint?: string }) {
-  return (
-    <article className="rounded-xl border border-hairline bg-card p-5">
-      <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-md bg-primary-50 text-primary">
-        <Wallet className="h-[18px] w-[18px]" strokeWidth={1.75} />
-      </div>
-      <p className="text-[11px] uppercase tracking-wider text-muted-foreground">{label}</p>
-      <p className="mt-1 font-display text-2xl font-bold text-foreground num">{value}</p>
-      {hint && <p className="mt-0.5 text-xs text-muted-foreground">{hint}</p>}
-    </article>
   );
 }
 

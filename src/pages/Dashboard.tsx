@@ -5,17 +5,11 @@ import { Plus, UserPlus, Users, Calendar as CalendarIcon, Wallet } from "lucide-
 import { TopBar } from "@/components/layout/TopBar";
 import { SectionCard } from "@/components/dashboard/SectionCard";
 import { GroupRow } from "@/components/dashboard/GroupRow";
-import { ReliabilityCard } from "@/components/dashboard/ReliabilityCard";
 import { useAuth } from "@/hooks/useAuth";
 import { listMyGroups } from "@/lib/api/groups";
 import { overviewToTontine } from "@/lib/api/types";
 import { listMyNextTurns } from "@/lib/api/turns";
 import { listMyContributionsDue } from "@/lib/api/contributions";
-import { getMyReliability } from "@/lib/api/reliability";
-import { listMyRecentAnnouncements } from "@/lib/api/announcements";
-import { DuesCard } from "@/components/dashboard/DuesCard";
-import { UpcomingTurnsCard } from "@/components/dashboard/UpcomingTurnsCard";
-import { RecentAnnouncementsCard } from "@/components/dashboard/RecentAnnouncementsCard";
 import { formatGNF } from "@/lib/format";
 
 function KpiTile({
@@ -49,21 +43,13 @@ export default function Dashboard() {
     queryKey: ["groups", "mine"],
     queryFn: listMyGroups,
   });
-  const { data: nextTurns = [], isLoading: turnsLoading } = useQuery({
+  const { data: nextTurns = [] } = useQuery({
     queryKey: ["turns", "mine", "next"],
     queryFn: listMyNextTurns,
   });
-  const { data: dues = [], isLoading: duesLoading } = useQuery({
+  const { data: dues = [] } = useQuery({
     queryKey: ["contributions", "due"],
     queryFn: listMyContributionsDue,
-  });
-  const { data: reliability } = useQuery({
-    queryKey: ["reliability", "mine"],
-    queryFn: getMyReliability,
-  });
-  const { data: announcements = [] } = useQuery({
-    queryKey: ["announcements", "mine", "recent"],
-    queryFn: () => listMyRecentAnnouncements(3),
   });
 
   const groups = useMemo(() => rows.map(overviewToTontine), [rows]);
@@ -89,9 +75,9 @@ export default function Dashboard() {
     <div className="animate-fade-in">
       <TopBar
         title={firstName ? `Bonjour, ${firstName}` : "Tableau de bord"}
-        subtitle="Suivez vos tontines et organisez vos cotisations en toute simplicité."
+        subtitle="Voici ce qui demande votre attention aujourd'hui."
         primaryAction={{
-          label: "Créer un groupe",
+          label: "Nouvelle tontine",
           onClick: () => navigate("/nouveau"),
           icon: <Plus className="h-4 w-4" />,
         }}
@@ -101,10 +87,10 @@ export default function Dashboard() {
         {/* KPI strip */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <KpiTile
-            icon={Users}
-            label="Groupes actifs"
-            value={String(activeCount)}
-            hint={`${groups.length} au total`}
+            icon={Wallet}
+            label="À payer"
+            value={totalDue > 0 ? `${formatGNF(totalDue)} GNF` : "—"}
+            hint={dues.length > 0 ? `${dues.length} cotisation${dues.length > 1 ? "s" : ""} en attente` : "Vous êtes à jour"}
           />
           <KpiTile
             icon={CalendarIcon}
@@ -113,83 +99,52 @@ export default function Dashboard() {
             hint={nextTurnHint}
           />
           <KpiTile
-            icon={Wallet}
-            label="À payer"
-            value={totalDue > 0 ? `${formatGNF(totalDue)} GNF` : "—"}
-            hint={dues.length > 0 ? `${dues.length} cotisation${dues.length > 1 ? "s" : ""}` : "Vous êtes à jour"}
+            icon={Users}
+            label="Mes tontines"
+            value={String(activeCount)}
+            hint={`${groups.length} au total`}
           />
         </div>
 
-        {/* Main grid */}
-        <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
-          <SectionCard
-            className="lg:col-span-2"
-            title="Mes groupes"
-            subtitle={isLoading ? "Chargement…" : `${groups.length} groupe${groups.length > 1 ? "s" : ""}`}
-            action={groups.length > 0 ? { label: "Voir tout", onClick: () => navigate("/groupes") } : undefined}
-            bare
-          >
-            {isLoading ? (
-              <p className="px-5 py-6 text-sm text-muted-foreground lg:px-6">Chargement…</p>
-            ) : preview.length === 0 ? (
-              <div className="px-5 py-10 text-center lg:px-6">
-                <p className="text-sm text-muted-foreground">Vous n'avez encore aucun groupe.</p>
-                <div className="mt-4 flex flex-wrap justify-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => navigate("/nouveau")}
-                    className="inline-flex h-9 items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-semibold text-primary-foreground transition hover:bg-primary-700"
-                  >
-                    <Plus className="h-4 w-4" /> Créer un groupe
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => navigate("/rejoindre")}
-                    className="inline-flex h-9 items-center gap-1.5 rounded-md border border-hairline bg-card px-3 text-sm font-semibold text-foreground transition hover:bg-secondary"
-                  >
-                    <UserPlus className="h-4 w-4" /> Rejoindre avec un code
-                  </button>
-                </div>
+        {/* Mes tontines */}
+        <SectionCard
+          title="Mes tontines"
+          subtitle={isLoading ? "Chargement…" : `${groups.length} groupe${groups.length > 1 ? "s" : ""}`}
+          action={groups.length > 0 ? { label: "Voir tout", onClick: () => navigate("/groupes") } : undefined}
+          bare
+        >
+          {isLoading ? (
+            <p className="px-5 py-6 text-sm text-muted-foreground lg:px-6">Chargement…</p>
+          ) : preview.length === 0 ? (
+            <div className="px-5 py-10 text-center lg:px-6">
+              <p className="text-sm text-muted-foreground">Vous n'avez encore aucune tontine.</p>
+              <div className="mt-4 flex flex-wrap justify-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => navigate("/nouveau")}
+                  className="inline-flex h-9 items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-semibold text-primary-foreground transition hover:bg-primary-700"
+                >
+                  <Plus className="h-4 w-4" /> Créer une tontine
+                </button>
+                <button
+                  type="button"
+                  onClick={() => navigate("/rejoindre")}
+                  className="inline-flex h-9 items-center gap-1.5 rounded-md border border-hairline bg-card px-3 text-sm font-semibold text-foreground transition hover:bg-secondary"
+                >
+                  <UserPlus className="h-4 w-4" /> Rejoindre avec un code
+                </button>
               </div>
-            ) : (
-              <ul className="divide-y divide-border/60">
-                {preview.map((g) => (
-                  <li key={g.id}>
-                    <GroupRow group={g} />
-                  </li>
-                ))}
-              </ul>
-            )}
-          </SectionCard>
-
-          <ReliabilityCard
-            score={reliability?.score ?? 0}
-            tier={reliability?.tier ?? "nouveau"}
-            onTime={{
-              current: reliability?.total_on_time ?? 0,
-              total: reliability?.total_paid ?? 0,
-            }}
-            late={reliability?.total_late ?? 0}
-            avgDelay={reliability?.avg_delay_days ?? 0}
-            memberSince={
-              user?.created_at
-                ? new Date(user.created_at).toLocaleDateString("fr-FR", { month: "short", year: "numeric" })
-                : "—"
-            }
-          />
-        </div>
-
-        {/* Cartes actionnables membre */}
-        <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-          <DuesCard dues={dues} isLoading={duesLoading} />
-          <UpcomingTurnsCard
-            turns={nextTurns}
-            myUserId={user?.id ?? null}
-            isLoading={turnsLoading}
-          />
-        </div>
-
-        <RecentAnnouncementsCard items={announcements} />
+            </div>
+          ) : (
+            <ul className="divide-y divide-border/60">
+              {preview.map((g) => (
+                <li key={g.id}>
+                  <GroupRow group={g} />
+                </li>
+              ))}
+            </ul>
+          )}
+        </SectionCard>
       </div>
     </div>
   );
