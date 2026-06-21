@@ -266,7 +266,7 @@ function ReportDetailDialog({ report, onClose }: { report: DefaulterReportEnrich
           <Field label="Téléphone" value={report.reported_user_phone ?? "—"} mono />
           <Field label="Tour" value={report.turn_number ? `#${report.turn_number}` : "—"} />
           <Field label="Échéance" value={report.due_date ? new Date(report.due_date).toLocaleDateString("fr-FR") : "—"} />
-          <Field label="Montant" value={report.contribution_amount?.toLocaleString("fr-FR") + " GNF" || "—"} />
+          <Field label="Montant" value={report.contribution_amount != null ? `${report.contribution_amount.toLocaleString("fr-FR")} GNF` : "—"} />
           <Field label="Retard" value={`${report.default_days ?? 0} j`} />
           <Field label="KYC" value={report.kyc_status ?? "none"} />
           <Field label="Signalé par" value={report.reported_by_name ?? "—"} />
