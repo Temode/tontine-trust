@@ -1,5 +1,10 @@
 import { createContext, ReactNode, useContext } from "react";
-import { useIncomingCalls, IncomingCall, IncomingCallsStatus } from "./useIncomingCalls";
+import {
+  useIncomingCalls,
+  IncomingCall,
+  IncomingCallsStatus,
+  DiagEvent,
+} from "./useIncomingCalls";
 
 interface Ctx {
   current: IncomingCall | null;
@@ -7,6 +12,8 @@ interface Ctx {
   status: IncomingCallsStatus;
   groupCount: number;
   lastEventAt: number | null;
+  pendingCount: number;
+  events: DiagEvent[];
 }
 
 const IncomingCallsCtx = createContext<Ctx | null>(null);
@@ -29,6 +36,8 @@ export function useIncomingCallsContext(): Ctx {
       status: "idle",
       groupCount: 0,
       lastEventAt: null,
+      pendingCount: 0,
+      events: [],
     };
   }
   return v;
