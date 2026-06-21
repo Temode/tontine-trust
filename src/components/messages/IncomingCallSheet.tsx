@@ -3,13 +3,13 @@ import { useMutation } from "@tanstack/react-query";
 import { Phone, PhoneOff } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { useIncomingCalls } from "@/hooks/useIncomingCalls";
+import { useIncomingCallsContext } from "@/hooks/IncomingCallsContext";
 import { respondCallRequest } from "@/lib/api/calls";
 import { CallRoom } from "./CallRoom";
 import { useRingtone } from "@/hooks/useRingtone";
 
 export function IncomingCallSheet() {
-  const { current, dismiss } = useIncomingCalls();
+  const { current, dismiss } = useIncomingCallsContext();
   const [joined, setJoined] = useState<{ callId: string; groupName: string; groupId: string } | null>(null);
   const notifiedRef = useRef<string | null>(null);
   const toastIdRef = useRef<string | number | null>(null);

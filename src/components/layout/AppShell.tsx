@@ -5,6 +5,8 @@ import { DesktopSidebar } from "./DesktopSidebar";
 import { useNotificationsRealtime } from "@/hooks/useNotifications";
 import { useChatToasts } from "@/hooks/useChatToasts";
 import { IncomingCallSheet } from "@/components/messages/IncomingCallSheet";
+import { CallDiagnosticPanel } from "@/components/messages/CallDiagnosticPanel";
+import { IncomingCallsProvider } from "@/hooks/IncomingCallsContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { GuidedTourProvider } from "@/components/tour/GuidedTour";
 import { QuickActionsProvider } from "@/components/quick-actions/QuickActionsProvider";
@@ -24,6 +26,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <GuidedTourProvider>
       <QuickActionsProvider>
+        <IncomingCallsProvider>
         <div className="min-h-screen bg-background">
           <DesktopSidebar />
           <div className="lg:pl-72">
@@ -38,7 +41,9 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
           <BottomNav />
           <IncomingCallSheet />
+          <CallDiagnosticPanel />
         </div>
+        </IncomingCallsProvider>
       </QuickActionsProvider>
     </GuidedTourProvider>
   );
