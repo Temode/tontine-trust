@@ -46,6 +46,7 @@ export function NotificationBell() {
         <button
           type="button"
           aria-label={`${unread} notifications non lues`}
+          data-tour="notifications"
           className="relative flex h-10 w-10 items-center justify-center rounded-lg border border-hairline bg-card text-muted-foreground transition hover:text-foreground"
         >
           <Bell className="h-[18px] w-[18px]" />
