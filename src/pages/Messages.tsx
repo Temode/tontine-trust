@@ -8,7 +8,7 @@ import { ConversationsList } from "@/components/messages/ConversationsList";
 import { ConversationHeader } from "@/components/messages/ConversationHeader";
 import {
   listConversationsForUser,
-  markConversationSeen,
+  markGroupRead,
   subscribeAllUserConversations,
 } from "@/lib/api/chat";
 import { cn } from "@/lib/utils";
@@ -41,8 +41,9 @@ export default function Messages() {
   // Marquer comme lu à l'ouverture
   useEffect(() => {
     if (groupId) {
-      markConversationSeen(groupId);
-      qc.invalidateQueries({ queryKey: ["conversations"] });
+      markGroupRead(groupId)
+        .then(() => qc.invalidateQueries({ queryKey: ["conversations"] }))
+        .catch(() => {});
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [groupId]);
