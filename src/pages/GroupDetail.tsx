@@ -47,6 +47,7 @@ import { ReviewsPanel } from "@/components/group/ReviewsPanel";
 import { TestModePanel } from "@/components/group/TestModePanel";
 import { InvitationsHistoryPanel } from "@/components/groups/InvitationsHistoryPanel";
 import { GroupDefaultersSection } from "@/components/group/GroupDefaultersSection";
+import { GroupDisputesSection } from "@/components/group/GroupDisputesSection";
 
 type Section =
   | "overview"
@@ -523,7 +524,12 @@ export default function GroupDetail() {
 
         <div className="mt-5">
           {section === "overview" && <OverviewTab nextTurn={nextTurn} payout={totalPayout} />}
-          {section === "overview" && <GroupDefaultersSection groupId={grp.id} />}
+          {section === "overview" && (
+            <>
+              <GroupDefaultersSection groupId={grp.id} />
+              <GroupDisputesSection groupId={grp.id} />
+            </>
+          )}
           {section === "members" && (
             <MembersTab
               members={activeMembers}

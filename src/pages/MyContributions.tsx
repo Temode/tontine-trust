@@ -34,6 +34,10 @@ import { DjomyPaymentModal } from "@/components/payment/DjomyPaymentModal";
 import { InFlightPaymentsCard } from "@/components/payment/InFlightPaymentsCard";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { useAuth } from "@/hooks/useAuth";
+import { PenaltyBreakdown } from "@/components/contribution/PenaltyBreakdown";
+import { DefaultHistorySection } from "@/components/contribution/DefaultHistorySection";
+import { DisputeDialog } from "@/components/contribution/DisputeDialog";
+import { Scale } from "lucide-react";
 
 type StatusFilter = "all" | "due" | "late" | "paid";
 
@@ -57,6 +61,7 @@ export default function MyContributions() {
   });
 
   const [payingDue, setPayingDue] = useState<DbContributionDue | null>(null);
+  const [disputingDue, setDisputingDue] = useState<DbContributionDue | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [groupFilter, setGroupFilter] = useState<string>("all");
@@ -396,6 +401,7 @@ export default function MyContributions() {
                     key={d.contribution_id}
                     due={d}
                     onPay={() => setPayingDue(d)}
+                    onDispute={() => setDisputingDue(d)}
                   />
                 ))}
               </div>
@@ -518,6 +524,8 @@ export default function MyContributions() {
             </>
           )}
         </SectionCard>
+
+        <DefaultHistorySection />
       </div>
       {payingDue && (
         <DjomyPaymentModal
@@ -531,6 +539,14 @@ export default function MyContributions() {
           beneficiaryName={payingDue.beneficiary_name}
         />
       )}
+      {disputingDue && (
+        <DisputeDialog
+          open={!!disputingDue}
+          onOpenChange={(o) => !o && setDisputingDue(null)}
+          contributionId={disputingDue.contribution_id}
+          groupName={disputingDue.group_name}
+        />
+      )}
     </div>
   );
 }
@@ -538,9 +554,10 @@ export default function MyContributions() {
 interface CardProps {
   due: DbContributionDue;
   onPay: () => void;
+  onDispute?: () => void;
 }
 
-function DueContributionCard({ due, onPay }: CardProps) {
+function DueContributionCard({ due, onPay, onDispute }: CardProps) {
   const isDefaulted = due.status === "defaulted";
   const isOverdue = due.days_to_due < 0;
   const isUrgent = due.days_to_due >= 0 && due.days_to_due <= 3;
@@ -608,6 +625,21 @@ function DueContributionCard({ due, onPay }: CardProps) {
           Payer maintenant
           <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
         </button>
+
+        {(isDefaulted || (isOverdue && (due.late_penalty_percent ?? 0) > 0)) && (
+          <PenaltyBreakdown due={due} />
+        )}
+
+        {isDefaulted && onDispute && (
+          <button
+            type="button"
+            onClick={onDispute}
+            className="inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-md border border-primary/40 bg-card px-3 text-xs font-semibold text-primary hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+          >
+            <Scale className="h-3.5 w-3.5" />
+            Contester / demander une revue
+          </button>
+        )}
       </div>
     </article>
   );

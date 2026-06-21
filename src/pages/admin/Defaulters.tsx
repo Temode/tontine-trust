@@ -8,6 +8,7 @@ import {
   Scale,
   Loader2,
   ExternalLink,
+  History,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -26,6 +27,7 @@ import {
 } from "@/components/ui/dialog";
 import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
+import { DefaultReportAuditSheet } from "@/components/admin/DefaultReportAuditSheet";
 
 type StatusFilter = "all" | "open" | "in_review" | "legal_action" | "resolved" | "dismissed";
 
@@ -49,6 +51,7 @@ const STATUS_STYLES: Record<string, string> = {
 export default function AdminDefaulters() {
   const [filter, setFilter] = useState<StatusFilter>("open");
   const [selected, setSelected] = useState<DefaulterReportEnriched | null>(null);
+  const [auditing, setAuditing] = useState<DefaulterReportEnriched | null>(null);
 
   const q = useQuery({
     queryKey: ["admin-defaulter-reports"],
@@ -175,6 +178,13 @@ export default function AdminDefaulters() {
                     </a>
                   )}
                   <button
+                    onClick={() => setAuditing(r)}
+                    className="mr-1 inline-flex h-7 items-center gap-1 rounded border border-slate-700 px-2 text-xs text-slate-300 hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
+                    title="Voir le journal d'audit"
+                  >
+                    <History className="h-3 w-3" /> Audit
+                  </button>
+                  <button
                     onClick={() => setSelected(r)}
                     className="inline-flex h-7 items-center gap-1 rounded bg-amber-400 px-2 text-xs font-semibold text-slate-900 hover:bg-amber-300"
                   >
@@ -190,6 +200,8 @@ export default function AdminDefaulters() {
       {selected && (
         <ReportDetailDialog report={selected} onClose={() => setSelected(null)} />
       )}
+
+      <DefaultReportAuditSheet report={auditing} onClose={() => setAuditing(null)} />
     </div>
   );
 }
