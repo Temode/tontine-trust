@@ -1,11 +1,11 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { Plus } from "lucide-react";
+import { AlertTriangle, Plus } from "lucide-react";
 import { TopBar } from "@/components/layout/TopBar";
 import { EmptyState } from "@/components/groups/EmptyState";
 import { GroupsGrid } from "@/components/groups/GroupsGrid";
-import { GroupsKpiStrip } from "@/components/groups/GroupsKpiStrip";
+import { GroupsHero } from "@/components/groups/GroupsHero";
 import { GroupsTable } from "@/components/groups/GroupsTable";
 import { GroupsToolbar } from "@/components/groups/GroupsToolbar";
 import type { GroupsFilter, SortDir, SortKey, ViewMode } from "@/components/groups/types";
@@ -93,7 +93,7 @@ export default function MyGroups() {
   const [filter, setFilter] = useState<GroupsFilter>("all");
   const [sort, setSort] = useState<SortKey>("deadline");
   const [sortDir, setSortDir] = useState<SortDir>(STATUS_DEFAULT_DIRS.deadline);
-  const [view, setView] = useState<ViewMode>("table");
+  const [view, setView] = useState<ViewMode>("grid");
 
   const { data: rows = [], isLoading, isError, error, refetch } = useQuery({
     queryKey: ["groups", "mine"],
@@ -207,7 +207,7 @@ export default function MyGroups() {
       />
 
       <div className="space-y-6 px-5 py-6 lg:px-8 lg:py-8">
-        <GroupsKpiStrip stats={portfolio} />
+        <GroupsHero stats={portfolio} />
 
         {applications.length > 0 && (
           <ApplicationsList applications={applications} onCancel={handleCancelApplication} />
@@ -230,17 +230,29 @@ export default function MyGroups() {
         />
 
         {isLoading ? (
-          <p className="text-sm text-muted-foreground">Chargement…</p>
+          <div className="space-y-4" aria-busy="true" aria-live="polite">
+            <div className="h-12 animate-pulse rounded-2xl bg-secondary/60" />
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="h-56 animate-pulse rounded-xl bg-secondary/60" />
+              ))}
+            </div>
+          </div>
         ) : isError ? (
-          <div className="rounded-xl border border-destructive/40 bg-destructive/5 p-5 text-sm">
-            <p className="font-display text-base font-bold text-foreground">Impossible de charger vos groupes</p>
-            <p className="mt-1 text-muted-foreground">
-              {error instanceof Error ? error.message : "Erreur réseau inattendue."}
-            </p>
+          <div className="flex flex-col items-start gap-4 rounded-2xl border border-destructive/30 bg-destructive/[0.04] p-6 sm:flex-row sm:items-center">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-destructive/10 text-destructive">
+              <AlertTriangle className="h-5 w-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="font-display text-base font-bold text-foreground">Impossible de charger vos groupes</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {error instanceof Error ? error.message : "Erreur réseau inattendue."}
+              </p>
+            </div>
             <button
               type="button"
               onClick={() => refetch()}
-              className="mt-3 inline-flex h-9 items-center rounded-md bg-primary px-3 text-xs font-semibold text-primary-foreground transition hover:bg-primary/90"
+              className="inline-flex h-9 shrink-0 items-center rounded-lg border border-hairline bg-card px-4 text-xs font-medium text-foreground transition hover:bg-secondary"
             >
               Réessayer
             </button>
@@ -259,9 +271,13 @@ export default function MyGroups() {
           <GroupsGrid groups={filteredGroups} />
         )}
 
-        <p className="text-[11px] text-muted-foreground">
-          {filteredGroups.length} {filteredGroups.length > 1 ? "groupes" : "groupe"} affichés · Données en direct depuis votre registre Tontine Digital.
-        </p>
+        <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-muted-foreground">
+          <span>
+            <span className="num">{filteredGroups.length}</span>{" "}
+            {filteredGroups.length > 1 ? "groupes affichés" : "groupe affiché"}
+          </span>
+          <span>Données en direct · Tontine Digitale</span>
+        </div>
       </div>
     </div>
   );
