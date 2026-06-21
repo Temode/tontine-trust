@@ -416,6 +416,8 @@ export function useWebRTCCall({
             const fromId: string = payload.user_id;
             if (!fromId || fromId === myId) return;
             logDiag({ peer: fromId, type: "info", detail: "peer-join" });
+            // Send our current media state to the newcomer immediately.
+            broadcastMediaState();
             if (myId < fromId) {
               const pc = createPeerConnection(fromId);
               const offer = await pc.createOffer();
