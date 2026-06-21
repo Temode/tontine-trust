@@ -25,14 +25,18 @@ export function CallParticipantTile({
   speaking,
 }: Props) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const hasVideo = !!stream && stream.getVideoTracks().some((t) => t.enabled);
 
   useEffect(() => {
-    if (videoRef.current && stream) {
+    if (stream && videoRef.current) {
       videoRef.current.srcObject = stream;
     }
-  }, [stream]);
+    if (stream && audioRef.current && !isLocal) {
+      audioRef.current.srcObject = stream;
+    }
+  }, [stream, isLocal]);
 
   const ini = initials ?? getInitials(name) ?? "··";
   const bad =
@@ -71,9 +75,9 @@ export function CallParticipantTile({
         </div>
       )}
 
-      {/* Hidden audio sink for remote audio (also covered by video element on remotes) */}
-      {!isLocal && stream && !hasVideo && (
-        <audio ref={videoRef as unknown as React.RefObject<HTMLAudioElement>} autoPlay playsInline />
+      {/* Always sink remote audio so even camera-off peers are heard. */}
+      {!isLocal && stream && (
+        <audio ref={audioRef} autoPlay playsInline className="hidden" />
       )}
 
       {/* Overlay : name + status */}
