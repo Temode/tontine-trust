@@ -19,6 +19,26 @@ export interface RemotePeer {
   user_id: string;
   stream: MediaStream | null;
   connectionState: RTCPeerConnectionState;
+  iceConnectionState?: RTCIceConnectionState;
+  signalingState?: RTCSignalingState;
+  retries?: number;
+  lastError?: string | null;
+}
+
+export interface WebRTCDiagEvent {
+  ts: number;
+  peer?: string;
+  type:
+    | "ice"
+    | "ice-state"
+    | "conn-state"
+    | "signaling"
+    | "offer"
+    | "answer"
+    | "retry"
+    | "error"
+    | "info";
+  detail?: string;
 }
 
 const FALLBACK_ICE: RTCIceServer[] = [
@@ -26,14 +46,24 @@ const FALLBACK_ICE: RTCIceServer[] = [
   { urls: "stun:stun1.l.google.com:19302" },
 ];
 
+const MAX_RETRIES = 3;
+const RETRY_DELAYS_MS = [1000, 2000, 4000];
+
 interface UseWebRTCCallOpts {
   callId: string | null;
   enabled: boolean;
   groupId?: string;
   recordingEnabled?: boolean;
+  video?: boolean;
 }
 
-export function useWebRTCCall({ callId, enabled, groupId, recordingEnabled }: UseWebRTCCallOpts) {
+export function useWebRTCCall({
+  callId,
+  enabled,
+  groupId,
+  recordingEnabled,
+  video = true,
+}: UseWebRTCCallOpts) {
   const { user } = useAuth();
   const myId = user?.id ?? null;
 
@@ -42,8 +72,11 @@ export function useWebRTCCall({ callId, enabled, groupId, recordingEnabled }: Us
   const [participants, setParticipants] = useState<CallParticipant[]>([]);
   const [peers, setPeers] = useState<Record<string, RemotePeer>>({});
   const [isMuted, setMuted] = useState(false);
+  const [isCamOff, setCamOff] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [turnAvailable, setTurnAvailable] = useState(false);
+  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+  const [diagEvents, setDiagEvents] = useState<WebRTCDiagEvent[]>([]);
 
   const localStreamRef = useRef<MediaStream | null>(null);
   const pcsRef = useRef<Record<string, RTCPeerConnection>>({});
@@ -51,11 +84,20 @@ export function useWebRTCCall({ callId, enabled, groupId, recordingEnabled }: Us
   const startedRef = useRef(false);
   const iceServersRef = useRef<RTCIceServer[]>(FALLBACK_ICE);
   const usedRelayRef = useRef<Set<string>>(new Set());
+  const retryCountRef = useRef<Record<string, number>>({});
+  const retryTimersRef = useRef<Record<string, number>>({});
   const recorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
   const recordStartRef = useRef<number>(0);
   const mixedStreamRef = useRef<MediaStream | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
+
+  const logDiag = useCallback((ev: Omit<WebRTCDiagEvent, "ts">) => {
+    setDiagEvents((prev) => {
+      const next = [...prev, { ts: Date.now(), ...ev }];
+      return next.length > 150 ? next.slice(-150) : next;
+    });
+  }, []);
 
   const updatePeer = useCallback((id: string, patch: Partial<RemotePeer>) => {
     setPeers((prev) => ({
@@ -75,7 +117,15 @@ export function useWebRTCCall({ callId, enabled, groupId, recordingEnabled }: Us
       pc.close();
       delete pcsRef.current[id];
     }
+    const t = retryTimersRef.current[id];
+    if (t) {
+      window.clearTimeout(t);
+      delete retryTimersRef.current[id];
+    }
   }, []);
+
+  // Forward decls via refs (mutual recursion: createPeerConnection -> scheduleRetry -> rebuildPeer -> createPeerConnection)
+  const scheduleRetryRef = useRef<(peerId: string, reason: string) => void>(() => {});
 
   const createPeerConnection = useCallback(
     (peerId: string): RTCPeerConnection => {
@@ -95,18 +145,21 @@ export function useWebRTCCall({ callId, enabled, groupId, recordingEnabled }: Us
             event: "ice",
             payload: { from: myId, to: peerId, candidate: ev.candidate.toJSON() },
           });
+          logDiag({ peer: peerId, type: "ice", detail: ev.candidate.type ?? "candidate" });
         }
       };
 
       pc.ontrack = (ev) => {
         const [stream] = ev.streams;
         updatePeer(peerId, { stream });
-        // If a recording is active, plug the new remote stream into the mix.
+        logDiag({ peer: peerId, type: "info", detail: `track ${ev.track.kind}` });
         if (audioCtxRef.current && mixedStreamRef.current) {
           try {
             const ctx = audioCtxRef.current;
             const src = ctx.createMediaStreamSource(stream);
-            const dest = (mixedStreamRef.current as MediaStream & { _dest?: MediaStreamAudioDestinationNode })._dest;
+            const dest = (mixedStreamRef.current as MediaStream & {
+              _dest?: MediaStreamAudioDestinationNode;
+            })._dest;
             if (dest) src.connect(dest);
           } catch (e) {
             console.warn("mix remote stream failed", e);
@@ -114,30 +167,130 @@ export function useWebRTCCall({ callId, enabled, groupId, recordingEnabled }: Us
         }
       };
 
+      pc.oniceconnectionstatechange = () => {
+        updatePeer(peerId, { iceConnectionState: pc.iceConnectionState });
+        logDiag({ peer: peerId, type: "ice-state", detail: pc.iceConnectionState });
+        if (pc.iceConnectionState === "failed") {
+          scheduleRetryRef.current(peerId, "ice-failed");
+        }
+      };
+      pc.onsignalingstatechange = () => {
+        updatePeer(peerId, { signalingState: pc.signalingState });
+        logDiag({ peer: peerId, type: "signaling", detail: pc.signalingState });
+      };
+
       pc.onconnectionstatechange = () => {
         updatePeer(peerId, { connectionState: pc.connectionState });
+        logDiag({ peer: peerId, type: "conn-state", detail: pc.connectionState });
         if (pc.connectionState === "failed") {
-          // Retry once with TURN-only if available and not yet tried.
-          if (turnAvailable && !usedRelayRef.current.has(peerId)) {
-            usedRelayRef.current.add(peerId);
-            pc.close();
-            delete pcsRef.current[peerId];
-            // Re-create with relay policy; the smaller id will re-offer on next peer-join cycle.
-            createPeerConnection(peerId);
-            return;
-          }
-          removePeer(peerId);
+          scheduleRetryRef.current(peerId, "conn-failed");
         } else if (pc.connectionState === "closed") {
           removePeer(peerId);
         }
       };
 
       pcsRef.current[peerId] = pc;
-      updatePeer(peerId, { connectionState: pc.connectionState });
+      updatePeer(peerId, {
+        connectionState: pc.connectionState,
+        iceConnectionState: pc.iceConnectionState,
+        signalingState: pc.signalingState,
+        retries: retryCountRef.current[peerId] ?? 0,
+        lastError: null,
+      });
       return pc;
     },
-    [myId, updatePeer, removePeer, turnAvailable],
+    [myId, updatePeer, removePeer, logDiag],
   );
+
+  const rebuildPeer = useCallback(
+    async (peerId: string) => {
+      const old = pcsRef.current[peerId];
+      if (old) {
+        try {
+          old.close();
+        } catch {
+          /* ignore */
+        }
+        delete pcsRef.current[peerId];
+      }
+      if (!myId) return;
+      const pc = createPeerConnection(peerId);
+      if (myId < peerId && channelRef.current) {
+        try {
+          const offer = await pc.createOffer();
+          await pc.setLocalDescription(offer);
+          channelRef.current.send({
+            type: "broadcast",
+            event: "offer",
+            payload: { from: myId, to: peerId, sdp: offer },
+          });
+          logDiag({ peer: peerId, type: "offer", detail: "rebuild" });
+        } catch (e) {
+          logDiag({ peer: peerId, type: "error", detail: (e as Error).message });
+        }
+      }
+    },
+    [createPeerConnection, myId, logDiag],
+  );
+
+  const scheduleRetry = useCallback(
+    (peerId: string, reason: string) => {
+      if (retryTimersRef.current[peerId]) return;
+      const attempt = (retryCountRef.current[peerId] ?? 0) + 1;
+      if (attempt > MAX_RETRIES) {
+        if (turnAvailable && !usedRelayRef.current.has(peerId)) {
+          usedRelayRef.current.add(peerId);
+          retryCountRef.current[peerId] = 0;
+          logDiag({ peer: peerId, type: "retry", detail: "switch to TURN-only" });
+          void rebuildPeer(peerId);
+          return;
+        }
+        updatePeer(peerId, { lastError: `Échec après ${MAX_RETRIES} tentatives (${reason})` });
+        logDiag({ peer: peerId, type: "error", detail: `give up after ${MAX_RETRIES} (${reason})` });
+        removePeer(peerId);
+        return;
+      }
+      retryCountRef.current[peerId] = attempt;
+      const delay = RETRY_DELAYS_MS[attempt - 1] ?? 4000;
+      logDiag({
+        peer: peerId,
+        type: "retry",
+        detail: `attempt ${attempt}/${MAX_RETRIES} in ${delay}ms (${reason})`,
+      });
+      updatePeer(peerId, { retries: attempt });
+      retryTimersRef.current[peerId] = window.setTimeout(async () => {
+        delete retryTimersRef.current[peerId];
+        const pc = pcsRef.current[peerId];
+        if (!pc || !channelRef.current || !myId) return;
+        try {
+          if (myId < peerId) {
+            const offer = await pc.createOffer({ iceRestart: true });
+            await pc.setLocalDescription(offer);
+            channelRef.current.send({
+              type: "broadcast",
+              event: "offer",
+              payload: { from: myId, to: peerId, sdp: offer, restart: true },
+            });
+            logDiag({ peer: peerId, type: "offer", detail: "iceRestart" });
+          } else {
+            channelRef.current.send({
+              type: "broadcast",
+              event: "need-restart",
+              payload: { from: myId, to: peerId },
+            });
+          }
+        } catch (e) {
+          logDiag({ peer: peerId, type: "error", detail: (e as Error).message });
+        }
+      }, delay);
+    },
+    [myId, logDiag, removePeer, updatePeer, turnAvailable, rebuildPeer],
+  );
+
+  // Wire ref so createPeerConnection (created earlier) can call latest scheduleRetry.
+  useEffect(() => {
+    scheduleRetryRef.current = scheduleRetry;
+  }, [scheduleRetry]);
 
   const refreshParticipants = useCallback(async () => {
     if (!callId) return;
@@ -160,23 +313,46 @@ export function useWebRTCCall({ callId, enabled, groupId, recordingEnabled }: Us
     const start = async () => {
       try {
         setStatus("requesting-mic");
-        const stream = await navigator.mediaDevices.getUserMedia({
-          audio: { echoCancellation: true, noiseSuppression: true },
-        });
+        const constraints: MediaStreamConstraints = {
+          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+          video: video
+            ? { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" }
+            : false,
+        };
+        let stream: MediaStream;
+        try {
+          stream = await navigator.mediaDevices.getUserMedia(constraints);
+        } catch (e) {
+          if (video) {
+            logDiag({ type: "info", detail: "video failed, fallback audio-only" });
+            stream = await navigator.mediaDevices.getUserMedia({ audio: constraints.audio });
+          } else {
+            throw e;
+          }
+        }
         if (cancelled) {
           stream.getTracks().forEach((t) => t.stop());
           return;
         }
         localStreamRef.current = stream;
+        setLocalStream(stream);
+        logDiag({
+          type: "info",
+          detail: `local stream ready (${stream.getTracks().map((t) => t.kind).join("+")})`,
+        });
 
         setStatus("connecting");
-        // Fetch ICE servers (STUN-only or STUN+TURN if Twilio is configured)
         try {
           const ice = await fetchIceServers();
           iceServersRef.current = ice.iceServers.length ? ice.iceServers : FALLBACK_ICE;
           setTurnAvailable(ice.turn);
+          logDiag({
+            type: "info",
+            detail: `ICE servers: ${ice.iceServers.length} (TURN=${ice.turn})`,
+          });
         } catch {
           iceServersRef.current = FALLBACK_ICE;
+          logDiag({ type: "error", detail: "fetchIceServers failed, fallback STUN" });
         }
         await joinCall(callId);
         await refreshParticipants();
@@ -190,7 +366,7 @@ export function useWebRTCCall({ callId, enabled, groupId, recordingEnabled }: Us
           .on("broadcast", { event: "peer-join" }, async ({ payload }) => {
             const fromId: string = payload.user_id;
             if (!fromId || fromId === myId) return;
-            // Smaller id creates the offer to avoid glare
+            logDiag({ peer: fromId, type: "info", detail: "peer-join" });
             if (myId < fromId) {
               const pc = createPeerConnection(fromId);
               const offer = await pc.createOffer();
@@ -200,6 +376,7 @@ export function useWebRTCCall({ callId, enabled, groupId, recordingEnabled }: Us
                 event: "offer",
                 payload: { from: myId, to: fromId, sdp: offer },
               });
+              logDiag({ peer: fromId, type: "offer", detail: "initial" });
             }
           })
           .on("broadcast", { event: "offer" }, async ({ payload }) => {
@@ -214,12 +391,18 @@ export function useWebRTCCall({ callId, enabled, groupId, recordingEnabled }: Us
               event: "answer",
               payload: { from: myId, to: fromId, sdp: answer },
             });
+            logDiag({
+              peer: fromId,
+              type: "answer",
+              detail: payload.restart ? "iceRestart" : "initial",
+            });
           })
           .on("broadcast", { event: "answer" }, async ({ payload }) => {
             if (payload.to !== myId) return;
             const pc = pcsRef.current[payload.from];
-            if (pc && !pc.currentRemoteDescription) {
+            if (pc) {
               await pc.setRemoteDescription(new RTCSessionDescription(payload.sdp));
+              logDiag({ peer: payload.from, type: "info", detail: "remote answer set" });
             }
           })
           .on("broadcast", { event: "ice" }, async ({ payload }) => {
@@ -230,11 +413,35 @@ export function useWebRTCCall({ callId, enabled, groupId, recordingEnabled }: Us
                 await pc.addIceCandidate(new RTCIceCandidate(payload.candidate));
               } catch (e) {
                 console.warn("addIceCandidate failed", e);
+                logDiag({
+                  peer: payload.from,
+                  type: "error",
+                  detail: `addIceCandidate: ${(e as Error).message}`,
+                });
               }
+            }
+          })
+          .on("broadcast", { event: "need-restart" }, async ({ payload }) => {
+            if (payload.to !== myId) return;
+            const fromId = payload.from as string;
+            const pc = pcsRef.current[fromId];
+            if (!pc) return;
+            try {
+              const offer = await pc.createOffer({ iceRestart: true });
+              await pc.setLocalDescription(offer);
+              channel.send({
+                type: "broadcast",
+                event: "offer",
+                payload: { from: myId, to: fromId, sdp: offer, restart: true },
+              });
+              logDiag({ peer: fromId, type: "offer", detail: "iceRestart (asked)" });
+            } catch (e) {
+              logDiag({ peer: fromId, type: "error", detail: (e as Error).message });
             }
           })
           .on("broadcast", { event: "peer-leave" }, ({ payload }) => {
             removePeer(payload.user_id);
+            logDiag({ peer: payload.user_id, type: "info", detail: "peer-leave" });
           })
           .subscribe(async (state) => {
             if (state === "SUBSCRIBED") {
@@ -244,17 +451,23 @@ export function useWebRTCCall({ callId, enabled, groupId, recordingEnabled }: Us
                 payload: { user_id: myId },
               });
               setStatus("live");
+              logDiag({ type: "info", detail: "signaling channel subscribed" });
             }
           });
       } catch (e) {
         if (cancelled) return;
         const err = e as Error;
         console.error("call start failed", err);
-        setError(
+        const friendly =
           err.name === "NotAllowedError" || err.name === "SecurityError"
-            ? "Autorisez l'accès au micro pour rejoindre l'appel."
-            : err.message || "Connexion à l'appel impossible.",
-        );
+            ? "Autorisez l'accès au micro et à la caméra pour rejoindre l'appel."
+            : err.name === "NotFoundError"
+              ? "Aucun micro ou caméra détecté."
+              : err.name === "NotReadableError"
+                ? "Le micro/caméra est déjà utilisé par une autre application."
+                : err.message || "Connexion à l'appel impossible.";
+        setError(friendly);
+        logDiag({ type: "error", detail: `start: ${err.name}: ${err.message}` });
         setStatus("error");
       }
     };
@@ -264,9 +477,8 @@ export function useWebRTCCall({ callId, enabled, groupId, recordingEnabled }: Us
     return () => {
       cancelled = true;
     };
-  }, [enabled, callId, myId, createPeerConnection, removePeer, refreshParticipants]);
+  }, [enabled, callId, myId, createPeerConnection, removePeer, refreshParticipants, video, logDiag]);
 
-  // Subscribe to participants table changes
   useEffect(() => {
     if (!enabled || !callId) return;
     const ch = subscribeCallParticipants(callId, () => {
@@ -290,11 +502,15 @@ export function useWebRTCCall({ callId, enabled, groupId, recordingEnabled }: Us
     } catch {
       /* ignore */
     }
+    Object.values(retryTimersRef.current).forEach((t) => window.clearTimeout(t));
+    retryTimersRef.current = {};
+    retryCountRef.current = {};
     Object.values(pcsRef.current).forEach((pc) => pc.close());
     pcsRef.current = {};
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach((t) => t.stop());
       localStreamRef.current = null;
+      setLocalStream(null);
     }
     if (channelRef.current) {
       try {
@@ -316,7 +532,6 @@ export function useWebRTCCall({ callId, enabled, groupId, recordingEnabled }: Us
     }
   }, [callId, myId]);
 
-  // Unmount cleanup
   useEffect(() => {
     return () => {
       if (startedRef.current) {
@@ -340,6 +555,13 @@ export function useWebRTCCall({ callId, enabled, groupId, recordingEnabled }: Us
     }
   }, [isMuted, callId]);
 
+  const toggleCam = useCallback(() => {
+    const next = !isCamOff;
+    setCamOff(next);
+    const stream = localStreamRef.current;
+    if (stream) stream.getVideoTracks().forEach((t) => (t.enabled = !next));
+  }, [isCamOff]);
+
   const startRecording = useCallback(async () => {
     if (recorderRef.current) return;
     const local = localStreamRef.current;
@@ -349,7 +571,9 @@ export function useWebRTCCall({ callId, enabled, groupId, recordingEnabled }: Us
     }
     const ctx = new AudioContext();
     const dest = ctx.createMediaStreamDestination();
-    ctx.createMediaStreamSource(local).connect(dest);
+    if (local.getAudioTracks().length > 0) {
+      ctx.createMediaStreamSource(new MediaStream(local.getAudioTracks())).connect(dest);
+    }
     Object.values(peers).forEach((p) => {
       if (p.stream) ctx.createMediaStreamSource(p.stream).connect(dest);
     });
@@ -383,12 +607,15 @@ export function useWebRTCCall({ callId, enabled, groupId, recordingEnabled }: Us
         recordedChunksRef.current = [];
         recorderRef.current = null;
         if (audioCtxRef.current) {
-          try { await audioCtxRef.current.close(); } catch { /* ignore */ }
+          try {
+            await audioCtxRef.current.close();
+          } catch {
+            /* ignore */
+          }
           audioCtxRef.current = null;
         }
         mixedStreamRef.current = null;
         setIsRecording(false);
-        // Upload if we have a groupId/callId
         if (groupId && callId && blob.size > 0) {
           try {
             const { signedUrl } = await uploadCallRecording(groupId, callId, blob);
@@ -403,17 +630,19 @@ export function useWebRTCCall({ callId, enabled, groupId, recordingEnabled }: Us
     });
   }, [groupId, callId]);
 
-  // Auto-start recording if requested when call goes live
   useEffect(() => {
     if (status === "live" && recordingEnabled && !recorderRef.current) {
       void startRecording().catch((e) => console.warn("auto-record", e));
     }
   }, [status, recordingEnabled, startRecording]);
 
-  // Stop recording before leaving
   const leaveWithStop = useCallback(async () => {
     if (recorderRef.current) {
-      try { await stopRecording(); } catch { /* ignore */ }
+      try {
+        await stopRecording();
+      } catch {
+        /* ignore */
+      }
     }
     await leave();
   }, [leave, stopRecording]);
@@ -425,10 +654,14 @@ export function useWebRTCCall({ callId, enabled, groupId, recordingEnabled }: Us
     peers,
     isMuted,
     toggleMute,
+    isCamOff,
+    toggleCam,
     leave: leaveWithStop,
     isRecording,
     startRecording,
     stopRecording,
     turnAvailable,
+    localStream,
+    diagEvents,
   };
 }
