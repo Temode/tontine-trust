@@ -9,6 +9,7 @@ export interface IncomingCall {
   topic: string | null;
   requested_by: string;
   requester_name: string;
+  requester_avatar: string | null;
   created_at: string;
 }
 
@@ -87,7 +88,7 @@ export function useIncomingCalls(): {
         supabase.from("groups").select("name").eq("id", row.group_id).maybeSingle(),
         supabase
           .from("profiles")
-          .select("full_name")
+          .select("full_name, avatar_url")
           .eq("id", row.requested_by)
           .maybeSingle(),
       ]);
@@ -99,6 +100,7 @@ export function useIncomingCalls(): {
         topic: row.topic,
         requested_by: row.requested_by,
         requester_name: profile?.full_name ?? "Un membre",
+        requester_avatar: (profile?.avatar_url as string | null) ?? null,
         created_at: row.created_at,
       });
     };

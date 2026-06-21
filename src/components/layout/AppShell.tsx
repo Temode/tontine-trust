@@ -4,9 +4,10 @@ import { BottomNav } from "./BottomNav";
 import { DesktopSidebar } from "./DesktopSidebar";
 import { useNotificationsRealtime } from "@/hooks/useNotifications";
 import { useChatToasts } from "@/hooks/useChatToasts";
-import { IncomingCallSheet } from "@/components/messages/IncomingCallSheet";
+import { IncomingCallScreen } from "@/components/messages/IncomingCallScreen";
 import { CallDiagnosticPanel } from "@/components/messages/CallDiagnosticPanel";
 import { IncomingCallsProvider } from "@/hooks/IncomingCallsContext";
+import { usePrimeCallChannel } from "@/hooks/usePrimeCallChannel";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { GuidedTourProvider } from "@/components/tour/GuidedTour";
 import { QuickActionsProvider } from "@/components/quick-actions/QuickActionsProvider";
@@ -22,6 +23,7 @@ function RouteFallback() {
 export function AppShell({ children }: { children: ReactNode }) {
   useNotificationsRealtime();
   useChatToasts();
+  usePrimeCallChannel();
   const location = useLocation();
   return (
     <GuidedTourProvider>
@@ -40,7 +42,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             </main>
           </div>
           <BottomNav />
-          <IncomingCallSheet />
+          <IncomingCallScreen />
           <CallDiagnosticPanel />
         </div>
         </IncomingCallsProvider>
