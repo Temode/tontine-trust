@@ -64,6 +64,14 @@ Deno.serve(async (req) => {
     return json({ error: "body_invalid" }, 400);
   }
 
-  const result = await sendMessage({ to: recipients, body, senderName });
+  const result = await sendMessage({
+    to: recipients,
+    body,
+    senderName,
+    logContext: {
+      kind: "manual_admin_test",
+      triggeredBy: userRes.user.id,
+    },
+  });
   return json(result, result.success ? 200 : 502);
 });
