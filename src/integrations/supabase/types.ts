@@ -4948,6 +4948,9 @@ export type Database = {
         | "defaulter_report_resolved"
         | "dispute_raised"
         | "dispute_resolved"
+        | "payment_pause_request_created"
+        | "payment_pause_request_approved"
+        | "payment_pause_request_rejected"
       payment_method_external:
         | "cash"
         | "bank_transfer"
@@ -5211,6 +5214,9 @@ export const Constants = {
         "defaulter_report_resolved",
         "dispute_raised",
         "dispute_resolved",
+        "payment_pause_request_created",
+        "payment_pause_request_approved",
+        "payment_pause_request_rejected",
       ],
       payment_method_external: [
         "cash",
