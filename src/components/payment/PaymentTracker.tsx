@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, Loader2, AlertCircle, X, Clock } from "lucide-react";
+import { Check, Loader2, AlertCircle, X, Clock, Receipt, ArrowRight } from "lucide-react";
+import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 
@@ -116,6 +117,22 @@ export function PaymentTracker({ paymentId, compact = false }: { paymentId: stri
         <p className="mt-2 text-[11px] text-muted-foreground">
           Mise à jour automatique dès réception de la confirmation Djomy.
         </p>
+      )}
+      {q.data.status === "succeeded" && !compact && (
+        <div className="mt-3 flex flex-wrap gap-2 border-t border-hairline pt-3">
+          <Link
+            to={`/paiement/${paymentId}/recu`}
+            className="inline-flex h-10 items-center gap-1.5 rounded-md bg-primary px-3 text-xs font-semibold text-primary-foreground transition hover:bg-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+          >
+            <Receipt className="h-3.5 w-3.5" /> Voir le reçu <ArrowRight className="h-3.5 w-3.5" />
+          </Link>
+          <Link
+            to="/recus"
+            className="inline-flex h-10 items-center gap-1.5 rounded-md border border-hairline px-3 text-xs font-medium text-foreground transition hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+          >
+            Tous mes reçus
+          </Link>
+        </div>
       )}
     </div>
   );
