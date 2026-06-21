@@ -381,6 +381,13 @@ export type Database = {
             foreignKeyName: "external_payment_proofs_contribution_id_fkey"
             columns: ["contribution_id"]
             isOneToOne: false
+            referencedRelation: "group_defaulters"
+            referencedColumns: ["contribution_id"]
+          },
+          {
+            foreignKeyName: "external_payment_proofs_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
             referencedRelation: "group_payments_history"
             referencedColumns: ["contribution_id"]
           },
@@ -1192,6 +1199,13 @@ export type Database = {
             foreignKeyName: "ledger_entries_contribution_id_fkey"
             columns: ["contribution_id"]
             isOneToOne: false
+            referencedRelation: "group_defaulters"
+            referencedColumns: ["contribution_id"]
+          },
+          {
+            foreignKeyName: "ledger_entries_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
             referencedRelation: "group_payments_history"
             referencedColumns: ["contribution_id"]
           },
@@ -1407,6 +1421,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "contributions"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_default_reports_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
+            referencedRelation: "group_defaulters"
+            referencedColumns: ["contribution_id"]
           },
           {
             foreignKeyName: "member_default_reports_contribution_id_fkey"
@@ -1702,6 +1723,13 @@ export type Database = {
             foreignKeyName: "payment_links_contribution_id_fkey"
             columns: ["contribution_id"]
             isOneToOne: false
+            referencedRelation: "group_defaulters"
+            referencedColumns: ["contribution_id"]
+          },
+          {
+            foreignKeyName: "payment_links_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
             referencedRelation: "group_payments_history"
             referencedColumns: ["contribution_id"]
           },
@@ -1814,6 +1842,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "contributions"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
+            referencedRelation: "group_defaulters"
+            referencedColumns: ["contribution_id"]
           },
           {
             foreignKeyName: "payments_contribution_id_fkey"
@@ -2104,6 +2139,13 @@ export type Database = {
             foreignKeyName: "reminder_log_contribution_id_fkey"
             columns: ["contribution_id"]
             isOneToOne: false
+            referencedRelation: "group_defaulters"
+            referencedColumns: ["contribution_id"]
+          },
+          {
+            foreignKeyName: "reminder_log_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
             referencedRelation: "group_payments_history"
             referencedColumns: ["contribution_id"]
           },
@@ -2281,6 +2323,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "contributions"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tontine_alerts_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
+            referencedRelation: "group_defaulters"
+            referencedColumns: ["contribution_id"]
           },
           {
             foreignKeyName: "tontine_alerts_contribution_id_fkey"
@@ -3046,6 +3095,72 @@ export type Database = {
           },
         ]
       }
+      group_defaulters: {
+        Row: {
+          amount: number | null
+          contribution_id: string | null
+          default_days: number | null
+          defaulted_at: string | null
+          due_date: string | null
+          group_id: string | null
+          has_open_report: boolean | null
+          payer_name: string | null
+          payer_user_id: string | null
+          turn_id: string | null
+          turn_number: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contributions_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "admin_group_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contributions_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contributions_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "my_groups_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contributions_turn_id_fkey"
+            columns: ["turn_id"]
+            isOneToOne: false
+            referencedRelation: "next_turn_per_group"
+            referencedColumns: ["turn_id"]
+          },
+          {
+            foreignKeyName: "contributions_turn_id_fkey"
+            columns: ["turn_id"]
+            isOneToOne: false
+            referencedRelation: "turn_assignment_audit"
+            referencedColumns: ["turn_id"]
+          },
+          {
+            foreignKeyName: "contributions_turn_id_fkey"
+            columns: ["turn_id"]
+            isOneToOne: false
+            referencedRelation: "turn_settlement"
+            referencedColumns: ["turn_id"]
+          },
+          {
+            foreignKeyName: "contributions_turn_id_fkey"
+            columns: ["turn_id"]
+            isOneToOne: false
+            referencedRelation: "turns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       group_ledger_view: {
         Row: {
           amount: number | null
@@ -3359,6 +3474,8 @@ export type Database = {
           beneficiary_user_id: string | null
           contribution_id: string | null
           days_to_due: number | null
+          default_days: number | null
+          defaulted_at: string | null
           due_date: string | null
           expected_penalty: number | null
           group_id: string | null
@@ -3592,6 +3709,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "contributions"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
+            referencedRelation: "group_defaulters"
+            referencedColumns: ["contribution_id"]
           },
           {
             foreignKeyName: "payments_contribution_id_fkey"
@@ -4347,6 +4471,7 @@ export type Database = {
         Returns: string
       }
       mark_all_notifications_read: { Args: never; Returns: number }
+      mark_defaulted_contributions: { Args: never; Returns: number }
       mark_notification_read: { Args: { _id: string }; Returns: undefined }
       mask_phone: { Args: { _phone: string }; Returns: string }
       member_can: {
@@ -4418,6 +4543,10 @@ export type Database = {
           _provider?: Database["public"]["Enums"]["payment_provider"]
           _turn_id: string
         }
+        Returns: string
+      }
+      report_defaulter: {
+        Args: { _contribution_id: string; _reason?: string }
         Returns: string
       }
       request_group_deletion: {
@@ -4505,6 +4634,15 @@ export type Database = {
       }
       transfer_ownership: {
         Args: { _group_id: string; _new_owner_user_id: string }
+        Returns: undefined
+      }
+      update_defaulter_report: {
+        Args: {
+          _internal_notes?: string
+          _report_id: string
+          _resolution_note?: string
+          _status?: string
+        }
         Returns: undefined
       }
       update_group_settings: {
