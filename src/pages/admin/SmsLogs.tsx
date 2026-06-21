@@ -3,7 +3,8 @@ import { useQuery } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
 import { fr } from "date-fns/locale";
 import { listSmsLogs, type SmsLog } from "@/lib/api/smsLogs";
-import { Search, RefreshCw } from "lucide-react";
+import { Search, RefreshCw, ExternalLink, User } from "lucide-react";
+import { Link } from "react-router-dom";
 
 const STATUS_TONE: Record<SmsLog["status"], string> = {
   sent: "border-emerald-500/30 bg-emerald-500/10 text-emerald-300",
@@ -100,6 +101,7 @@ export default function AdminSmsLogs() {
                 <th className="text-left px-4 py-2">Statut</th>
                 <th className="text-left px-4 py-2">Type</th>
                 <th className="text-left px-4 py-2">Destinataire</th>
+                <th className="text-left px-4 py-2">Contexte</th>
                 <th className="text-left px-4 py-2">Message</th>
                 <th className="text-left px-4 py-2">Erreur</th>
               </tr>
@@ -107,7 +109,7 @@ export default function AdminSmsLogs() {
             <tbody>
               {data.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-slate-500">
+                  <td colSpan={7} className="px-4 py-8 text-center text-slate-500">
                     Aucune entrée pour ces filtres.
                   </td>
                 </tr>
@@ -127,6 +129,30 @@ export default function AdminSmsLogs() {
                   <td className="px-4 py-3 text-slate-300 whitespace-nowrap">{row.kind}</td>
                   <td className="px-4 py-3 font-mono text-slate-200 whitespace-nowrap">
                     {row.recipient_normalized ?? row.recipient}
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap space-y-1">
+                    {row.group ? (
+                      <Link
+                        to={`/groupes/${row.group.id}`}
+                        className="inline-flex items-center gap-1 text-amber-300 hover:text-amber-200 text-xs"
+                      >
+                        <ExternalLink className="h-3 w-3" />
+                        {row.group.name}
+                      </Link>
+                    ) : (
+                      <span className="text-slate-600 text-xs">—</span>
+                    )}
+                    {row.user_id && (
+                      <div>
+                        <Link
+                          to={`/admin/utilisateurs?focus=${row.user_id}`}
+                          className="inline-flex items-center gap-1 text-slate-300 hover:text-white text-xs"
+                        >
+                          <User className="h-3 w-3" />
+                          {row.profile?.full_name ?? row.user_id.slice(0, 8)}
+                        </Link>
+                      </div>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-slate-300 max-w-md">
                     <span className="line-clamp-2">{row.body}</span>
