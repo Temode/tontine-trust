@@ -414,6 +414,23 @@ export function CallRoom({ open, onOpenChange, callId, groupName, groupId, initi
           </button>
           <button
             type="button"
+            onClick={() => {
+              void toggleScreenShare().catch((e: Error) => {
+                toast.error("Partage d'écran impossible", { description: e.message });
+              });
+            }}
+            disabled={status !== "live"}
+            className={cn(
+              "inline-flex h-12 w-12 items-center justify-center rounded-full border border-hairline transition hover:bg-secondary disabled:opacity-50",
+              isScreenSharing && "border-primary/40 bg-primary/10 text-primary",
+            )}
+            aria-label={isScreenSharing ? "Arrêter le partage d'écran" : "Partager mon écran"}
+            title={isScreenSharing ? "Arrêter le partage" : "Partager mon écran"}
+          >
+            {isScreenSharing ? <MonitorX className="h-5 w-5" /> : <MonitorUp className="h-5 w-5" />}
+          </button>
+          <button
+            type="button"
             onClick={requestRecording}
             disabled={status !== "live"}
             className={cn(
