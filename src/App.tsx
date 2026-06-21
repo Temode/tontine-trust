@@ -40,6 +40,7 @@ const AdminGroups = lazy(() => import("@/pages/admin/Groups"));
 const AdminPayments = lazy(() => import("@/pages/admin/Payments"));
 const AdminAudit = lazy(() => import("@/pages/admin/Audit"));
 const AdminIntegrity = lazy(() => import("@/pages/admin/Integrity"));
+const AdminDjomySettings = lazy(() => import("@/pages/admin/DjomySettings"));
 import { AdminShell } from "@/components/admin/AdminShell";
 
 const queryClient = new QueryClient({
@@ -143,6 +144,7 @@ const App = () => (
                     <Route path="/admin/paiements" element={<RouteBoundary name="Admin paiements"><AdminPayments /></RouteBoundary>} />
                     <Route path="/admin/audit" element={<RouteBoundary name="Admin audit"><AdminAudit /></RouteBoundary>} />
                     <Route path="/admin/integrite" element={<RouteBoundary name="Intégrité tontine"><AdminIntegrity /></RouteBoundary>} />
+                    <Route path="/admin/djomy" element={<RouteBoundary name="Identifiants Djomy"><AdminDjomySettings /></RouteBoundary>} />
                   </Route>
                 </Route>
                 <Route path="*" element={<RouteBoundary name="Page introuvable"><NotFound /></RouteBoundary>} />
