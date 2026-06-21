@@ -17,6 +17,7 @@ import { ApplicationsList } from "@/components/join-group/ApplicationsList";
 import { useQueryClient } from "@tanstack/react-query";
 import type { TontineGroup } from "@/lib/types";
 import { toast } from "sonner";
+import { useQuickActions } from "@/components/quick-actions/QuickActionsProvider";
 
 const STATUS_DEFAULT_DIRS: Record<SortKey, SortDir> = {
   name: "asc",
@@ -89,6 +90,7 @@ function toCsv(groups: TontineGroup[]): string {
 
 export default function MyGroups() {
   const navigate = useNavigate();
+  const { openCreate } = useQuickActions();
 
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<GroupsFilter>("all");
@@ -222,7 +224,7 @@ export default function MyGroups() {
         subtitle="Suivi consolidé de votre portefeuille de tontines."
         primaryAction={{
           label: "Créer un groupe",
-          onClick: () => navigate("/nouveau"),
+          onClick: openCreate,
           icon: <Plus className="h-4 w-4" />,
         }}
       />
