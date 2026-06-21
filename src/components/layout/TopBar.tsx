@@ -1,9 +1,10 @@
-import { LogOut, Plus, Search } from "lucide-react";
+import { HelpCircle, LogOut, Plus, Search } from "lucide-react";
 import type { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
+import { useTour } from "@/components/tour/useTour";
 
 interface TopBarProps {
   title: string;
@@ -20,6 +21,7 @@ export function TopBar({
 }: TopBarProps) {
   const { user, roles, signOut } = useAuth();
   const navigate = useNavigate();
+  const { start: startTour } = useTour();
   // Priorité : super_admin > admin > organisateur > participant
   const ROLE_PRIORITY = ["super_admin", "admin", "organisateur", "participant"] as const;
   const primaryRole =
@@ -52,6 +54,16 @@ export function TopBar({
           </div>
 
           <NotificationBell />
+
+          <button
+            type="button"
+            onClick={startTour}
+            aria-label="Revoir la visite guidée"
+            title="Revoir la visite guidée"
+            className="hidden h-10 w-10 items-center justify-center rounded-lg border border-hairline bg-card text-muted-foreground transition hover:text-foreground sm:flex"
+          >
+            <HelpCircle className="h-[18px] w-[18px]" />
+          </button>
 
           {primaryAction && (
             <button
