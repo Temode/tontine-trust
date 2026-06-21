@@ -1,5 +1,15 @@
 import { supabase } from "@/integrations/supabase/client";
 
+export interface DefaultReportAuditEntry {
+  id: string;
+  action: string;
+  actor_user_id: string | null;
+  actor_name: string | null;
+  actor_role: string | null;
+  metadata: Record<string, unknown> | null;
+  created_at: string;
+}
+
 export interface GroupDefaulterRow {
   contribution_id: string;
   group_id: string;
@@ -125,4 +135,21 @@ export async function canUserReportDefaulter(groupId: string, userId: string) {
     .maybeSingle();
   if (error) return false;
   return !!data?.can_report_defaulter;
+}
+
+export async function getDefaultReportAudit(reportId: string): Promise<DefaultReportAuditEntry[]> {
+  const { data, error } = await supabase.rpc("get_default_report_audit", { _report_id: reportId });
+  if (error) throw error;
+  return (data ?? []) as DefaultReportAuditEntry[];
+}
+
+export async function addReportInternalNote(reportId: string, note: string) {
+  const { error } = await supabase.rpc("update_defaulter_report", {
+    _report_id: reportId,
+    _status: null,
+    _internal_notes: note,
+    _resolution_note: null,
+    _note_only: true,
+  });
+  if (error) throw error;
 }

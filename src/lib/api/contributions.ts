@@ -15,6 +15,8 @@ export interface DbContributionDue {
   expected_penalty: number;
   default_days?: number | null;
   defaulted_at?: string | null;
+  late_penalty_percent?: number | null;
+  late_penalty_after_days?: number | null;
 }
 
 export async function listMyContributionsDue(): Promise<DbContributionDue[]> {
