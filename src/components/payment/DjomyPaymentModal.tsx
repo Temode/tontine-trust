@@ -1,5 +1,5 @@
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { Loader2, ShieldCheck, X, ExternalLink } from "lucide-react";
+import { Loader2, ShieldCheck, X, ExternalLink, ArrowLeft, Calendar, Wallet, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
@@ -14,6 +14,9 @@ interface Props {
   contributionId: string;
   groupName: string;
   amount: number;
+  turnNumber?: number;
+  dueDate?: string;
+  beneficiaryName?: string | null;
 }
 
 const METHODS: Array<{
@@ -28,10 +31,11 @@ const METHODS: Array<{
   { id: "CARD", name: "Carte bancaire (Visa/Mastercard)", short: "CB", swatch: "bg-slate-800", text: "text-white" },
 ];
 
-export function DjomyPaymentModal({ open, onOpenChange, contributionId, groupName, amount }: Props) {
+export function DjomyPaymentModal({ open, onOpenChange, contributionId, groupName, amount, turnNumber, dueDate, beneficiaryName }: Props) {
   const [method, setMethod] = useState<DjomyMethod>("OM");
   const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(false);
+  const [step, setStep] = useState<"form" | "recap">("form");
   const sandbox = (import.meta.env.VITE_DJOMY_ENV ?? "sandbox") === "sandbox";
 
   const { data: profile } = useQuery({ queryKey: ["profile", "me"], queryFn: getMyProfile, enabled: open });
@@ -40,11 +44,20 @@ export function DjomyPaymentModal({ open, onOpenChange, contributionId, groupNam
     if (open) {
       setMethod("OM");
       setLoading(false);
+      setStep("form");
       setPhone(profile?.phone_number ?? "");
     }
   }, [open, profile?.phone_number]);
 
   const phoneOk = method === "CARD" || /\d{8,}/.test(phone.replace(/\D/g, ""));
+
+  const goToRecap = () => {
+    if (!phoneOk) {
+      toast.error("Numéro requis", { description: "Saisissez le numéro Mobile Money du payeur." });
+      return;
+    }
+    setStep("recap");
+  };
 
   const handleConfirm = async () => {
     if (!phoneOk) {
@@ -88,18 +101,20 @@ export function DjomyPaymentModal({ open, onOpenChange, contributionId, groupNam
                 Paiement sécurisé · Djomy {sandbox && <span className="ml-1 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-800">SANDBOX</span>}
               </p>
               <DialogPrimitive.Title className="font-display text-base font-bold text-foreground lg:text-lg">
-                Régler la cotisation
+                {step === "form" ? "Régler la cotisation" : "Confirmer le paiement"}
               </DialogPrimitive.Title>
             </div>
             <DialogPrimitive.Close
               aria-label="Fermer"
-              className="flex h-8 w-8 items-center justify-center rounded-md border border-hairline text-muted-foreground transition hover:text-foreground"
+              className="flex h-10 w-10 items-center justify-center rounded-md border border-hairline text-muted-foreground transition hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
             >
               <X className="h-4 w-4" />
             </DialogPrimitive.Close>
           </div>
 
           <div className="max-h-[calc(92vh-72px)] overflow-y-auto p-5 lg:p-6">
+          {step === "form" ? (
+            <>
             <article className="mb-5 rounded-lg border border-hairline bg-secondary/40 px-5 py-4">
               <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Montant à payer</p>
               <p className="mt-1 font-display text-3xl font-bold text-foreground num">
@@ -123,7 +138,7 @@ export function DjomyPaymentModal({ open, onOpenChange, contributionId, groupNam
                     aria-checked={selected}
                     onClick={() => setMethod(m.id)}
                     className={cn(
-                      "flex w-full items-center gap-3 rounded-lg border-2 px-4 py-3 text-left transition",
+                      "flex w-full min-h-[48px] items-center gap-3 rounded-lg border-2 px-4 py-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2",
                       selected
                         ? "border-primary bg-primary-50/60"
                         : "border-hairline hover:border-muted-foreground/30",
@@ -153,10 +168,11 @@ export function DjomyPaymentModal({ open, onOpenChange, contributionId, groupNam
                   id="djomy-phone"
                   type="tel"
                   inputMode="tel"
+                  autoComplete="tel"
                   placeholder="6XX XX XX XX"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
-                  className="h-11 w-full rounded-lg border border-hairline bg-card px-3 text-sm text-foreground focus:border-primary focus:outline-none"
+                  className="h-11 w-full rounded-lg border border-hairline bg-card px-3 text-sm text-foreground focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                 />
                 <p className="mt-1 text-[11px] text-muted-foreground">
                   Vous recevrez une demande de confirmation sur ce numéro après la redirection.
@@ -171,19 +187,83 @@ export function DjomyPaymentModal({ open, onOpenChange, contributionId, groupNam
 
             <button
               type="button"
-              onClick={handleConfirm}
-              disabled={loading || !phoneOk}
-              className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-primary text-sm font-semibold text-primary-foreground transition hover:bg-primary-700 disabled:opacity-60"
+              onClick={goToRecap}
+              disabled={!phoneOk}
+              className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-primary text-sm font-semibold text-primary-foreground transition hover:bg-primary-700 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
             >
-              {loading ? (
-                <><Loader2 className="h-4 w-4 animate-spin" /> Redirection…</>
-              ) : (
-                <>Continuer vers Djomy <ExternalLink className="h-4 w-4" /></>
-              )}
+              Vérifier le récapitulatif <ExternalLink className="h-4 w-4" />
             </button>
+            </>
+          ) : (
+            <>
+              <article className="mb-5 rounded-lg border border-hairline bg-secondary/40 px-5 py-4 text-center">
+                <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Vous allez payer</p>
+                <p className="mt-1 font-display text-4xl font-bold text-foreground num tabular-nums">
+                  {formatGNF(amount)}
+                  <span className="ml-2 text-base font-medium text-muted-foreground">GNF</span>
+                </p>
+              </article>
+              <dl className="mb-5 divide-y divide-border/60 rounded-lg border border-hairline bg-card">
+                <RecapRow icon={<Users className="h-4 w-4" />} label="Tontine" value={groupName} />
+                {turnNumber !== undefined && (
+                  <RecapRow icon={<Calendar className="h-4 w-4" />} label="Tour" value={`#${turnNumber}`} />
+                )}
+                {dueDate && (
+                  <RecapRow icon={<Calendar className="h-4 w-4" />} label="Échéance" value={new Date(dueDate).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })} />
+                )}
+                {beneficiaryName && (
+                  <RecapRow icon={<Users className="h-4 w-4" />} label="Bénéficiaire" value={beneficiaryName} />
+                )}
+                <RecapRow icon={<Wallet className="h-4 w-4" />} label="Mode" value={METHODS.find((m) => m.id === method)?.name ?? method} />
+                {method !== "CARD" && phone && (
+                  <RecapRow icon={<Wallet className="h-4 w-4" />} label="Numéro" value={phone} />
+                )}
+              </dl>
+              <p className="mb-4 inline-flex items-center gap-2 text-[11px] text-muted-foreground">
+                <ShieldCheck className="h-3.5 w-3.5 text-success" />
+                En confirmant, vous serez redirigé vers Djomy pour valider le paiement.
+              </p>
+              <div className="flex flex-col-reverse gap-2 sm:flex-row sm:gap-3">
+                <button
+                  type="button"
+                  onClick={() => setStep("form")}
+                  disabled={loading}
+                  className="inline-flex h-12 flex-1 items-center justify-center gap-2 rounded-lg border border-hairline bg-card text-sm font-semibold text-foreground transition hover:bg-secondary disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                >
+                  <ArrowLeft className="h-4 w-4" /> Modifier
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirm}
+                  disabled={loading}
+                  className="inline-flex h-12 flex-[1.4] items-center justify-center gap-2 rounded-lg bg-primary text-sm font-semibold text-primary-foreground transition hover:bg-primary-700 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                >
+                  {loading ? (
+                    <><Loader2 className="h-4 w-4 animate-spin" /> Redirection…</>
+                  ) : (
+                    <>Confirmer et payer <ExternalLink className="h-4 w-4" /></>
+                  )}
+                </button>
+              </div>
+            </>
+          )}
           </div>
         </DialogPrimitive.Content>
       </DialogPrimitive.Portal>
     </DialogPrimitive.Root>
+  );
+}
+
+function RecapRow({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+  return (
+    <div className="flex items-center gap-3 px-4 py-3">
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary-50 text-primary">
+        {icon}
+      </span>
+      <div className="flex flex-1 items-center justify-between gap-3 min-w-0">
+        <p className="text-[11px] uppercase tracking-wider text-muted-foreground">{label}</p>
+        <p className="truncate text-sm font-semibold text-foreground text-right">{value}</p>
+      </div>
+    </div>
   );
 }
