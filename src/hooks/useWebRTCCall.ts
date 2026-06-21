@@ -2,11 +2,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import {
+  fetchIceServers,
   joinCall,
   leaveCall,
   listCallParticipants,
   setCallMute,
+  setCallRecording,
   subscribeCallParticipants,
+  uploadCallRecording,
   type CallParticipant,
 } from "@/lib/api/calls";
 
@@ -18,7 +21,7 @@ export interface RemotePeer {
   connectionState: RTCPeerConnectionState;
 }
 
-const ICE_SERVERS: RTCIceServer[] = [
+const FALLBACK_ICE: RTCIceServer[] = [
   { urls: "stun:stun.l.google.com:19302" },
   { urls: "stun:stun1.l.google.com:19302" },
 ];
@@ -26,9 +29,11 @@ const ICE_SERVERS: RTCIceServer[] = [
 interface UseWebRTCCallOpts {
   callId: string | null;
   enabled: boolean;
+  groupId?: string;
+  recordingEnabled?: boolean;
 }
 
-export function useWebRTCCall({ callId, enabled }: UseWebRTCCallOpts) {
+export function useWebRTCCall({ callId, enabled, groupId, recordingEnabled }: UseWebRTCCallOpts) {
   const { user } = useAuth();
   const myId = user?.id ?? null;
 
@@ -37,11 +42,20 @@ export function useWebRTCCall({ callId, enabled }: UseWebRTCCallOpts) {
   const [participants, setParticipants] = useState<CallParticipant[]>([]);
   const [peers, setPeers] = useState<Record<string, RemotePeer>>({});
   const [isMuted, setMuted] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [turnAvailable, setTurnAvailable] = useState(false);
 
   const localStreamRef = useRef<MediaStream | null>(null);
   const pcsRef = useRef<Record<string, RTCPeerConnection>>({});
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const startedRef = useRef(false);
+  const iceServersRef = useRef<RTCIceServer[]>(FALLBACK_ICE);
+  const usedRelayRef = useRef<Set<string>>(new Set());
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const recordedChunksRef = useRef<Blob[]>([]);
+  const recordStartRef = useRef<number>(0);
+  const mixedStreamRef = useRef<MediaStream | null>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
 
   const updatePeer = useCallback((id: string, patch: Partial<RemotePeer>) => {
     setPeers((prev) => ({
@@ -65,7 +79,11 @@ export function useWebRTCCall({ callId, enabled }: UseWebRTCCallOpts) {
 
   const createPeerConnection = useCallback(
     (peerId: string): RTCPeerConnection => {
-      const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+      const relay = usedRelayRef.current.has(peerId);
+      const pc = new RTCPeerConnection({
+        iceServers: iceServersRef.current,
+        iceTransportPolicy: relay ? "relay" : "all",
+      });
 
       const local = localStreamRef.current;
       if (local) local.getTracks().forEach((t) => pc.addTrack(t, local));
@@ -87,7 +105,18 @@ export function useWebRTCCall({ callId, enabled }: UseWebRTCCallOpts) {
 
       pc.onconnectionstatechange = () => {
         updatePeer(peerId, { connectionState: pc.connectionState });
-        if (pc.connectionState === "failed" || pc.connectionState === "closed") {
+        if (pc.connectionState === "failed") {
+          // Retry once with TURN-only if available and not yet tried.
+          if (turnAvailable && !usedRelayRef.current.has(peerId)) {
+            usedRelayRef.current.add(peerId);
+            pc.close();
+            delete pcsRef.current[peerId];
+            // Re-create with relay policy; the smaller id will re-offer on next peer-join cycle.
+            createPeerConnection(peerId);
+            return;
+          }
+          removePeer(peerId);
+        } else if (pc.connectionState === "closed") {
           removePeer(peerId);
         }
       };
@@ -96,7 +125,7 @@ export function useWebRTCCall({ callId, enabled }: UseWebRTCCallOpts) {
       updatePeer(peerId, { connectionState: pc.connectionState });
       return pc;
     },
-    [myId, updatePeer, removePeer],
+    [myId, updatePeer, removePeer, turnAvailable],
   );
 
   const refreshParticipants = useCallback(async () => {
@@ -130,6 +159,14 @@ export function useWebRTCCall({ callId, enabled }: UseWebRTCCallOpts) {
         localStreamRef.current = stream;
 
         setStatus("connecting");
+        // Fetch ICE servers (STUN-only or STUN+TURN if Twilio is configured)
+        try {
+          const ice = await fetchIceServers();
+          iceServersRef.current = ice.iceServers.length ? ice.iceServers : FALLBACK_ICE;
+          setTurnAvailable(ice.turn);
+        } catch {
+          iceServersRef.current = FALLBACK_ICE;
+        }
         await joinCall(callId);
         await refreshParticipants();
 
