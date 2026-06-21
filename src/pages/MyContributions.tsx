@@ -1,5 +1,6 @@
-import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useEffect, useMemo, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import {
   ShieldCheck,
@@ -14,6 +15,7 @@ import {
   Clock,
   Receipt,
   AlertOctagon,
+  RefreshCw,
 } from "lucide-react";
 import { TopBar } from "@/components/layout/TopBar";
 import { SectionCard } from "@/components/dashboard/SectionCard";
@@ -32,6 +34,7 @@ import {
 import { listMyPaymentsHistory } from "@/lib/api/payments";
 import { launchDjomyCheckout } from "@/lib/payment/launchDjomyCheckout";
 import { InFlightPaymentsCard } from "@/components/payment/InFlightPaymentsCard";
+import { reconcileDjomyPayments } from "@/hooks/useDjomyPaymentReconciler";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { useAuth } from "@/hooks/useAuth";
 import { PenaltyBreakdown } from "@/components/contribution/PenaltyBreakdown";
