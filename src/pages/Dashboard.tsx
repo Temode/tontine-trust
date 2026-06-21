@@ -5,8 +5,6 @@ import {
   Plus,
   UserPlus,
   Users,
-  Calendar as CalendarIcon,
-  CheckCircle2,
   ArrowRight,
   ShieldCheck,
 } from "lucide-react";
@@ -21,31 +19,6 @@ import { overviewToTontine } from "@/lib/api/types";
 import { listMyNextTurns } from "@/lib/api/turns";
 import { listMyContributionsDue } from "@/lib/api/contributions";
 import { formatGNF } from "@/lib/format";
-
-function KpiTile({
-  icon: Icon,
-  label,
-  value,
-  hint,
-}: {
-  icon: typeof Users;
-  label: string;
-  value: string;
-  hint?: string;
-}) {
-  return (
-    <article className="rounded-xl border border-hairline bg-card p-5 transition hover:border-primary/30">
-      <div className="flex items-center gap-3">
-        <div className="flex h-9 w-9 items-center justify-center rounded-md bg-primary-50 text-primary">
-          <Icon className="h-[16px] w-[16px]" strokeWidth={1.75} />
-        </div>
-        <p className="text-[11px] uppercase tracking-wider text-muted-foreground">{label}</p>
-      </div>
-      <p className="mt-3 font-display text-2xl font-bold text-foreground num">{value}</p>
-      {hint && <p className="mt-1 text-xs text-muted-foreground">{hint}</p>}
-    </article>
-  );
-}
 
 export default function Dashboard() {
   const navigate = useNavigate();
