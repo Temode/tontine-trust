@@ -101,6 +101,17 @@ export function useWebRTCCall({ callId, enabled, groupId, recordingEnabled }: Us
       pc.ontrack = (ev) => {
         const [stream] = ev.streams;
         updatePeer(peerId, { stream });
+        // If a recording is active, plug the new remote stream into the mix.
+        if (audioCtxRef.current && mixedStreamRef.current) {
+          try {
+            const ctx = audioCtxRef.current;
+            const src = ctx.createMediaStreamSource(stream);
+            const dest = (mixedStreamRef.current as MediaStream & { _dest?: MediaStreamAudioDestinationNode })._dest;
+            if (dest) src.connect(dest);
+          } catch (e) {
+            console.warn("mix remote stream failed", e);
+          }
+        }
       };
 
       pc.onconnectionstatechange = () => {
@@ -329,6 +340,84 @@ export function useWebRTCCall({ callId, enabled, groupId, recordingEnabled }: Us
     }
   }, [isMuted, callId]);
 
+  const startRecording = useCallback(async () => {
+    if (recorderRef.current) return;
+    const local = localStreamRef.current;
+    if (!local) throw new Error("Aucun flux local actif.");
+    if (typeof MediaRecorder === "undefined") {
+      throw new Error("Votre navigateur ne supporte pas l'enregistrement.");
+    }
+    const ctx = new AudioContext();
+    const dest = ctx.createMediaStreamDestination();
+    ctx.createMediaStreamSource(local).connect(dest);
+    Object.values(peers).forEach((p) => {
+      if (p.stream) ctx.createMediaStreamSource(p.stream).connect(dest);
+    });
+    audioCtxRef.current = ctx;
+    const mixed = dest.stream as MediaStream & { _dest?: MediaStreamAudioDestinationNode };
+    mixed._dest = dest;
+    mixedStreamRef.current = mixed;
+    const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+      ? "audio/webm;codecs=opus"
+      : MediaRecorder.isTypeSupported("audio/mp4")
+        ? "audio/mp4"
+        : "audio/webm";
+    const rec = new MediaRecorder(mixed, { mimeType });
+    recordedChunksRef.current = [];
+    rec.ondataavailable = (e) => {
+      if (e.data && e.data.size > 0) recordedChunksRef.current.push(e.data);
+    };
+    rec.start(1000);
+    recordStartRef.current = Date.now();
+    recorderRef.current = rec;
+    setIsRecording(true);
+  }, [peers]);
+
+  const stopRecording = useCallback(async (): Promise<Blob | null> => {
+    const rec = recorderRef.current;
+    if (!rec) return null;
+    return new Promise((resolve) => {
+      rec.onstop = async () => {
+        const blob = new Blob(recordedChunksRef.current, { type: rec.mimeType });
+        const duration = Math.round((Date.now() - recordStartRef.current) / 1000);
+        recordedChunksRef.current = [];
+        recorderRef.current = null;
+        if (audioCtxRef.current) {
+          try { await audioCtxRef.current.close(); } catch { /* ignore */ }
+          audioCtxRef.current = null;
+        }
+        mixedStreamRef.current = null;
+        setIsRecording(false);
+        // Upload if we have a groupId/callId
+        if (groupId && callId && blob.size > 0) {
+          try {
+            const { signedUrl } = await uploadCallRecording(groupId, callId, blob);
+            await setCallRecording(callId, signedUrl, blob.size, duration);
+          } catch (e) {
+            console.error("upload recording failed", e);
+          }
+        }
+        resolve(blob);
+      };
+      rec.stop();
+    });
+  }, [groupId, callId]);
+
+  // Auto-start recording if requested when call goes live
+  useEffect(() => {
+    if (status === "live" && recordingEnabled && !recorderRef.current) {
+      void startRecording().catch((e) => console.warn("auto-record", e));
+    }
+  }, [status, recordingEnabled, startRecording]);
+
+  // Stop recording before leaving
+  const leaveWithStop = useCallback(async () => {
+    if (recorderRef.current) {
+      try { await stopRecording(); } catch { /* ignore */ }
+    }
+    await leave();
+  }, [leave, stopRecording]);
+
   return {
     status,
     error,
@@ -336,6 +425,10 @@ export function useWebRTCCall({ callId, enabled, groupId, recordingEnabled }: Us
     peers,
     isMuted,
     toggleMute,
-    leave,
+    leave: leaveWithStop,
+    isRecording,
+    startRecording,
+    stopRecording,
+    turnAvailable,
   };
 }
