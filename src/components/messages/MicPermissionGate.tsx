@@ -410,3 +410,116 @@ export function MicPermissionGate({ onGranted, onCancel, withVideo = true }: Pro
     </div>
   );
 }
+
+function StatusIcon({ status }: { status: CheckStatus }) {
+  if (status === "ok") return <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />;
+  if (status === "warn") return <CircleAlert className="h-3.5 w-3.5 text-amber-500" />;
+  if (status === "fail") return <CircleAlert className="h-3.5 w-3.5 text-destructive" />;
+  return <CircleHelp className="h-3.5 w-3.5 text-muted-foreground" />;
+}
+
+interface ChecklistProps {
+  hasMic: boolean;
+  hasCam: boolean;
+  micLevel: number;
+  screenStatus: CheckStatus;
+  screenDetail: string;
+  onTestScreen: () => Promise<void> | void;
+}
+
+function DiagnosticChecklist({
+  hasMic,
+  hasCam,
+  micLevel,
+  screenStatus,
+  screenDetail,
+  onTestScreen,
+}: ChecklistProps) {
+  const secure =
+    typeof window !== "undefined" &&
+    (window.isSecureContext || location.hostname === "localhost");
+  const hasGUM = typeof navigator !== "undefined" && !!navigator.mediaDevices?.getUserMedia;
+  const hasGDM = typeof navigator !== "undefined" && !!navigator.mediaDevices?.getDisplayMedia;
+  const hasRTC = typeof window !== "undefined" && typeof window.RTCPeerConnection !== "undefined";
+  const mobile = isMobileUA();
+
+  const rows: CheckRow[] = [
+    {
+      label: "Contexte sécurisé (HTTPS)",
+      status: secure ? "ok" : "fail",
+      detail: secure ? "OK" : "L'appel nécessite HTTPS.",
+    },
+    {
+      label: "WebRTC",
+      status: hasRTC ? "ok" : "fail",
+      detail: hasRTC ? "RTCPeerConnection disponible" : "Non supporté par le navigateur.",
+    },
+    {
+      label: "Accès micro (getUserMedia)",
+      status: !hasGUM ? "fail" : hasMic ? "ok" : "pending",
+      detail: hasMic
+        ? micLevel > 0.05
+          ? "Signal détecté"
+          : "Connecté — parlez pour tester le niveau"
+        : hasGUM
+          ? "Cliquez sur Tester"
+          : "Non supporté",
+    },
+    {
+      label: "Caméra",
+      status: hasCam ? "ok" : hasMic ? "warn" : "pending",
+      detail: hasCam ? "Aperçu actif" : "Audio seul possible",
+    },
+    {
+      label: "Partage d'écran (getDisplayMedia)",
+      status: !hasGDM ? (mobile ? "warn" : "fail") : screenStatus,
+      detail: !hasGDM
+        ? mobile
+          ? "Indisponible sur la plupart des mobiles"
+          : "Non supporté"
+        : screenDetail ||
+          (mobile ? "Limité sur mobile — testez si nécessaire" : "Cliquez sur Tester"),
+    },
+    {
+      label: mobile ? "Appareil mobile détecté" : "Appareil desktop détecté",
+      status: "ok",
+      detail: typeof navigator !== "undefined" ? navigator.userAgent.slice(0, 60) : "",
+    },
+  ];
+
+  return (
+    <div className="rounded-lg border border-hairline bg-card/40 p-3 text-xs">
+      <div className="mb-2 flex items-center justify-between">
+        <p className="flex items-center gap-1.5 font-display text-[11px] font-bold uppercase tracking-wider text-foreground">
+          {mobile ? (
+            <Smartphone className="h-3.5 w-3.5 text-primary" />
+          ) : (
+            <MonitorIcon className="h-3.5 w-3.5 text-primary" />
+          )}
+          Checklist diagnostique
+        </p>
+        <button
+          type="button"
+          onClick={() => void onTestScreen()}
+          disabled={!hasGDM}
+          className="rounded-md border border-hairline px-2 py-1 text-[10px] font-semibold text-foreground hover:bg-secondary disabled:opacity-40"
+        >
+          Tester le partage d'écran
+        </button>
+      </div>
+      <ul className="space-y-1.5">
+        {rows.map((r) => (
+          <li key={r.label} className="flex items-start gap-2">
+            <StatusIcon status={r.status} />
+            <div className="min-w-0 flex-1">
+              <p className="font-semibold text-foreground">{r.label}</p>
+              {r.detail && (
+                <p className="truncate text-[10px] text-muted-foreground">{r.detail}</p>
+              )}
+            </div>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
