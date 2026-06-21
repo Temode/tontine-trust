@@ -1,85 +1,81 @@
-## Lot A — Tests RLS E2E (fixture Supabase réaliste)
+## Objectif
 
-**Fixture SQL** `supabase/tests/fixtures/rls-quick-actions.sql` (exécutée via `psql` en début de suite, idempotente : `BEGIN; ... ROLLBACK;` ou cleanup ciblé) qui seed :
+Réécrire `src/pages/MyContributions.tsx` (route `/payer`) pour atteindre le niveau "infrastructure financière" défini dans `docs/DESIGN_DOCTRINE.md` — calme, autorité, clarté, zéro scroll pour l'info critique. Aucun changement de logique métier, de schéma, ou d'API : uniquement présentation, hiérarchie et composition.
 
-- 3 users (organisateur, membre, étranger) via `auth.admin.createUser` côté script.
-- 1 groupe `tontine-rls-test` (monthly, 10 000 GNF, 5 membres).
-- 4 invitations :
-  - `valid-active` — `expires_at = now()+7d`, `uses_remaining = 5`.
-  - `expired` — `expires_at = now()-1d`.
-  - `exhausted` — `uses_remaining = 0`.
-  - `revoked` — `revoked_at = now()`.
-- 3 cotisations dues sur cycle courant (1 due, 1 en retard, 1 payée) pour vérifier `my_contributions_due`.
+## Diagnostic de l'écran actuel
 
-**Suite E2E** `tests/e2e/rls-quick-actions.spec.ts` (Vitest + `@supabase/supabase-js`, clients `anon` par utilisateur et `service_role` pour audit) :
+- Hero bleu/or correct mais générique (trois tuiles équivalentes → aucune action primaire visible).
+- Barre de filtres dense, sans titre, dominée par la recherche — viole la règle "une seule action primaire" et "hiérarchie typo stricte".
+- Trois sections empilées (Récap / À régler / Historique) toutes au même poids visuel → l'utilisateur ne voit pas *quoi payer maintenant*.
+- Ligne de cotisation à régler : CTA "Payer via Djomy" en bas à droite, petit, secondaire visuellement par rapport au montant.
+- `DueCard` existe déjà dans le dashboard avec l'accent latéral d'urgence (pattern de référence de la doctrine) mais n'est pas utilisé ici.
 
-| # | Scénario | Attendu |
-|---|----------|---------|
-| 1 | `consume_invitation('valid-active')` user externe | success, `uses_remaining -= 1` |
-| 2 | Même code après épuisement | erreur `invitation_exhausted` |
-| 3 | `consume_invitation('expired')` | erreur `invitation_expired` |
-| 4 | `consume_invitation('revoked')` | erreur `invitation_revoked` |
-| 5 | Code malformé (`ZZZZ-9999`) | erreur Zod côté client + 400 RPC |
-| 6 | `create_group` montant 999 GNF / 75 000 001 GNF | reject (CHECK + Zod) |
-| 7 | `create_group` fréquence inconnue | reject enum |
-| 8 | `select * from my_contributions_due` user étranger | 0 ligne (RLS) |
-| 9 | Org sélectionne invitations d'un autre groupe | 0 ligne |
+## Direction de redesign (les 4 règles d'or appliquées)
 
-Cleanup : `delete from auth.users where email like '%@rls.test'` en `afterAll` via service role.
+### 1. Hero "Cockpit de paiement" — une seule action primaire
+Refondre le hero en cockpit asymétrique 2/3 + 1/3 :
+- **Colonne gauche (focus)** : libellé `À régler maintenant` (uppercase tracking-wider, opacity 75), montant XXL display bold en `num` + unité GNF séparée, sous-ligne `{n} cotisations · {n} en retard` discrète. CTA primaire **unique** "Payer la plus urgente" (whitespace-nowrap, déclenche `DjomyPaymentModal` sur la prochaine échéance) + lien ghost "Tout voir".
+- **Colonne droite** : mini-timeline verticale des 3 prochaines échéances (date compacte + nom tontine tronqué + montant en `tabular-nums`), rien de cliquable hormis chevron discret.
+- Halo accent or très diffus en arrière-plan (déjà présent), pas de gradient violet. Aucune tuile KPI redondante : les compteurs "En retard / Payées" descendent dans une bande KPI fine sous le hero.
 
-CI : nouveau job `bun test tests/e2e/rls-quick-actions.spec.ts` dans le workflow GitHub Actions existant, conditionné à la présence des secrets `SUPABASE_SERVICE_ROLE_KEY` (sinon `skip`).
+### 2. Bande KPI minimale (pattern doctrine)
+Trois KPI tiles plates inline sous le hero : `Total dû`, `En retard`, `Payées ce cycle`. Icône dans `bg-primary-50`, label uppercase tracking-wider, valeur display bold, hint discret. Pas de fond coloré, juste `border-hairline`.
 
----
+### 3. Filtres dégonflés
+- Les filtres ne dominent plus : barre compacte alignée à droite (`h-9`, `w-64` recherche, deux selects `h-9` étroits), aucun fond `card/80`, juste un séparateur. Titre de section "Cotisations" à gauche.
+- Filtre statut par segmented control (Tous / À régler / Retard / Payées) à la place des selects pour les statuts → plus lisible, une seule décision.
 
-## Lot B — SMS Nimba (inspiré Paxefy)
+### 4. Section "À régler" en cartes DueCard
+Remplacer la liste plate par une grille responsive de `DueCard` (composant déjà utilisé dans le dashboard) :
+- Accent latéral coloré selon urgence (retard = `destructive`, ≤3j = `warning`, sinon `primary`).
+- Montant XL, date relative ("dans 2 jours", "il y a 4 jours"), nom tontine, tour, bénéficiaire.
+- Un seul CTA "Payer maintenant" pleine largeur en bas de carte (whitespace-nowrap).
+- Grille `grid-cols-1 md:grid-cols-2 xl:grid-cols-3`, `gap-4`.
+- Si plus de 6 cartes : pagination "Voir tout (n)" plutôt que scroll infini.
 
-**Pré-requis utilisateur (étape suivante via `add_secret`)** :
-- `NIMBA_SERVICE_ID`
-- `NIMBA_SECRET_TOKEN`
-- `NIMBA_SENDER_NAME` (défaut `Tontine`)
-- `SMS_ENABLED` (optionnel, `false` désactive)
+### 5. Récapitulatif par tontine → repli secondaire
+Le récap par tontine devient une carte unique, repliée par défaut (`<details>` ou Accordion shadcn), titre "Vue par tontine ({n})". Reste accessible mais ne concurrence plus l'action principale.
 
-**Helper partagé** `supabase/functions/_shared/nimbasms.ts` — port direct du module Paxefy (auth Basic, retry 3x sur 420/429/5xx, fire-and-forget `sendMessageBg`, `fmtSms` pour montants GNF). Sender par défaut `Tontine`.
+### 6. Historique
+Garder la liste actuelle (pattern propre) mais :
+- Titre `Historique des paiements` + sous-titre date du dernier paiement.
+- Limite affichée 10 (au lieu de 50) + bouton ghost "Voir tout l'historique" → route `/recus` (déjà existante).
+- Montants en `tabular-nums`, séparateur de groupe en `divide-border/60` (déjà OK).
 
-**Normalisation numéros guinéens** dans `profiles.phone` : helper `normalizeGNPhone(raw)` qui produit `224XXXXXXXXX` (accepte `+224`, `00224`, `6XXXXXXXX`). Utilisé avant chaque envoi.
+### 7. États vides & chargement
+- Skeletons (jamais de spinner) pour hero, KPI, cartes — formes proches du rendu final (carte avec accent latéral fantôme).
+- Empty state "À régler" = composant `EmptyState` avec icône `ShieldCheck`, titre "Vous êtes à jour", description "Aucune cotisation en attente.", CTA secondaire "Voir mes tontines".
 
-**Préférences utilisateur** : étendre `notification_preferences` (migration séparée) avec :
-- `sms_turn_upcoming boolean default true`
-- `sms_contribution_due boolean default true`
-- `sms_payment_received boolean default false`
+## Détails de mise en œuvre (technique)
 
-UI : ajouter une section "SMS" dans le panneau Rappels de `GroupDetail` (toggles par type, badge "Numéro non vérifié" si `profiles.phone` est vide).
+- Fichier touché : **uniquement** `src/pages/MyContributions.tsx`. Aucune modification d'API, de hook, de modèle, ou d'edge function.
+- Réutiliser :
+  - `DueCard` (`src/components/dashboard/DueCard.tsx`) pour les cartes à régler.
+  - `EmptyState` (`src/components/ui/EmptyState.tsx`).
+  - `SectionCard` pour les sections secondaires.
+  - `formatGNF`, `formatRelativeDays` (déjà importés).
+  - Tokens sémantiques existants (`primary`, `accent`, `destructive`, `warning`, `success`, `hairline`, `primary-50`, `primary-700`) — zéro couleur hardcodée.
+- Ajouter un Accordion shadcn si le récap passe en repli (`@/components/ui/accordion`).
+- Segmented control = simple groupe de boutons stylé (pas de nouveau composant), aria-pressed correct.
+- `DjomyPaymentModal` ouvert : 
+  - depuis le CTA hero (= `dues[0]` triée par `due_date asc` puis `days_to_due asc`).
+  - depuis chaque `DueCard`.
+- Vérifier rendu à 1280×800 et 712×800 (cibles doctrine) avec Playwright après implémentation : capture avant/après, contrôle qu'aucun CTA ne wrap, que l'info critique tient au-dessus de la ligne de flottaison.
 
-**Edge functions** :
+## Checklist doctrine avant livraison
 
-1. **`send-tontine-reminders`** (cron horaire — créée pour Lot 3 emails) — branche également l'envoi SMS pour chaque user dont la préférence est ON et le téléphone connu :
-   - J-2 prochain tour → `Tontine: votre tour arrive le {date}. Montant collecté ≈ {fmtSms(amount)} GNF.`
-   - J-1 cotisation due → `Tontine {group}: cotisation de {fmtSms(amount)} GNF due demain. Payez via l'app.`
-2. **`send-payment-confirmation-sms`** (déclenchée par trigger `contributions` ou appelée depuis le webhook Djomy déjà existant) — SMS de confirmation au payeur et à l'organisateur si opt-in.
+- [ ] Une seule action primaire visible (CTA hero "Payer la plus urgente").
+- [ ] Info critique (montant dû + CTA) visible sans scroll à 1280×800 et 712×800.
+- [ ] Tous les CTA sur une ligne, `whitespace-nowrap`.
+- [ ] Montants en `tabular-nums` + `formatGNF` + unité séparée.
+- [ ] Skeletons, pas de spinner.
+- [ ] Empty states via `EmptyState`.
+- [ ] Cluster filtres séparé du CTA principal (`gap-3` minimum).
+- [ ] Aucune couleur hardcodée — tokens uniquement.
+- [ ] Responsive vérifié à 712px.
 
-Toutes les fonctions :
-- CORS standard, `verify_jwt = false` côté config si déclenché par cron / webhook, sinon `true`.
-- Validation Zod du payload.
-- Log dans `reminder_log` (déjà présent) avec `channel = 'sms'`, `provider_message_id`, `cost`.
+## Hors scope
 
-**Tests Deno** `supabase/functions/_shared/nimbasms.test.ts` :
-- credentials manquants → `{ success: false }`.
-- `SMS_ENABLED=false` → court-circuit success.
-- mock fetch 201/420/400 (retry vs no-retry).
-- `fmtSms(1500000) === '1\u00A0500\u00A0000'`.
-
----
-
-## Ordre d'exécution proposé
-
-1. Lot A (fixture + 9 specs E2E + job CI) — autonome, aucune dépendance externe.
-2. Lot B étape 1 : helper `nimbasms.ts` + tests Deno + migration `notification_preferences` + UI préférences SMS.
-3. Lot B étape 2 : intégration dans `send-tontine-reminders` (cron) et `send-payment-confirmation-sms`. Demande des secrets Nimba via `add_secret` juste avant le déploiement.
-
----
-
-## Questions avant de coder
-
-1. **Lot A — env de test** : on cible la base Lovable Cloud actuelle (avec préfixe d'isolation `@rls.test` + cleanup), ou tu préfères que je documente la procédure pour une instance Supabase dédiée aux tests ?
-2. **Lot B — opt-in SMS** : par défaut **ON** pour `turn_upcoming` et `contribution_due`, **OFF** pour `payment_received` — OK ou tout OFF par défaut (RGPD strict) ?
-3. **Lot B — Sender ID** : `Tontine` (11 chars max alphanum Nimba) — OK ou autre nom ?
+- Pas de changement du flux Djomy ni du modal de paiement.
+- Pas de nouvelle table, edge function ou migration.
+- Pas de modification de `Dashboard`, `Receipts`, ou des composants partagés (sauf import).
