@@ -12,12 +12,27 @@ export interface IncomingCall {
   created_at: string;
 }
 
+export type IncomingCallsStatus =
+  | "idle"
+  | "connecting"
+  | "subscribed"
+  | "no_groups"
+  | "error"
+  | "timeout"
+  | "closed";
+
 export function useIncomingCalls(): {
   current: IncomingCall | null;
   dismiss: () => void;
+  status: IncomingCallsStatus;
+  groupCount: number;
+  lastEventAt: number | null;
 } {
   const { user } = useAuth();
   const [current, setCurrent] = useState<IncomingCall | null>(null);
+  const [status, setStatus] = useState<IncomingCallsStatus>("idle");
+  const [groupCount, setGroupCount] = useState(0);
+  const [lastEventAt, setLastEventAt] = useState<number | null>(null);
   const dismissedRef = useRef<Set<string>>(new Set());
   const currentRef = useRef<IncomingCall | null>(null);
   currentRef.current = current;
@@ -59,6 +74,7 @@ export function useIncomingCalls(): {
     };
 
     const setup = async () => {
+      setStatus("connecting");
       const { data: members } = await supabase
         .from("group_members")
         .select("group_id")
@@ -66,7 +82,11 @@ export function useIncomingCalls(): {
         .eq("status", "active");
       if (cancelled) return;
       groupIds = (members ?? []).map((m) => m.group_id as string);
-      if (groupIds.length === 0) return;
+      setGroupCount(groupIds.length);
+      if (groupIds.length === 0) {
+        setStatus("no_groups");
+        return;
+      }
 
       // Catch-up : récupère un appel pending récent qu'on aurait raté
       // pendant un reload ou une perte de connexion brève.
@@ -89,6 +109,7 @@ export function useIncomingCalls(): {
           "postgres_changes",
           { event: "INSERT", schema: "public", table: "call_requests" },
           async (payload) => {
+            setLastEventAt(Date.now());
             const row = payload.new as {
               id: string;
               group_id: string;
@@ -107,16 +128,18 @@ export function useIncomingCalls(): {
           "postgres_changes",
           { event: "UPDATE", schema: "public", table: "call_requests" },
           (payload) => {
+            setLastEventAt(Date.now());
             const row = payload.new as { id: string; status: string };
             if (currentRef.current?.id === row.id && row.status !== "pending") {
               setCurrent(null);
             }
           },
         )
-        .subscribe((status) => {
-          if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
-            console.warn("[useIncomingCalls] realtime status:", status);
-          }
+        .subscribe((s) => {
+          if (s === "SUBSCRIBED") setStatus("subscribed");
+          else if (s === "CHANNEL_ERROR") setStatus("error");
+          else if (s === "TIMED_OUT") setStatus("timeout");
+          else if (s === "CLOSED") setStatus("closed");
         });
     };
 
@@ -142,5 +165,5 @@ export function useIncomingCalls(): {
     }
   };
 
-  return { current, dismiss };
+  return { current, dismiss, status, groupCount, lastEventAt };
 }
