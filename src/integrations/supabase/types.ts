@@ -1971,6 +1971,110 @@ export type Database = {
           },
         ]
       }
+      sms_logs: {
+        Row: {
+          body: string
+          created_at: string
+          error: string | null
+          group_id: string | null
+          id: string
+          kind: string
+          provider: string
+          provider_cost: number | null
+          provider_message_id: string | null
+          recipient: string
+          recipient_normalized: string | null
+          status: string
+          triggered_by: string | null
+          turn_id: string | null
+          user_id: string | null
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          error?: string | null
+          group_id?: string | null
+          id?: string
+          kind?: string
+          provider?: string
+          provider_cost?: number | null
+          provider_message_id?: string | null
+          recipient: string
+          recipient_normalized?: string | null
+          status?: string
+          triggered_by?: string | null
+          turn_id?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          error?: string | null
+          group_id?: string | null
+          id?: string
+          kind?: string
+          provider?: string
+          provider_cost?: number | null
+          provider_message_id?: string | null
+          recipient?: string
+          recipient_normalized?: string | null
+          status?: string
+          triggered_by?: string | null
+          turn_id?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sms_logs_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "admin_group_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sms_logs_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sms_logs_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "my_groups_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sms_logs_turn_id_fkey"
+            columns: ["turn_id"]
+            isOneToOne: false
+            referencedRelation: "next_turn_per_group"
+            referencedColumns: ["turn_id"]
+          },
+          {
+            foreignKeyName: "sms_logs_turn_id_fkey"
+            columns: ["turn_id"]
+            isOneToOne: false
+            referencedRelation: "turn_assignment_audit"
+            referencedColumns: ["turn_id"]
+          },
+          {
+            foreignKeyName: "sms_logs_turn_id_fkey"
+            columns: ["turn_id"]
+            isOneToOne: false
+            referencedRelation: "turn_settlement"
+            referencedColumns: ["turn_id"]
+          },
+          {
+            foreignKeyName: "sms_logs_turn_id_fkey"
+            columns: ["turn_id"]
+            isOneToOne: false
+            referencedRelation: "turns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tontine_alerts: {
         Row: {
           code: string

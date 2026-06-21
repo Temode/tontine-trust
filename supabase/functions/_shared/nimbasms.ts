@@ -53,6 +53,14 @@ export interface SendMessageParams {
   channel?: NimbaChannel;
   /** Surcharge le NIMBA_SENDER_NAME pour ce message. */
   senderName?: string;
+  /** Contexte de traçabilité, journalisé dans `sms_logs` si présent. */
+  logContext?: {
+    userId?: string | null;
+    groupId?: string | null;
+    turnId?: string | null;
+    kind?: string;
+    triggeredBy?: string | null;
+  };
 }
 
 export interface MessageResult {
@@ -62,6 +70,47 @@ export interface MessageResult {
   error?: string;
 }
 
+async function logSmsAttempt(
+  ctx: NonNullable<SendMessageParams["logContext"]>,
+  recipientsRaw: string[],
+  recipients: string[],
+  body: string,
+  result: { status: "sent" | "failed" | "skipped"; error?: string; messageId?: string; cost?: number },
+) {
+  const url = Deno.env.get("SUPABASE_URL");
+  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!url || !key) return;
+  try {
+    const rows = recipientsRaw.map((raw, i) => ({
+      user_id: ctx.userId ?? null,
+      group_id: ctx.groupId ?? null,
+      turn_id: ctx.turnId ?? null,
+      triggered_by: ctx.triggeredBy ?? null,
+      kind: ctx.kind ?? "manual",
+      recipient: raw,
+      recipient_normalized: recipients[i] ?? null,
+      body,
+      status: result.status,
+      provider: "nimba",
+      provider_message_id: result.messageId ?? null,
+      provider_cost: result.cost ?? null,
+      error: result.error ?? null,
+    }));
+    await fetch(`${url}/rest/v1/sms_logs`, {
+      method: "POST",
+      headers: {
+        apikey: key,
+        Authorization: `Bearer ${key}`,
+        "Content-Type": "application/json",
+        Prefer: "return=minimal",
+      },
+      body: JSON.stringify(rows),
+    });
+  } catch (e) {
+    console.error("[NimbaSMS] sms_logs insert failed:", e);
+  }
+}
+
 /**
  * Envoie un message via Nimba SMS.
  * Ne lance jamais d'exception — retourne toujours { success, error? }.
@@ -69,6 +118,13 @@ export interface MessageResult {
 export async function sendMessage(params: SendMessageParams): Promise<MessageResult> {
   if (Deno.env.get("SMS_ENABLED") === "false") {
     console.log("[NimbaSMS] Désactivé via SMS_ENABLED=false");
+    if (params.logContext) {
+      const raw = Array.isArray(params.to) ? params.to : [params.to];
+      await logSmsAttempt(params.logContext, raw, raw, params.body, {
+        status: "skipped",
+        error: "SMS_ENABLED=false",
+      });
+    }
     return { success: true };
   }
 
@@ -83,6 +139,13 @@ export async function sendMessage(params: SendMessageParams): Promise<MessageRes
       "[NimbaSMS] Credentials manquants. " +
         "Configurez NIMBA_SERVICE_ID et NIMBA_SECRET_TOKEN dans les Supabase Secrets.",
     );
+    if (params.logContext) {
+      const raw = Array.isArray(params.to) ? params.to : [params.to];
+      await logSmsAttempt(params.logContext, raw, raw, params.body, {
+        status: "failed",
+        error: "credentials_missing",
+      });
+    }
     return { success: false, error: "Nimba SMS credentials not configured" };
   }
 
@@ -97,6 +160,7 @@ export async function sendMessage(params: SendMessageParams): Promise<MessageRes
   if (recipients.length > 30) {
     console.warn(`[NimbaSMS] ${recipients.length} destinataires > 30 — tronqué à 30`);
     recipients.splice(30);
+    raw.splice(30);
   }
 
   const basicAuth = btoa(`${serviceId}:${secretToken}`);
@@ -125,6 +189,13 @@ export async function sendMessage(params: SendMessageParams): Promise<MessageRes
           `[NimbaSMS] Envoyé (tentative ${attempt}) → to=${recipients.join(",")} ` +
             `id=${data.messageid} coût=${data.message_cost} SMS`,
         );
+        if (params.logContext) {
+          await logSmsAttempt(params.logContext, raw, recipients, params.body, {
+            status: "sent",
+            messageId: data.messageid,
+            cost: data.message_cost,
+          });
+        }
         return {
           success: true,
           messageId: data.messageid,
@@ -146,6 +217,12 @@ export async function sendMessage(params: SendMessageParams): Promise<MessageRes
         : (data?.detail ?? JSON.stringify(data));
       console.error(`[NimbaSMS] Erreur API (${res.status}): ${errDetail}`, `to=${recipients}`);
       if (res.status < 500) {
+        if (params.logContext) {
+          await logSmsAttempt(params.logContext, raw, recipients, params.body, {
+            status: "failed",
+            error: `NimbaSMS ${res.status}: ${errDetail}`,
+          });
+        }
         return { success: false, error: `NimbaSMS ${res.status}: ${errDetail}` };
       }
 
@@ -153,15 +230,35 @@ export async function sendMessage(params: SendMessageParams): Promise<MessageRes
         await sleep(attempt * 1_500);
         continue;
       }
+      if (params.logContext) {
+        await logSmsAttempt(params.logContext, raw, recipients, params.body, {
+          status: "failed",
+          error: `NimbaSMS ${res.status}: ${errDetail}`,
+        });
+      }
       return { success: false, error: `NimbaSMS ${res.status}: ${errDetail}` };
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error(`[NimbaSMS] Erreur réseau (tentative ${attempt}):`, msg);
-      if (attempt === MAX_RETRIES) return { success: false, error: msg };
+      if (attempt === MAX_RETRIES) {
+        if (params.logContext) {
+          await logSmsAttempt(params.logContext, raw, recipients, params.body, {
+            status: "failed",
+            error: msg,
+          });
+        }
+        return { success: false, error: msg };
+      }
       await sleep(attempt * 1_000);
     }
   }
 
+  if (params.logContext) {
+    await logSmsAttempt(params.logContext, raw, recipients, params.body, {
+      status: "failed",
+      error: "max retries dépassé",
+    });
+  }
   return { success: false, error: "NimbaSMS: max retries dépassé" };
 }
 
