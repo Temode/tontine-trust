@@ -264,7 +264,7 @@ export default function DjomySettings() {
         </ol>
         <p className="text-xs text-slate-500">
           Pour basculer entre sandbox et production, demande aussi la mise à jour du secret{" "}
-          <code className="text-amber-300">DJOMY_ENV</code> (<code>sandbox</code> ou <code>prod</code>).
+          <code className="text-amber-300">DJOMY_ENV</code> (<code>sandbox</code> ou <code>production</code>).
         </p>
       </section>
     </div>
