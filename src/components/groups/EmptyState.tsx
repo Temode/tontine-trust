@@ -10,7 +10,7 @@ interface EmptyStateProps {
 export function EmptyState({ filtered, onClearFilters }: EmptyStateProps) {
   if (filtered) {
     return (
-      <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-hairline bg-card px-6 py-14 text-center">
+      <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-hairline bg-card px-6 py-14 text-center">
         <div className="flex h-12 w-12 items-center justify-center rounded-full bg-secondary text-muted-foreground">
           <Search className="h-5 w-5" />
         </div>
@@ -32,7 +32,7 @@ export function EmptyState({ filtered, onClearFilters }: EmptyStateProps) {
   }
 
   return (
-    <div className="rounded-xl border border-hairline bg-card px-6 py-14 text-center">
+    <div className="rounded-2xl border border-hairline bg-card px-6 py-14 text-center">
       <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary-50 text-primary">
         <PlusCircle className="h-5 w-5" />
       </div>
