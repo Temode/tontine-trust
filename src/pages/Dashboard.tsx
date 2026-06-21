@@ -1,7 +1,13 @@
 import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Plus, UserPlus, Users, Calendar as CalendarIcon, Wallet, CheckCircle2 } from "lucide-react";
+import {
+  Plus,
+  UserPlus,
+  Users,
+  ArrowRight,
+  ShieldCheck,
+} from "lucide-react";
 import { TopBar } from "@/components/layout/TopBar";
 import { SectionCard } from "@/components/dashboard/SectionCard";
 import { GroupRow } from "@/components/dashboard/GroupRow";
@@ -13,29 +19,6 @@ import { overviewToTontine } from "@/lib/api/types";
 import { listMyNextTurns } from "@/lib/api/turns";
 import { listMyContributionsDue } from "@/lib/api/contributions";
 import { formatGNF } from "@/lib/format";
-
-function KpiTile({
-  icon: Icon,
-  label,
-  value,
-  hint,
-}: {
-  icon: typeof Users;
-  label: string;
-  value: string;
-  hint?: string;
-}) {
-  return (
-    <article className="rounded-xl border border-hairline bg-card p-5">
-      <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-md bg-primary-50 text-primary">
-        <Icon className="h-[18px] w-[18px]" strokeWidth={1.75} />
-      </div>
-      <p className="text-[11px] uppercase tracking-wider text-muted-foreground">{label}</p>
-      <p className="mt-1 font-display text-2xl font-bold text-foreground num">{value}</p>
-      {hint && <p className="mt-0.5 text-xs text-muted-foreground">{hint}</p>}
-    </article>
-  );
-}
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -72,6 +55,14 @@ export default function Dashboard() {
     [dues],
   );
   const topDues = sortedDues.slice(0, 3);
+  const mostUrgent = sortedDues[0];
+  const mostUrgentLabel = mostUrgent
+    ? mostUrgent.days_to_due < 0
+      ? `En retard de ${Math.abs(mostUrgent.days_to_due)} j`
+      : mostUrgent.days_to_due === 0
+        ? "À régler aujourd'hui"
+        : `Prochaine échéance dans ${mostUrgent.days_to_due} j`
+    : null;
 
   const firstName =
     (user?.user_metadata?.full_name as string | undefined)?.split(" ")[0] ??
@@ -91,50 +82,117 @@ export default function Dashboard() {
       />
 
       <div className="space-y-6 px-5 py-6 lg:px-8 lg:py-8">
-        {/* Cotisations à payer — priorité absolue, zéro scroll */}
-        <section aria-label="Cotisations à payer">
-          <div className="mb-3 flex items-end justify-between gap-3">
-            <div>
-              <h2 className="font-display text-lg font-semibold text-foreground">
-                À payer
-              </h2>
-              <p className="text-xs text-muted-foreground">
+        {/* HERO — panneau institutionnel : signal critique + CTA principal */}
+        <section
+          aria-label="Solde à régler"
+          className="relative overflow-hidden rounded-2xl border border-hairline bg-card"
+        >
+          {/* fond sarcelle très discret */}
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/[0.06] via-transparent to-accent/[0.05]"
+          />
+          {/* filet sarcelle latéral, signature visuelle Tontine */}
+          <div aria-hidden className="absolute inset-y-0 left-0 w-1 bg-primary" />
+
+          <div className="relative flex flex-col gap-6 p-6 lg:flex-row lg:items-center lg:justify-between lg:p-8">
+            <div className="min-w-0">
+              <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
+                {dues.length === 0 ? "Statut du compte" : "Solde à régler"}
+              </p>
+
+              {isLoadingDues ? (
+                <div className="mt-3 h-10 w-56 animate-pulse rounded-md bg-secondary/60" />
+              ) : dues.length === 0 ? (
+                <div className="mt-2 flex items-center gap-2">
+                  <ShieldCheck className="h-6 w-6 text-primary" strokeWidth={2} />
+                  <p className="font-display text-3xl font-bold leading-none tracking-tight text-foreground">
+                    Vous êtes à jour
+                  </p>
+                </div>
+              ) : (
+                <p className="mt-2 font-display text-[40px] font-bold leading-none tracking-tight text-foreground num lg:text-[44px]">
+                  {formatGNF(totalDue)}
+                  <span className="ml-2 align-baseline text-lg font-semibold text-muted-foreground">
+                    GNF
+                  </span>
+                </p>
+              )}
+
+              <p className="mt-3 text-sm text-muted-foreground">
                 {isLoadingDues
                   ? "Vérification de vos cotisations…"
                   : dues.length === 0
-                  ? "Aucune cotisation en attente. Bravo, vous êtes à jour."
-                  : `${dues.length} cotisation${dues.length > 1 ? "s" : ""} en attente`}
+                    ? "Aucune cotisation en attente. On vous préviendra dès qu'un nouveau tour démarre."
+                    : `${dues.length} cotisation${dues.length > 1 ? "s" : ""} en attente${mostUrgentLabel ? ` · ${mostUrgentLabel}` : ""}`}
               </p>
             </div>
-            {dues.length > topDues.length && (
+
+            {dues.length > 0 && (
               <button
                 type="button"
                 onClick={() => navigate("/cotisations")}
-                className="text-xs font-semibold text-primary hover:underline"
+                className="group inline-flex h-12 shrink-0 items-center justify-center gap-2 self-start rounded-lg bg-primary px-6 text-sm font-semibold text-primary-foreground shadow-sm transition hover:bg-primary-700 lg:self-auto"
               >
-                Voir tout ({dues.length})
+                Régler maintenant
+                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
               </button>
             )}
           </div>
 
-          {isLoadingDues ? (
-            <div className="space-y-3">
-              {[0, 1].map((i) => (
-                <div
-                  key={i}
-                  className="h-24 animate-pulse rounded-xl border border-hairline bg-card"
-                />
-              ))}
+          {/* Bandeau métriques institutionnelles, intégré au hero */}
+          <div className="relative grid grid-cols-2 divide-x divide-hairline border-t border-hairline bg-card/60 sm:grid-cols-3">
+            <div className="px-6 py-4">
+              <p className="text-[10px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
+                Prochain tour
+              </p>
+              <p className="mt-1 font-display text-lg font-semibold text-foreground num">
+                {nextTurnLabel}
+              </p>
+              <p className="mt-0.5 truncate text-xs text-muted-foreground">{nextTurnHint}</p>
             </div>
-          ) : dues.length === 0 ? (
-            <div className="rounded-xl border border-hairline bg-card">
-              <EmptyState
-                icon={CheckCircle2}
-                title="Vous êtes à jour 🎉"
-                description="Aucune cotisation à régler pour l'instant. On vous préviendra dès qu'un nouveau tour démarre."
-              />
+            <div className="px-6 py-4">
+              <p className="text-[10px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
+                Tontines actives
+              </p>
+              <p className="mt-1 font-display text-lg font-semibold text-foreground num">
+                {activeCount}
+              </p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                {groups.length} au total
+              </p>
             </div>
-          ) : (
+            <div className="col-span-2 border-t border-hairline px-6 py-4 sm:col-span-1 sm:border-t-0">
+              <p className="text-[10px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
+                Cotisations en attente
+              </p>
+              <p className="mt-1 font-display text-lg font-semibold text-foreground num">
+                {dues.length}
+              </p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                {dues.length === 0 ? "Aucune action requise" : "À traiter cette semaine"}
+              </p>
+            </div>
+          </div>
+        </section>
+
+        {/* Liste des cotisations à payer (détail) */}
+        {!isLoadingDues && dues.length > 0 && (
+          <section aria-label="Détail des cotisations à payer">
+            <div className="mb-3 flex items-end justify-between gap-3">
+              <h2 className="font-display text-base font-semibold text-foreground">
+                Détail des échéances
+              </h2>
+              {dues.length > topDues.length && (
+                <button
+                  type="button"
+                  onClick={() => navigate("/cotisations")}
+                  className="text-xs font-semibold text-primary hover:underline"
+                >
+                  Voir tout ({dues.length})
+                </button>
+              )}
+            </div>
             <div className="space-y-3">
               {topDues.map((d) => (
                 <DueCard
@@ -149,30 +207,19 @@ export default function Dashboard() {
                 />
               ))}
             </div>
-          )}
-        </section>
+          </section>
+        )}
 
-        {/* KPI strip — vue d'ensemble */}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <KpiTile
-            icon={Wallet}
-            label="Total à payer"
-            value={totalDue > 0 ? `${formatGNF(totalDue)} GNF` : "—"}
-            hint={dues.length > 0 ? "Cumul des cotisations en attente" : "Vous êtes à jour"}
-          />
-          <KpiTile
-            icon={CalendarIcon}
-            label="Prochain tour"
-            value={nextTurnLabel}
-            hint={nextTurnHint}
-          />
-          <KpiTile
-            icon={Users}
-            label="Mes tontines"
-            value={String(activeCount)}
-            hint={`${groups.length} au total`}
-          />
-        </div>
+        {isLoadingDues && (
+          <div className="space-y-3">
+            {[0, 1].map((i) => (
+              <div
+                key={i}
+                className="h-24 animate-pulse rounded-xl border border-hairline bg-card"
+              />
+            ))}
+          </div>
+        )}
 
         {/* Mes tontines */}
         <SectionCard
