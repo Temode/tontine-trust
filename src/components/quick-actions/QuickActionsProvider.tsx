@@ -1,4 +1,6 @@
 import { createContext, useCallback, useContext, useState, type ReactNode } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { listMyContributionsDue } from "@/lib/api/contributions";
 import { CreateGroupDialog } from "./CreateGroupDialog";
 import { JoinGroupDialog } from "./JoinGroupDialog";
 import { PayContributionsDialog } from "./PayContributionsDialog";
@@ -12,6 +14,7 @@ interface QuickActionsContextValue {
 const QuickActionsContext = createContext<QuickActionsContextValue | null>(null);
 
 export function QuickActionsProvider({ children }: { children: ReactNode }) {
+  const queryClient = useQueryClient();
   const [createOpen, setCreateOpen] = useState(false);
   const [joinOpen, setJoinOpen] = useState(false);
   const [payOpen, setPayOpen] = useState(false);
@@ -19,7 +22,15 @@ export function QuickActionsProvider({ children }: { children: ReactNode }) {
   const value: QuickActionsContextValue = {
     openCreate: useCallback(() => setCreateOpen(true), []),
     openJoin: useCallback(() => setJoinOpen(true), []),
-    openPay: useCallback(() => setPayOpen(true), []),
+    openPay: useCallback(() => {
+      // Préchargement : la modale s'ouvre déjà remplie si la requête est cache-warm.
+      queryClient.prefetchQuery({
+        queryKey: ["contributions", "due"],
+        queryFn: listMyContributionsDue,
+        staleTime: 15_000,
+      });
+      setPayOpen(true);
+    }, [queryClient]),
   };
 
   return (
