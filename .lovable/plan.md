@@ -1,62 +1,56 @@
-# Plan — Transparence et gestion des défauts
+# Audit (corrigé) et nettoyage du flux paiement
 
-Objectif : renforcer la traçabilité côté admin et côté membre autour des défaillances, en complétant le système existant (`member_default_reports`, `audit_log`, `notifications`, `user_reliability_scores`).
+## 1. Constat — pourquoi aucun membre n'a payé sur les tontines existantes
 
-## 1. Journal d'audit consultable sur `/admin/defaillants`
+État réel des `payments` des deux groupes d'Alice :
 
-- **Backend** : ajouter une fonction RPC `get_default_report_audit(p_report_id uuid)` qui retourne l'historique trié à partir de `audit_log` (entrées `entity_type = 'member_default_report'` + entrées liées `contribution_id`), enrichies avec les profils `actor_user_id` (nom, rôle).
-- **UI** : sur la page admin existante (`src/pages/admin/Defaulters.tsx`), ajouter un panneau latéral (Sheet) « Historique du dossier » ouvrable depuis chaque ligne. Colonnes : date, acteur (avatar + nom + rôle), action (`reported`, `status_changed`, `note_added`, `kyc_updated`), ancien → nouveau statut, note interne.
-- **Notes internes** : ajouter un champ texte + bouton « Ajouter une note » qui appelle `update_defaulter_report` (déjà existant) avec un nouveau paramètre `p_note_only = true` pour journaliser sans changer le statut.
+- **14 tentatives** au total sur la contribution 1000 GNF + 100 000 GNF.
+- **0 paiement `succeeded`**. Tout est resté `initiated` ou `pending`.
+- Aucun `error_message` enregistré.
 
-## 2. Contestation membre sur `/cotisations`
+Causes identifiées :
+1. **Bug montant ×100 côté Djomy** : la contribution est de 1 000 GNF dans notre base, l'edge function `djomy-init-payment` envoie bien `amount: 1000` à `/v1/payments/gateway`, mais la page Djomy affiche **100 000 GNF**. Symptôme classique d'unités mineures ("centimes") interprétées par Djomy. À corriger (voir §3).
+2. **Webhook jamais reçu / statut jamais rafraîchi** : les paiements restent `initiated/pending` parce qu'aucun callback Djomy ne les confirme. Il manque une vérification automatique du statut au retour utilisateur (`/payment/return`) en plus du webhook.
+3. **Modale intermédiaire inutile** : la sélection OM/MOMO/CARD côté app fait doublon avec la page de gateway Djomy qui propose déjà tous les moyens (Orange Money, MTN MoMo, Visa/Mastercard). L'utilisateur clique deux fois pour la même décision.
 
-- **Nouvelle table** : `contribution_disputes` (contribution_id, raised_by, reason, evidence_url, status `open|under_review|accepted|rejected|resolved`, organizer_response, resolved_at, resolved_by).
-- **RPC** : `raise_contribution_dispute(p_contribution_id, p_reason, p_evidence_url)` + `resolve_contribution_dispute(p_dispute_id, p_status, p_response)` réservée aux organisateurs du groupe (`has_admin_permission`).
-- **UI membre** : sur chaque carte de contribution `defaulted` ou `late` dans `MyContributions.tsx`, bouton « Contester / demander une revue » → modale avec motif (textarea) + lien optionnel vers une preuve. Affichage du statut courant et de la réponse de l'organisateur (badge + timeline).
-- **UI organisateur** : nouvelle section « Contestations en attente » dans `GroupDetail.tsx` (à côté de `GroupDefaultersSection`) avec actions Accepter / Rejeter / Marquer résolu.
+## 2. Suppression du « Mode test » (alignement doctrine design)
 
-## 3. Notifications in-app + récap admin
+- **Supprimer** `src/components/group/TestModePanel.tsx`.
+- **Retirer son import et son onglet** dans `src/pages/GroupDetail.tsx` (et tout déclencheur côté `GroupSettings.tsx`).
+- **Retirer la mention « Mode test »** dans `DjomyPaymentModal.tsx` / écrans liés.
+- Ne RIEN ajouter de simulation côté front : on traite la production comme la production. La doctrine interdit toute esthétique de jeu / bac à sable visible par l'utilisateur final.
 
-- Étendre `mark_defaulted_contributions()` (migration) pour :
-  - Insérer dans `notifications` (`type = 'contribution_defaulted'`) avec `data.group_id`, `data.contribution_id`, `data.deep_link = '/groupes/:id'`.
-  - Créer une entrée agrégée dans `tontine_alerts` (`severity = 'high'`, `category = 'defaulter_digest'`) avec un récapitulatif quotidien : nombre de nouveaux défauts, top groupes, lien `/admin/defaillants`.
-- Côté UI : le `NotificationCenter` existant gère déjà le `deep_link` ; vérifier qu'un défaut redirige bien vers la page du groupe. Sur `AdminDashboard` (ou `AdminSidebar` si dashboard absent), afficher un badge compteur sur « Défaillants ».
+## 3. Correction du montant envoyé à Djomy
 
-## 4. Détail pénalité sur la carte « en défaut »
+- **Reproduire** : poser un `console.log` ciblé dans `djomy-init-payment` (`amount` envoyé + body brut Djomy + réponse `data`) puis relancer un paiement de 1 000 GNF et observer dans `supabase--edge_function_logs` ce que Djomy renvoie comme montant.
+- Selon le résultat :
+  - Si la réponse Djomy contient déjà `100000` → leur API utilise des centimes. Adapter en envoyant `amount * 100` côté serveur **et** documenter dans `mem/tech/partenaire-djomy.md`. Côté affichage front (DB, reçus, contributions) on garde les GNF entiers.
+  - Si la réponse renvoie `1000` mais la page affiche `100000` → bug d'affichage Djomy à signaler ; en attendant, envoyer `amount` ajusté pour matcher leur convention.
+- Ajouter un test unitaire dans `supabase/functions/_shared` qui fige la conversion, pour éviter une régression silencieuse.
 
-Dans `MyContributions.tsx`, lorsque `status = 'defaulted'` (ou `late`), afficher un encart dépliable :
-- Pourcentage de pénalité (depuis `groups.late_penalty_percent`, déjà copié sur `contributions.penalty_rate_applied`).
-- Jours de retard retenus (`default_days` ou calcul `now - turn.due_date`).
-- Montant estimé : `amount * penalty_rate / 100 * jours` (selon règle existante).
-- Bloc « Comment est calculé votre score de fiabilité » : ratio paiements à temps, impact d'un défaut (-15 pts), seuils de tier (`good ≥ 80`, `warning ≥ 60`, `blocked < 60` ou ≥ 2 défauts). Texte statique sourcé du code de `recompute_reliability`.
+## 4. Suppression de la modale de paiement intermédiaire
 
-## 5. Section « Historique des défauts » sur `/cotisations`
+- **Supprimer** `src/components/payment/DjomyPaymentModal.tsx` et `src/components/payment/PaymentModal.tsx` (et leurs imports : `MyContributions.tsx`, `DueCard.tsx`, `PayContributionsDialog.tsx`, etc.).
+- Remplacer chaque bouton « Payer » par un appel direct :
+  1. RPC `start_djomy_payment(contribution_id, _method := NULL, _payer_phone := profile.phone)`.
+  2. `supabase.functions.invoke('djomy-init-payment', { body: { contributionId, returnUrl, cancelUrl } })`.
+  3. `window.location.assign(redirectUrl)` vers la page Djomy qui propose elle-même OM, MoMo, Visa.
+- Adapter `start_djomy_payment` (migration) : `_method` devient optionnel ; et `djomy-init-payment` envoie `allowedPaymentMethods: ["OM","MOMO","CARD"]` par défaut.
+- Conserver un `PaymentTracker` léger (toast + polling de `getDjomyPaymentStatus`) après retour sur `/payment/return` pour mettre à jour les statuts `initiated → pending → succeeded/failed` sans dépendre uniquement du webhook.
 
-Nouvel onglet (ou accordéon en bas) listant, pour l'utilisateur connecté, chaque contribution ayant déjà été en défaut au moins une fois :
-- Échéance (date, tontine, montant).
-- Date de bascule (`defaulted_at`).
-- Notifications envoyées : extraites de `notifications` (filter `data.contribution_id`) + `manual_reminders_log`.
-- État de résolution : payé le X / contestation en cours / signalé à Tontine.
+## 5. Visibilité de l'historique des cotisations dans chaque groupe
 
-Implémenté via une RPC `get_user_default_history(p_user_id)` qui agrège `contributions` + `notifications` + `member_default_reports` + `contribution_disputes`.
-
-## Détails techniques
-
-- Migrations SQL :
-  1. `contribution_disputes` + GRANT + RLS (`raised_by = auth.uid()` pour lecture/insertion ; organisateurs via `has_admin_permission` pour update).
-  2. RPC `raise_contribution_dispute`, `resolve_contribution_dispute`, `get_default_report_audit`, `get_user_default_history`.
-  3. Mise à jour de `mark_defaulted_contributions` (notif + alerte agrégée) et de `update_defaulter_report` (mode note-only).
-- Fichiers front modifiés/créés :
-  - `src/lib/api/disputes.ts` (nouveau).
-  - `src/components/contribution/DisputeDialog.tsx` (nouveau).
-  - `src/components/contribution/PenaltyBreakdown.tsx` (nouveau).
-  - `src/components/contribution/DefaultHistorySection.tsx` (nouveau).
-  - `src/components/admin/DefaultReportAuditSheet.tsx` (nouveau).
-  - `src/components/group/GroupDisputesSection.tsx` (nouveau).
-  - Modifs : `MyContributions.tsx`, `GroupDetail.tsx`, `admin/Defaulters.tsx`, `AdminSidebar.tsx`, `lib/api/defaulters.ts`.
+Dans `GroupDetail.tsx`, dans l'onglet de l'organisateur, vérifier que `PaymentsHistoryPanel` est bien monté pour Alice et qu'il affiche les 14 tentatives existantes (statut, méthode, date). Si une ligne n'apparaît pas, corriger la requête `listGroupPayments` (RLS : ajouter une policy `SELECT` sur `payments` pour les co-organisateurs du `group_id`).
 
 ## Hors périmètre
 
-- Upload de preuves vers un bucket privé (on stocke uniquement une URL collée par le membre pour l'instant).
-- Envoi e-mail / SMS sur défaut (on reste in-app, le digest SMS existant continue de tourner).
-- Tableau de bord temps réel ; on rafraîchit via React Query au focus.
+- Aucun outil de simulation / sandbox visible utilisateur.
+- Pas de modification du système Défauts / Disputes (déjà audité, ok, juste invisible car aucune échéance n'est encore passée — c'est conforme).
+- Pas de refonte UI au-delà du retrait des écrans listés.
+
+## Détails techniques
+
+- 1 migration : `start_djomy_payment` accepte `_method text DEFAULT NULL` ; ajustement éventuel d'unité monétaire géré côté edge function uniquement.
+- Fichiers supprimés : `TestModePanel.tsx`, `DjomyPaymentModal.tsx`, `PaymentModal.tsx`.
+- Fichiers modifiés : `GroupDetail.tsx`, `GroupSettings.tsx`, `MyContributions.tsx`, `DueCard.tsx`, `PayContributionsDialog.tsx`, `djomy-init-payment/index.ts`, `lib/api/djomy.ts`, `mem/tech/partenaire-djomy.md`.
+- Tests : un test Deno pour la conversion de montant + une vérif Playwright que cliquer « Payer » redirige directement vers `djomy.africa`.

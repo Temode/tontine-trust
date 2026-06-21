@@ -17,3 +17,10 @@ type: reference
 3. Confirmation des montants min/max et frais appliqués
 
 **Ne PAS recommander d'alternative** (CinetPay, FedaPay, PayDunya, LigdiCash) : décision déjà prise.
+
+**Conventions d'intégration (à respecter) :**
+- Endpoint utilisé : `POST /v1/payments/gateway` (page Djomy avec choix du moyen).
+- `amount` : nombre positif **en GNF entiers** (pas de centimes — confirmé par la doc Djomy).
+- `allowedPaymentMethods` : envoyer `["OM","MOMO","CARD"]` par défaut. Le payeur choisit OM, MoMo ou carte Visa/Mastercard directement sur le portail Djomy. **Ne pas** ré-implémenter cette sélection côté app (doctrine : un clic = une redirection).
+- Pas de modale intermédiaire côté front. Le bouton « Payer » appelle `launchDjomyCheckout(contributionId)` et redirige vers `redirectUrl`.
+- Pas de « mode test » visible utilisateur : la doctrine interdit toute esthétique de bac à sable. Les tests se font en sandbox via le tableau de bord `/admin/djomy`.

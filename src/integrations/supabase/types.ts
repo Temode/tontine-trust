@@ -4775,8 +4775,8 @@ export type Database = {
       start_djomy_payment: {
         Args: {
           _contribution_id: string
-          _method: string
-          _payer_phone: string
+          _method?: string
+          _payer_phone?: string
         }
         Returns: string
       }

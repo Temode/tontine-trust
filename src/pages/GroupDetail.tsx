@@ -31,7 +31,7 @@ import {
 import { listGroupTurns } from "@/lib/api/turns";
 import { releasePayout, listGroupLedger } from "@/lib/api/payouts";
 import { listMyContributionsDue } from "@/lib/api/contributions";
-import { DjomyPaymentModal } from "@/components/payment/DjomyPaymentModal";
+import { launchDjomyCheckout } from "@/lib/payment/launchDjomyCheckout";
 import { getGroupReliability, type DbGroupReliabilityRow } from "@/lib/api/reliability";
 import { ReliabilityBadge } from "@/components/reliability/ReliabilityBadge";
 import { useAuth } from "@/hooks/useAuth";
@@ -44,7 +44,6 @@ import { AuditLog } from "@/components/group/AuditLog";
 import { SwapsPanel } from "@/components/group/SwapsPanel";
 import { AuctionPanel } from "@/components/group/AuctionPanel";
 import { ReviewsPanel } from "@/components/group/ReviewsPanel";
-import { TestModePanel } from "@/components/group/TestModePanel";
 import { InvitationsHistoryPanel } from "@/components/groups/InvitationsHistoryPanel";
 import { GroupDefaultersSection } from "@/components/group/GroupDefaultersSection";
 import { GroupDisputesSection } from "@/components/group/GroupDisputesSection";
@@ -58,8 +57,7 @@ type Section =
   | "auctions"
   | "reviews"
   | "chat"
-  | "audit"
-  | "test";
+  | "audit";
 
 const FREQ_LABEL: Record<string, string> = {
   mensuelle: "Mensuelle",
@@ -170,8 +168,6 @@ export default function GroupDetail() {
     queryKey: ["contributions", "due"],
     queryFn: listMyContributionsDue,
   });
-  const [payNow, setPayNow] = useState(false);
-
   if (groupQ.isLoading) {
     return <div className="px-6 py-12 text-sm text-muted-foreground">Chargement…</div>;
   }
@@ -220,7 +216,6 @@ export default function GroupDetail() {
     ...(grp.status === "completed" ? [{ id: "reviews" as Section, label: "Avis" }] : []),
     { id: "chat", label: "Discussion" },
     ...(isOrganizer ? [{ id: "audit" as Section, label: "Audit" }] : []),
-    ...(isOrganizer ? [{ id: "test" as Section, label: "Mode test" }] : []),
   ];
 
   return (
@@ -356,7 +351,7 @@ export default function GroupDetail() {
           <button
             type="button"
             onClick={() => {
-              if (myDueForGroup) setPayNow(true);
+              if (myDueForGroup) void launchDjomyCheckout(myDueForGroup.contribution_id);
             }}
             disabled={!myDueForGroup}
             className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-hairline bg-card px-4 text-xs font-semibold text-foreground transition hover:bg-secondary disabled:opacity-50"
@@ -434,7 +429,7 @@ export default function GroupDetail() {
             </div>
             <button
               type="button"
-              onClick={() => setPayNow(true)}
+              onClick={() => void launchDjomyCheckout(myDueForGroup.contribution_id)}
               className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground transition hover:bg-primary-700"
             >
               <ShieldCheck className="h-4 w-4" />
@@ -573,20 +568,8 @@ export default function GroupDetail() {
             />
           )}
           {section === "audit" && isOrganizer && <AuditLog groupId={grp.id} />}
-          {section === "test" && isOrganizer && (
-            <TestModePanel groupId={grp.id} groupName={grp.name} />
-          )}
         </div>
       </div>
-      {myDueForGroup && (
-        <DjomyPaymentModal
-          open={payNow}
-          onOpenChange={setPayNow}
-          contributionId={myDueForGroup.contribution_id}
-          groupName={myDueForGroup.group_name}
-          amount={myDueForGroup.amount}
-        />
-      )}
     </div>
   );
 }
