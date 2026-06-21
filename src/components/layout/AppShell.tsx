@@ -5,6 +5,7 @@ import { DesktopSidebar } from "./DesktopSidebar";
 import { useNotificationsRealtime } from "@/hooks/useNotifications";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { GuidedTourProvider } from "@/components/tour/GuidedTour";
+import { QuickActionsProvider } from "@/components/quick-actions/QuickActionsProvider";
 
 function RouteFallback() {
   return (
@@ -19,20 +20,22 @@ export function AppShell({ children }: { children: ReactNode }) {
   const location = useLocation();
   return (
     <GuidedTourProvider>
-      <div className="min-h-screen bg-background">
-        <DesktopSidebar />
-        <div className="lg:pl-72">
-          <main className="pb-20 lg:pb-0">
-            <ErrorBoundary
-              resetKey={location.pathname}
-              fallbackTitle="Cet écran a rencontré une erreur"
-            >
-              <Suspense fallback={<RouteFallback />}>{children}</Suspense>
-            </ErrorBoundary>
-          </main>
+      <QuickActionsProvider>
+        <div className="min-h-screen bg-background">
+          <DesktopSidebar />
+          <div className="lg:pl-72">
+            <main className="pb-20 lg:pb-0">
+              <ErrorBoundary
+                resetKey={location.pathname}
+                fallbackTitle="Cet écran a rencontré une erreur"
+              >
+                <Suspense fallback={<RouteFallback />}>{children}</Suspense>
+              </ErrorBoundary>
+            </main>
+          </div>
+          <BottomNav />
         </div>
-        <BottomNav />
-      </div>
+      </QuickActionsProvider>
     </GuidedTourProvider>
   );
 }

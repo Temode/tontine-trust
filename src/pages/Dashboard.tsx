@@ -20,10 +20,12 @@ import { listMyNextTurns } from "@/lib/api/turns";
 import { listMyContributionsDue } from "@/lib/api/contributions";
 import { formatGNF } from "@/lib/format";
 import { Receipt } from "lucide-react";
+import { useQuickActions } from "@/components/quick-actions/QuickActionsProvider";
 
 export default function Dashboard() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { openCreate, openJoin, openPay } = useQuickActions();
 
   const { data: rows = [], isLoading } = useQuery({
     queryKey: ["groups", "mine"],
@@ -77,7 +79,7 @@ export default function Dashboard() {
         subtitle="Voici ce qui demande votre attention aujourd'hui."
         primaryAction={{
           label: "Nouvelle tontine",
-          onClick: () => navigate("/nouveau"),
+          onClick: openCreate,
           icon: <Plus className="h-4 w-4" />,
         }}
       />
@@ -184,7 +186,7 @@ export default function Dashboard() {
         >
           <button
             type="button"
-            onClick={() => navigate("/nouveau")}
+            onClick={openCreate}
             className="group flex items-center gap-3 rounded-xl px-4 py-3 text-left transition hover:bg-secondary/60"
           >
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
@@ -198,7 +200,7 @@ export default function Dashboard() {
           </button>
           <button
             type="button"
-            onClick={() => navigate("/rejoindre")}
+            onClick={openJoin}
             className="group flex items-center gap-3 rounded-xl px-4 py-3 text-left transition hover:bg-secondary/60"
           >
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent/15 text-accent-foreground">
@@ -212,7 +214,7 @@ export default function Dashboard() {
           </button>
           <button
             type="button"
-            onClick={() => navigate("/cotisations")}
+            onClick={openPay}
             className="group flex items-center gap-3 rounded-xl px-4 py-3 text-left transition hover:bg-secondary/60"
           >
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-secondary text-foreground">
