@@ -80,7 +80,7 @@ export function GroupsToolbar({
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <div className="h-6 w-px bg-hairline" aria-hidden />
+          <div className="h-6 w-px bg-border" aria-hidden />
 
           <div className="flex items-center gap-0.5 rounded-lg border border-hairline bg-card p-0.5" role="tablist" aria-label="Vue">
             <ViewToggleButton current={view} target="grid" onClick={onViewChange} icon={LayoutGrid} label="Grille" />
