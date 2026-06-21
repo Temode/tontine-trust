@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Calendar, Phone, PhoneOff } from "lucide-react";
 import { toast } from "sonner";
+import { useState } from "react";
 import {
   Sheet,
   SheetContent,
@@ -18,6 +19,7 @@ import {
 } from "@/lib/api/calls";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
+import { CallRoom } from "./CallRoom";
 
 interface Props {
   open: boolean;
@@ -46,6 +48,7 @@ const STATUS_COLOR: Record<CallStatus, string> = {
 export function CallHistoryDrawer({ open, onOpenChange, groupId }: Props) {
   const { user } = useAuth();
   const qc = useQueryClient();
+  const [joinCallId, setJoinCallId] = useState<string | null>(null);
   const { data: calls = [], isLoading } = useQuery({
     queryKey: ["call-requests", groupId],
     queryFn: () => listCallRequests(groupId),
@@ -78,8 +81,7 @@ export function CallHistoryDrawer({ open, onOpenChange, groupId }: Props) {
             Historique des appels
           </SheetTitle>
           <SheetDescription>
-            Demandes d'appel passées et à venir. Le canal audio sera disponible
-            prochainement.
+            Demandes d'appel passées et en cours. Cliquez sur « Rejoindre » pour entrer dans un appel actif.
           </SheetDescription>
         </SheetHeader>
 
@@ -137,12 +139,15 @@ export function CallHistoryDrawer({ open, onOpenChange, groupId }: Props) {
                     {!mine && (
                       <button
                         type="button"
-                        onClick={() => respond.mutate({ id: c.id, status: "accepted" })}
+                        onClick={() => {
+                          respond.mutate({ id: c.id, status: "accepted" });
+                          setJoinCallId(c.id);
+                        }}
                         disabled={respond.isPending}
                         className="inline-flex h-8 flex-1 items-center justify-center gap-1.5 rounded-md bg-primary px-3 text-xs font-semibold text-primary-foreground hover:bg-primary-700"
                       >
                         <Phone className="h-3.5 w-3.5" />
-                        Accepter
+                        Rejoindre
                       </button>
                     )}
                     <button
@@ -165,16 +170,11 @@ export function CallHistoryDrawer({ open, onOpenChange, groupId }: Props) {
                 {c.status === "accepted" && (
                   <button
                     type="button"
-                    onClick={() =>
-                      toast.info("Canal audio bientôt disponible", {
-                        description:
-                          "L'appel est planifié — le module vocal arrive bientôt.",
-                      })
-                    }
+                    onClick={() => setJoinCallId(c.id)}
                     className="mt-3 inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-md border border-primary/40 bg-primary/5 px-3 text-xs font-semibold text-primary hover:bg-primary/10"
                   >
                     <Phone className="h-3.5 w-3.5" />
-                    Rejoindre — bientôt disponible
+                    Rejoindre l'appel
                   </button>
                 )}
               </div>
@@ -182,6 +182,11 @@ export function CallHistoryDrawer({ open, onOpenChange, groupId }: Props) {
           })}
         </div>
       </SheetContent>
+      <CallRoom
+        open={!!joinCallId}
+        onOpenChange={(v) => !v && setJoinCallId(null)}
+        callId={joinCallId}
+      />
     </Sheet>
   );
 }

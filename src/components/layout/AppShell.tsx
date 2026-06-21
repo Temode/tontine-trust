@@ -4,6 +4,7 @@ import { BottomNav } from "./BottomNav";
 import { DesktopSidebar } from "./DesktopSidebar";
 import { useNotificationsRealtime } from "@/hooks/useNotifications";
 import { useChatToasts } from "@/hooks/useChatToasts";
+import { IncomingCallSheet } from "@/components/messages/IncomingCallSheet";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { GuidedTourProvider } from "@/components/tour/GuidedTour";
 import { QuickActionsProvider } from "@/components/quick-actions/QuickActionsProvider";
@@ -36,6 +37,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             </main>
           </div>
           <BottomNav />
+          <IncomingCallSheet />
         </div>
       </QuickActionsProvider>
     </GuidedTourProvider>
