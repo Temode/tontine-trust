@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowRight, ArrowUpRight, CheckCircle2, Loader2, PlusCircle, ShieldCheck, X } from "lucide-react";
+import { ArrowUpRight, Loader2, PlusCircle, ShieldCheck } from "lucide-react";
 import { z } from "zod";
 import { toast } from "sonner";
 import {
@@ -15,17 +15,15 @@ import { cn } from "@/lib/utils";
 import { formatGNF } from "@/lib/format";
 import { createGroup } from "@/lib/api/groups";
 import { DEFAULT_DRAFT, generateInviteCode, type GroupCategory } from "@/components/create-group/types";
+import { contributionSchema, membersSchema } from "@/lib/validation/policy";
+import { InviteSuccessPanel } from "./InviteSuccessPanel";
 
 const quickSchema = z.object({
   name: z.string().trim().min(3, "Le nom doit faire au moins 3 caractères.").max(64, "64 caractères max."),
   category: z.enum(["family", "professional", "business", "community"]),
   frequency: z.enum(["Hebdomadaire", "Quinzaine", "Mensuelle"]),
-  contribution: z
-    .number({ invalid_type_error: "Cotisation requise." })
-    .int()
-    .min(1000, "Minimum 1 000 GNF.")
-    .max(50_000_000, "Maximum 50 000 000 GNF."),
-  members: z.number({ invalid_type_error: "Nombre requis." }).int().min(2, "Au moins 2 membres.").max(50, "50 max."),
+  contribution: contributionSchema,
+  members: membersSchema,
 });
 
 type QuickInput = z.infer<typeof quickSchema>;
@@ -59,7 +57,7 @@ export function CreateGroupDialog({ open, onOpenChange }: { open: boolean; onOpe
   const [errors, setErrors] = useState<Partial<Record<keyof QuickInput, string>>>({});
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<{ id: string; code: string } | null>(null);
+  const [success, setSuccess] = useState<{ id: string; code: string; name: string } | null>(null);
 
   const cagnotte = useMemo(() => form.contribution * form.members, [form.contribution, form.members]);
 
@@ -108,7 +106,7 @@ export function CreateGroupDialog({ open, onOpenChange }: { open: boolean; onOpe
         members: parsed.data.members,
         inviteCode: code,
       });
-      setSuccess({ id: result.group.id, code: result.inviteCode });
+      setSuccess({ id: result.group.id, code: result.inviteCode, name: parsed.data.name });
       toast.success("Tontine créée", { description: parsed.data.name });
       await queryClient.invalidateQueries({ queryKey: ["groups", "mine"] });
     } catch (err) {
@@ -123,17 +121,14 @@ export function CreateGroupDialog({ open, onOpenChange }: { open: boolean; onOpe
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-2xl gap-0 overflow-hidden p-0">
         {success ? (
-          <SuccessView
+          <InviteSuccessPanel
             groupId={success.id}
-            inviteCode={success.code}
+            groupName={success.name}
+            initialCode={success.code}
             onClose={() => handleOpenChange(false)}
-            onNavigate={() => {
+            onViewGroup={() => {
               handleOpenChange(false);
               navigate(`/groupes/${success.id}`);
-            }}
-            onInvite={() => {
-              handleOpenChange(false);
-              navigate(`/inviter?group=${success.id}`);
             }}
           />
         ) : (
