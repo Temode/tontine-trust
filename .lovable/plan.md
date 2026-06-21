@@ -1,91 +1,84 @@
 ## Objectif
 
-Finaliser le lot « Mes tontines » avec : modales plus performantes, flux d'invitation post-création complet, validations renforcées (client + API), audit RLS des modales, et nouvelle page de détail tontine avec hero billion-dollar.
+Couvrir les 5 demandes en respectant la doctrine design (bleu sarcelle + or, font-display, skeletons, une seule action primaire, tabular-nums).
 
-## Lot A — Performance des modales
+---
 
-**React Query cache + skeletons précis**
-- Introduire `@tanstack/react-query` (déjà présent) pour cacher :
-  - `previewByCode(code)` avec `staleTime: 30s`, `gcTime: 5min`, clé `["invitation-preview", code]`
-  - `listMyDues()` dans `PayContributionsDialog` avec `staleTime: 15s`
-  - `listMyGroups()` partagé entre Dashboard / MyGroups
-- Debounce déjà en place dans `JoinGroupDialog` (350ms) — conservé, mais lookup délégué à React Query.
-- Skeletons dédiés par état :
-  - JoinDialog : skeleton « preview card » (avatar + 3 stats) pendant le lookup, distinct de l'état vide.
-  - PayDialog : skeleton « liste de dues » (3 lignes avec montant + date) au lieu du spinner global.
-  - CreateDialog : skeleton du panneau « cagnotte preview » pendant le recalcul si async.
-- Préchargement : sur ouverture de `PayContributionsDialog`, `prefetchQuery(["my-dues"])` côté provider pour que la modale ouvre déjà remplie.
+## Lot 1 — Tests automatisés des règles RLS / validation
 
-## Lot B — Flux Invitation post-création
+**Cible** : RPC `create_group_with_invitation`, `preview_group_by_code`, `join_group_with_code`, vue `my_contributions_due`.
 
-**Nouveau composant `InviteSuccessPanel`** (réutilisé dans `CreateGroupDialog` + page d'invitation) :
-- Affiche le code généré (gros, monospace, copiable).
-- Lien d'invitation court : `https://<domain>/rejoindre?code=TD-XXXX-XXXX` + bouton copier.
-- Bouton « Partager via WhatsApp / SMS / Email » (via Web Share API si dispo, sinon fallbacks `wa.me` / `mailto:` / `sms:`).
-- QR code (réutilise `QrCodeSvg`).
-- Gestion d'erreurs :
-  - Si code expiré → bouton « Générer un nouveau code » → appel `createInvitation()`.
-  - Si code révoqué/épuisé → message contextuel + CTA régénérer.
-  - Affichage du compteur d'utilisations restantes + date d'expiration.
-- Intégration dans `CreateGroupDialog` : après succès, l'écran de confirmation devient ce panneau (au lieu des deux boutons actuels).
+Deux niveaux :
 
-## Lot C — Validation client + API
+1. **Tests unitaires Vitest** (`src/lib/validation/policy.test.ts`) sur les schémas Zod partagés : montants hors bornes, multiples interdits, fréquences hors liste, codes mal formés. Rapides, déterministes, exécutés en CI.
+2. **Tests d'intégration Supabase** (`tests/e2e/rls-quick-actions.spec.ts`, exécuté par le job E2E existant `.github/workflows/e2e.yml`) :
+   - Code invalide → erreur format.
+   - Code inexistant → `null` / erreur traduite.
+   - Code expiré (seed via fixture) → message contextuel.
+   - Code épuisé (usage limit atteint) → erreur.
+   - Création avec montant < 1 000 ou non multiple → rejetée par RPC.
+   - Création avec fréquence inconnue → rejetée.
+   - `my_contributions_due` ne retourne que les cotisations de l'utilisateur connecté (test cross-user avec service role).
 
-**Politique projet (constants `src/lib/validation/group.ts`)** :
-- Cotisation : min 1 000 GNF, max 10 000 000 GNF, multiple de 1 000.
-- Membres : 2 à 50.
-- Fréquences autorisées : `quotidienne`, `hebdomadaire`, `quinzaine`, `mensuelle`.
-- Code invitation : regex `^TD-[A-Z0-9]{4}-[A-Z0-9]{4}$` (déjà en place).
+Réutilise la fixture `tests/e2e/fixtures/famille-alice.ts`, ajoute un helper `seedExpiredInvitation` et `seedExhaustedInvitation`.
 
-**Client** : Zod schema partagé importé par `CreateGroupDialog`, `JoinGroupDialog`, page CreateGroup.
+## Lot 2 — Copie du code d'invitation renforcée
 
-**API (migration Postgres)** : ajout de `CHECK` constraints sur `groups.contribution_amount` et `groups.max_members`, et garde-fou dans `create_group_with_invitation` + `join_group_with_code` pour refuser :
-- Montants hors politique → `INVALID_CONTRIBUTION_BOUNDS`
-- Membres hors politique → `INVALID_MAX_MEMBERS_BOUNDS`
-- Fréquence inconnue → `INVALID_FREQUENCY`
+Refonte de `InviteSuccessPanel` :
+- **Mode masqué par défaut** : code affiché en `••••-••••-••••` avec bouton œil (show/hide).
+- **Bouton copier** : feedback immédiat (icône check vert + toast 1.5s, libellé "Copié ✓"), retour à l'état initial après 2s.
+- **Compteur de régénérations** : `Régénérations utilisées : X / 3` (limite côté client + future garde RPC). Bouton désactivé quand atteint avec tooltip.
+- **Lien d'invitation** : même pattern masqué/copié.
+- Tout en tokens sémantiques, font-display, tabular-nums pour le compteur.
 
-Erreurs traduites dans `src/lib/api/groups.ts` et `src/lib/api/invitations.ts`.
+Pas de migration SQL (la limite côté serveur sera ajoutée plus tard si besoin).
 
-## Lot D — Audit RLS des modales
+## Lot 3 — Notifications rappels (in-app + e-mail)
 
-Vérification ciblée (lecture seule, aucun changement sauf si écart) :
-- `CreateGroupDialog` → `create_group_with_invitation` (SECURITY DEFINER, déjà OK).
-- `JoinGroupDialog` → `preview_group_by_code` (requiert auth, déjà OK) + `join_group_with_code`.
-- `PayContributionsDialog` → vue `my_dues` / `my_groups_overview` filtrée par `auth.uid()`.
+**In-app** : déjà supporté via table `notifications` et hook `useNotificationsRealtime`. Ajoute deux types : `turn_upcoming` (J-2 avant le prochain tour) et `contribution_due_reminder` (J-3 et J-1).
 
-Si une vue expose des colonnes au-delà du périmètre de l'utilisateur connecté, on resserre via `security_invoker=on` ou policy `USING (user_id = auth.uid())`. Action concrète seulement si l'audit révèle un écart — sinon rapport « conforme ».
+**E-mail** : utilise l'infrastructure Lovable Emails.
+- Si domaine déjà configuré → `email_domain--scaffold_transactional_email` puis 2 templates : `turn-upcoming.tsx`, `contribution-due.tsx` (palette sarcelle/or).
+- Sinon → demander à l'utilisateur d'activer le domaine via le dialog officiel.
 
-## Lot E — Page de détail tontine `/tontines/:id`
+**Scheduler** : Edge Function `send-tontine-reminders` invoquée par `pg_cron` chaque heure. Elle interroge `my_contributions_due` / `turns` à venir, respecte `notification_preferences` (`turn_upcoming`, `contribution_due` × canaux `in_app`/`email`), enqueue les emails et insère les notifications in-app.
 
-Le fichier `src/pages/GroupDetail.tsx` existe : on le refonte pour appliquer la doctrine billion-dollar.
+**Réglages depuis GroupDetail** : nouveau bloc « Rappels » dans l'onglet Paramètres de la tontine (ou menu kebab → "Préférences de rappel") qui édite `notification_preferences` filtrées sur ces 2 types. Réutilise l'API existante `listMyNotificationPreferences` / `updateNotificationPreferences`.
 
-**Hero**
-- Bandeau gradient sarcelle → fond profond, halo doré subtil.
-- Titre (nom du groupe) en font-display 3xl, catégorie en chip, statut (`StatusBadge`).
-- Sous-titre : organisateur + date de création + visibilité.
-- 4 métriques alignées : Cagnotte par tour, Prochain tour (date + bénéficiaire), Membres actifs / max, Score moyen de fiabilité.
+## Lot 4 — Page « Mes contributions »
 
-**Barre d'actions** (même doctrine que le hero du Dashboard) :
-- « Voir membres » → `/groupes/:id/membres`
-- « Gérer contributions » → ouvre `PayContributionsDialog` filtré sur ce groupe
-- « Inviter » → ouvre `InviteSuccessPanel` avec code actif
-- Menu kebab : Paramètres, Annonces, Chat, Historique paiements, Supprimer
+Nouvelle route `/mes-contributions` (la page actuelle `MyContributions.tsx` à `/payer` reste pour le flux de paiement express ; on extrait la liste vers une vue dédiée plus riche, ou on enrichit l'existante — je choisis **enrichir** pour ne pas dupliquer).
 
-**Corps**
-- Tabs (Vue d'ensemble / Membres / Tours / Paiements / Annonces / Chat) — réutilisent les panneaux existants (`MembersAdminPanel`, `TurnsTimeline`, `PaymentsHistoryPanel`, `AnnouncementsPanel`, `GroupChat`).
-- Vue d'ensemble : 2 colonnes desktop (timeline des tours + annonces récentes), empilé mobile.
+Ajouts dans `MyContributions.tsx` :
+- **Hero compact** : titre display, total dû, nombre de cotisations en retard.
+- **Filtres** : statut (toutes / due / en retard / payée), tontine (select), recherche texte (nom de tontine).
+- **Récap par tontine** : carte par groupe avec total à régler + nombre d'échéances + CTA "Tout payer" (chaîne les paiements via la file existante).
+- **Liste détaillée** : status badge (StatusBadge réutilisé), date d'échéance, montant, urgence colorée (`<3j` destructive, `<7j` accent or, sinon neutre).
+- État vide doctrine (`EmptyState`).
+- Skeletons (jamais de spinner).
 
-## Implementation order
+Données : `my_contributions_due` (déjà filtrée par `auth.uid()`) + `my_payments_history` pour le statut "payée".
 
-1. Lot C (validation) — fondations partagées.
-2. Lot B (InviteSuccessPanel) — réutilisé en E.
-3. Lot A (React Query + skeletons).
-4. Lot D (audit RLS).
-5. Lot E (page de détail).
+## Lot 5 — Historique des codes d'invitation dans GroupDetail
 
-## Technical notes
+Nouveau panneau `InvitationsHistoryPanel` ajouté dans un onglet « Invitations » de `GroupDetail.tsx` :
+- Table responsive : Code (masqué par défaut, bouton œil), Statut (badge `valide` / `expiré` / `épuisé` / `révoqué`), Créé le, Expire le, Utilisations `X / max`.
+- Action : copier, révoquer (organisateur uniquement, RPC existante si dispo sinon UPDATE direct via RLS), régénérer.
+- Tri par date desc, pagination si > 20.
+- API : nouvelle fonction `listGroupInvitations(groupId)` dans `src/lib/api/invitations.ts` (lecture sur `invitations` filtrée par `group_id`, RLS existante restreint déjà aux membres organisateurs).
 
-- React Query : `QueryClient` déjà initialisé dans `App.tsx` (à vérifier, sinon l'ajouter).
-- Migration SQL minimale : ajout de `CHECK` + raise dans 2 RPC. Pas de changement de schéma destructif.
-- Aucun changement d'auth ou de provider.
-- Tous les nouveaux composants restent dans `src/components/groups/` ou `src/components/quick-actions/`.
+---
+
+## Ordre d'implémentation
+
+1. **Lot 2** (UI pure, rapide, livre une amélioration visible immédiate).
+2. **Lot 5** (UI + petit ajout API, complète la page détail).
+3. **Lot 4** (page Mes contributions enrichie).
+4. **Lot 1** (tests Vitest + E2E — verrouille les acquis).
+5. **Lot 3** (notifications — plus lourd : migration SQL + edge function + emails + UI réglages).
+
+## Points à confirmer avant exécution
+
+1. **Lot 3 e-mails** : tu veux que je provisionne tout de suite l'infrastructure Lovable Emails (création domaine via dialog si absent) ? Ou on commence par in-app seulement et on branche l'email après ?
+2. **Lot 4** : j'enrichis la page existante `/payer` (recommandé, pas de duplication) ou je crée une route séparée `/mes-contributions` qui coexiste ?
+3. **Lot 1 tests RLS** : tu valides l'extension de la fixture `famille-alice` (seeds invitation expirée + épuisée) plutôt qu'une nouvelle fixture isolée ?

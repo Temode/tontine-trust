@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   ArrowLeft,
+  Bell,
   Calendar,
   CheckCircle2,
   HandCoins,
@@ -44,8 +45,19 @@ import { SwapsPanel } from "@/components/group/SwapsPanel";
 import { AuctionPanel } from "@/components/group/AuctionPanel";
 import { ReviewsPanel } from "@/components/group/ReviewsPanel";
 import { TestModePanel } from "@/components/group/TestModePanel";
+import { InvitationsHistoryPanel } from "@/components/groups/InvitationsHistoryPanel";
 
-type Section = "overview" | "members" | "rotation" | "swaps" | "auctions" | "reviews" | "chat" | "audit" | "test";
+type Section =
+  | "overview"
+  | "members"
+  | "rotation"
+  | "invitations"
+  | "swaps"
+  | "auctions"
+  | "reviews"
+  | "chat"
+  | "audit"
+  | "test";
 
 const FREQ_LABEL: Record<string, string> = {
   mensuelle: "Mensuelle",
@@ -200,6 +212,7 @@ export default function GroupDetail() {
     { id: "overview", label: "Aperçu" },
     { id: "members", label: "Membres" },
     { id: "rotation", label: "Rotation" },
+    ...(isOrganizer ? [{ id: "invitations" as Section, label: "Invitations" }] : []),
     { id: "swaps", label: "Échanges" },
     ...(grp.rotation_order_kind === "auction" ? [{ id: "auctions" as Section, label: "Enchères" }] : []),
     ...(grp.status === "completed" ? [{ id: "reviews" as Section, label: "Avis" }] : []),
@@ -369,6 +382,14 @@ export default function GroupDetail() {
             <ChevronRight className="h-4 w-4" />
             Paramètres
           </Link>
+          <Link
+            to="/parametres/notifications"
+            className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-hairline bg-card px-4 text-xs font-medium text-muted-foreground transition hover:text-foreground"
+            title="Régler vos rappels (prochain tour, cotisations dues) — in-app et email"
+          >
+            <Bell className="h-4 w-4" />
+            Rappels
+          </Link>
         </div>
 
         {canStart && (
@@ -520,6 +541,9 @@ export default function GroupDetail() {
             />
           )}
           {section === "chat" && <GroupChat groupId={grp.id} />}
+          {section === "invitations" && isOrganizer && (
+            <InvitationsHistoryPanel groupId={grp.id} canManage={isOrganizer} />
+          )}
           {section === "swaps" && (
             <SwapsPanel
               groupId={grp.id}
