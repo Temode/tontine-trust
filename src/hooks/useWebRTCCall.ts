@@ -469,6 +469,25 @@ export function useWebRTCCall({
                 event: "peer-join",
                 payload: { user_id: myId },
               });
+              const activePeers = participantsRef.current
+                .filter((p) => !p.left_at && p.user_id !== myId)
+                .map((p) => p.user_id);
+              for (const peerId of activePeers) {
+                if (myId >= peerId || pcsRef.current[peerId]) continue;
+                try {
+                  const pc = createPeerConnection(peerId);
+                  const offer = await pc.createOffer();
+                  await pc.setLocalDescription(offer);
+                  channel.send({
+                    type: "broadcast",
+                    event: "offer",
+                    payload: { from: myId, to: peerId, sdp: offer },
+                  });
+                  logDiag({ peer: peerId, type: "offer", detail: "existing-peer" });
+                } catch (e) {
+                  logDiag({ peer: peerId, type: "error", detail: (e as Error).message });
+                }
+              }
               setStatus("live");
               logDiag({ type: "info", detail: "signaling channel subscribed" });
             }
