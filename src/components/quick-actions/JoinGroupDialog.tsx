@@ -165,3 +165,25 @@ function Stat({ label, value }: { label: string; value: string }) {
 function capitalize(s: string): string {
   return s ? s[0].toUpperCase() + s.slice(1) : s;
 }
+
+function PreviewSkeleton() {
+  return (
+    <article className="rounded-xl border border-hairline bg-card p-4">
+      <div className="flex items-start gap-3">
+        <div className="h-10 w-10 shrink-0 animate-pulse rounded-lg bg-secondary" />
+        <div className="min-w-0 flex-1 space-y-2">
+          <div className="h-4 w-2/3 animate-pulse rounded bg-secondary" />
+          <div className="h-3 w-1/3 animate-pulse rounded bg-secondary/70" />
+        </div>
+      </div>
+      <div className="mt-4 grid grid-cols-3 gap-3">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div key={i} className="space-y-1.5">
+            <div className="h-2.5 w-12 animate-pulse rounded bg-secondary/70" />
+            <div className="h-4 w-16 animate-pulse rounded bg-secondary" />
+          </div>
+        ))}
+      </div>
+    </article>
+  );
+}
