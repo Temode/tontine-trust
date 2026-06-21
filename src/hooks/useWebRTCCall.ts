@@ -645,14 +645,16 @@ export function useWebRTCCall({
         console.warn("setCallMute", e);
       }
     }
-  }, [isMuted, callId]);
+    broadcastMediaState({ micMuted: next });
+  }, [isMuted, callId, broadcastMediaState]);
 
   const toggleCam = useCallback(() => {
     const next = !isCamOff;
     setCamOff(next);
     const stream = localStreamRef.current;
     if (stream) stream.getVideoTracks().forEach((t) => (t.enabled = !next));
-  }, [isCamOff]);
+    broadcastMediaState({ camOff: next });
+  }, [isCamOff, broadcastMediaState]);
 
   const stopScreenShare = useCallback(async () => {
     const stream = localStreamRef.current;
@@ -684,7 +686,8 @@ export function useWebRTCCall({
     setLocalStream(new MediaStream(stream.getTracks()));
     setScreenSharing(false);
     logDiag({ type: "info", detail: "screen share stopped" });
-  }, [isCamOff, logDiag]);
+    broadcastMediaState({ screenSharing: false });
+  }, [isCamOff, logDiag, broadcastMediaState]);
 
   const startScreenShare = useCallback(async () => {
     if (screenStreamRef.current) return;
@@ -724,7 +727,8 @@ export function useWebRTCCall({
     setLocalStream(new MediaStream(stream.getTracks()));
     setScreenSharing(true);
     logDiag({ type: "info", detail: "screen share started" });
-  }, [logDiag, stopScreenShare]);
+    broadcastMediaState({ screenSharing: true });
+  }, [logDiag, stopScreenShare, broadcastMediaState]);
 
   const toggleScreenShare = useCallback(async () => {
     if (screenStreamRef.current) {
