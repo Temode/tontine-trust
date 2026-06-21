@@ -473,6 +473,15 @@ export function useWebRTCCall({
             removePeer(payload.user_id);
             logDiag({ peer: payload.user_id, type: "info", detail: "peer-leave" });
           })
+          .on("broadcast", { event: "media-state" }, ({ payload }) => {
+            const fromId = payload.from as string;
+            if (!fromId || fromId === myId) return;
+            updatePeer(fromId, {
+              micMuted: !!payload.micMuted,
+              camOff: !!payload.camOff,
+              screenSharing: !!payload.screenSharing,
+            });
+          })
           .subscribe(async (state) => {
             if (state === "SUBSCRIBED") {
               const announce = () =>
