@@ -26,6 +26,8 @@ const KINDS = [
   { value: "payment_confirmed", label: "Paiement confirmé" },
   { value: "turn_upcoming_j2", label: "Tour J-2" },
   { value: "contribution_due_j1", label: "Cotisation J-1" },
+  { value: "preview_j2", label: "Aperçu cron J-2" },
+  { value: "preview_j1", label: "Aperçu cron J-1" },
 ];
 
 export default function AdminSmsLogs() {
