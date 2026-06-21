@@ -1,6 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Circle, Mic, MicOff, PhoneOff, ShieldAlert, Square } from "lucide-react";
+import {
+  Activity,
+  Circle,
+  Mic,
+  MicOff,
+  PhoneOff,
+  ShieldAlert,
+  Square,
+  Video,
+  VideoOff,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
@@ -25,6 +35,7 @@ export function CallRoom({ open, onOpenChange, callId, groupName, groupId }: Pro
   const { user } = useAuth();
   const [micGranted, setMicGranted] = useState(false);
   const [recordingEnabled, setRecordingEnabled] = useState(false);
+  const [showDiag, setShowDiag] = useState(false);
   const {
     status,
     error,
@@ -32,14 +43,19 @@ export function CallRoom({ open, onOpenChange, callId, groupName, groupId }: Pro
     peers,
     isMuted,
     toggleMute,
+    isCamOff,
+    toggleCam,
     leave,
     isRecording,
     turnAvailable,
+    localStream,
+    diagEvents,
   } = useWebRTCCall({
     callId,
     enabled: open && micGranted,
     groupId,
     recordingEnabled,
+    video: true,
   });
 
   const { data: call } = useQuery({
@@ -220,8 +236,10 @@ export function CallRoom({ open, onOpenChange, callId, groupName, groupId }: Pro
             <CallParticipantTile
               name={user?.user_metadata?.full_name ?? "Vous"}
               initials={getInitials(user?.user_metadata?.full_name ?? "Moi") ?? "··"}
+              stream={localStream}
               isLocal
               isMuted={isMuted}
+              isCamOff={isCamOff}
               connectionState="connected"
             />
             {remoteParticipants.map((p) => {
@@ -242,6 +260,104 @@ export function CallRoom({ open, onOpenChange, callId, groupName, groupId }: Pro
               </div>
             )}
           </div>
+
+          {/* WebRTC diagnostic drawer */}
+          {showDiag && (
+            <div className="mx-auto mt-6 max-w-3xl rounded-xl border border-hairline bg-card p-4 text-xs">
+              <div className="mb-3 flex items-center justify-between">
+                <p className="font-display text-sm font-semibold text-foreground">
+                  Diagnostic WebRTC
+                </p>
+                <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                  {diagEvents.length} events
+                </span>
+              </div>
+              {/* Per-peer summary */}
+              <div className="mb-3 grid gap-2 sm:grid-cols-2">
+                {Object.values(peers).map((p) => {
+                  const name =
+                    participants.find((pa) => pa.user_id === p.user_id)?.profile?.full_name ??
+                    p.user_id.slice(0, 8);
+                  return (
+                    <div key={p.user_id} className="rounded-md border border-hairline p-2">
+                      <p className="font-semibold text-foreground">{name}</p>
+                      <p className="text-muted-foreground">
+                        conn:{" "}
+                        <span className="font-mono text-foreground">{p.connectionState}</span> ·
+                        ice:{" "}
+                        <span className="font-mono text-foreground">
+                          {p.iceConnectionState ?? "—"}
+                        </span>
+                      </p>
+                      <p className="text-muted-foreground">
+                        signaling:{" "}
+                        <span className="font-mono text-foreground">
+                          {p.signalingState ?? "—"}
+                        </span>{" "}
+                        · retries:{" "}
+                        <span className="font-mono text-foreground">{p.retries ?? 0}</span>
+                      </p>
+                      {p.lastError && (
+                        <p className="mt-1 text-destructive">{p.lastError}</p>
+                      )}
+                    </div>
+                  );
+                })}
+                {Object.keys(peers).length === 0 && (
+                  <p className="text-muted-foreground">Aucun pair connecté.</p>
+                )}
+              </div>
+              {/* Event log */}
+              <div className="max-h-48 overflow-y-auto rounded-md bg-muted/40 p-2 font-mono text-[10px] leading-relaxed">
+                {diagEvents.slice(-60).map((e, i) => (
+                  <div key={i} className="flex gap-2">
+                    <span className="text-muted-foreground">
+                      {new Date(e.ts).toLocaleTimeString()}
+                    </span>
+                    <span className="text-primary">{e.type}</span>
+                    {e.peer && (
+                      <span className="text-muted-foreground">[{e.peer.slice(0, 6)}]</span>
+                    )}
+                    <span className="flex-1 truncate text-foreground">{e.detail ?? ""}</span>
+                  </div>
+                ))}
+                {diagEvents.length === 0 && (
+                  <p className="text-muted-foreground">Aucun événement.</p>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  const blob = new Blob(
+                    [
+                      JSON.stringify(
+                        {
+                          callId,
+                          timestamp: new Date().toISOString(),
+                          status,
+                          turnAvailable,
+                          peers,
+                          events: diagEvents,
+                        },
+                        null,
+                        2,
+                      ),
+                    ],
+                    { type: "application/json" },
+                  );
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement("a");
+                  a.href = url;
+                  a.download = `webrtc-diag-${callId}-${Date.now()}.json`;
+                  a.click();
+                  URL.revokeObjectURL(url);
+                }}
+                className="mt-3 h-8 w-full rounded-md border border-hairline text-[11px] font-semibold text-foreground hover:bg-secondary"
+              >
+                Exporter le diagnostic (JSON)
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Footer / controls */}
@@ -257,6 +373,18 @@ export function CallRoom({ open, onOpenChange, callId, groupName, groupId }: Pro
             aria-label={isMuted ? "Réactiver le micro" : "Couper le micro"}
           >
             {isMuted ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
+          </button>
+          <button
+            type="button"
+            onClick={toggleCam}
+            disabled={status !== "live" || !localStream?.getVideoTracks().length}
+            className={cn(
+              "inline-flex h-12 w-12 items-center justify-center rounded-full border border-hairline transition hover:bg-secondary disabled:opacity-50",
+              isCamOff && "border-destructive/40 bg-destructive/10 text-destructive",
+            )}
+            aria-label={isCamOff ? "Réactiver la caméra" : "Couper la caméra"}
+          >
+            {isCamOff ? <VideoOff className="h-5 w-5" /> : <Video className="h-5 w-5" />}
           </button>
           <button
             type="button"
@@ -277,6 +405,18 @@ export function CallRoom({ open, onOpenChange, callId, groupName, groupId }: Pro
                   ? "Enregistrer"
                   : `Consentements ${consentCount}/${totalParticipants}`}
             {!allConsented && myConsent && <ShieldAlert className="h-3.5 w-3.5" />}
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowDiag((v) => !v)}
+            className={cn(
+              "inline-flex h-12 w-12 items-center justify-center rounded-full border border-hairline transition hover:bg-secondary",
+              showDiag && "border-primary/40 bg-primary/10 text-primary",
+            )}
+            aria-label="Diagnostic WebRTC"
+            title="Diagnostic WebRTC"
+          >
+            <Activity className="h-5 w-5" />
           </button>
           <button
             type="button"
