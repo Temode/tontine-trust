@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, Loader2, AlertCircle, X, Clock, Receipt, ArrowRight } from "lucide-react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { getDjomyPaymentStatus } from "@/lib/api/djomy";
 import { cn } from "@/lib/utils";
 
 type PaymentStatus = "initiated" | "pending" | "succeeded" | "failed" | "cancelled" | "refunded";
@@ -54,6 +55,25 @@ export function PaymentTracker({ paymentId, compact = false }: { paymentId: stri
       return s === "succeeded" || s === "failed" || s === "cancelled" || s === "refunded" ? false : 4000;
     },
   });
+
+  // Réconciliation active avec Djomy : si le webhook tarde / échoue, on interroge
+  // directement le statut chez Djomy toutes les 5 s tant que le paiement n'est pas final.
+  useEffect(() => {
+    const tx = q.data?.djomy_transaction_id;
+    const status = q.data?.status;
+    if (!tx || !status) return;
+    if (status === "succeeded" || status === "failed" || status === "cancelled" || status === "refunded") return;
+    let cancelled = false;
+    const tick = async () => {
+      try {
+        await getDjomyPaymentStatus(tx);
+        if (!cancelled) qc.invalidateQueries({ queryKey: ["payment", paymentId] });
+      } catch { /* ignore — on retentera */ }
+    };
+    void tick();
+    const id = setInterval(tick, 5000);
+    return () => { cancelled = true; clearInterval(id); };
+  }, [q.data?.djomy_transaction_id, q.data?.status, paymentId, qc]);
 
   useEffect(() => {
     const channel = supabase
