@@ -3,6 +3,7 @@ import {
   FileCheck2,
   LayoutDashboard,
   type LucideIcon,
+  MessageCircle,
   User,
   Users,
   Wallet,
@@ -32,6 +33,7 @@ const sections: NavSection[] = [
     items: [
       { to: "/dashboard", label: "Accueil", icon: LayoutDashboard, tourId: "nav-accueil" },
       { to: "/groupes", label: "Mes tontines", icon: Users, tourId: "nav-tontines" },
+      { to: "/discussions", label: "Discussions", icon: MessageCircle, tourId: "nav-discussions" },
       { to: "/cotisations", label: "Payer", icon: Wallet, tourId: "nav-payer" },
       { to: "/recus", label: "Historique & reçus", icon: FileCheck2 },
       { to: "/profil", label: "Mon profil", icon: User },

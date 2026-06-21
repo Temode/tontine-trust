@@ -23,6 +23,7 @@ const MyGroups = lazy(() => import("@/pages/MyGroups"));
 const MyContributions = lazy(() => import("@/pages/MyContributions"));
 const Receipts = lazy(() => import("@/pages/Receipts"));
 const Notifications = lazy(() => import("@/pages/Notifications"));
+const Messages = lazy(() => import("@/pages/Messages"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
 const Profile = lazy(() => import("@/pages/Profile"));
 const GroupSettings = lazy(() => import("@/pages/GroupSettings"));
@@ -124,6 +125,8 @@ const App = () => (
                     <Route path="/recus" element={<RouteBoundary name="Reçus"><Receipts /></RouteBoundary>} />
                     <Route path="/recus/:id" element={<RouteBoundary name="Reçu"><Receipts /></RouteBoundary>} />
                     <Route path="/notifications" element={<RouteBoundary name="Notifications"><Notifications /></RouteBoundary>} />
+                    <Route path="/discussions" element={<RouteBoundary name="Discussions"><Messages /></RouteBoundary>} />
+                    <Route path="/discussions/:groupId" element={<RouteBoundary name="Discussion"><Messages /></RouteBoundary>} />
                     <Route path="/nouveau" element={<RouteBoundary name="Créer un groupe"><CreateGroup /></RouteBoundary>} />
                     <Route path="/rejoindre" element={<RouteBoundary name="Rejoindre un groupe"><JoinGroup /></RouteBoundary>} />
                     <Route path="/inviter" element={<RouteBoundary name="Inviter"><InviteMembers /></RouteBoundary>} />
