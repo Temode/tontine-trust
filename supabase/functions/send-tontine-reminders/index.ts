@@ -114,21 +114,26 @@ Deno.serve(async (req) => {
   }
 
   // ── 2. Cotisation due J-1 ───────────────────────────────────────────────
+  // Join via turns pour la date d'échéance (contributions n'a pas de due_date).
   const { data: dueContribs, error: cErr } = await admin
     .from("contributions")
-    .select("id, amount, user_id, group_id, turn_id, due_date, groups(name), turns(turn_number)")
+    .select(
+      "id, amount, payer_user_id, group_id, turn_id, groups(name), turns!inner(turn_number, due_date)"
+    )
     .eq("status", "pending")
-    .eq("due_date", target_due_date);
+    .eq("turns.due_date", target_due_date);
   if (cErr) console.error("[reminders] contributions fetch:", cErr);
 
-  const dueUsers = Array.from(new Set((dueContribs ?? []).map((c: any) => c.user_id)));
+  const dueUsers = Array.from(
+    new Set((dueContribs ?? []).map((c: any) => c.payer_user_id)),
+  );
   const duePhones = await loadPhones(admin, dueUsers);
   const duePrefs = await loadSmsPrefs(admin, dueUsers, ["contribution_due"]);
 
   for (const c of (dueContribs ?? []) as any[]) {
-    const phone = duePhones.get(c.user_id);
+    const phone = duePhones.get(c.payer_user_id);
     if (!phone) { skipped++; continue; }
-    if (!optedIn(duePrefs, c.user_id, "contribution_due")) { skipped++; continue; }
+    if (!optedIn(duePrefs, c.payer_user_id, "contribution_due")) { skipped++; continue; }
     const groupName = c.groups?.name ?? "Tontine";
     const turnNumber = c.turns?.turn_number ?? "";
     const body =
@@ -138,7 +143,7 @@ Deno.serve(async (req) => {
       to: phone,
       body,
       logContext: {
-        userId: c.user_id,
+        userId: c.payer_user_id,
         groupId: c.group_id,
         turnId: c.turn_id,
         kind: "contribution_due_j1",
