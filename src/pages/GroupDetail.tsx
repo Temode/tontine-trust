@@ -54,6 +54,8 @@ import {
   type PausePaymentRequest,
 } from "@/lib/api/pauseRequests";
 import { supabase } from "@/integrations/supabase/client";
+import { CurrentTurnBanner } from "@/components/group/CurrentTurnBanner";
+import { useTontineRealtime } from "@/hooks/useTontineRealtime";
 
 type Section =
   | "overview"
@@ -99,6 +101,8 @@ export default function GroupDetail() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [section, setSection] = useState<Section>("overview");
+
+  useTontineRealtime(id);
 
   const groupQ = useQuery({
     queryKey: ["group", id],
