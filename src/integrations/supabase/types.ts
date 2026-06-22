@@ -119,6 +119,61 @@ export type Database = {
         }
         Relationships: []
       }
+      beneficiary_balances: {
+        Row: {
+          available_amount: number
+          created_at: string
+          group_id: string
+          id: string
+          total_credited: number
+          total_withdrawn: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          available_amount?: number
+          created_at?: string
+          group_id: string
+          id?: string
+          total_credited?: number
+          total_withdrawn?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          available_amount?: number
+          created_at?: string
+          group_id?: string
+          id?: string
+          total_credited?: number
+          total_withdrawn?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "beneficiary_balances_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "admin_group_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "beneficiary_balances_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "beneficiary_balances_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "my_groups_overview"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       call_participants: {
         Row: {
           call_id: string
@@ -3224,6 +3279,73 @@ export type Database = {
         }
         Relationships: []
       }
+      withdrawal_requests: {
+        Row: {
+          amount: number
+          created_at: string
+          destination: string | null
+          djomy_payout_ref: string | null
+          group_id: string
+          id: string
+          method: Database["public"]["Enums"]["withdrawal_method"]
+          notes: string | null
+          processed_at: string | null
+          processed_by: string | null
+          status: Database["public"]["Enums"]["withdrawal_status"]
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          destination?: string | null
+          djomy_payout_ref?: string | null
+          group_id: string
+          id?: string
+          method: Database["public"]["Enums"]["withdrawal_method"]
+          notes?: string | null
+          processed_at?: string | null
+          processed_by?: string | null
+          status?: Database["public"]["Enums"]["withdrawal_status"]
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          destination?: string | null
+          djomy_payout_ref?: string | null
+          group_id?: string
+          id?: string
+          method?: Database["public"]["Enums"]["withdrawal_method"]
+          notes?: string | null
+          processed_at?: string | null
+          processed_by?: string | null
+          status?: Database["public"]["Enums"]["withdrawal_status"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "withdrawal_requests_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "admin_group_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "withdrawal_requests_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "withdrawal_requests_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "my_groups_overview"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       admin_group_overview: {
@@ -3913,6 +4035,41 @@ export type Database = {
           },
           {
             foreignKeyName: "member_reviews_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "my_groups_overview"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      my_balances: {
+        Row: {
+          available_amount: number | null
+          group_id: string | null
+          group_name: string | null
+          id: string | null
+          total_credited: number | null
+          total_withdrawn: number | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "beneficiary_balances_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "admin_group_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "beneficiary_balances_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "beneficiary_balances_group_id_fkey"
             columns: ["group_id"]
             isOneToOne: false
             referencedRelation: "my_groups_overview"
@@ -4845,6 +5002,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      auto_close_turn: { Args: { _turn_id: string }; Returns: boolean }
       cancel_my_bid: { Args: { _turn_id: string }; Returns: undefined }
       cancel_turn_swap: { Args: { _request_id: string }; Returns: undefined }
       close_auction: { Args: { _turn_id: string }; Returns: string }
@@ -5082,6 +5240,15 @@ export type Database = {
       }
       request_turn_swap: {
         Args: { _from_turn: string; _reason?: string; _to_turn: string }
+        Returns: string
+      }
+      request_withdrawal: {
+        Args: {
+          _amount: number
+          _destination?: string
+          _group_id: string
+          _method: Database["public"]["Enums"]["withdrawal_method"]
+        }
         Returns: string
       }
       resolve_contribution_dispute: {
@@ -5373,6 +5540,13 @@ export type Database = {
       swap_policy: "none" | "with_consent" | "organizer_only"
       swap_status: "pending" | "accepted" | "rejected" | "cancelled"
       turn_status: "upcoming" | "collecting" | "paid" | "skipped"
+      withdrawal_method: "OM" | "MOMO" | "CARD" | "BANK" | "CASH"
+      withdrawal_status:
+        | "pending"
+        | "processing"
+        | "paid"
+        | "failed"
+        | "cancelled"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -5653,6 +5827,14 @@ export const Constants = {
       swap_policy: ["none", "with_consent", "organizer_only"],
       swap_status: ["pending", "accepted", "rejected", "cancelled"],
       turn_status: ["upcoming", "collecting", "paid", "skipped"],
+      withdrawal_method: ["OM", "MOMO", "CARD", "BANK", "CASH"],
+      withdrawal_status: [
+        "pending",
+        "processing",
+        "paid",
+        "failed",
+        "cancelled",
+      ],
     },
   },
 } as const
