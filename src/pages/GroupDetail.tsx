@@ -568,6 +568,14 @@ export default function GroupDetail() {
           </div>
         )}
 
+        {nextTurn && nextTurn.status === "collecting" && (
+          <CurrentTurnBanner
+            turn={nextTurn}
+            currentUserId={user?.id ?? null}
+            groupContribution={grp.contribution_amount}
+          />
+        )}
+
         {isOrganizer && pendingMembers.length > 0 && (
           <div className="mt-5">
             <SectionCard
