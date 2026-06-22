@@ -135,6 +135,7 @@ const App = () => (
                     <Route path="/profil/confidentialite" element={<RouteBoundary name="Confidentialité"><PrivacySettings /></RouteBoundary>} />
                     <Route path="/profil/suppression" element={<RouteBoundary name="Supprimer mon compte"><DeleteAccount /></RouteBoundary>} />
                     <Route path="/payment/return" element={<RouteBoundary name="Retour paiement"><PaymentReturn /></RouteBoundary>} />
+                    <Route path="/paiement/retour" element={<RouteBoundary name="Retour paiement"><PaymentReturn /></RouteBoundary>} />
                     <Route path="/payment/cancel" element={<RouteBoundary name="Paiement annulé"><PaymentCancel /></RouteBoundary>} />
                     <Route path="/paiement/:paymentId/recu" element={<RouteBoundary name="Preuve de paiement"><PaymentReceipt /></RouteBoundary>} />
                   </Route>

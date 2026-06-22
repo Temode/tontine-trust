@@ -3,11 +3,14 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Loader2, ArrowLeft } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PaymentTracker } from "@/components/payment/PaymentTracker";
+import { useAuth } from "@/hooks/useAuth";
+import { reconcileDjomyPayments } from "@/hooks/useDjomyPaymentReconciler";
 
 
 export default function PaymentReturn() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const transactionId = params.get("transactionId") ?? params.get("transaction_id");
   const pidParam = params.get("pid") ?? params.get("paymentId");
   const storedPid = (() => {
@@ -15,6 +18,14 @@ export default function PaymentReturn() {
   })();
   const [paymentId, setPaymentId] = useState<string | null>(pidParam ?? storedPid);
   const [resolving, setResolving] = useState(!(pidParam ?? storedPid));
+
+  // Force une réconciliation Djomy immédiate au montage, peu importe la route
+  // d'entrée (/payment/return ou /paiement/retour). Évite l'écran "je dois payer"
+  // après que l'utilisateur soit revenu via la flèche retour du navigateur.
+  useEffect(() => {
+    if (!user?.id) return;
+    void reconcileDjomyPayments(user.id, { force: true });
+  }, [user?.id]);
 
   useEffect(() => {
     if (paymentId || !transactionId) { setResolving(false); return; }
