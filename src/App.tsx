@@ -35,6 +35,7 @@ const DeleteAccount = lazy(() => import("@/pages/DeleteAccount"));
 const PaymentReturn = lazy(() => import("@/pages/PaymentReturn"));
 const PaymentCancel = lazy(() => import("@/pages/PaymentCancel"));
 const PaymentReceipt = lazy(() => import("@/pages/PaymentReceipt"));
+const MyBalance = lazy(() => import("@/pages/MyBalance"));
 const AdminOverview = lazy(() => import("@/pages/admin/Overview"));
 const AdminDeletions = lazy(() => import("@/pages/admin/Deletions"));
 const AdminUsers = lazy(() => import("@/pages/admin/Users"));
@@ -122,6 +123,7 @@ const App = () => (
                     <Route path="/groupes/:id/co-organisateurs" element={<RouteBoundary name="Co-organisateurs"><GroupCoOrganizers /></RouteBoundary>} />
                     <Route path="/groupes/:id/membres" element={<RouteBoundary name="Gérer les membres"><GroupMembers /></RouteBoundary>} />
                     <Route path="/cotisations" element={<RouteBoundary name="Mes cotisations"><MyContributions /></RouteBoundary>} />
+                    <Route path="/solde" element={<RouteBoundary name="Mon solde"><MyBalance /></RouteBoundary>} />
                     <Route path="/recus" element={<RouteBoundary name="Reçus"><Receipts /></RouteBoundary>} />
                     <Route path="/recus/:id" element={<RouteBoundary name="Reçu"><Receipts /></RouteBoundary>} />
                     <Route path="/notifications" element={<RouteBoundary name="Notifications"><Notifications /></RouteBoundary>} />
