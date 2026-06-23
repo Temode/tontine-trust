@@ -155,6 +155,9 @@ export async function createGroup(draft: GroupDraft): Promise<CreateGroupResult>
     visibility: draft.visibility,
     co_organizers: coOrganizers,
     invite_code: draft.inviteCode,
+    new_member_lock_last_third: draft.newMemberLockLastThird,
+    deposit_required: draft.depositRequired,
+    deposit_months: draft.depositMonths,
   };
 
   const { data: rpcData, error: rpcError } = await supabase.rpc(
