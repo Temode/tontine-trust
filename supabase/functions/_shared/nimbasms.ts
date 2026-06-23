@@ -130,10 +130,9 @@ export async function sendMessage(params: SendMessageParams): Promise<MessageRes
 
   const serviceId = Deno.env.get("NIMBA_SERVICE_ID");
   const secretToken = Deno.env.get("NIMBA_SECRET_TOKEN");
-  // Sender name approuvé Nimba — fallback temporaire sur "ImmoConnect"
-  // jusqu'à enregistrement d'un sender dédié "Tontine".
+  // Sender name approuvé Nimba — fallback sur "Tontine".
   const senderName =
-    params.senderName ?? Deno.env.get("NIMBA_SENDER_NAME") ?? "ImmoConnect";
+    params.senderName ?? Deno.env.get("NIMBA_SENDER_NAME") ?? "Tontine";
   const channel: NimbaChannel = params.channel ?? "sms";
 
   if (!serviceId || !secretToken) {
