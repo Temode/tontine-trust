@@ -101,7 +101,14 @@ export default function Profile() {
             aria-label="Changer la photo de profil"
           >
             {avatarUrl ? (
-              <img src={avatarUrl} alt={fullName} className="h-full w-full object-cover" />
+              <img
+                src={avatarUrl}
+                alt={fullName}
+                className="h-full w-full object-cover"
+                onError={() => {
+                  if (!refreshAvatarM.isPending) refreshAvatarM.mutate();
+                }}
+              />
             ) : (
               <span className="flex h-full w-full items-center justify-center">{initials || "?"}</span>
             )}
