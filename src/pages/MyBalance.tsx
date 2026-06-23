@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Wallet, TrendingUp, History, CheckCircle2, Clock, XCircle } from "lucide-react";
+import { ArrowLeft, Wallet, TrendingUp, History, CheckCircle2, Clock, XCircle, Lock } from "lucide-react";
 import { Link } from "react-router-dom";
 import { listMyBalances, listMyWithdrawals, type DbMyBalance, type DbWithdrawalRequest } from "@/lib/api/balances";
+import { listMyHeldPayouts } from "@/lib/api/holdPayouts";
 import { formatGNF } from "@/lib/format";
 import { WithdrawDialog } from "@/components/balance/WithdrawDialog";
 import { useTontineRealtime } from "@/hooks/useTontineRealtime";
