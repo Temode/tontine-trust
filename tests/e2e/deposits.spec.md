@@ -26,3 +26,16 @@ Les scripts attendent les variables d'environnement Lovable :
 - `LOVABLE_BROWSER_SUPABASE_SESSION_JSON`
 
 Et un code d'invitation valide passé en argument : `--invite-code XXXXXX --group-id <uuid>`.
+
+## Scénario D — Idempotence du webhook Djomy
+1. Récupérer un `eventId` Djomy fictif (UUID v4) et signer le payload avec `DJOMY_WEBHOOK_SECRET` (HMAC-SHA256).
+2. `POST` deux fois le même payload (`payment.success`, `metadata.purpose='deposit'`, `merchantPaymentReference=<deposit_id>`) sur `…/functions/v1/djomy-webhook`.
+3. **Attendu, 1er appel :** `{ ok:true, depositId, status:"succeeded", transitioned:"paid" }` + 1 SMS envoyé (vérifier `sms_logs.kind='deposit_paid'`).
+4. **Attendu, 2e appel :** `{ ok:true, ignored:"already_processed" }` — aucune nouvelle ligne dans `sms_logs`, `member_deposits.paid_at` inchangé.
+5. Variante : rejouer un `payment.failed` après un `payment.success` déjà traité → le second événement est ignoré (eventId différent mais l'idempotence interne RPC `apply_deposit_webhook` refuse de descendre depuis `paid`).
+
+## Scénario E — SMS de notification caution
+1. Démarrer un dépôt (Scénario B) puis simuler un `payment.success` signé.
+2. **Attendu :** SMS reçu sur le numéro du profil, contenu « caution de X GNF validée ».
+3. Désactiver dans `notification_preferences` le canal `sms` pour `notif_type='deposit_status'`.
+4. Rejouer un échec → **aucun SMS** envoyé, mais `member_deposits.status='failed'` mis à jour.
