@@ -276,6 +276,34 @@ Deno.serve(async (req) => {
   }
 
   // ─────────────────────────────────────────────────────────────────────
+  else if (kind === "payout_hold_extended") {
+    const turnId = payload.turn_id as string;
+    const turnNo = payload.turn_number ?? "?";
+    const benefId = payload.beneficiary_user_id as string;
+    const amount = Number(payload.amount ?? 0);
+    const holdUntil = payload.hold_until as string;
+    const releaseDate = fmtDateFR(holdUntil);
+
+    const body =
+      `Bonjour, le tour #${turnNo} de la tontine "${gname}" est cloture. ` +
+      `Montant credite sur votre solde : ${fmtGNF(amount)}. ` +
+      `Suite a un retard de cotisation ce cycle, la liberation de vos fonds est repoussee au ${releaseDate}. ` +
+      `Ref: ${ref}. Tontine Digitale vous informe.`;
+    results.push({
+      target: "beneficiary",
+      user: benefId,
+      ...(await sendOne({
+        admin,
+        userId: benefId,
+        groupId,
+        turnId,
+        kind: "payout_hold_extended",
+        body,
+      })),
+    });
+  }
+
+  // ─────────────────────────────────────────────────────────────────────
   else if (kind === "cycle_completed") {
     const createdBy = (group as { created_by?: string } | null)?.created_by;
     const recipients = new Set<string>();
