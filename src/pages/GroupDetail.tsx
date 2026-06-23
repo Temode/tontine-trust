@@ -60,6 +60,47 @@ import { DepositCallout } from "@/components/group/DepositCallout";
 import { PositionBadge } from "@/components/group/PositionBadge";
 import { ContractSignDialog } from "@/components/contract/ContractSignDialog";
 import { getActiveContract, getMyContractSignature } from "@/lib/api/contracts";
+import { useQuery as useQueryContract } from "@tanstack/react-query";
+
+function ContractSignSection({ groupId }: { groupId: string }) {
+  const [open, setOpen] = useState(false);
+  const contractQ = useQueryContract({
+    queryKey: ["active-contract", groupId],
+    queryFn: () => getActiveContract(groupId),
+    enabled: !!groupId,
+  });
+  const sigQ = useQueryContract({
+    queryKey: ["my-contract-sig", contractQ.data?.contract_id],
+    queryFn: () => getMyContractSignature(contractQ.data!.contract_id),
+    enabled: !!contractQ.data?.contract_id,
+  });
+  if (!contractQ.data) return null;
+  if (sigQ.data) return null;
+  return (
+    <>
+      <section className="mt-5 rounded-xl border-2 border-amber-400 bg-amber-50 p-4">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-700">
+          Signature requise
+        </p>
+        <h3 className="mt-0.5 font-display text-base font-bold text-amber-950">
+          Signez le contrat numérique pour activer le cycle
+        </h3>
+        <p className="mt-1.5 text-sm text-amber-900/90">
+          Le démarrage du cycle est bloqué tant que tous les membres n'ont pas signé.
+          Signature électronique via code SMS — 1 minute.
+        </p>
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="mt-3 inline-flex h-10 items-center gap-2 rounded-md bg-amber-600 px-4 text-sm font-semibold text-white hover:bg-amber-700"
+        >
+          Signer le contrat
+        </button>
+      </section>
+      <ContractSignDialog open={open} onOpenChange={setOpen} groupId={groupId} />
+    </>
+  );
+}
 
 type Section =
   | "overview"
