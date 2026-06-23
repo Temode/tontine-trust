@@ -5300,6 +5300,10 @@ export type Database = {
         Args: { _approve: boolean; _reason?: string; _request_id: string }
         Returns: undefined
       }
+      admin_force_deposit_status: {
+        Args: { _deposit_id: string; _new_status: string; _reason: string }
+        Returns: undefined
+      }
       admin_force_group_status: {
         Args: { _action: string; _group_id: string; _reason?: string }
         Returns: undefined
@@ -5307,6 +5311,26 @@ export type Database = {
       admin_forfeit_member_deposit: {
         Args: { _deposit_id: string; _reason: string }
         Returns: undefined
+      }
+      admin_list_deposits: {
+        Args: { _group_id?: string; _limit?: number; _status?: string }
+        Returns: {
+          amount: number
+          created_at: string
+          deposit_id: string
+          djomy_transaction_id: string
+          group_id: string
+          group_name: string
+          member_deposit_status: string
+          months: number
+          paid_at: string
+          payment_method: string
+          status: string
+          updated_at: string
+          user_full_name: string
+          user_id: string
+          user_phone: string
+        }[]
       }
       admin_refund_member_deposit: {
         Args: { _deposit_id: string; _reason?: string }
@@ -5420,6 +5444,22 @@ export type Database = {
           created_at: string
           id: string
           metadata: Json
+        }[]
+      }
+      get_member_position_info: {
+        Args: { _group_id: string; _user_id?: string }
+        Returns: {
+          deposit_required: boolean
+          deposit_status: string
+          is_in_last_third: boolean
+          joined_after_start: boolean
+          last_third_start: number
+          lock_reason: string
+          max_members: number
+          member_position: number
+          total_active: number
+          user_id: string
+          withdrawal_locked: boolean
         }[]
       }
       get_user_default_history: {

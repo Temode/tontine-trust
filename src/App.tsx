@@ -50,6 +50,8 @@ const AdminCronPreview = lazy(() => import("@/pages/admin/CronPreview"));
 const AdminDefaulters = lazy(() => import("@/pages/admin/Defaulters"));
 const AdminKycReview = lazy(() => import("@/pages/admin/KycReview"));
 const Kyc = lazy(() => import("@/pages/Kyc"));
+const AdminDeposits = lazy(() => import("@/pages/admin/Deposits"));
+const DepositPayment = lazy(() => import("@/pages/DepositPayment"));
 import { AdminShell } from "@/components/admin/AdminShell";
 
 const queryClient = new QueryClient({
@@ -124,6 +126,7 @@ const App = () => (
                     <Route path="/groupes/:id/parametres" element={<RouteBoundary name="Paramètres du groupe"><GroupSettings /></RouteBoundary>} />
                     <Route path="/groupes/:id/co-organisateurs" element={<RouteBoundary name="Co-organisateurs"><GroupCoOrganizers /></RouteBoundary>} />
                     <Route path="/groupes/:id/membres" element={<RouteBoundary name="Gérer les membres"><GroupMembers /></RouteBoundary>} />
+                   <Route path="/groupes/:id/caution" element={<RouteBoundary name="Dépôt de caution"><DepositPayment /></RouteBoundary>} />
                     <Route path="/cotisations" element={<RouteBoundary name="Mes cotisations"><MyContributions /></RouteBoundary>} />
                     <Route path="/solde" element={<RouteBoundary name="Mon solde"><MyBalance /></RouteBoundary>} />
                     <Route path="/recus" element={<RouteBoundary name="Reçus"><Receipts /></RouteBoundary>} />
@@ -165,6 +168,7 @@ const App = () => (
                     <Route path="/admin/cron-preview" element={<RouteBoundary name="Aperçu cron rappels"><AdminCronPreview /></RouteBoundary>} />
                     <Route path="/admin/defaillants" element={<RouteBoundary name="Défaillants"><AdminDefaulters /></RouteBoundary>} />
                     <Route path="/admin/kyc" element={<RouteBoundary name="Vérifications KYC"><AdminKycReview /></RouteBoundary>} />
+                    <Route path="/admin/cautions" element={<RouteBoundary name="Cautions"><AdminDeposits /></RouteBoundary>} />
                   </Route>
                 </Route>
                 <Route path="*" element={<RouteBoundary name="Page introuvable"><NotFound /></RouteBoundary>} />

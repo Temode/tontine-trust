@@ -63,6 +63,16 @@ export async function requestWithdrawal(args: {
     _method: args.method,
     _destination: args.destination ?? null,
   });
-  if (error) throw error;
+  if (error) {
+    if (/DEPOSIT_REQUIRED/.test(error.message)) {
+      throw new Error(
+        "Caution requise : déposez votre caution avant de pouvoir retirer des fonds.",
+      );
+    }
+    if (/INSUFFICIENT_BALANCE/.test(error.message)) {
+      throw new Error("Solde disponible insuffisant.");
+    }
+    throw error;
+  }
   return data as string;
 }
