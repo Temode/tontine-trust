@@ -57,6 +57,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { CurrentTurnBanner } from "@/components/group/CurrentTurnBanner";
 import { useTontineRealtime } from "@/hooks/useTontineRealtime";
 import { DepositCallout } from "@/components/group/DepositCallout";
+import { PositionBadge } from "@/components/group/PositionBadge";
 
 type Section =
   | "overview"
@@ -581,14 +582,17 @@ export default function GroupDetail() {
           const me = activeMembers.find((m) => m.user_id === user?.id);
           if (!me) return null;
           return (
-            <DepositCallout
-              groupId={grp.id}
-              groupName={grp.name}
-              contributionAmount={grp.contribution_amount}
-              depositRequired={!!(grp as { deposit_required?: boolean }).deposit_required}
-              depositMonths={Number((grp as { deposit_months?: number }).deposit_months ?? 0)}
-              memberDepositStatus={(me as { deposit_status?: string | null }).deposit_status ?? null}
-            />
+            <>
+              <DepositCallout
+                groupId={grp.id}
+                groupName={grp.name}
+                contributionAmount={grp.contribution_amount}
+                depositRequired={!!(grp as { deposit_required?: boolean }).deposit_required}
+                depositMonths={Number((grp as { deposit_months?: number }).deposit_months ?? 0)}
+                memberDepositStatus={(me as { deposit_status?: string | null }).deposit_status ?? null}
+              />
+              {user?.id && <PositionBadge groupId={grp.id} userId={user.id} />}
+            </>
           );
         })()}
 
