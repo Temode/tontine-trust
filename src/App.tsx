@@ -53,6 +53,7 @@ const Kyc = lazy(() => import("@/pages/Kyc"));
 const AdminDeposits = lazy(() => import("@/pages/admin/Deposits"));
 const DepositPayment = lazy(() => import("@/pages/DepositPayment"));
 const AdminContractTemplate = lazy(() => import("@/pages/admin/ContractTemplate"));
+const AdminPayoutHolds = lazy(() => import("@/pages/admin/PayoutHolds"));
 import { AdminShell } from "@/components/admin/AdminShell";
 
 const queryClient = new QueryClient({
