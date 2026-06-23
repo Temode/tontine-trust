@@ -393,6 +393,13 @@ export type Database = {
             foreignKeyName: "contribution_disputes_contribution_id_fkey"
             columns: ["contribution_id"]
             isOneToOne: false
+            referencedRelation: "pending_reminders_view"
+            referencedColumns: ["contribution_id"]
+          },
+          {
+            foreignKeyName: "contribution_disputes_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
             referencedRelation: "turn_assignment_audit"
             referencedColumns: ["contribution_id"]
           },
@@ -703,6 +710,13 @@ export type Database = {
             columns: ["contribution_id"]
             isOneToOne: false
             referencedRelation: "my_late_contributions"
+            referencedColumns: ["contribution_id"]
+          },
+          {
+            foreignKeyName: "external_payment_proofs_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
+            referencedRelation: "pending_reminders_view"
             referencedColumns: ["contribution_id"]
           },
           {
@@ -1614,6 +1628,13 @@ export type Database = {
             foreignKeyName: "ledger_entries_contribution_id_fkey"
             columns: ["contribution_id"]
             isOneToOne: false
+            referencedRelation: "pending_reminders_view"
+            referencedColumns: ["contribution_id"]
+          },
+          {
+            foreignKeyName: "ledger_entries_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
             referencedRelation: "turn_assignment_audit"
             referencedColumns: ["contribution_id"]
           },
@@ -1835,6 +1856,13 @@ export type Database = {
             columns: ["contribution_id"]
             isOneToOne: false
             referencedRelation: "my_late_contributions"
+            referencedColumns: ["contribution_id"]
+          },
+          {
+            foreignKeyName: "member_default_reports_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
+            referencedRelation: "pending_reminders_view"
             referencedColumns: ["contribution_id"]
           },
           {
@@ -2138,6 +2166,13 @@ export type Database = {
             foreignKeyName: "payment_links_contribution_id_fkey"
             columns: ["contribution_id"]
             isOneToOne: false
+            referencedRelation: "pending_reminders_view"
+            referencedColumns: ["contribution_id"]
+          },
+          {
+            foreignKeyName: "payment_links_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
             referencedRelation: "turn_assignment_audit"
             referencedColumns: ["contribution_id"]
           },
@@ -2238,6 +2273,13 @@ export type Database = {
             columns: ["contribution_id"]
             isOneToOne: false
             referencedRelation: "my_late_contributions"
+            referencedColumns: ["contribution_id"]
+          },
+          {
+            foreignKeyName: "payment_pause_requests_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
+            referencedRelation: "pending_reminders_view"
             referencedColumns: ["contribution_id"]
           },
           {
@@ -2362,6 +2404,13 @@ export type Database = {
             columns: ["contribution_id"]
             isOneToOne: false
             referencedRelation: "my_late_contributions"
+            referencedColumns: ["contribution_id"]
+          },
+          {
+            foreignKeyName: "payments_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
+            referencedRelation: "pending_reminders_view"
             referencedColumns: ["contribution_id"]
           },
           {
@@ -2660,6 +2709,13 @@ export type Database = {
             foreignKeyName: "reminder_log_contribution_id_fkey"
             columns: ["contribution_id"]
             isOneToOne: false
+            referencedRelation: "pending_reminders_view"
+            referencedColumns: ["contribution_id"]
+          },
+          {
+            foreignKeyName: "reminder_log_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
             referencedRelation: "turn_assignment_audit"
             referencedColumns: ["contribution_id"]
           },
@@ -2843,6 +2899,13 @@ export type Database = {
             columns: ["contribution_id"]
             isOneToOne: false
             referencedRelation: "my_late_contributions"
+            referencedColumns: ["contribution_id"]
+          },
+          {
+            foreignKeyName: "tontine_alerts_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
+            referencedRelation: "pending_reminders_view"
             referencedColumns: ["contribution_id"]
           },
           {
@@ -4368,6 +4431,13 @@ export type Database = {
             foreignKeyName: "payments_contribution_id_fkey"
             columns: ["contribution_id"]
             isOneToOne: false
+            referencedRelation: "pending_reminders_view"
+            referencedColumns: ["contribution_id"]
+          },
+          {
+            foreignKeyName: "payments_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
             referencedRelation: "turn_assignment_audit"
             referencedColumns: ["contribution_id"]
           },
@@ -4621,6 +4691,74 @@ export type Database = {
             columns: ["group_id"]
             isOneToOne: false
             referencedRelation: "my_groups_overview"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pending_reminders_view: {
+        Row: {
+          amount: number | null
+          bucket: string | null
+          contribution_id: string | null
+          days_late: number | null
+          due_date: string | null
+          expected_penalty: number | null
+          group_id: string | null
+          group_name: string | null
+          late_penalty_after_days: number | null
+          late_penalty_percent: number | null
+          payer_user_id: string | null
+          turn_id: string | null
+          turn_number: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contributions_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "admin_group_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contributions_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contributions_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "my_groups_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contributions_turn_id_fkey"
+            columns: ["turn_id"]
+            isOneToOne: false
+            referencedRelation: "next_turn_per_group"
+            referencedColumns: ["turn_id"]
+          },
+          {
+            foreignKeyName: "contributions_turn_id_fkey"
+            columns: ["turn_id"]
+            isOneToOne: false
+            referencedRelation: "turn_assignment_audit"
+            referencedColumns: ["turn_id"]
+          },
+          {
+            foreignKeyName: "contributions_turn_id_fkey"
+            columns: ["turn_id"]
+            isOneToOne: false
+            referencedRelation: "turn_settlement"
+            referencedColumns: ["turn_id"]
+          },
+          {
+            foreignKeyName: "contributions_turn_id_fkey"
+            columns: ["turn_id"]
+            isOneToOne: false
+            referencedRelation: "turns"
             referencedColumns: ["id"]
           },
         ]
