@@ -199,62 +199,75 @@ Deno.serve(async (req) => {
     if (r.success) sentTurn++;
   }
 
-  // ── 2. Cotisation due J-1 ───────────────────────────────────────────────
-  // Join via turns pour la date d'échéance (contributions n'a pas de due_date).
-  const { data: dueContribs, error: cErr } = await admin
-    .from("contributions")
+  // ── 2. Rappels de cotisation (tous buckets) ─────────────────────────────
+  // Lit la vue pending_reminders_view qui calcule jour/bucket/pénalité côté SQL.
+  // Idempotence : on saute l'envoi SMS si reminder_log a déjà cette ligne aujourd'hui.
+  const today = baseDate ?? new Date().toISOString().slice(0, 10);
+  const { data: pending, error: pErr } = await admin
+    .from("pending_reminders_view")
     .select(
-      "id, amount, payer_user_id, group_id, turn_id, groups(name), turns!inner(turn_number, due_date)"
+      "contribution_id, payer_user_id, group_id, group_name, turn_id, turn_number, due_date, amount, late_penalty_percent, expected_penalty, days_late, bucket",
     )
-    .eq("status", "pending")
-    .eq("turns.due_date", target_due_date);
-  if (cErr) console.error("[reminders] contributions fetch:", cErr);
+    .not("bucket", "is", null);
+  if (pErr) console.error("[reminders] pending view:", pErr);
 
   const dueUsers = Array.from(
-    new Set((dueContribs ?? []).map((c: any) => c.payer_user_id)),
+    new Set((pending ?? []).map((c: any) => c.payer_user_id)),
   );
   const duePhones = await loadPhones(admin, dueUsers);
   const duePrefs = await loadSmsPrefs(admin, dueUsers, ["contribution_due"]);
 
-  for (const c of (dueContribs ?? []) as any[]) {
+  const sentByBucket: Record<string, number> = {};
+
+  for (const c of (pending ?? []) as any[]) {
     const phone = duePhones.get(c.payer_user_id);
-    const reason =
-      !phone ? "no_phone" : !optedIn(duePrefs, c.payer_user_id, "contribution_due") ? "opted_out" : null;
-    const groupName = c.groups?.name ?? "Tontine";
-    const turnNumber = c.turns?.turn_number ?? "";
-    const body =
-      `Tontine ${groupName}: cotisation de ${fmtSms(Number(c.amount))} GNF ` +
-      `due demain (tour #${turnNumber}). Payez via l'app.`;
+    const body = buildReminderSms({
+      groupName: c.group_name ?? "Tontine",
+      turnNumber: c.turn_number,
+      dueDate: c.due_date,
+      amount: Number(c.amount),
+      expectedPenalty: Number(c.expected_penalty ?? 0),
+      latePct: Number(c.late_penalty_percent ?? 0),
+      bucket: c.bucket,
+      daysLate: Number(c.days_late ?? 0),
+    });
+
     if (dryRun) {
       previewContribution.push({
-        contribution_id: c.id,
+        contribution_id: c.contribution_id,
         group_id: c.group_id,
-        group_name: groupName,
+        group_name: c.group_name,
         turn_id: c.turn_id,
-        turn_number: turnNumber,
+        turn_number: c.turn_number,
+        bucket: c.bucket,
+        days_late: c.days_late,
+        expected_penalty: Number(c.expected_penalty ?? 0),
         payer_user_id: c.payer_user_id,
         amount: Number(c.amount),
         phone,
         body,
-        would_send: !reason,
-        skip_reason: reason,
+        would_send: !!phone && optedIn(duePrefs, c.payer_user_id, "contribution_due"),
       });
-      await logSmsAttempt(
-        {
-          userId: c.payer_user_id,
-          groupId: c.group_id,
-          turnId: c.turn_id,
-          kind: "preview_j1",
-          triggeredBy,
-        },
-        [phone ?? "—"],
-        [phone ?? "—"],
-        body,
-        { status: "skipped", error: reason ? `dry_run:${reason}` : `dry_run:would_send@${baseDate ?? "today"}` },
-      );
       continue;
     }
+
+    // Idempotence SMS : déjà loggué aujourd'hui pour ce bucket ?
+    const { count } = await admin
+      .from("sms_logs")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", c.payer_user_id)
+      .eq("turn_id", c.turn_id)
+      .eq("kind", `contribution_due_${c.bucket}`)
+      .gte("created_at", `${today}T00:00:00Z`);
+    if ((count ?? 0) > 0) continue;
+
+    const reason = !phone
+      ? "no_phone"
+      : !optedIn(duePrefs, c.payer_user_id, "contribution_due")
+      ? "opted_out"
+      : null;
     if (reason) { skipped++; continue; }
+
     const r = await sendMessage({
       to: phone,
       body,
@@ -262,10 +275,13 @@ Deno.serve(async (req) => {
         userId: c.payer_user_id,
         groupId: c.group_id,
         turnId: c.turn_id,
-        kind: "contribution_due_j1",
+        kind: `contribution_due_${c.bucket}`,
       },
     });
-    if (r.success) sentContribution++;
+    if (r.success) {
+      sentContribution++;
+      sentByBucket[c.bucket] = (sentByBucket[c.bucket] ?? 0) + 1;
+    }
   }
 
   return new Response(
