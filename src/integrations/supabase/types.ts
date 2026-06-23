@@ -1499,40 +1499,76 @@ export type Database = {
       }
       kyc_documents: {
         Row: {
+          country_code: string | null
           created_at: string
           doc_type: string
+          document_number: string | null
           id: string
           review_note: string | null
           reviewed_at: string | null
           reviewed_by: string | null
           status: string
           storage_path: string
+          target_level: number
           updated_at: string
           user_id: string
         }
         Insert: {
+          country_code?: string | null
           created_at?: string
           doc_type: string
+          document_number?: string | null
           id?: string
           review_note?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
           status?: string
           storage_path: string
+          target_level?: number
           updated_at?: string
           user_id: string
         }
         Update: {
+          country_code?: string | null
           created_at?: string
           doc_type?: string
+          document_number?: string | null
           id?: string
           review_note?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
           status?: string
           storage_path?: string
+          target_level?: number
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      kyc_levels_config: {
+        Row: {
+          description: string | null
+          label: string
+          level: number
+          max_contribution_amount: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          description?: string | null
+          label: string
+          level: number
+          max_contribution_amount: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          description?: string | null
+          label?: string
+          level?: number
+          max_contribution_amount?: number
+          updated_at?: string
+          updated_by?: string | null
         }
         Relationships: []
       }
@@ -2443,6 +2479,39 @@ export type Database = {
           },
         ]
       }
+      phone_otp_challenges: {
+        Row: {
+          attempts: number
+          code_hash: string
+          consumed_at: string | null
+          created_at: string
+          expires_at: string
+          id: string
+          phone_e164: string
+          user_id: string
+        }
+        Insert: {
+          attempts?: number
+          code_hash: string
+          consumed_at?: string | null
+          created_at?: string
+          expires_at: string
+          id?: string
+          phone_e164: string
+          user_id: string
+        }
+        Update: {
+          attempts?: number
+          code_hash?: string
+          consumed_at?: string | null
+          created_at?: string
+          expires_at?: string
+          id?: string
+          phone_e164?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -2451,9 +2520,11 @@ export type Database = {
           deletion_reason: string | null
           full_name: string
           id: string
+          kyc_level: number
           kyc_status: Database["public"]["Enums"]["kyc_status"]
           kyc_verified_at: string | null
           phone_number: string | null
+          phone_verified_at: string | null
           phone_visible_in_groups: boolean
           reliability_score: number
           suspended_at: string | null
@@ -2468,9 +2539,11 @@ export type Database = {
           deletion_reason?: string | null
           full_name: string
           id: string
+          kyc_level?: number
           kyc_status?: Database["public"]["Enums"]["kyc_status"]
           kyc_verified_at?: string | null
           phone_number?: string | null
+          phone_verified_at?: string | null
           phone_visible_in_groups?: boolean
           reliability_score?: number
           suspended_at?: string | null
@@ -2485,9 +2558,11 @@ export type Database = {
           deletion_reason?: string | null
           full_name?: string
           id?: string
+          kyc_level?: number
           kyc_status?: Database["public"]["Enums"]["kyc_status"]
           kyc_verified_at?: string | null
           phone_number?: string | null
+          phone_verified_at?: string | null
           phone_visible_in_groups?: boolean
           reliability_score?: number
           suspended_at?: string | null
@@ -4084,6 +4159,26 @@ export type Database = {
           },
         ]
       }
+      kyc_admin_queue: {
+        Row: {
+          country_code: string | null
+          created_at: string | null
+          current_level: number | null
+          doc_type: string | null
+          document_id: string | null
+          document_number: string | null
+          full_name: string | null
+          phone_number: string | null
+          review_note: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string | null
+          storage_path: string | null
+          target_level: number | null
+          user_id: string | null
+        }
+        Relationships: []
+      }
       member_review_global: {
         Row: {
           avg_rating: number | null
@@ -5121,6 +5216,10 @@ export type Database = {
         Args: { _reason?: string; _suspend: boolean; _target_user: string }
         Returns: undefined
       }
+      admin_validate_kyc: {
+        Args: { _approve: boolean; _document_id: string; _note?: string }
+        Returns: undefined
+      }
       append_ledger: {
         Args: {
           _amount: number
@@ -5258,10 +5357,10 @@ export type Database = {
       join_call: { Args: { p_call_id: string }; Returns: undefined }
       join_group_with_code: {
         Args: {
-          _accepted_terms_version: string
+          _accepted_terms_version?: string
           _code: string
-          _message: string
-          _operator: string
+          _message?: string
+          _operator?: string
         }
         Returns: string
       }
@@ -5302,6 +5401,7 @@ export type Database = {
       mark_defaulted_contributions: { Args: never; Returns: number }
       mark_group_read: { Args: { p_group_id: string }; Returns: undefined }
       mark_notification_read: { Args: { _id: string }; Returns: undefined }
+      mark_phone_verified: { Args: never; Returns: number }
       mask_phone: { Args: { _phone: string }; Returns: string }
       member_can: {
         Args: { _flag: string; _group: string; _user: string }
@@ -5494,6 +5594,15 @@ export type Database = {
           _note?: string
           _proof_url?: string
           _reference?: string
+        }
+        Returns: string
+      }
+      submit_kyc_document: {
+        Args: {
+          _country_code?: string
+          _doc_type: string
+          _document_number?: string
+          _storage_path: string
         }
         Returns: string
       }

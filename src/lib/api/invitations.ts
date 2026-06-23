@@ -59,6 +59,8 @@ const RPC_ERROR_LABELS: Record<string, string> = {
   MESSAGE_TOO_LONG: "Message trop long (280 caractères max.).",
   TERMS_REQUIRED: "Vous devez accepter les conditions générales d'utilisation.",
   TERMS_VERSION_UNKNOWN: "Version des CGU inconnue.",
+  KYC_INSUFFICIENT:
+    "Votre niveau de vérification (KYC) est insuffisant pour rejoindre cette tontine. Vérifiez votre identité dans Profil → Vérification d'identité.",
 };
 
 export interface JoinWithCodeOptions {

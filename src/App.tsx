@@ -48,6 +48,8 @@ const AdminSmsTest = lazy(() => import("@/pages/admin/SmsTest"));
 const AdminSmsLogs = lazy(() => import("@/pages/admin/SmsLogs"));
 const AdminCronPreview = lazy(() => import("@/pages/admin/CronPreview"));
 const AdminDefaulters = lazy(() => import("@/pages/admin/Defaulters"));
+const AdminKycReview = lazy(() => import("@/pages/admin/KycReview"));
+const Kyc = lazy(() => import("@/pages/Kyc"));
 import { AdminShell } from "@/components/admin/AdminShell";
 
 const queryClient = new QueryClient({
@@ -136,6 +138,7 @@ const App = () => (
                     <Route path="/parametres/notifications" element={<RouteBoundary name="Préférences notifications"><NotificationPreferences /></RouteBoundary>} />
                     <Route path="/profil/confidentialite" element={<RouteBoundary name="Confidentialité"><PrivacySettings /></RouteBoundary>} />
                     <Route path="/profil/suppression" element={<RouteBoundary name="Supprimer mon compte"><DeleteAccount /></RouteBoundary>} />
+                    <Route path="/profil/kyc" element={<RouteBoundary name="Vérification d'identité"><Kyc /></RouteBoundary>} />
                     <Route path="/payment/return" element={<RouteBoundary name="Retour paiement"><PaymentReturn /></RouteBoundary>} />
                     <Route path="/paiement/retour" element={<RouteBoundary name="Retour paiement"><PaymentReturn /></RouteBoundary>} />
                     <Route path="/payment/cancel" element={<RouteBoundary name="Paiement annulé"><PaymentCancel /></RouteBoundary>} />
@@ -161,6 +164,7 @@ const App = () => (
                     <Route path="/admin/sms-logs" element={<RouteBoundary name="Journal SMS"><AdminSmsLogs /></RouteBoundary>} />
                     <Route path="/admin/cron-preview" element={<RouteBoundary name="Aperçu cron rappels"><AdminCronPreview /></RouteBoundary>} />
                     <Route path="/admin/defaillants" element={<RouteBoundary name="Défaillants"><AdminDefaulters /></RouteBoundary>} />
+                    <Route path="/admin/kyc" element={<RouteBoundary name="Vérifications KYC"><AdminKycReview /></RouteBoundary>} />
                   </Route>
                 </Route>
                 <Route path="*" element={<RouteBoundary name="Page introuvable"><NotFound /></RouteBoundary>} />

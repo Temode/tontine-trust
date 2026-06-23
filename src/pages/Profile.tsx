@@ -1,4 +1,4 @@
-import { LogOut, RefreshCw, AlertTriangle, Camera, Loader2, Bell, Shield } from "lucide-react";
+import { LogOut, RefreshCw, AlertTriangle, Camera, Loader2, Bell, Shield, BadgeCheck } from "lucide-react";
 import { toast } from "sonner";
 import { Link, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -12,6 +12,7 @@ import {
   recomputeMyReliability,
 } from "@/lib/api/reliability";
 import { getMyProfile, uploadAvatar } from "@/lib/api/profile";
+import { getMyKyc, KYC_LEVEL_LABEL } from "@/lib/api/kyc";
 import { useRef } from "react";
 import { formatGNF } from "@/lib/format";
 
@@ -22,6 +23,7 @@ export default function Profile() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const profileQ = useQuery({ queryKey: ["profile", "mine"], queryFn: getMyProfile });
+  const kycQ = useQuery({ queryKey: ["kyc", "mine"], queryFn: getMyKyc });
 
   const uploadM = useMutation({
     mutationFn: (file: File) => uploadAvatar(file),
@@ -189,6 +191,17 @@ export default function Profile() {
         >
           <Shield className="h-4 w-4" />
           Confidentialité &amp; suppression de compte
+        </Link>
+
+        <Link
+          to="/profil/kyc"
+          className="inline-flex h-10 items-center gap-2 rounded-md border border-hairline bg-card px-4 text-sm font-semibold text-foreground transition hover:bg-secondary"
+        >
+          <BadgeCheck className="h-4 w-4 text-primary" />
+          Vérification d'identité
+          <span className="ml-auto rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+            {KYC_LEVEL_LABEL[kycQ.data?.kyc_level ?? 0]}
+          </span>
         </Link>
       </div>
     </div>
