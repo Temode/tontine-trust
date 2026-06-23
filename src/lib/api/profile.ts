@@ -53,8 +53,13 @@ export async function uploadAvatar(file: File): Promise<string> {
     .upload(path, blob, { upsert: true, contentType: "image/webp", cacheControl: "3600" });
   if (upErr) throw upErr;
 
-  const { data: pub } = supabase.storage.from("avatars").getPublicUrl(path);
-  const url = pub.publicUrl;
+  // Le bucket "avatars" est privé (politique workspace) : on stocke une URL signée
+  // longue durée (1 an) pour que <img src=...> fonctionne sans en-tête d'auth.
+  const { data: signed, error: signErr } = await supabase.storage
+    .from("avatars")
+    .createSignedUrl(path, 60 * 60 * 24 * 365);
+  if (signErr) throw signErr;
+  const url = signed.signedUrl;
 
   const { error: updErr } = await supabase
     .from("profiles")
