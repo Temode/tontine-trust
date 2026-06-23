@@ -5,9 +5,14 @@ import { listGroupDefaulters, canUserReportDefaulter, type GroupDefaulterRow } f
 import { formatGNF } from "@/lib/format";
 import { ReportDefaulterDialog } from "./ReportDefaulterDialog";
 import { useAuth } from "@/hooks/useAuth";
+import { DisputeExportButton } from "./DisputeExportButton";
+import { useQuery as useQueryPerm } from "@tanstack/react-query";
+import { getGroup } from "@/lib/api/groups";
 
 export function GroupDefaultersSection({ groupId }: { groupId: string }) {
   const { user } = useAuth();
+  const groupQ = useQueryPerm({ queryKey: ["group", groupId], queryFn: () => getGroup(groupId) });
+  const isOrganizer = !!user && (groupQ.data?.created_by === user.id || (groupQ.data?.co_organizers ?? []).includes(user.id));
   const q = useQuery({
     queryKey: ["group-defaulters", groupId],
     queryFn: () => listGroupDefaulters(groupId),
@@ -67,6 +72,13 @@ export function GroupDefaultersSection({ groupId }: { groupId: string }) {
                   Signaler à Tontine
                 </button>
               ) : null}
+              {isOrganizer && (
+                <DisputeExportButton
+                  groupId={groupId}
+                  memberId={d.payer_user_id}
+                  memberName={d.payer_name ?? "Membre"}
+                />
+              )}
             </li>
           ))}
         </ul>

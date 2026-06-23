@@ -310,6 +310,78 @@ export type Database = {
           },
         ]
       }
+      contract_signatures: {
+        Row: {
+          contract_id: string
+          group_id: string
+          hash_sha256: string
+          id: string
+          ip: string | null
+          otp_ref: string | null
+          signed_at: string
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          contract_id: string
+          group_id: string
+          hash_sha256: string
+          id?: string
+          ip?: string | null
+          otp_ref?: string | null
+          signed_at?: string
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          contract_id?: string
+          group_id?: string
+          hash_sha256?: string
+          id?: string
+          ip?: string | null
+          otp_ref?: string | null
+          signed_at?: string
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contract_signatures_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "group_contracts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contract_signatures_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "admin_group_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contract_signatures_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contract_signatures_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "my_groups_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contract_signatures_otp_ref_fkey"
+            columns: ["otp_ref"]
+            isOneToOne: false
+            referencedRelation: "phone_otp_challenges"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contribution_disputes: {
         Row: {
           contribution_id: string
@@ -590,6 +662,76 @@ export type Database = {
           },
           {
             foreignKeyName: "cycles_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "my_groups_overview"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dispute_exports: {
+        Row: {
+          created_at: string
+          error_message: string | null
+          expires_at: string | null
+          group_id: string
+          id: string
+          member_id: string
+          pdf_path: string | null
+          reason: string
+          requested_by: string
+          sha256: string | null
+          signed_url: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          error_message?: string | null
+          expires_at?: string | null
+          group_id: string
+          id?: string
+          member_id: string
+          pdf_path?: string | null
+          reason: string
+          requested_by: string
+          sha256?: string | null
+          signed_url?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          error_message?: string | null
+          expires_at?: string | null
+          group_id?: string
+          id?: string
+          member_id?: string
+          pdf_path?: string | null
+          reason?: string
+          requested_by?: string
+          sha256?: string | null
+          signed_url?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dispute_exports_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "admin_group_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dispute_exports_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dispute_exports_group_id_fkey"
             columns: ["group_id"]
             isOneToOne: false
             referencedRelation: "my_groups_overview"
@@ -950,6 +1092,61 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      group_contracts: {
+        Row: {
+          body_md: string
+          created_at: string
+          created_by: string | null
+          group_id: string | null
+          id: string
+          is_default: boolean
+          published_at: string
+          version: string
+        }
+        Insert: {
+          body_md: string
+          created_at?: string
+          created_by?: string | null
+          group_id?: string | null
+          id?: string
+          is_default?: boolean
+          published_at?: string
+          version: string
+        }
+        Update: {
+          body_md?: string
+          created_at?: string
+          created_by?: string | null
+          group_id?: string | null
+          id?: string
+          is_default?: boolean
+          published_at?: string
+          version?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_contracts_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "admin_group_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_contracts_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_contracts_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "my_groups_overview"
             referencedColumns: ["id"]
           },
         ]
@@ -5296,6 +5493,18 @@ export type Database = {
         }
         Returns: undefined
       }
+      admin_complete_dispute_export: {
+        Args: {
+          _error?: string
+          _expires_at?: string
+          _id: string
+          _pdf_path?: string
+          _sha256?: string
+          _signed_url?: string
+          _status: string
+        }
+        Returns: undefined
+      }
       admin_decide_deletion: {
         Args: { _approve: boolean; _reason?: string; _request_id: string }
         Returns: undefined
@@ -5331,6 +5540,10 @@ export type Database = {
           user_id: string
           user_phone: string
         }[]
+      }
+      admin_publish_contract_template: {
+        Args: { _body_md: string; _version: string }
+        Returns: string
       }
       admin_refund_member_deposit: {
         Args: { _deposit_id: string; _reason?: string }
@@ -5433,6 +5646,17 @@ export type Database = {
       frequency_to_days: {
         Args: { _freq: Database["public"]["Enums"]["group_frequency"] }
         Returns: number
+      }
+      get_active_contract: {
+        Args: { _group_id: string }
+        Returns: {
+          body_md: string
+          contract_id: string
+          group_id: string
+          is_default: boolean
+          published_at: string
+          version: string
+        }[]
       }
       get_default_report_audit: {
         Args: { _report_id: string }
@@ -5652,6 +5876,10 @@ export type Database = {
         Args: { _contribution_id: string; _reason?: string }
         Returns: string
       }
+      request_dispute_export: {
+        Args: { _group_id: string; _member_id: string; _reason: string }
+        Returns: string
+      }
       request_group_call: {
         Args: { p_group_id: string; p_scheduled_at: string; p_topic: string }
         Returns: string
@@ -5742,6 +5970,16 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      sign_contract: {
+        Args: {
+          _group_id: string
+          _hash_sha256: string
+          _ip?: string
+          _otp_challenge_id: string
+          _user_agent?: string
+        }
+        Returns: string
       }
       start_cycle: { Args: { _group_id: string }; Returns: string }
       start_djomy_payment: {
