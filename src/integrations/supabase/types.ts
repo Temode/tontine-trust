@@ -1392,6 +1392,24 @@ export type Database = {
         }
         Relationships: []
       }
+      internal_config: {
+        Row: {
+          key: string
+          updated_at: string
+          value: string
+        }
+        Insert: {
+          key: string
+          updated_at?: string
+          value: string
+        }
+        Update: {
+          key?: string
+          updated_at?: string
+          value?: string
+        }
+        Relationships: []
+      }
       invitations: {
         Row: {
           code: string
@@ -5017,6 +5035,10 @@ export type Database = {
       }
       delete_account: { Args: { _reason?: string }; Returns: undefined }
       enqueue_payment_reminders: { Args: never; Returns: number }
+      enqueue_tontine_sms: {
+        Args: { _kind: string; _payload: Json }
+        Returns: undefined
+      }
       explain_contribution: {
         Args: { _contribution_id: string }
         Returns: Json
@@ -5509,6 +5531,7 @@ export type Database = {
         | "payment_pause_request_created"
         | "payment_pause_request_approved"
         | "payment_pause_request_rejected"
+        | "cycle_completed"
       payment_method_external:
         | "cash"
         | "bank_transfer"
@@ -5791,6 +5814,7 @@ export const Constants = {
         "payment_pause_request_created",
         "payment_pause_request_approved",
         "payment_pause_request_rejected",
+        "cycle_completed",
       ],
       payment_method_external: [
         "cash",

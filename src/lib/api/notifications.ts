@@ -93,4 +93,6 @@ export const KIND_LABEL: Record<NotificationKind, string> = {
   group_completed: "Groupe terminé",
   announcement: "Annonce",
   system: "Système",
-};
+  // "cycle_completed" est ajouté dynamiquement (enum DB plus récent que les types générés)
+  ...({ cycle_completed: "Cycle terminé" } as Record<string, string>),
+} as Record<NotificationKind, string>;

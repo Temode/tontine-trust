@@ -28,6 +28,7 @@ const ORDERED_KINDS: NotificationKind[] = [
   "turn_paid",
   "cycle_started",
   "group_completed",
+  "cycle_completed" as NotificationKind,
   "invitation_received",
   "invitation_accepted",
   "member_joined",
