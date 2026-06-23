@@ -40,6 +40,7 @@ import type { DbGroup, DbGroupMember, DbNextTurn } from "@/lib/api/types";
 import { SectionCard } from "@/components/dashboard/SectionCard";
 import { InvitePanel, INVITE_PANEL_ID } from "@/components/groups/InvitePanel";
 import { GroupChat } from "@/components/group/GroupChat";
+import { PayoutHoldHistory } from "@/components/balance/PayoutHoldHistory";
 import { AnnouncementsPanel } from "@/components/group/AnnouncementsPanel";
 import { AuditLog } from "@/components/group/AuditLog";
 import { SwapsPanel } from "@/components/group/SwapsPanel";
