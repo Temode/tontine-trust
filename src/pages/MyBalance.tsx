@@ -29,11 +29,17 @@ export default function MyBalance() {
     queryKey: ["my-withdrawals"],
     queryFn: listMyWithdrawals,
   });
+  const heldQ = useQuery({
+    queryKey: ["my-held-payouts"],
+    queryFn: listMyHeldPayouts,
+  });
 
   const balances = balancesQ.data ?? [];
   const totalAvailable = balances.reduce((s, b) => s + b.available_amount, 0);
   const totalCredited = balances.reduce((s, b) => s + b.total_credited, 0);
   const totalWithdrawn = balances.reduce((s, b) => s + b.total_withdrawn, 0);
+  const heldPayouts = heldQ.data ?? [];
+  const totalHeld = heldPayouts.reduce((s, h) => s + h.payout_amount, 0);
 
   return (
     <div className="animate-fade-in">
