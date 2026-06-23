@@ -50,6 +50,47 @@ function optedIn(prefs: PrefMap, userId: string, kind: string): boolean {
   return v === undefined ? true : v; // défaut ON
 }
 
+function fmtDateFR(iso?: string | null): string {
+  if (!iso) return "—";
+  const d = new Date(iso.length <= 10 ? `${iso}T00:00:00Z` : iso);
+  const dd = String(d.getUTCDate()).padStart(2, "0");
+  const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
+  return `${dd}/${mm}/${d.getUTCFullYear()}`;
+}
+
+function buildReminderSms(args: {
+  groupName: string;
+  turnNumber: number | string;
+  dueDate: string;
+  amount: number;
+  expectedPenalty: number;
+  latePct: number;
+  bucket: string;
+  daysLate: number;
+}): string {
+  const { groupName, turnNumber, dueDate, amount, expectedPenalty, latePct, bucket, daysLate } = args;
+  const amt = `${fmtSms(amount)} GNF`;
+  const pen = expectedPenalty > 0
+    ? ` Pénalité encourue ${fmtSms(expectedPenalty)} GNF (${latePct}%).`
+    : "";
+  if (bucket === "J-2" || bucket === "J-1") {
+    const j = bucket === "J-2" ? "dans 2 jours" : "demain";
+    return `Tontine Digitale : cotisation ${amt} pour le groupe « ${groupName} » (tour #${turnNumber}) due ${j} le ${fmtDateFR(dueDate)}. Reglez via l'app pour eviter toute penalite.`;
+  }
+  if (bucket === "J0") {
+    return `Tontine Digitale : votre cotisation ${amt} (groupe « ${groupName} », tour #${turnNumber}) est due aujourd'hui ${fmtDateFR(dueDate)}.${pen} Reglez via l'app.`;
+  }
+  // J+1, J+3
+  if (bucket === "J+1" || bucket === "J+3") {
+    return `Tontine Digitale : cotisation en retard de ${daysLate} j (groupe « ${groupName} », tour #${turnNumber}, ${amt}).${pen} Reglez sans delai via l'app.`;
+  }
+  if (bucket === "J+7") {
+    return `Tontine Digitale : ${daysLate} j de retard sur le tour #${turnNumber} du groupe « ${groupName} » (${amt}).${pen} Un signalement vient d'etre transmis aux organisateurs. Reglez pour eviter la suspension.`;
+  }
+  // J+14
+  return `Tontine Digitale : 14 j de retard sur le tour #${turnNumber} du groupe « ${groupName} » (${amt}).${pen} Vos droits (vote, encheres) sont desormais suspendus jusqu'au reglement.`;
+}
+
 async function loadPhones(
   admin: ReturnType<typeof createClient>,
   userIds: string[],
