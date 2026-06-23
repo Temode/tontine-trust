@@ -56,7 +56,19 @@ Deno.serve(async (req) => {
   const metadata = (data.metadata as Record<string, unknown> | undefined) ?? {};
   const purpose = String(metadata.purpose ?? "");
 
-  // Idempotence : upsert event (PK eventId) — si conflit, on a déjà traité.
+  // Idempotence forte : si l'eventId existe déjà, on a déjà traité — on sort sans rien refaire.
+  // (Évite double SMS / double validation de caution en cas de re-livraison Djomy.)
+  if (signatureValid) {
+    const { data: existing } = await admin
+      .from("djomy_webhook_events")
+      .select("event_id")
+      .eq("event_id", eventId)
+      .maybeSingle();
+    if (existing) {
+      console.log("[djomy-webhook] duplicate event, skipping", eventId);
+      return json({ ok: true, ignored: "already_processed", eventId }, 200);
+    }
+  }
   const { error: insErr } = await admin
     .from("djomy_webhook_events")
     .insert({
@@ -66,7 +78,11 @@ Deno.serve(async (req) => {
       signature_valid: signatureValid,
       payload,
     });
-  if (insErr && !String(insErr.message).toLowerCase().includes("duplicate")) {
+  if (insErr) {
+    // Course inter-livraisons : un autre worker a inséré le même eventId entre temps.
+    if (String(insErr.message).toLowerCase().includes("duplicate")) {
+      return json({ ok: true, ignored: "already_processed_race", eventId }, 200);
+    }
     console.error("[djomy-webhook] event insert error", insErr);
   }
 
@@ -96,6 +112,14 @@ Deno.serve(async (req) => {
   }
   if (depositId) {
     if (!newStatus) return json({ ok: true, ignored: "unhandled_event" }, 200);
+    // Snapshot AVANT pour ne notifier que sur transition réelle
+    const { data: before } = await admin
+      .from("member_deposits")
+      .select("id, user_id, group_id, amount, months, status")
+      .eq("id", depositId)
+      .maybeSingle();
+    const previousStatus = before?.status ?? null;
+
     const { error: depErr } = await admin.rpc("apply_deposit_webhook", {
       _deposit_id: depositId,
       _new_status: newStatus,
@@ -106,7 +130,60 @@ Deno.serve(async (req) => {
       console.error("[djomy-webhook] deposit rpc error", depErr);
       return json({ ok: false, error: depErr.message }, 500);
     }
-    return json({ ok: true, depositId, status: newStatus });
+
+    // Notifie le membre uniquement si le statut a changé vers paid/failed.
+    const mappedNew =
+      newStatus === "succeeded" || newStatus === "paid" ? "paid"
+      : newStatus === "failed" ? "failed"
+      : null;
+    const shouldNotify = mappedNew && previousStatus !== mappedNew
+      && (previousStatus === null || previousStatus === "pending");
+    if (shouldNotify && before?.user_id) {
+      try {
+        const { data: prof } = await admin
+          .from("profiles")
+          .select("phone_number")
+          .eq("id", before.user_id)
+          .maybeSingle();
+        const phone = normalizeGNPhone(prof?.phone_number ?? null);
+
+        const { data: pref } = await admin
+          .from("notification_preferences")
+          .select("enabled")
+          .eq("user_id", before.user_id)
+          .eq("notif_type", "deposit_status")
+          .eq("channel", "sms")
+          .maybeSingle();
+        const optedIn = pref?.enabled !== false; // défaut ON
+
+        if (phone && optedIn) {
+          const { data: grp } = await admin
+            .from("groups").select("name").eq("id", before.group_id).maybeSingle();
+          const gname = (grp?.name as string | undefined) ?? "Tontine";
+          const amount = Number(before.amount ?? 0);
+          const body = mappedNew === "paid"
+            ? `Tontine ${gname}: caution de ${fmtSms(amount)} GNF validée. Votre participation est activée. Merci!`
+            : `Tontine ${gname}: paiement de votre caution (${fmtSms(amount)} GNF) ECHOUE. Reprenez le dépôt depuis l'app.`;
+          sendMessageBg({
+            to: phone,
+            body,
+            logContext: {
+              userId: before.user_id,
+              groupId: before.group_id,
+              kind: `deposit_${mappedNew}`,
+            },
+          });
+        }
+      } catch (e) {
+        console.error("[djomy-webhook] deposit sms hook failed:", e);
+      }
+    }
+
+    return json({
+      ok: true, depositId, status: newStatus,
+      transitioned: shouldNotify ? mappedNew : null,
+      previousStatus,
+    });
   }
 
   // Retrouve le payment local
