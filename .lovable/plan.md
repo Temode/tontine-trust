@@ -1,124 +1,47 @@
-## Vue d'ensemble
+## Vérification d'implémentation — Chantiers 1 à 4
 
-Quatre chantiers à livrer **séquentiellement** (1 → 2 → 3 → 4). Chacun est autonome : on ne démarre le suivant qu'après validation visible du précédent (UI + données). Ce plan définit la cible. Avant chaque chantier, je redemande votre feu vert.
+Audit du code, du schéma DB (RPCs, colonnes, tables) et des tests présents. Voici l'état réel.
 
----
+### Chantier 1 — KYC à Paliers ✅ Implémenté
+- Table `kyc_levels_config` (3 niveaux), `kyc_documents`, colonnes `profiles.kyc_level / kyc_status / phone_verified_at / kyc_verified_at`.
+- Edge functions `kyc-send-otp`, `kyc-verify-otp` (Nimba SMS — logs OK).
+- RPCs `submit_kyc_document`, `admin_validate_kyc`.
+- UI : `src/pages/Kyc.tsx` (parcours membre), `src/pages/admin/KycReview.tsx` (revue admin).
+- Plafond par palier appliqué côté join (erreur `KYC_INSUFFICIENT`).
 
-## Chantier 1 — KYC à paliers (« Parcours de confiance »)
+### Chantier 2 — Caution & verrou dernier tiers ✅ Implémenté
+- `group_members.deposit_status` + `was_late_*`, table `member_deposits` (0 lignes en prod = aucun parcours réel exécuté encore).
+- Page `src/pages/DepositPayment.tsx`, admin `src/pages/admin/Deposits.tsx` (forçage + audit_log).
+- Composant `PositionBadge`, blocage `request_withdrawal` (`DEPOSIT_REQUIRED`, `POSITION_LOCKED`).
+- Webhook Djomy idempotent via `djomy_webhook_events`.
 
-### Modèle de données
-- Nouvelle table `kyc_levels_config` (configurable par admin plateforme) — plafonds par palier.
-- Colonne `profiles.kyc_level smallint not null default 0` (0=non vérifié, 1=Découverte, 2=Vérifié).
-- Réutilise la table existante `kyc_documents` (déjà présente) pour stocker NINA / passeport / carte d'électeur.
-- Trigger : passage à `kyc_level=1` dès qu'un OTP SMS est validé (réutilise le flux Nimba existant).
-- Workflow back-office : page admin `KycReview` (file d'attente), RPC `admin_validate_kyc(user_id, decision, level)`.
+### Chantier 3 — Contrat numérique & export de litige ✅ Implémenté
+- Tables `group_contracts` (1 modèle par défaut publié), `contract_signatures`, `dispute_exports`.
+- RPCs `get_active_contract`, `sign_contract`, `admin_publish_contract_template`.
+- Edge function `generate-dispute-pdf` + bucket `dispute-exports` (URL signée 24 h).
+- UI : `ContractSignDialog` (OTP SMS + SHA-256), `DisputeExportButton`, `src/pages/admin/ContractTemplate.tsx`.
+- Garde-fou `start_cycle` rejette `CONTRACT_NOT_SIGNED`.
 
-### Règles métier (gardes-fous SQL)
-- RPC `join_group` (à étendre) : rejette `KYC_INSUFFICIENT` si `groups.contribution_amount > kyc_max_amount[user.kyc_level]`.
-- RPC `assign_turn_position` (rotation) :
-  - Palier 1 → position dans le **dernier tiers** uniquement.
-  - Palier 2 → position autorisée à partir du **deuxième tiers**.
-  - Organisateur peut toujours forcer (audit-logué).
+### Chantier 4 — Pénalité de rétention majorée ✅ Implémenté
+- `group_members.was_late_in_cycle / was_late_at_turn_number`, `turns.payout_hold_until`, `payout_hold_config` (4 fréquences).
+- RPCs `send_payout_hold_extended_if_needed` (idempotent), `admin_list_payout_holds`, `admin_resend_payout_hold_notice`, `list_my_payout_hold_history`.
+- `enqueue_payment_reminders` flagge J+1, `auto_close_turn` calcule la date de libération.
+- UI : `src/pages/admin/PayoutHolds.tsx`, `PayoutHoldHistory`, badge « Rétention prolongée », blocage `WithdrawDialog` (`PAYOUT_LOCKED_UNTIL`).
+- SMS Nimba `payout_hold_extended` via `send-tontine-sms`, log idempotent `payout_hold_notifications_log`.
+- Tests unitaires `src/lib/holds/computeHoldUntil.test.ts` (Vitest, propriétés + cas limites).
 
-### UI
-- Page `/profil/kyc` avec stepper (Téléphone → Pièce d'identité), badges « Découverte » / « Vérifié », explications des privilèges débloqués.
-- Banner dans `JoinFlow` si KYC insuffisant : « Vérifiez votre identité pour rejoindre cette tontine » + CTA.
-- Back-office : `src/pages/admin/KycReview.tsx`.
+### ⚠️ Écart constaté — Tests E2E non exécutables
+Les 3 fichiers `tests/e2e/{deposits,dispute-export,payout-hold}.spec.md` sont des **scénarios rédigés en Markdown**, pas des specs Playwright. Seuls `famille-alice.spec.ts`, `payment-return-realtime.spec.ts` et `rls-quick-actions.spec.ts` tournent réellement dans la CI (`.github/workflows/e2e.yml`).
 
----
+Conséquence : la logique back est en place et vérifiable manuellement, mais **aucune garantie automatisée** que les parcours bout-en-bout (caution échouée, signature OTP, J+1, blocage retrait) ne régressent.
 
-## Chantier 2 — Intégration nouveaux membres sur gros montants
+### Recommandation — action de finition
+Convertir les 3 specs Markdown en specs Playwright `.spec.ts` réelles, branchées sur le fixture `famille-alice` :
 
-Trois verrous **optionnels au choix de l'organisateur**, configurés dans `GroupSettings` :
+1. `tests/e2e/deposits.spec.ts` — scénarios A/B/C (rejoin tardif, dépôt en échec, forçage admin) avec assertions sur `group_members.deposit_status`, `audit_log` et l'UI.
+2. `tests/e2e/contract-and-dispute.spec.ts` — scénarios F/G/H (garde-fou `start_cycle`, signature OTP avec mock Nimba, publication template admin) + export PDF avec vérification du hash SHA-256 et de l'URL signée 24 h.
+3. `tests/e2e/payout-hold.spec.ts` — scénarios 1 à 7 (détection J+1, application +7 j, blocage `request_withdrawal`, idempotence du log, reset au `start_cycle`, SMS Nimba mocké, resend admin).
+4. Ajout des 3 nouvelles specs dans `.github/workflows/e2e.yml` (matrice ou liste).
+5. Lancement local via `bunx playwright test` pour confirmer le vert avant push.
 
-### A. Positionnement algorithmique (déjà partiellement amorcé en chantier 1)
-- Flag `groups.new_member_lock_last_third boolean default false`.
-- Si activé : tout membre ayant rejoint après le début du cycle (ou avec `kyc_level=2` mais sans historique) est forcé dans le dernier tiers de la rotation.
-
-### B. Caution financière
-- Nouvelle colonne `groups.deposit_amount bigint` (défini par l'organisateur, ex. 1 ou 2 mensualités).
-- Nouvelle table `member_deposits (member_id, group_id, amount, status [held/released/forfeited], djomy_payment_id, locked_at, released_at, forfeited_reason)`.
-- Flux Djomy dédié : `init_deposit_payment` → webhook → `member_deposits.status='held'` → membre activé dans le groupe.
-- Restitution automatique à la clôture du cycle si aucun incident (`member_default_reports` vide pour ce membre).
-- Saisie automatique en cas de défaut post-payout (lien avec la règle existante du chantier précédent).
-- UI : `DepositPanel` dans `JoinFlow` + carte « Mes cautions » dans `MyBalance`.
-
-### C. (Pas demandé — on s'en tient aux deux ci-dessus.)
-
-### UI Organisateur
-- `GroupSettings` → nouvelle carte « Sécurité des nouveaux membres » : 2 toggles indépendants + champ caution.
-
----
-
-## Chantier 3 — Passerelle juridique : export de litige certifié
-
-### Contrat numérique de solidarité
-- Nouvelle table `group_contracts (group_id, version, body_md, created_at)` — modèle par défaut maintenu par admin plateforme, surchargeable par groupe.
-- Nouvelle table `contract_signatures (contract_id, user_id, signed_at, ip, user_agent, hash_sha256, otp_ref)` — signature électronique via OTP SMS (réutilise Nimba).
-- Garde-fou : `start_cycle` rejette `CONTRACT_NOT_SIGNED` si un membre n'a pas signé.
-- UI : `ContractSignDialog` (texte scrollable + OTP), affiché à l'adhésion.
-
-### Bouton « Export de litige »
-- RPC `generate_dispute_export(group_id, member_id, reason)` → enregistre une demande dans `dispute_exports (id, group_id, member_id, requested_by, reason, status, pdf_path, sha256, created_at)`.
-- Edge function `generate-dispute-pdf` (Deno + jsPDF/pdf-lib) qui assemble le PDF :
-  1. Page de garde certifiée Tontine Digitale (logo, n° de dossier, hash SHA-256 du PDF).
-  2. Identité du défaillant : KYC validé (photo pièce, NINA), profil, n° téléphone vérifié.
-  3. Historique immuable du ledger (`ledger_entries`) horodaté.
-  4. Reçus Orange Money / MoMo (`receipts` + `payments.provider_ref`).
-  5. Contrat numérique signé (texte + horodatage signature + hash).
-  6. Preuve de versement de la cagnotte au défaillant (`turns` complétés + `payments` de payout).
-  7. Preuve du défaut de paiement (cotisations `status='pending'` après échéance + SMS de rappel envoyés via `sms_logs`).
-- Stockage : bucket `dispute-exports` (privé, signé URL 24 h, accès admin + organisateur).
-- UI : bouton dans `GroupDefaultersSection` → modal motif → file d'attente → téléchargement.
-- Audit : `audit_log` entrée systématique.
-
----
-
-## Chantier 4 — Pénalité de rétention majorée
-
-### Logique
-- Colonne `group_members.was_late_in_cycle boolean default false`.
-- Colonne `group_members.was_late_at_turn_number int[]` (trace les tours concernés, debug).
-- Trigger / extension de `enqueue_payment_reminders` : dès J+1 sur une cotisation `pending`, basculer le flag à `true` pour ce membre dans le cycle courant.
-- Reset à `false` au démarrage d'un nouveau cycle (`start_cycle`).
-
-### Application sur le payout
-- Fonction `compute_hold_until(turn_id) returns timestamptz` :
-  - Si `was_late_in_cycle = false` → `due_date + standard_hold_days[frequency]`.
-  - Si `was_late_in_cycle = true` → `due_date + standard_hold_days[frequency] + 7`.
-- `standard_hold_days` (table de config ou enum) :
-  - `daily` → 0, `weekly` → 7, `biweekly` → 7, `monthly` → 7.
-- Colonne `turns.payout_hold_until timestamptz` calculée à la complétion du tour (`status='collecting' → 'paid'`).
-- Garde-fou retrait : `request_withdrawal` rejette `PAYOUT_LOCKED_UNTIL` tant que `now() < payout_hold_until`.
-
-### UI
-- `MyBalance` : carte « Fonds en attente de libération » avec date exacte + raison (« Retard durant ce cycle : libération repoussée de 7 jours »).
-- `GroupDetail` (vue bénéficiaire) : badge « Rétention prolongée — libération le 03/07 ».
-- Notification SMS automatique au membre concerné dès qu'il devient bénéficiaire avec rétention majorée.
-
----
-
-## Ordre d'exécution et points de validation
-
-| Étape | Livrable visible | Critère d'acceptation |
-|---|---|---|
-| 1.a Migration KYC + RPC | `kyc_level` visible sur le profil | `select kyc_level from profiles` renvoie 0 par défaut |
-| 1.b UI `/profil/kyc` + admin review | Stepper fonctionnel, file admin | Vous pouvez valider un faux NINA en local |
-| 1.c Gardes-fous `join_group` / rotation | `JoinFlow` bloque si KYC insuffisant | Test E2E Rougui adapté |
-| 2.a Migration caution + Djomy deposit | `member_deposits` peuplée | Webhook crée bien la ligne `held` |
-| 2.b UI organisateur + UI joueur | Carte « Sécurité nouveaux » + flux caution | Démo bout en bout |
-| 3.a Contrat numérique + signature OTP | Dialog signature à l'adhésion | `start_cycle` bloqué tant que non signé |
-| 3.b Export PDF + bucket | Bouton fonctionne dans `GroupDefaultersSection` | PDF téléchargeable avec les 7 sections |
-| 4.a Migration `was_late_in_cycle` + recalcul `payout_hold_until` | Colonne visible, calcul testable | Backfill sur cycles en cours |
-| 4.b Garde-fou retrait + UI | Retrait bloqué avec message clair | Notification SMS au bénéficiaire |
-
----
-
-## Questions avant de démarrer le chantier 1
-
-1. **Plafond Palier 1** : OK pour `50 000 GNF` comme demandé ? Voulez-vous aussi un plafond cumulé (somme des cotisations sur 30 jours) ?
-2. **Pièces acceptées Palier 2** : NINA + Passeport + Carte d'électeur uniquement, ou ajoute-t-on permis de conduire / carte consulaire ?
-3. **Validation KYC** : revue **manuelle** par l'équipe Tontine Digitale uniquement, ou veut-on dès maintenant brancher un fournisseur OCR/biométrie (Smile ID, Youverify) ? La revue manuelle est plus rapide à livrer.
-4. **OTP SMS** : on réutilise Nimba (déjà en prod) — confirmez-vous ? Sinon préciser le fournisseur.
-
-Une fois ces réponses obtenues, je passe en mode build et j'implémente le **chantier 1 uniquement**, puis je vous remontre la démo avant de toucher au chantier 2.
+Aucune migration ni changement de schéma n'est nécessaire — uniquement de la couverture de test. Une fois ces specs en place, les 4 chantiers sont considérés livrés + verrouillés contre régression.
