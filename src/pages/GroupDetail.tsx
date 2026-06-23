@@ -17,6 +17,7 @@ import {
   ChevronRight,
   Wallet,
   X,
+  Lock,
 } from "lucide-react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { cn } from "@/lib/utils";
