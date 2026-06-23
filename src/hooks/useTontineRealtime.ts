@@ -11,7 +11,8 @@ export function useTontineRealtime(groupId?: string) {
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    const channelName = groupId ? `tontine-${groupId}` : "tontine-all";
+    const suffix = Math.random().toString(36).slice(2, 8);
+    const channelName = groupId ? `tontine-${groupId}-${suffix}` : `tontine-all-${suffix}`;
     const channel = supabase.channel(channelName);
 
     const turnsFilter = groupId ? { filter: `group_id=eq.${groupId}` } : {};
