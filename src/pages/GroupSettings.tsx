@@ -94,6 +94,12 @@ export default function GroupSettings() {
         late_penalty_percent: group.late_penalty_percent,
         late_penalty_after_days: group.late_penalty_after_days,
         visibility: group.visibility ?? "private",
+        new_member_lock_last_third:
+          (group as { new_member_lock_last_third?: boolean }).new_member_lock_last_third ?? false,
+        deposit_required:
+          (group as { deposit_required?: boolean }).deposit_required ?? false,
+        deposit_months:
+          ((group as { deposit_months?: number }).deposit_months ?? 0) as 0 | 1 | 2,
       });
     }
   }, [group]);
