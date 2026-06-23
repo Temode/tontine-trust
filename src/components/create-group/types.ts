@@ -29,6 +29,11 @@ export interface GroupDraft {
   inviteCode: string;
   visibility: Visibility;
   coOrganizerPhones: string;
+
+  /** Sécurité nouveaux membres (Chantier 2) */
+  newMemberLockLastThird: boolean;
+  depositRequired: boolean;
+  depositMonths: 0 | 1 | 2;
 }
 
 export const DEFAULT_DRAFT: GroupDraft = {
@@ -45,6 +50,9 @@ export const DEFAULT_DRAFT: GroupDraft = {
   inviteCode: generateInviteCode(),
   visibility: "private",
   coOrganizerPhones: "",
+  newMemberLockLastThird: false,
+  depositRequired: false,
+  depositMonths: 0,
 };
 
 export function generateInviteCode(): string {
