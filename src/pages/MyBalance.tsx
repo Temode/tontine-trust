@@ -116,6 +116,9 @@ export default function MyBalance() {
           </section>
         )}
 
+        {/* Historique complet des rétentions (libérées + en cours) */}
+        <PayoutHoldHistory />
+
         {/* Liste des soldes par groupe */}
         <h2 className="mt-8 font-display text-base font-bold text-foreground">Par groupe</h2>
         {balancesQ.isLoading ? (
