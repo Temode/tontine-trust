@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Wallet, TrendingUp, History, CheckCircle2, Clock, XCircle } from "lucide-react";
+import { ArrowLeft, Wallet, TrendingUp, History, CheckCircle2, Clock, XCircle, Lock } from "lucide-react";
 import { Link } from "react-router-dom";
 import { listMyBalances, listMyWithdrawals, type DbMyBalance, type DbWithdrawalRequest } from "@/lib/api/balances";
+import { listMyHeldPayouts } from "@/lib/api/holdPayouts";
 import { formatGNF } from "@/lib/format";
 import { WithdrawDialog } from "@/components/balance/WithdrawDialog";
 import { useTontineRealtime } from "@/hooks/useTontineRealtime";
@@ -28,11 +29,17 @@ export default function MyBalance() {
     queryKey: ["my-withdrawals"],
     queryFn: listMyWithdrawals,
   });
+  const heldQ = useQuery({
+    queryKey: ["my-held-payouts"],
+    queryFn: listMyHeldPayouts,
+  });
 
   const balances = balancesQ.data ?? [];
   const totalAvailable = balances.reduce((s, b) => s + b.available_amount, 0);
   const totalCredited = balances.reduce((s, b) => s + b.total_credited, 0);
   const totalWithdrawn = balances.reduce((s, b) => s + b.total_withdrawn, 0);
+  const heldPayouts = heldQ.data ?? [];
+  const totalHeld = heldPayouts.reduce((s, h) => s + h.payout_amount, 0);
 
   return (
     <div className="animate-fade-in">
@@ -71,6 +78,42 @@ export default function MyBalance() {
             </dl>
           </div>
         </article>
+
+        {/* Fonds en attente de libération */}
+        {heldPayouts.length > 0 && (
+          <section className="mt-5 rounded-xl border-2 border-amber-400 bg-amber-50/60 p-4">
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-500 text-white">
+                <Lock className="h-4 w-4" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-700">
+                  Fonds en attente de libération
+                </p>
+                <p className="mt-0.5 font-display text-base font-bold text-amber-950 num">
+                  {formatGNF(totalHeld)} GNF
+                </p>
+                <ul className="mt-2 space-y-1">
+                  {heldPayouts.map((h) => (
+                    <li key={h.id} className="text-xs text-amber-900/90">
+                      <span className="font-semibold">{h.group_name ?? "Groupe"}</span> — tour #{h.turn_number} ·
+                      libération le{" "}
+                      {new Date(h.payout_hold_until).toLocaleDateString("fr-FR", {
+                        day: "2-digit",
+                        month: "long",
+                        year: "numeric",
+                      })}
+                      {" "}· {formatGNF(h.payout_amount)} GNF
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-2 text-[11px] text-amber-800/80">
+                  Retard de cotisation durant ce cycle : la libération de votre payout est repoussée de 7 jours.
+                </p>
+              </div>
+            </div>
+          </section>
+        )}
 
         {/* Liste des soldes par groupe */}
         <h2 className="mt-8 font-display text-base font-bold text-foreground">Par groupe</h2>

@@ -69,6 +69,19 @@ export async function requestWithdrawal(args: {
         "Caution requise : déposez votre caution avant de pouvoir retirer des fonds.",
       );
     }
+    if (/PAYOUT_LOCKED_UNTIL/.test(error.message)) {
+      const raw = error.message.match(/PAYOUT_LOCKED_UNTIL:([^\s]+)/)?.[1];
+      const date = raw
+        ? new Date(raw).toLocaleDateString("fr-FR", {
+            day: "2-digit",
+            month: "long",
+            year: "numeric",
+          })
+        : "date inconnue";
+      throw new Error(
+        `Payout verrouillé jusqu'au ${date} suite à un retard de cotisation dans ce cycle.`,
+      );
+    }
     if (/INSUFFICIENT_BALANCE/.test(error.message)) {
       throw new Error("Solde disponible insuffisant.");
     }

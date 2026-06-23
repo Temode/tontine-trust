@@ -15,7 +15,7 @@ export async function listGroupTurns(groupId: string): Promise<DbNextTurn[]> {
   const { data, error } = await supabase
     .from("turns")
     .select(
-      "id, group_id, cycle_id, turn_number, due_date, payout_amount, status, beneficiary_user_id",
+      "id, group_id, cycle_id, turn_number, due_date, payout_amount, status, beneficiary_user_id, payout_hold_until",
     )
     .eq("group_id", groupId)
     .order("turn_number", { ascending: true });

@@ -1274,6 +1274,8 @@ export type Database = {
           suspended_by: string | null
           suspended_reason: string | null
           user_id: string
+          was_late_at_turn_number: number[] | null
+          was_late_in_cycle: boolean
         }
         Insert: {
           applicant_message?: string | null
@@ -1297,6 +1299,8 @@ export type Database = {
           suspended_by?: string | null
           suspended_reason?: string | null
           user_id: string
+          was_late_at_turn_number?: number[] | null
+          was_late_in_cycle?: boolean
         }
         Update: {
           applicant_message?: string | null
@@ -1320,6 +1324,8 @@ export type Database = {
           suspended_by?: string | null
           suspended_reason?: string | null
           user_id?: string
+          was_late_at_turn_number?: number[] | null
+          was_late_in_cycle?: boolean
         }
         Relationships: [
           {
@@ -2776,6 +2782,24 @@ export type Database = {
           },
         ]
       }
+      payout_hold_config: {
+        Row: {
+          frequency: Database["public"]["Enums"]["group_frequency"]
+          penalty_extra_days: number
+          standard_days: number
+        }
+        Insert: {
+          frequency: Database["public"]["Enums"]["group_frequency"]
+          penalty_extra_days?: number
+          standard_days?: number
+        }
+        Update: {
+          frequency?: Database["public"]["Enums"]["group_frequency"]
+          penalty_extra_days?: number
+          standard_days?: number
+        }
+        Relationships: []
+      }
       phone_otp_challenges: {
         Row: {
           attempts: number
@@ -3567,6 +3591,7 @@ export type Database = {
           id: string
           paid_at: string | null
           payout_amount: number
+          payout_hold_until: string | null
           payout_reference: string | null
           status: Database["public"]["Enums"]["turn_status"]
           turn_number: number
@@ -3579,6 +3604,7 @@ export type Database = {
           id?: string
           paid_at?: string | null
           payout_amount: number
+          payout_hold_until?: string | null
           payout_reference?: string | null
           status?: Database["public"]["Enums"]["turn_status"]
           turn_number: number
@@ -3591,6 +3617,7 @@ export type Database = {
           id?: string
           paid_at?: string | null
           payout_amount?: number
+          payout_hold_until?: string | null
           payout_reference?: string | null
           status?: Database["public"]["Enums"]["turn_status"]
           turn_number?: number
@@ -5623,6 +5650,7 @@ export type Database = {
       cancel_my_bid: { Args: { _turn_id: string }; Returns: undefined }
       cancel_turn_swap: { Args: { _request_id: string }; Returns: undefined }
       close_auction: { Args: { _turn_id: string }; Returns: string }
+      compute_hold_until: { Args: { _turn_id: string }; Returns: string }
       confirm_external_payment: {
         Args: { _proof_id: string }
         Returns: undefined
@@ -6188,6 +6216,7 @@ export type Database = {
         | "payment_pause_request_rejected"
         | "cycle_completed"
         | "deposit_status"
+        | "payout_hold_extended"
       payment_method_external:
         | "cash"
         | "bank_transfer"
@@ -6472,6 +6501,7 @@ export const Constants = {
         "payment_pause_request_rejected",
         "cycle_completed",
         "deposit_status",
+        "payout_hold_extended",
       ],
       payment_method_external: [
         "cash",

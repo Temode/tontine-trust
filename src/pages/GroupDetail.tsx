@@ -17,6 +17,7 @@ import {
   ChevronRight,
   Wallet,
   X,
+  Lock,
 } from "lucide-react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -636,6 +637,40 @@ export default function GroupDetail() {
               />
               {user?.id && <PositionBadge groupId={grp.id} userId={user.id} />}
               <ContractSignSection groupId={grp.id} />
+              {(() => {
+                const myPaidTurn = turns.find(
+                  (t) =>
+                    t.beneficiary_user_id === user?.id &&
+                    t.status === "paid" &&
+                    t.payout_hold_until &&
+                    new Date(t.payout_hold_until).getTime() > Date.now(),
+                );
+                if (!myPaidTurn) return null;
+                const releaseDate = new Date(myPaidTurn.payout_hold_until!).toLocaleDateString("fr-FR", {
+                  day: "2-digit",
+                  month: "long",
+                  year: "numeric",
+                });
+                return (
+                  <div className="mt-3 flex items-start gap-3 rounded-xl border border-amber-400/60 bg-amber-50/60 p-4">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-500 text-white">
+                      <Lock className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-700">
+                        Rétention prolongée
+                      </p>
+                      <p className="mt-0.5 text-sm font-bold text-amber-950">
+                        Libération le {releaseDate}
+                      </p>
+                      <p className="mt-0.5 text-xs text-amber-900/90">
+                        Vous avez été en retard de cotisation durant ce cycle. Vos fonds seront disponibles le{" "}
+                        {releaseDate}.
+                      </p>
+                    </div>
+                  </div>
+                );
+              })()}
             </>
           );
         })()}
