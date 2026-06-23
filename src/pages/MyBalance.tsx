@@ -6,6 +6,7 @@ import { listMyBalances, listMyWithdrawals, type DbMyBalance, type DbWithdrawalR
 import { listMyHeldPayouts } from "@/lib/api/holdPayouts";
 import { formatGNF } from "@/lib/format";
 import { WithdrawDialog } from "@/components/balance/WithdrawDialog";
+import { PayoutHoldHistory } from "@/components/balance/PayoutHoldHistory";
 import { useTontineRealtime } from "@/hooks/useTontineRealtime";
 import { cn } from "@/lib/utils";
 
