@@ -317,6 +317,15 @@ export default function GroupSettings() {
             </strong>{" "}
             pour tout paiement effectué après le délai.
           </p>
+          <div className="mt-4 rounded-lg border border-hairline bg-secondary/40 p-3 text-xs leading-relaxed text-muted-foreground">
+            <p className="mb-1 font-medium text-foreground">Escalade automatique en cas de retard prolongé</p>
+            <ul className="space-y-0.5">
+              <li>• J-2, J-1, J0 : SMS de rappel d'échéance</li>
+              <li>• J+1, J+3 : SMS de retard avec montant de la pénalité encourue</li>
+              <li>• J+7 : signalement automatique de défaut transmis aux organisateurs</li>
+              <li>• J+14 : suspension automatique du membre (vote, enchères) jusqu'au règlement</li>
+            </ul>
+          </div>
         </SectionCard>
 
         <SectionCard title="Visibilité" subtitle="Qui peut découvrir et rejoindre ce groupe">
