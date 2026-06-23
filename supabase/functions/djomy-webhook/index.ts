@@ -53,6 +53,8 @@ Deno.serve(async (req) => {
   const data = (payload.data as Record<string, unknown> | undefined) ?? {};
   const transactionId = (data.transactionId as string) ?? null;
   const merchantRef = (data.merchantPaymentReference as string) ?? null;
+  const metadata = (data.metadata as Record<string, unknown> | undefined) ?? {};
+  const purpose = String(metadata.purpose ?? "");
 
   // Idempotence : upsert event (PK eventId) — si conflit, on a déjà traité.
   const { error: insErr } = await admin
@@ -72,6 +74,41 @@ Deno.serve(async (req) => {
     return json({ ok: true, ignored: "invalid_signature" }, 200);
   }
 
+  const map: Record<string, string> = {
+    "payment.success": "succeeded",
+    "payment.failed": "failed",
+    "payment.cancelled": "cancelled",
+    "payment.pending": "pending",
+    "payment.created": "pending",
+    "payment.redirected": "pending",
+  };
+  const newStatus = map[eventType];
+
+  // Routage cautions : si purpose=deposit ou si le ref correspond à un member_deposit
+  let depositId: string | null = null;
+  if (purpose === "deposit" && merchantRef) {
+    depositId = merchantRef;
+  } else if (merchantRef) {
+    const { data: dep } = await admin
+      .from("member_deposits").select("id")
+      .eq("id", merchantRef).maybeSingle();
+    if (dep) depositId = dep.id;
+  }
+  if (depositId) {
+    if (!newStatus) return json({ ok: true, ignored: "unhandled_event" }, 200);
+    const { error: depErr } = await admin.rpc("apply_deposit_webhook", {
+      _deposit_id: depositId,
+      _new_status: newStatus,
+      _provider_ref: transactionId,
+      _payment_method: (data.paymentMethod as string) ?? null,
+    });
+    if (depErr) {
+      console.error("[djomy-webhook] deposit rpc error", depErr);
+      return json({ ok: false, error: depErr.message }, 500);
+    }
+    return json({ ok: true, depositId, status: newStatus });
+  }
+
   // Retrouve le payment local
   let paymentId: string | null = null;
   if (merchantRef) paymentId = merchantRef;
@@ -87,15 +124,6 @@ Deno.serve(async (req) => {
     return json({ ok: true, ignored: "unknown_payment" }, 200);
   }
 
-  const map: Record<string, string> = {
-    "payment.success": "succeeded",
-    "payment.failed": "failed",
-    "payment.cancelled": "cancelled",
-    "payment.pending": "pending",
-    "payment.created": "pending",
-    "payment.redirected": "pending",
-  };
-  const newStatus = map[eventType];
   if (!newStatus) return json({ ok: true, ignored: "unhandled_event" }, 200);
 
   const { error: rpcErr } = await admin.rpc("apply_djomy_webhook", {

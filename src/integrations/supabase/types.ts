@@ -1061,8 +1061,10 @@ export type Database = {
           can_chat: boolean
           can_invite: boolean
           can_swap: boolean
+          deposit_status: string
           group_id: string
           id: string
+          joined_after_start: boolean
           joined_at: string
           position: number | null
           preferred_operator: string | null
@@ -1082,8 +1084,10 @@ export type Database = {
           can_chat?: boolean
           can_invite?: boolean
           can_swap?: boolean
+          deposit_status?: string
           group_id: string
           id?: string
+          joined_after_start?: boolean
           joined_at?: string
           position?: number | null
           preferred_operator?: string | null
@@ -1103,8 +1107,10 @@ export type Database = {
           can_chat?: boolean
           can_invite?: boolean
           can_swap?: boolean
+          deposit_status?: string
           group_id?: string
           id?: string
+          joined_after_start?: boolean
           joined_at?: string
           position?: number | null
           preferred_operator?: string | null
@@ -1331,6 +1337,8 @@ export type Database = {
           created_by: string
           deleted_at: string | null
           deletion_request_id: string | null
+          deposit_months: number
+          deposit_required: boolean
           description: string | null
           frequency: Database["public"]["Enums"]["group_frequency"]
           id: string
@@ -1338,6 +1346,7 @@ export type Database = {
           late_penalty_percent: number
           max_members: number
           name: string
+          new_member_lock_last_third: boolean
           paused_at: string | null
           paused_by: string | null
           paused_reason: string | null
@@ -1359,6 +1368,8 @@ export type Database = {
           created_by: string
           deleted_at?: string | null
           deletion_request_id?: string | null
+          deposit_months?: number
+          deposit_required?: boolean
           description?: string | null
           frequency?: Database["public"]["Enums"]["group_frequency"]
           id?: string
@@ -1366,6 +1377,7 @@ export type Database = {
           late_penalty_percent?: number
           max_members: number
           name: string
+          new_member_lock_last_third?: boolean
           paused_at?: string | null
           paused_by?: string | null
           paused_reason?: string | null
@@ -1387,6 +1399,8 @@ export type Database = {
           created_by?: string
           deleted_at?: string | null
           deletion_request_id?: string | null
+          deposit_months?: number
+          deposit_required?: boolean
           description?: string | null
           frequency?: Database["public"]["Enums"]["group_frequency"]
           id?: string
@@ -1394,6 +1408,7 @@ export type Database = {
           late_penalty_percent?: number
           max_members?: number
           name?: string
+          new_member_lock_last_third?: boolean
           paused_at?: string | null
           paused_by?: string | null
           paused_reason?: string | null
@@ -1924,6 +1939,91 @@ export type Database = {
           },
           {
             foreignKeyName: "member_default_reports_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "my_groups_overview"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      member_deposits: {
+        Row: {
+          amount: number
+          created_at: string
+          djomy_transaction_id: string | null
+          forfeit_reason: string | null
+          forfeited_at: string | null
+          group_id: string
+          id: string
+          initiated_by: string
+          months: number
+          paid_at: string | null
+          payer_phone: string | null
+          payment_method: string | null
+          redirect_url: string | null
+          refund_reason: string | null
+          refunded_at: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          djomy_transaction_id?: string | null
+          forfeit_reason?: string | null
+          forfeited_at?: string | null
+          group_id: string
+          id?: string
+          initiated_by: string
+          months: number
+          paid_at?: string | null
+          payer_phone?: string | null
+          payment_method?: string | null
+          redirect_url?: string | null
+          refund_reason?: string | null
+          refunded_at?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          djomy_transaction_id?: string | null
+          forfeit_reason?: string | null
+          forfeited_at?: string | null
+          group_id?: string
+          id?: string
+          initiated_by?: string
+          months?: number
+          paid_at?: string | null
+          payer_phone?: string | null
+          payment_method?: string | null
+          redirect_url?: string | null
+          refund_reason?: string | null
+          refunded_at?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "member_deposits_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "admin_group_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_deposits_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_deposits_group_id_fkey"
             columns: ["group_id"]
             isOneToOne: false
             referencedRelation: "my_groups_overview"
@@ -5204,6 +5304,14 @@ export type Database = {
         Args: { _action: string; _group_id: string; _reason?: string }
         Returns: undefined
       }
+      admin_forfeit_member_deposit: {
+        Args: { _deposit_id: string; _reason: string }
+        Returns: undefined
+      }
+      admin_refund_member_deposit: {
+        Args: { _deposit_id: string; _reason?: string }
+        Returns: undefined
+      }
       admin_set_user_role: {
         Args: {
           _grant: boolean
@@ -5234,6 +5342,15 @@ export type Database = {
         }
         Returns: string
       }
+      apply_deposit_webhook: {
+        Args: {
+          _deposit_id: string
+          _new_status: string
+          _payment_method?: string
+          _provider_ref?: string
+        }
+        Returns: undefined
+      }
       apply_djomy_webhook: {
         Args: {
           _new_status: string
@@ -5247,6 +5364,14 @@ export type Database = {
       approve_member: { Args: { _member_id: string }; Returns: undefined }
       archive_group: {
         Args: { _group_id: string; _reason?: string }
+        Returns: undefined
+      }
+      attach_deposit_djomy_reference: {
+        Args: {
+          _deposit_id: string
+          _redirect_url: string
+          _transaction_id: string
+        }
         Returns: undefined
       }
       attach_djomy_reference: {
@@ -5325,6 +5450,7 @@ export type Database = {
         Returns: undefined
       }
       group_edit_window: { Args: { _group_id: string }; Returns: string }
+      group_is_started: { Args: { _group_id: string }; Returns: boolean }
       has_admin_permission: {
         Args: { _group: string; _perm: string; _user: string }
         Returns: boolean
@@ -5585,6 +5711,10 @@ export type Database = {
           _payer_phone?: string
         }
         Returns: string
+      }
+      start_member_deposit: {
+        Args: { _group_id: string; _payer_phone?: string }
+        Returns: Json
       }
       submit_external_payment: {
         Args: {
