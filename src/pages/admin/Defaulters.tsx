@@ -140,6 +140,60 @@ export default function AdminDefaulters() {
         })}
       </div>
 
+      <section className="rounded-lg border border-destructive/40 bg-destructive/5 p-3">
+        <header className="mb-2 flex items-center justify-between">
+          <div>
+            <h2 className="text-sm font-semibold text-destructive">
+              Retards en cours ({lateAlertsQ.data?.length ?? 0})
+            </h2>
+            <p className="text-[11px] text-slate-400">
+              Cotisations impayées au-delà de J+1, alertes auto. Non bloquant — l'organisateur garde la main pour signaler un défaut.
+            </p>
+          </div>
+          <button
+            onClick={() => relaunchM.mutate()}
+            disabled={relaunchM.isPending}
+            className="inline-flex h-7 items-center gap-1 rounded bg-destructive/20 px-2 text-xs font-semibold text-destructive hover:bg-destructive/30 disabled:opacity-50"
+          >
+            {relaunchM.isPending && <Loader2 className="h-3 w-3 animate-spin" />}
+            Relancer maintenant
+          </button>
+        </header>
+        {lateAlertsQ.isLoading ? (
+          <p className="text-xs text-slate-500">Chargement…</p>
+        ) : (lateAlertsQ.data?.length ?? 0) === 0 ? (
+          <p className="text-xs text-slate-500">Aucun retard actif.</p>
+        ) : (
+          <ul className="divide-y divide-destructive/20 text-xs">
+            {lateAlertsQ.data!.map((a) => {
+              const meta = (a.metadata ?? {}) as Record<string, unknown>;
+              return (
+                <li key={a.id} className="flex flex-wrap items-center justify-between gap-2 py-1.5">
+                  <span className="text-slate-200">{a.message}</span>
+                  <span className="flex items-center gap-2">
+                    <span
+                      className={cn(
+                        "rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase",
+                        a.severity === "critical"
+                          ? "bg-destructive/30 text-destructive"
+                          : "bg-amber-500/20 text-amber-300",
+                      )}
+                    >
+                      {a.severity}
+                    </span>
+                    {typeof meta.amount === "number" && (
+                      <span className="font-mono text-slate-300">
+                        {(meta.amount as number).toLocaleString("fr-FR")} GNF
+                      </span>
+                    )}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
+
       <div className="overflow-hidden rounded-lg border border-slate-800">
         <table className="w-full text-sm">
           <thead className="bg-slate-900 text-xs uppercase text-slate-400">
