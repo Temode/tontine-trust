@@ -356,6 +356,88 @@ export default function GroupSettings() {
           </div>
         </SectionCard>
 
+        <SectionCard
+          title="Sécurité des nouveaux membres"
+          subtitle="Protections déclenchées quand un membre rejoint après le démarrage"
+        >
+          <div className="space-y-3">
+            <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-hairline p-4 transition hover:bg-secondary/50 has-[:checked]:border-primary has-[:checked]:bg-primary-50">
+              <input
+                type="checkbox"
+                checked={form.new_member_lock_last_third ?? false}
+                disabled={locked}
+                onChange={(e) => update("new_member_lock_last_third", e.target.checked)}
+                className="mt-0.5 h-4 w-4 accent-primary"
+              />
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-foreground">
+                  Placer les nouveaux membres dans le dernier tiers de la rotation
+                </p>
+                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                  Un membre rejoignant après le démarrage du cycle reçoit automatiquement
+                  une position dans le dernier tiers — le temps qu'il bâtisse sa fiabilité.
+                </p>
+              </div>
+            </label>
+
+            <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-hairline p-4 transition hover:bg-secondary/50 has-[:checked]:border-primary has-[:checked]:bg-primary-50">
+              <input
+                type="checkbox"
+                checked={form.deposit_required ?? false}
+                disabled={locked}
+                onChange={(e) =>
+                  setForm((f) => ({
+                    ...f,
+                    deposit_required: e.target.checked,
+                    deposit_months: (e.target.checked
+                      ? (f.deposit_months && f.deposit_months > 0 ? f.deposit_months : 1)
+                      : 0) as 0 | 1 | 2,
+                  }))
+                }
+                className="mt-0.5 h-4 w-4 accent-primary"
+              />
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-foreground">
+                  Exiger une caution remboursable des nouveaux membres
+                </p>
+                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                  Le membre dépose un montant équivalent à 1 ou 2 mois de cotisation
+                  avant de participer aux tours. Caution remboursée à la fin du cycle si
+                  les engagements sont tenus, retenue sinon.
+                </p>
+                {form.deposit_required && (
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <span className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                      Montant
+                    </span>
+                    {[1, 2].map((m) => {
+                      const active = (form.deposit_months ?? 0) === m;
+                      return (
+                        <button
+                          key={m}
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            update("deposit_months", m as 1 | 2);
+                          }}
+                          aria-pressed={active}
+                          className={`rounded-md border px-3 py-1.5 text-xs font-semibold transition ${
+                            active
+                              ? "border-primary bg-primary text-primary-foreground"
+                              : "border-hairline text-foreground hover:bg-secondary"
+                          }`}
+                        >
+                          {m} mois de cotisation
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </label>
+          </div>
+        </SectionCard>
+
         {user?.id && (
           <MembersAdminPanel
             groupId={group.id}
