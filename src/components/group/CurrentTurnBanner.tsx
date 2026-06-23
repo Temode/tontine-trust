@@ -160,7 +160,11 @@ export function CurrentTurnBanner({ turn, currentUserId, groupContribution }: Pr
                       )}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      <StatusPill status={r.status} overdue={overdue} />
+                      <StatusPillImpl
+                        status={r.status}
+                        overdue={overdue}
+                        daysLate={overdue ? Math.abs(daysToDue) : 0}
+                      />
                     </p>
                   </div>
                   <span className="num shrink-0 text-sm font-semibold text-foreground">
@@ -187,6 +191,10 @@ export function CurrentTurnBanner({ turn, currentUserId, groupContribution }: Pr
 }
 
 function StatusPill({ status, overdue }: { status: MemberPaymentRow["status"]; overdue: boolean }) {
+  return <StatusPillImpl status={status} overdue={overdue} daysLate={0} />;
+}
+
+function StatusPillImpl({ status, overdue, daysLate }: { status: MemberPaymentRow["status"]; overdue: boolean; daysLate: number }) {
   if (status === "confirmed") {
     return (
       <span className="inline-flex items-center gap-1 text-success">
@@ -213,9 +221,9 @@ function StatusPill({ status, overdue }: { status: MemberPaymentRow["status"]; o
   }
   if (overdue) {
     return (
-      <span className="inline-flex items-center gap-1 text-destructive">
+      <span className="inline-flex items-center gap-1 rounded-full bg-destructive/10 px-1.5 py-0.5 font-semibold text-destructive">
         <AlertTriangle className="h-3 w-3" />
-        En retard
+        En retard{daysLate > 0 ? ` J+${daysLate}` : ""}
       </span>
     );
   }

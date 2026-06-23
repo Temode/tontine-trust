@@ -1,5 +1,7 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { listTontineAlerts, type TontineAlert } from "@/lib/api/integrity";
 import {
   AlertOctagon,
   Phone,
@@ -52,6 +54,29 @@ export default function AdminDefaulters() {
   const [filter, setFilter] = useState<StatusFilter>("open");
   const [selected, setSelected] = useState<DefaulterReportEnriched | null>(null);
   const [auditing, setAuditing] = useState<DefaulterReportEnriched | null>(null);
+  const qc = useQueryClient();
+
+  const lateAlertsQ = useQuery({
+    queryKey: ["admin-late-alerts"],
+    queryFn: async () => {
+      const all = await listTontineAlerts(false);
+      return all.filter((a) => a.code === "late_contribution");
+    },
+    refetchInterval: 60_000,
+  });
+
+  const relaunchM = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.rpc("enqueue_late_payment_alerts");
+      if (error) throw error;
+      return data as number;
+    },
+    onSuccess: (n) => {
+      toast.success(`${n ?? 0} relance(s) envoyée(s)`);
+      qc.invalidateQueries({ queryKey: ["admin-late-alerts"] });
+    },
+    onError: (e: any) => toast.error(e.message ?? "Erreur"),
+  });
 
   const q = useQuery({
     queryKey: ["admin-defaulter-reports"],
@@ -114,6 +139,60 @@ export default function AdminDefaulters() {
           );
         })}
       </div>
+
+      <section className="rounded-lg border border-destructive/40 bg-destructive/5 p-3">
+        <header className="mb-2 flex items-center justify-between">
+          <div>
+            <h2 className="text-sm font-semibold text-destructive">
+              Retards en cours ({lateAlertsQ.data?.length ?? 0})
+            </h2>
+            <p className="text-[11px] text-slate-400">
+              Cotisations impayées au-delà de J+1, alertes auto. Non bloquant — l'organisateur garde la main pour signaler un défaut.
+            </p>
+          </div>
+          <button
+            onClick={() => relaunchM.mutate()}
+            disabled={relaunchM.isPending}
+            className="inline-flex h-7 items-center gap-1 rounded bg-destructive/20 px-2 text-xs font-semibold text-destructive hover:bg-destructive/30 disabled:opacity-50"
+          >
+            {relaunchM.isPending && <Loader2 className="h-3 w-3 animate-spin" />}
+            Relancer maintenant
+          </button>
+        </header>
+        {lateAlertsQ.isLoading ? (
+          <p className="text-xs text-slate-500">Chargement…</p>
+        ) : (lateAlertsQ.data?.length ?? 0) === 0 ? (
+          <p className="text-xs text-slate-500">Aucun retard actif.</p>
+        ) : (
+          <ul className="divide-y divide-destructive/20 text-xs">
+            {lateAlertsQ.data!.map((a) => {
+              const meta = (a.metadata ?? {}) as Record<string, unknown>;
+              return (
+                <li key={a.id} className="flex flex-wrap items-center justify-between gap-2 py-1.5">
+                  <span className="text-slate-200">{a.message}</span>
+                  <span className="flex items-center gap-2">
+                    <span
+                      className={cn(
+                        "rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase",
+                        a.severity === "critical"
+                          ? "bg-destructive/30 text-destructive"
+                          : "bg-amber-500/20 text-amber-300",
+                      )}
+                    >
+                      {a.severity}
+                    </span>
+                    {typeof meta.amount === "number" && (
+                      <span className="font-mono text-slate-300">
+                        {(meta.amount as number).toLocaleString("fr-FR")} GNF
+                      </span>
+                    )}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
 
       <div className="overflow-hidden rounded-lg border border-slate-800">
         <table className="w-full text-sm">
