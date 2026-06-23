@@ -5745,6 +5745,7 @@ export type Database = {
         Returns: undefined
       }
       delete_account: { Args: { _reason?: string }; Returns: undefined }
+      enqueue_late_payment_alerts: { Args: never; Returns: number }
       enqueue_payment_reminders: { Args: never; Returns: number }
       enqueue_tontine_sms: {
         Args: { _kind: string; _payload: Json }
@@ -6319,6 +6320,7 @@ export type Database = {
         | "cycle_completed"
         | "deposit_status"
         | "payout_hold_extended"
+        | "contribution_late"
       payment_method_external:
         | "cash"
         | "bank_transfer"
@@ -6604,6 +6606,7 @@ export const Constants = {
         "cycle_completed",
         "deposit_status",
         "payout_hold_extended",
+        "contribution_late",
       ],
       payment_method_external: [
         "cash",
