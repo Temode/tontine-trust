@@ -58,6 +58,8 @@ import { CurrentTurnBanner } from "@/components/group/CurrentTurnBanner";
 import { useTontineRealtime } from "@/hooks/useTontineRealtime";
 import { DepositCallout } from "@/components/group/DepositCallout";
 import { PositionBadge } from "@/components/group/PositionBadge";
+import { ContractSignDialog } from "@/components/contract/ContractSignDialog";
+import { getActiveContract, getMyContractSignature } from "@/lib/api/contracts";
 
 type Section =
   | "overview"
@@ -592,6 +594,7 @@ export default function GroupDetail() {
                 memberDepositStatus={(me as { deposit_status?: string | null }).deposit_status ?? null}
               />
               {user?.id && <PositionBadge groupId={grp.id} userId={user.id} />}
+              <ContractSignSection groupId={grp.id} />
             </>
           );
         })()}
