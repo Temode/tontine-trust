@@ -11,7 +11,7 @@ import {
   listMyLateContributions,
   recomputeMyReliability,
 } from "@/lib/api/reliability";
-import { getMyProfile, uploadAvatar } from "@/lib/api/profile";
+import { getMyProfile, uploadAvatar, refreshAvatarSignedUrl } from "@/lib/api/profile";
 import { getMyKyc, KYC_LEVEL_LABEL } from "@/lib/api/kyc";
 import { useRef } from "react";
 import { formatGNF } from "@/lib/format";
@@ -32,6 +32,19 @@ export default function Profile() {
       qc.invalidateQueries({ queryKey: ["profile", "mine"] });
     },
     onError: (e: Error) => toast.error("Upload impossible", { description: e.message }),
+  });
+
+  const refreshAvatarM = useMutation({
+    mutationFn: refreshAvatarSignedUrl,
+    onSuccess: (url) => {
+      if (url) {
+        toast.success("Avatar réactivé");
+        qc.invalidateQueries({ queryKey: ["profile", "mine"] });
+      } else {
+        toast.info("Aucun avatar à réactiver");
+      }
+    },
+    onError: (e: Error) => toast.error("Réactivation impossible", { description: e.message }),
   });
 
   const { data: reliability } = useQuery({
@@ -88,7 +101,14 @@ export default function Profile() {
             aria-label="Changer la photo de profil"
           >
             {avatarUrl ? (
-              <img src={avatarUrl} alt={fullName} className="h-full w-full object-cover" />
+              <img
+                src={avatarUrl}
+                alt={fullName}
+                className="h-full w-full object-cover"
+                onError={() => {
+                  if (!refreshAvatarM.isPending) refreshAvatarM.mutate();
+                }}
+              />
             ) : (
               <span className="flex h-full w-full items-center justify-center">{initials || "?"}</span>
             )}
@@ -115,6 +135,17 @@ export default function Profile() {
             <p className="truncate font-display text-lg font-bold text-foreground">{fullName}</p>
             <p className="truncate text-sm text-muted-foreground">{email}</p>
             <p className="truncate text-xs text-muted-foreground">{phone}</p>
+            {avatarUrl && (
+              <button
+                type="button"
+                onClick={() => refreshAvatarM.mutate()}
+                disabled={refreshAvatarM.isPending}
+                className="mt-2 inline-flex h-7 items-center gap-1.5 rounded-md border border-hairline bg-card px-2 text-[11px] font-semibold text-foreground transition hover:bg-secondary disabled:opacity-60"
+              >
+                <RefreshCw className={`h-3 w-3 ${refreshAvatarM.isPending ? "animate-spin" : ""}`} />
+                Réactiver mon avatar
+              </button>
+            )}
           </div>
         </article>
 
