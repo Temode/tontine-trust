@@ -41,3 +41,64 @@ export async function listMyHeldPayouts(): Promise<DbHeldPayout[]> {
     was_late_in_cycle: true, // on sait que c'est le cas puisque payout_hold_until > standard
   }));
 }
+
+// ────────────────────────────────────────────────────────────────────────────
+// Historique des rétentions (libérées ou en cours) pour le membre connecté
+// ────────────────────────────────────────────────────────────────────────────
+
+export interface DbHoldHistoryRow {
+  turn_id: string;
+  group_id: string;
+  group_name: string | null;
+  turn_number: number;
+  payout_amount: number;
+  paid_at: string | null;
+  payout_hold_until: string;
+  is_extended: boolean;
+  is_released: boolean;
+}
+
+export async function listMyPayoutHoldHistory(): Promise<DbHoldHistoryRow[]> {
+  const { data, error } = await (supabase as any).rpc("list_my_payout_hold_history");
+  if (error) throw error;
+  return (data ?? []) as DbHoldHistoryRow[];
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Admin : liste les tours sous rétention + historique de retard
+// ────────────────────────────────────────────────────────────────────────────
+
+export interface AdminPayoutHoldRow {
+  turn_id: string;
+  group_id: string;
+  group_name: string | null;
+  turn_number: number;
+  beneficiary_user_id: string;
+  beneficiary_name: string | null;
+  payout_amount: number;
+  paid_at: string | null;
+  payout_hold_until: string;
+  is_extended: boolean;
+  is_released: boolean;
+  was_late_in_cycle: boolean;
+  was_late_at_turn_number: number[] | null;
+  notif_first_sent_at: string | null;
+  notif_last_sent_at: string | null;
+  notif_resend_count: number;
+}
+
+export async function adminListPayoutHolds(onlyActive = false): Promise<AdminPayoutHoldRow[]> {
+  const { data, error } = await (supabase as any).rpc("admin_list_payout_holds", {
+    _only_active: onlyActive,
+  });
+  if (error) throw error;
+  return (data ?? []) as AdminPayoutHoldRow[];
+}
+
+export async function adminResendPayoutHoldNotice(turnId: string): Promise<boolean> {
+  const { data, error } = await (supabase as any).rpc("admin_resend_payout_hold_notice", {
+    _turn_id: turnId,
+  });
+  if (error) throw error;
+  return Boolean(data);
+}

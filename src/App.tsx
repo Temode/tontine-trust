@@ -53,6 +53,7 @@ const Kyc = lazy(() => import("@/pages/Kyc"));
 const AdminDeposits = lazy(() => import("@/pages/admin/Deposits"));
 const DepositPayment = lazy(() => import("@/pages/DepositPayment"));
 const AdminContractTemplate = lazy(() => import("@/pages/admin/ContractTemplate"));
+const AdminPayoutHolds = lazy(() => import("@/pages/admin/PayoutHolds"));
 import { AdminShell } from "@/components/admin/AdminShell";
 
 const queryClient = new QueryClient({
@@ -171,6 +172,7 @@ const App = () => (
                     <Route path="/admin/kyc" element={<RouteBoundary name="Vérifications KYC"><AdminKycReview /></RouteBoundary>} />
                     <Route path="/admin/cautions" element={<RouteBoundary name="Cautions"><AdminDeposits /></RouteBoundary>} />
                     <Route path="/admin/contrat" element={<RouteBoundary name="Modèle de contrat"><AdminContractTemplate /></RouteBoundary>} />
+                    <Route path="/admin/retentions" element={<RouteBoundary name="Rétentions payout"><AdminPayoutHolds /></RouteBoundary>} />
                   </Route>
                 </Route>
                 <Route path="*" element={<RouteBoundary name="Page introuvable"><NotFound /></RouteBoundary>} />
