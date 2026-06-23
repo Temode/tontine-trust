@@ -2800,6 +2800,65 @@ export type Database = {
         }
         Relationships: []
       }
+      payout_hold_notifications_log: {
+        Row: {
+          beneficiary_user_id: string
+          first_sent_at: string
+          hold_until: string
+          last_actor_user_id: string | null
+          last_sent_at: string
+          resend_count: number
+          turn_id: string
+        }
+        Insert: {
+          beneficiary_user_id: string
+          first_sent_at?: string
+          hold_until: string
+          last_actor_user_id?: string | null
+          last_sent_at?: string
+          resend_count?: number
+          turn_id: string
+        }
+        Update: {
+          beneficiary_user_id?: string
+          first_sent_at?: string
+          hold_until?: string
+          last_actor_user_id?: string | null
+          last_sent_at?: string
+          resend_count?: number
+          turn_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payout_hold_notifications_log_turn_id_fkey"
+            columns: ["turn_id"]
+            isOneToOne: true
+            referencedRelation: "next_turn_per_group"
+            referencedColumns: ["turn_id"]
+          },
+          {
+            foreignKeyName: "payout_hold_notifications_log_turn_id_fkey"
+            columns: ["turn_id"]
+            isOneToOne: true
+            referencedRelation: "turn_assignment_audit"
+            referencedColumns: ["turn_id"]
+          },
+          {
+            foreignKeyName: "payout_hold_notifications_log_turn_id_fkey"
+            columns: ["turn_id"]
+            isOneToOne: true
+            referencedRelation: "turn_settlement"
+            referencedColumns: ["turn_id"]
+          },
+          {
+            foreignKeyName: "payout_hold_notifications_log_turn_id_fkey"
+            columns: ["turn_id"]
+            isOneToOne: true
+            referencedRelation: "turns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       phone_otp_challenges: {
         Row: {
           attempts: number
@@ -5568,6 +5627,27 @@ export type Database = {
           user_phone: string
         }[]
       }
+      admin_list_payout_holds: {
+        Args: { _only_active?: boolean }
+        Returns: {
+          beneficiary_name: string
+          beneficiary_user_id: string
+          group_id: string
+          group_name: string
+          is_extended: boolean
+          is_released: boolean
+          notif_first_sent_at: string
+          notif_last_sent_at: string
+          notif_resend_count: number
+          paid_at: string
+          payout_amount: number
+          payout_hold_until: string
+          turn_id: string
+          turn_number: number
+          was_late_at_turn_number: number[]
+          was_late_in_cycle: boolean
+        }[]
+      }
       admin_publish_contract_template: {
         Args: { _body_md: string; _version: string }
         Returns: string
@@ -5575,6 +5655,10 @@ export type Database = {
       admin_refund_member_deposit: {
         Args: { _deposit_id: string; _reason?: string }
         Returns: undefined
+      }
+      admin_resend_payout_hold_notice: {
+        Args: { _turn_id: string }
+        Returns: boolean
       }
       admin_set_user_role: {
         Args: {
@@ -5805,6 +5889,20 @@ export type Database = {
           turn_number: number
         }[]
       }
+      list_my_payout_hold_history: {
+        Args: never
+        Returns: {
+          group_id: string
+          group_name: string
+          is_extended: boolean
+          is_released: boolean
+          paid_at: string
+          payout_amount: number
+          payout_hold_until: string
+          turn_id: string
+          turn_number: number
+        }[]
+      }
       log_audit: {
         Args: {
           _action: string
@@ -5965,6 +6063,10 @@ export type Database = {
           _message?: string
         }
         Returns: string
+      }
+      send_payout_hold_extended_if_needed: {
+        Args: { _actor?: string; _force?: boolean; _turn_id: string }
+        Returns: boolean
       }
       set_call_mute: {
         Args: { p_call_id: string; p_muted: boolean }
