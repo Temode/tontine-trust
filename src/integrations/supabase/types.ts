@@ -6216,6 +6216,7 @@ export type Database = {
         | "payment_pause_request_rejected"
         | "cycle_completed"
         | "deposit_status"
+        | "payout_hold_extended"
       payment_method_external:
         | "cash"
         | "bank_transfer"
@@ -6500,6 +6501,7 @@ export const Constants = {
         "payment_pause_request_rejected",
         "cycle_completed",
         "deposit_status",
+        "payout_hold_extended",
       ],
       payment_method_external: [
         "cash",
