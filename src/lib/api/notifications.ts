@@ -91,6 +91,7 @@ export const KIND_LABEL: Record<NotificationKind, string> = {
   reliability_changed: "Score mis à jour",
   member_joined: "Nouveau membre",
   group_completed: "Groupe terminé",
+  cycle_completed: "Cycle terminé",
   announcement: "Annonce",
   system: "Système",
 };
