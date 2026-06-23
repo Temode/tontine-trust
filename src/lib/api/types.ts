@@ -87,6 +87,7 @@ export interface DbNextTurn {
   status: DbTurnStatus;
   beneficiary_user_id: string;
   beneficiary_name: string | null;
+  payout_hold_until?: string | null;
 }
 
 const FREQ_TO_UI: Record<DbFrequency, Frequency> = {
