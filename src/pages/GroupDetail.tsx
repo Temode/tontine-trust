@@ -671,6 +671,7 @@ export default function GroupDetail() {
                   </div>
                 );
               })()}
+              {user?.id && <PayoutHoldHistory groupId={grp.id} />}
             </>
           );
         })()}
