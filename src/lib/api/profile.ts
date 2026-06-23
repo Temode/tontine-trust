@@ -69,3 +69,42 @@ export async function uploadAvatar(file: File): Promise<string> {
 
   return url;
 }
+
+/**
+ * Extrait le chemin d'objet à partir d'une URL Supabase Storage (publique ou signée).
+ * Retourne null si l'URL ne pointe pas vers le bucket avatars ou n'est pas reconnue.
+ */
+export function extractAvatarPath(url: string | null | undefined): string | null {
+  if (!url) return null;
+  const m = url.match(/\/storage\/v1\/object\/(?:sign|public)\/avatars\/([^?#]+)/);
+  return m ? decodeURIComponent(m[1]) : null;
+}
+
+/**
+ * Régénère une URL signée (1 an) pour l'avatar de l'utilisateur courant à partir
+ * de l'URL stockée, puis met à jour `profiles.avatar_url`. Utile pour les avatars
+ * uploadés avant le passage aux URLs signées, ou dont le token a expiré.
+ * Retourne la nouvelle URL, ou null si aucun avatar n'est connu.
+ */
+export async function refreshAvatarSignedUrl(): Promise<string | null> {
+  const { data: u } = await supabase.auth.getUser();
+  const uid = u.user?.id;
+  if (!uid) throw new Error("Non authentifié");
+
+  const profile = await getMyProfile();
+  const path = extractAvatarPath(profile?.avatar_url);
+  if (!path) return null;
+
+  const { data: signed, error: signErr } = await supabase.storage
+    .from("avatars")
+    .createSignedUrl(path, 60 * 60 * 24 * 365);
+  if (signErr) throw signErr;
+  const url = signed.signedUrl;
+
+  const { error: updErr } = await supabase
+    .from("profiles")
+    .update({ avatar_url: url })
+    .eq("id", uid);
+  if (updErr) throw updErr;
+  return url;
+}
