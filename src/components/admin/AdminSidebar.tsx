@@ -14,7 +14,7 @@ import {
   CalendarClock,
   AlertOctagon,
 } from "lucide-react";
-import { BadgeCheck } from "lucide-react";
+import { BadgeCheck, Banknote } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const ITEMS = [
@@ -27,6 +27,7 @@ const ITEMS = [
   { to: "/admin/integrite", label: "Intégrité tontine", icon: ShieldAlert },
   { to: "/admin/defaillants", label: "Défaillants", icon: AlertOctagon },
   { to: "/admin/kyc", label: "Vérifications KYC", icon: BadgeCheck },
+  { to: "/admin/cautions", label: "Cautions", icon: Banknote },
   { to: "/admin/djomy", label: "Identifiants Djomy", icon: KeyRound },
   { to: "/admin/sms-test", label: "Test SMS", icon: Send },
   { to: "/admin/sms-logs", label: "Journal SMS", icon: MessageSquare },
