@@ -160,7 +160,11 @@ export function CurrentTurnBanner({ turn, currentUserId, groupContribution }: Pr
                       )}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      <StatusPill status={r.status} overdue={overdue} />
+                      <StatusPillImpl
+                        status={r.status}
+                        overdue={overdue}
+                        daysLate={overdue ? Math.abs(daysToDue) : 0}
+                      />
                     </p>
                   </div>
                   <span className="num shrink-0 text-sm font-semibold text-foreground">
