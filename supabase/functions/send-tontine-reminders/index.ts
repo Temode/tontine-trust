@@ -291,7 +291,7 @@ Deno.serve(async (req) => {
       base_date: baseDate ?? new Date().toISOString().slice(0, 10),
       target_turn_date,
       target_due_date,
-      sent: { turn_upcoming_j2: sentTurn, contribution_due_j1: sentContribution },
+      sent: { turn_upcoming_j2: sentTurn, contribution_due_total: sentContribution, by_bucket: sentByBucket },
       skipped,
       ...(dryRun
         ? {
