@@ -1,5 +1,7 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { listTontineAlerts, type TontineAlert } from "@/lib/api/integrity";
 import {
   AlertOctagon,
   Phone,
@@ -52,6 +54,29 @@ export default function AdminDefaulters() {
   const [filter, setFilter] = useState<StatusFilter>("open");
   const [selected, setSelected] = useState<DefaulterReportEnriched | null>(null);
   const [auditing, setAuditing] = useState<DefaulterReportEnriched | null>(null);
+  const qc = useQueryClient();
+
+  const lateAlertsQ = useQuery({
+    queryKey: ["admin-late-alerts"],
+    queryFn: async () => {
+      const all = await listTontineAlerts(false);
+      return all.filter((a) => a.code === "late_contribution");
+    },
+    refetchInterval: 60_000,
+  });
+
+  const relaunchM = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.rpc("enqueue_late_payment_alerts");
+      if (error) throw error;
+      return data as number;
+    },
+    onSuccess: (n) => {
+      toast.success(`${n ?? 0} relance(s) envoyée(s)`);
+      qc.invalidateQueries({ queryKey: ["admin-late-alerts"] });
+    },
+    onError: (e: any) => toast.error(e.message ?? "Erreur"),
+  });
 
   const q = useQuery({
     queryKey: ["admin-defaulter-reports"],
