@@ -73,6 +73,9 @@ export interface UpdateGroupSettingsPayload {
   late_penalty_percent?: number;
   late_penalty_after_days?: number;
   visibility?: "private" | "public-link" | "directory";
+  new_member_lock_last_third?: boolean;
+  deposit_required?: boolean;
+  deposit_months?: 0 | 1 | 2;
 }
 
 const UPDATE_ERROR_LABELS: Record<string, string> = {
