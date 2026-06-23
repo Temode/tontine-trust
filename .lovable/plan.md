@@ -1,105 +1,81 @@
-## Correction de mon diagnostic
+## Objectif
 
-Tu as raison — **chaque membre paie chaque tour, y compris le bénéficiaire**. Donc sur le tour 1 d'« Epargne » :
-- Attendu : 3 contributions de 10 000 GNF (toi, Kankou, Rougui).
-- Réel : 2 confirmées (toi + Kankou). **Rougui n'a effectivement pas payé** sa propre cotisation alors qu'elle est en plus la bénéficiaire.
-- Le tour reste `collecting` car il manque sa contribution → aucun bouton "Payer" ne s'affiche pour elle car **aucun tour avec contribution attendue d'elle n'est ouvert dans son UI**. C'est un bug de visibilité côté membre.
+SMS Nimba aux 4 moments clés du cycle, **format opérateur** (style Orange Money / UBA) : une ligne dense, factuelle, avec référence courte et signature de marque. Déclenchement temps réel via triggers DB → Edge Function interne (pas de cron).
 
-Le solde du bénéficiaire (versement automatique + retrait à la demande) **n'existe pas encore** dans la base — il faut le créer.
+## Format SMS — style opérateur financier
 
----
+Règles strictes inspirées d'OM :
+- Pas de saut de ligne, pas d'emoji, pas de point d'exclamation.
+- Montants : `9 000 GNF` (espace insécable milliers, unité collée).
+- Référence courte type `TD{YYMMDD}.{HHMM}.{6 hex}` — ex `TD260622.2231.B23018`.
+- Signature finale invariable : **`Tontine Digitale vous remercie.`** (ou `Tontine Digitale vous informe.` pour les avis non-transactionnels).
+- ≤ 320 caractères (2 segments GSM).
 
-## Plan en 4 volets (conforme à la Doctrine Design)
+## Les 4 SMS
 
-### 1. Backend — Solde bénéficiaire + auto‑clôture des tours
+**1. Confirmation au payeur** — `contributions.status → confirmed`
+```
+Bonjour, votre cotisation de 10 000 GNF pour la tontine "Epargne" (tour #1, beneficiaire Rougui D.) a ete confirmee. 2/3 membres ont cotise. Echeance: 22/06/2026. Ref: TD260622.2231.B23018. Tontine Digitale vous remercie.
+```
 
-Migration `db/47_beneficiary_balance_and_auto_close.sql` :
+**2. Avis aux membres restants** — même évènement, destinataires = contributions encore `pending` sur ce tour
+```
+Bonjour, Kankou S. vient de cotiser pour la tontine "Epargne" (tour #1). Votre cotisation de 10 000 GNF reste due le 22/06/2026. Reglez depuis l application. Ref: TD260622.2231.B23018. Tontine Digitale vous informe.
+```
 
-- **Nouvelle table `beneficiary_balances`** (`user_id`, `group_id`, `available_amount`, `total_credited`, `total_withdrawn`) avec RLS : le propriétaire lit/écrit son propre solde, organisateurs du groupe lisent.
-- **Nouvelle table `withdrawal_requests`** (`user_id`, `group_id`, `amount`, `method` OM/MOMO/Carte, `status` pending/processing/paid/failed, `djomy_payout_ref`) — RLS : membre crée/lit les siennes, organisateur lit celles du groupe.
-- **Fonction `auto_close_turn_if_complete(turn_id)`** : si toutes les contributions attendues (tous membres `active`, **bénéficiaire inclus**) sont `confirmed` →
-  - `turns.status = 'paid'`, `paid_at = now()`,
-  - crédit du `beneficiary_balances.available_amount` (somme des cotisations − fee éventuel),
-  - ouverture du tour suivant en `collecting`,
-  - `audit_log` `turn_auto_closed` + `payout_credited` + notifications à tous.
-- **Fonction `flag_overdue_contributions()`** appelée par cron : pour chaque tour `collecting` dont `due_date < today − grace`, marque chaque contribution attendue non payée comme `defaulted`, déclenche `member_default_reports`, notifie.
-- **Trigger `AFTER UPDATE OF status ON contributions`** → appelle `auto_close_turn_if_complete`.
-- **Backfill one‑shot** : exécute la fonction sur tous les tours `collecting` existants. (Tour 1 d'Epargne restera `collecting` car il manque Rougui — exactement le bon comportement.)
-- **Vue `group_health_view`** : pour chaque groupe actif, expose tour courant, % payé, liste des défaillants → alimente Dashboard + alertes.
+**3. Versement au bénéficiaire** — `turns.status → paid` (via `auto_close_turn`)
+```
+Bonjour, le tour #1 de la tontine "Epargne" est cloture. Montant credite sur votre solde Tontine Digitale: 30 000 GNF. Demandez votre retrait depuis l application. Ref: TD260623.0815.A91204. Tontine Digitale vous remercie.
+```
 
-### 2. Frontend — Visibilité « tour courant » pour chaque membre (Doctrine)
+**4. Cycle terminé** — dernier tour passé `paid`, destinataires = organisateur + co-organisateurs
+```
+Bonjour, le cycle de la tontine "Epargne" est termine. Tous les versements ont ete effectues. Vous pouvez relancer un cycle, ajuster les regles ou inviter de nouveaux membres depuis l application. Ref: TD260623.0815.A91204. Tontine Digitale vous informe.
+```
 
-Composant `CurrentTurnBanner` placé en haut de `GroupDetail` et résumé dans `Dashboard` :
+Caractères : ASCII sans accents (compat GSM-7, évite la facturation Unicode et garantit la lisibilité tous combinés).
 
-- **Une seule action primaire** : si je dois payer ma cotisation du tour courant → bouton « Payer 10 000 GNF » (whitespace-nowrap, primary teal). Sinon → bouton secondaire ghost « Voir détails ».
-- Affiche : N° du tour, bénéficiaire (nom + avatar), échéance (date relative), montant attendu, **liste des 3 membres avec statut payé/en attente/en retard** (avec icône et token sémantique, pas de badge ALL CAPS).
-- Tabular-nums, formatGNF, gold accent uniquement pour les montants critiques.
+## Architecture
 
-Le bouton "Payer" s'affichera donc maintenant pour Rougui sur le tour 1 (sa propre cotisation manquante).
+```text
+contributions.status -> confirmed
+  ├─ trg_contribution_auto_close            (existant)
+  └─ trg_sms_on_contribution_confirmed      (NOUVEAU)
+        └─ pg_net -> send-tontine-sms (kind=contribution_confirmed)
+              ├─ SMS 1 au payeur
+              └─ SMS 2 aux membres encore pending
 
-### 3. Frontend — Page d'audit du groupe `/groupes/:id/audit`
+turns.status -> paid
+  └─ trg_sms_on_turn_paid                   (NOUVEAU)
+        └─ pg_net -> send-tontine-sms
+              ├─ SMS 3 au beneficiaire
+              └─ si dernier tour du cycle :
+                  SMS 4 organisateur + co-organisateurs
+```
 
-Conforme Doctrine : titre display bold, sous-titre muted, une seule action primaire « Forcer la réconciliation » (organisateur), reste en ghost.
-
-- **Timeline verticale** (création → invitations → approbations → paiements → clôtures → payouts → retraits → alertes), filtres pills sobres.
-- **Tableau « État des tours »** : tour, bénéficiaire, échéance, collecte (X/Y membres, X 000 / Y 000 GNF), statut. Tabular-nums partout.
-- **Section anomalies** : tours `collecting` dont `due_date` dépassé, membres en retard, contributions `defaulted`.
-- Skeletons (pas spinners).
-
-### 4. Frontend — Page « Mon solde » et présence quotidienne
-
-**Nouvelle page `/solde`** (entrée dans la nav) :
-- Carte « Solde disponible » par groupe (display bold XL, tabular-nums, accent or sur le montant).
-- Bouton primaire unique « Retirer » → ouvre `WithdrawDialog` (montant, méthode OM/MOMO/Carte, déclenche `djomy-init-payout` edge function existante ou nouvelle).
-- Historique des retraits (table sobre).
-
-**Dashboard** :
-- Nouvelle carte `TodayTontineCard` au-dessus de la ligne de flottaison : pour chaque groupe actif → tour courant + ma situation (« à payer », « payé », « bénéficiaire »).
-- Realtime sur `turns`, `contributions`, `beneficiary_balances` (extension de `useDjomyPaymentReconciler` + nouveau hook `useTontineRealtime`).
-
-**Notifications** (`send-tontine-reminders` étendu) :
-- J‑1, jour J, J+1, J+3 : rappels gradués au membre + alerte à l'organisateur.
-- À chaque clôture de tour : annonce « Tour N terminé, X a été crédité de Y GNF, à Z de payer ».
-- À chaque retrait : confirmation + reçu.
-
----
+Edge function interne, token partagé `X-Internal-Token`, `verify_jwt = false`. Charge le contexte (nom groupe, prénoms via `profiles.full_name` premier mot, montants, `due_date`, état contributions), appelle `sendMessage()` de `_shared/nimbasms.ts`. Idempotence : garde `OLD.status IS DISTINCT FROM NEW.status` + dédup côté logs.
 
 ## Fichiers
 
-**Créés** :
-- `db/47_beneficiary_balance_and_auto_close.sql`
-- `src/lib/api/balances.ts`, `src/lib/api/withdrawals.ts`, `src/lib/api/groupAudit.ts`
-- `src/pages/MyBalance.tsx`, `src/pages/GroupAudit.tsx`
-- `src/components/group/CurrentTurnBanner.tsx`
-- `src/components/dashboard/TodayTontineCard.tsx`
-- `src/components/balance/WithdrawDialog.tsx`
-- `src/hooks/useTontineRealtime.ts`
-- `supabase/functions/djomy-init-payout/index.ts` (si non existant)
+**Migration `db/48_sms_lifecycle_triggers.sql`**
+- Helper `enqueue_tontine_sms(kind text, payload jsonb)` via `pg_net.http_post` (pattern de `db/21_payment_reminders.sql`).
+- Triggers `AFTER UPDATE OF status` sur `contributions` et `turns` avec garde anti-doublon.
+- Détection cycle terminé : `NOT EXISTS (select 1 from turns where cycle_id = NEW.cycle_id and status <> 'paid')`.
+- Ajout valeur ENUM `cycle_completed` à `notification_kind` si absente.
 
-**Modifiés** :
-- `src/App.tsx` (routes `/solde`, `/groupes/:id/audit`)
-- `src/pages/Dashboard.tsx`, `src/pages/GroupDetail.tsx`
-- `src/components/layout/BottomNav.tsx` + `DesktopSidebar.tsx` (entrée Solde)
-- `supabase/functions/send-tontine-reminders/index.ts`
-- `src/hooks/useDjomyPaymentReconciler.ts`
+**Secret** : `TONTINE_SMS_INTERNAL_TOKEN` (généré via `generate_secret`).
 
----
+**Edge function `supabase/functions/send-tontine-sms/index.ts`**
+- `verify_jwt = false`, vérifie `X-Internal-Token`.
+- Helpers locaux : `fmtGNF(n)` (espace insécable + ` GNF`), `firstName(name)`, `stripAccents(s)`, `makeRef(prefix='TD')`.
+- 4 templates ci-dessus, génération de la `Ref` côté edge function.
+- Réutilise `sendMessage`, `normalizeGNPhone`, `logSmsAttempt`, filtre `notification_preferences` (défaut ON).
 
-## Conformité Doctrine vérifiée
+**UI — `src/pages/NotificationPreferences.tsx`**
+- Ajouter ligne SMS "Cycle termine" (kind `cycle_completed`). Aucune autre modif UI.
 
-- Couleurs : teal `#0D7377` primary, or `#E8AA14` uniquement sur montants critiques. Zéro hex hardcodé.
-- Une seule action primaire visible par page (Payer / Retirer / Forcer réconciliation).
-- Montants `tabular-nums` + `formatGNF`.
-- Skeletons partout, jamais de spinner.
-- Empty states avec icône + titre + description + 1 CTA.
-- Responsive vérifié à 712×800.
+## Hors scope
 
----
-
-## Résultat attendu
-
-- Rougui ouvre l'app → bandeau « Tour 1 — tu dois payer 10 000 GNF » → elle paie.
-- Dès sa contribution `confirmed`, le tour 1 se clôture seul, 30 000 GNF crédités sur son solde, tour 2 ouvert (bénéficiaire = toi).
-- Toi sur le Dashboard tu vois en permanence l'état des 3 membres et le tour courant.
-- Si quelqu'un est en retard, alerte + rappel automatique, défaut tracé dans l'audit.
-- Chaque bénéficiaire retire son argent quand il veut depuis `/solde`.
+- Pas de modification du cron `send-tontine-reminders` (rappels J-2/J-1 conservés, complémentaires).
+- Pas de modification schéma `contributions` / `turns` / `groups`.
+- Pas de nouveau composant visuel — actions "relancer cycle / inviter / paramètres" déjà disponibles dans `CycleAdminPanel.tsx` et `GroupSettings.tsx`.
