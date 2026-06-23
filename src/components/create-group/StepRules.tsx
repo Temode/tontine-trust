@@ -1,4 +1,4 @@
-import { ArrowRightLeft, ClipboardList, ShieldAlert, Shuffle, Users } from "lucide-react";
+import { ArrowRightLeft, ClipboardList, ShieldAlert, Shuffle, Users, Lock, Banknote } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { type GroupDraft, type RotationOrder, type SwapPolicy } from "./types";
@@ -200,6 +200,106 @@ export function StepRules({ draft, onChange, onBack, onContinue, index, total }:
                 </button>
               );
             })}
+          </div>
+        </section>
+
+        <section>
+          <Header
+            title="Sécurité des nouveaux membres"
+            hint="Protégez le groupe lorsqu'un membre rejoint après le démarrage du cycle."
+          />
+          <div className="mt-3 space-y-3">
+            <label
+              className={cn(
+                "flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition",
+                draft.newMemberLockLastThird
+                  ? "border-primary bg-primary-50/40"
+                  : "border-border hover:border-muted-foreground/30",
+              )}
+            >
+              <input
+                type="checkbox"
+                checked={draft.newMemberLockLastThird}
+                onChange={(e) => onChange({ newMemberLockLastThird: e.target.checked })}
+                className="mt-0.5 h-4 w-4 accent-primary"
+              />
+              <div className="flex-1">
+                <p className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                  <Lock className="h-3.5 w-3.5 text-primary" />
+                  Placer les nouveaux membres dans le dernier tiers
+                </p>
+                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                  Un membre rejoignant après le démarrage du cycle reçoit automatiquement
+                  une position dans le dernier tiers de la rotation. Le temps que sa
+                  fiabilité se construise.
+                </p>
+              </div>
+            </label>
+
+            <label
+              className={cn(
+                "flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition",
+                draft.depositRequired
+                  ? "border-primary bg-primary-50/40"
+                  : "border-border hover:border-muted-foreground/30",
+              )}
+            >
+              <input
+                type="checkbox"
+                checked={draft.depositRequired}
+                onChange={(e) =>
+                  onChange({
+                    depositRequired: e.target.checked,
+                    depositMonths: e.target.checked
+                      ? draft.depositMonths > 0
+                        ? draft.depositMonths
+                        : 1
+                      : 0,
+                  })
+                }
+                className="mt-0.5 h-4 w-4 accent-primary"
+              />
+              <div className="flex-1">
+                <p className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                  <Banknote className="h-3.5 w-3.5 text-primary" />
+                  Exiger une caution des nouveaux membres
+                </p>
+                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                  Un dépôt remboursable est exigé avant la participation aux tours. Il
+                  est libéré à la fin du cycle si le membre a honoré ses engagements,
+                  sinon retenu pour couvrir un défaut.
+                </p>
+                {draft.depositRequired && (
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <span className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                      Montant
+                    </span>
+                    {[1, 2].map((m) => {
+                      const active = draft.depositMonths === m;
+                      return (
+                        <button
+                          key={m}
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            onChange({ depositMonths: m as 1 | 2 });
+                          }}
+                          aria-pressed={active}
+                          className={cn(
+                            "rounded-md border px-3 py-1.5 text-xs font-semibold transition",
+                            active
+                              ? "border-primary bg-primary text-primary-foreground"
+                              : "border-border text-foreground hover:bg-secondary",
+                          )}
+                        >
+                          {m} mois de cotisation
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </label>
           </div>
         </section>
       </div>
