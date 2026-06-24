@@ -3802,6 +3802,7 @@ export type Database = {
           payout_amount: number
           payout_hold_until: string | null
           payout_reference: string | null
+          payout_released_at: string | null
           status: Database["public"]["Enums"]["turn_status"]
           turn_number: number
         }
@@ -3815,6 +3816,7 @@ export type Database = {
           payout_amount: number
           payout_hold_until?: string | null
           payout_reference?: string | null
+          payout_released_at?: string | null
           status?: Database["public"]["Enums"]["turn_status"]
           turn_number: number
         }
@@ -3828,6 +3830,7 @@ export type Database = {
           payout_amount?: number
           payout_hold_until?: string | null
           payout_reference?: string | null
+          payout_released_at?: string | null
           status?: Database["public"]["Enums"]["turn_status"]
           turn_number?: number
         }
@@ -6154,6 +6157,7 @@ export type Database = {
         Returns: undefined
       }
       reject_member: { Args: { _member_id: string }; Returns: undefined }
+      release_due_payout_holds: { Args: never; Returns: number }
       release_payout: {
         Args: {
           _provider?: Database["public"]["Enums"]["payment_provider"]
