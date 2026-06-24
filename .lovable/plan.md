@@ -1,111 +1,50 @@
-## Audit SMS — état actuel et lacunes
+## Pourquoi Rougui a pu retirer immédiatement alors que la règle existe
 
-### Déjà couverts par SMS (triggers Postgres + edge functions)
-| Évènement | Source | Destinataire |
-|---|---|---|
-| `contribution_confirmed` | trigger `sms_on_contribution_confirmed` → `send-tontine-sms` | Payeur + relance autres pending |
-| `turn_paid` (cagnotte versée) | trigger `sms_on_turn_paid` → `send-tontine-sms` | Bénéficiaire |
-| `payout_hold_extended` | edge `send-tontine-sms` | Bénéficiaire |
-| `cycle_completed` | trigger `sms_on_turn_paid` (dernier tour) | Organisateur + co-organisateurs |
-| `turn_upcoming_j2` (rappel tour) | cron `send-tontine-reminders` | Bénéficiaire |
-| `contribution_due` (J-2/J-1/J0) | cron | Membres pending |
-| `contribution_late` (J+1, J+3, J+7, J+14) | trigger + cron 15 min (livré au tour précédent) | Membres en retard |
+La règle « +7 j de blocage si retard » est bien implémentée (voir ma réponse précédente), mais **elle ne s'est pas déclenchée pour Rougui** à cause de la chaîne en amont. Voici l'audit factuel.
 
-### Lacunes critiques (à corriger — financier/sécurité)
-| Évènement | Destinataire | Priorité |
-|---|---|---|
-| **`withdrawal_requested`** — demande de retrait créée | **Demandeur** (« Votre demande de retrait de X GNF est enregistrée, Réf. WR-… ») + **super-admins / admins financiers** (« Nouvelle demande de retrait à valider ») | **P0** — manquant aujourd'hui |
-| **`withdrawal_processing`** — passage en cours de traitement | Demandeur | P0 |
-| **`withdrawal_paid`** — retrait effectivement versé | Demandeur (montant + canal + ref) | P0 |
-| **`withdrawal_failed` / `withdrawal_cancelled`** | Demandeur (raison) | P0 |
-| **`payment_confirmed_by_admin`** (validation manuelle d'un paiement externe) | Payeur | P0 |
-| **`payment_rejected_by_admin`** | Payeur (raison) | P0 |
-| **`penalty_adjusted` / `penalty_waived`** | Membre concerné | P1 |
+### Ce que disent les données
 
-### Lacunes opérationnelles (P1 — opt-in défaut ON pour les SMS structurants)
-| Évènement | Destinataire |
-|---|---|
-| `cycle_started` (un nouveau cycle démarre) | Tous les membres |
-| `cycle_paused` / `cycle_resumed` | Tous les membres |
-| `due_date_shifted` (échéance déplacée par l'organisateur) | Membres impactés |
-| `member_joined` | Organisateur |
-| `invitation_received` (avec lien d'invitation) | Invité (numéro saisi par l'organisateur) |
-| `member_suspended` / `member_reactivated` / `member_kicked` | Membre concerné |
-| `ownership_transferred` | Ancien + nouveau propriétaire |
-| `group_deletion_requested` / `_pending_admin` / `_approved` / `_refused` | Tous les membres du groupe |
-| `defaulter_reported` / `_resolved` | Membre signalé |
-| `payment_pause_request_approved` / `_rejected` | Demandeur |
-| `dispute_raised` / `_resolved` | Parties prenantes |
+**Cycle « Epargne » — fréquence quotidienne**
 
-### Hors SMS (rester in-app uniquement)
-`reliability_changed`, `announcement`, `chat`, `auction_outbid/won/lost/closed`, `swap_*`, `review_received`, `phone_visibility_changed`, `account_deleted`, `receipt_ready`, `permissions_changed` — bruit SMS trop élevé pour l'utilité ; restent en push/in-app.
+| Tour | Bénéficiaire | Payeur | Échéance | Confirmé le | Retard |
+|------|--------------|--------|----------|-------------|--------|
+| 1 | Rougui | Hadja Kankou | 22/06 | 22/06 00:02 | non |
+| 1 | Rougui | Elhadj Mamadou | 22/06 | 21/06 23:28 | non |
+| 1 | Rougui | **Rougui** | 22/06 | **24/06 21:44** | **+2 j** |
 
----
+- `turns.paid_at` = 24/06 21:44
+- `turns.payout_hold_until` = 24/06 21:44 (= `paid_at + 0 j`)
+- `group_members.was_late_in_cycle` (Rougui) = **false**
 
-## Plan d'implémentation
+→ Au moment où `auto_close_turn` a fermé son tour, le flag retard valait `false`, donc `compute_hold_until` a appliqué `standard_days=0` (quotidienne) + `0 j` de pénalité = libération immédiate. Elle a pu demander son retrait.
 
-Approche unifiée : **brancher tous les évènements manquants sur l'edge `send-tontine-sms`** (déjà sécurisé via `X-Internal-Token`, déjà au sender `Tontine`), via de nouveaux triggers Postgres qui appellent `enqueue_tontine_sms(_kind, _payload)`.
+### Pourquoi le flag est resté à false
 
-### Migration `db/49_sms_coverage_audit.sql`
+`was_late_in_cycle` n'est pas calculé en direct au moment du paiement. Il est posé **uniquement par le cron `enqueue_payment_reminders`** (cf. `db/26_notification_preferences.sql` + migration `20260623030227`), qui scanne les cotisations en retard à J+1 et met à jour le flag.
 
-**1. Étendre `send-tontine-sms/index.ts`** avec les nouveaux `kind` :
-- `withdrawal_requested` → 2 envois (demandeur + N admins financiers, identifiés via `has_role(..., 'super_admin')`)
-- `withdrawal_status_changed` (générique : `processing|paid|failed|cancelled`)
-- `payment_admin_decision` (`confirmed|rejected`, message paramétré)
-- `penalty_adjusted` / `penalty_waived`
-- `cycle_started` (boucle membres)
-- `cycle_paused` / `cycle_resumed`
-- `due_date_shifted`
-- `member_lifecycle` (`joined|suspended|reactivated|kicked`)
-- `ownership_transferred`
-- `group_deletion_event` (`requested|pending_admin|approved|refused`)
-- `defaulter_event` (`reported|resolved`)
-- `payment_pause_decision` (`approved|rejected`)
-- `dispute_event` (`raised|resolved`)
-- `invitation_sent` (numéro brut depuis `invitations.phone`)
+Or dans le cas Rougui :
+1. Échéance : 22/06.
+2. Sa cotisation est restée `pending` du 22 au 24/06.
+3. La validation manuelle a probablement été faite **avant** que le cron ne flague son retard (et le cron ignore les `confirmed`).
+4. `auto_close_turn` s'est exécuté juste après → flag toujours `false` → aucun hold.
 
-Chaque branche utilise `sendOne()` existant → respecte `notification_preferences` SMS + idempotence via `sms_logs`.
+Bref, la règle existe mais **la détection du retard est asynchrone** et ne couvre pas le cas où l'admin confirme une cotisation tardive avant le passage du cron.
 
-**2. Triggers Postgres**
-- `withdrawal_requests` (`AFTER INSERT` + `AFTER UPDATE OF status`) → `enqueue_tontine_sms('withdrawal_requested' | 'withdrawal_status_changed', ...)`
-- `payments` (`AFTER UPDATE` quand `status` passe `pending → confirmed|rejected` par un admin)
-- `cycles` (`AFTER INSERT` quand status = `active`)
-- `groups` (`AFTER UPDATE OF status` pour pause/reprise/archive)
-- `turns` (`AFTER UPDATE OF due_date`)
-- `group_members` (`AFTER UPDATE OF status` pour suspended/kicked/reactivated)
-- `group_deletion_requests` (`AFTER INSERT` + `UPDATE OF status`)
-- `member_default_reports` (`AFTER INSERT` + `UPDATE`)
-- `payment_pause_requests` (`AFTER UPDATE OF status`)
-- `contribution_disputes` (`AFTER INSERT` + `UPDATE`)
-- `invitations` (`AFTER INSERT` quand `phone` renseigné)
-- `member_admin_actions` (déjà existant) — instrumenter l'envoi SMS pour `ownership_transferred`
+### Ce qu'il faut décider
 
-**3. Préférences par défaut**
-Mise à jour de `seed_notification_preferences()` : SMS **ON par défaut** pour la liste « critiques » suivante (les autres restent OFF, l'utilisateur peut activer) :
-```
-withdrawal_requested, withdrawal_status_changed (mappé sur 4 types existants),
-payment_confirmed_by_admin, payment_rejected_by_admin,
-penalty_adjusted, penalty_waived,
-cycle_started, cycle_paused, cycle_resumed, due_date_shifted,
-group_deletion_requested, group_deletion_approved, group_deletion_refused,
-member_suspended, member_kicked,
-ownership_transferred,
-payment_pause_request_approved, payment_pause_request_rejected,
-dispute_raised, dispute_resolved
-```
-(les choix existants des utilisateurs sont préservés — un `ON CONFLICT DO NOTHING` reste en place.)
+Trois options possibles — dis-moi laquelle tu veux :
 
-**4. Page « Préférences de notifications »** (`src/pages/NotificationPreferences.tsx`)
-- Regrouper visuellement les types en 3 sections : **Critique** (verrouillé ON recommandé), **Important**, **Discret**. Pas de changement de logique métier — juste lisibilité.
+**(A) Détection synchrone du retard à la confirmation**
+À chaque passage d'une cotisation en `confirmed`, comparer `confirmed_at` (ou `submitted_at`) à `due_date` et poser `was_late_in_cycle = true` immédiatement. Le hold s'appliquera donc systématiquement, même pour les confirmations admin tardives. Recommandé.
 
-### Tests
-- `tests/e2e/sms-coverage.spec.ts` — pour chaque évènement critique, déclencher l'action (ex. `request_withdrawal`, validation admin d'un paiement, suspension membre) puis vérifier qu'une ligne `sms_logs` est créée avec le bon `kind` et `status='sent'|'skipped'` cohérent avec les préférences.
+**(B) Recalcul du hold après auto_close**
+Garder la détection cron, mais permettre de **prolonger un hold a posteriori** si on découvre un retard rétroactif (et notifier le bénéficiaire). Plus complexe, surtout si la personne a déjà retiré.
 
-### Hors périmètre
-- Pas de refonte de l'edge function `send-tontine-sms` (on ajoute des branches).
-- Pas de re-envoi rétroactif pour les évènements passés.
-- Aucune modification des préférences existantes des utilisateurs (RGPD).
-- Pas de SMS pour `chat`, `auction_*`, `swap_*`, `review_*`, `announcement`, `reliability_changed` — restent in-app/push.
+**(C) Ne rien changer**
+On considère que les retards confirmés rapidement par l'admin ne « comptent pas ». C'est la situation actuelle.
 
-### Impact attendu
-Après déploiement : chaque demande de retrait, validation/refus de paiement, démarrage de cycle, suspension de membre, etc. déclenche un SMS dans les secondes via le trigger Postgres, sans cron à attendre. Cohérent avec les préférences utilisateur et journalisé dans `sms_logs`.
+### Cas Rougui en particulier
+
+Son retrait est déjà parti et son solde est à 0. Aucune correction rétroactive n'est applicable (sauf à ouvrir une dette/régularisation manuelle). Ma recommandation : appliquer **l'option A** pour que ça ne se reproduise plus, sans toucher au passé.
+
+Confirme l'option (A, B ou C) et je passe en build pour l'implémenter.
