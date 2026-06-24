@@ -69,6 +69,14 @@ export default function AdminDefaulters() {
     mutationFn: async () => {
       const { data, error } = await supabase.rpc("enqueue_late_payment_alerts");
       if (error) throw error;
+      // Pousser immédiatement les SMS sans attendre le prochain tick cron
+      try {
+        await supabase.functions.invoke("send-tontine-reminders", {
+          body: { triggered_by: "admin_defaulters_relaunch" },
+        });
+      } catch (e) {
+        console.warn("[defaulters] send-tontine-reminders invoke failed", e);
+      }
       return data as number;
     },
     onSuccess: (n) => {
