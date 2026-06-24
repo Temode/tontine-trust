@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Wallet, TrendingUp, History, CheckCircle2, Clock, XCircle, Lock } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -17,6 +17,40 @@ const METHOD_LABEL: Record<string, string> = {
   BANK: "Virement",
   CASH: "Espèces",
 };
+
+function useNow(intervalMs = 1000) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), intervalMs);
+    return () => clearInterval(id);
+  }, [intervalMs]);
+  return now;
+}
+
+function HoldCountdown({ until }: { until: string }) {
+  const now = useNow(1000);
+  const target = new Date(until).getTime();
+  const diff = Math.max(0, target - now);
+  const released = diff === 0;
+  if (released) {
+    return (
+      <span className="ml-1 inline-flex items-center rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700">
+        Débloqué
+      </span>
+    );
+  }
+  const totalSec = Math.floor(diff / 1000);
+  const d = Math.floor(totalSec / 86400);
+  const h = Math.floor((totalSec % 86400) / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  const txt = d > 0 ? `${d}j ${h}h ${m}m` : h > 0 ? `${h}h ${m}m ${s}s` : `${m}m ${s}s`;
+  return (
+    <span className="ml-1 inline-flex items-center gap-1 rounded-full bg-amber-200/70 px-1.5 py-0.5 text-[10px] font-semibold text-amber-900 num">
+      ⏳ {txt}
+    </span>
+  );
+}
 
 export default function MyBalance() {
   useTontineRealtime();
@@ -98,12 +132,15 @@ export default function MyBalance() {
                   {heldPayouts.map((h) => (
                     <li key={h.id} className="text-xs text-amber-900/90">
                       <span className="font-semibold">{h.group_name ?? "Groupe"}</span> — tour #{h.turn_number} ·
-                      libération le{" "}
-                      {new Date(h.payout_hold_until).toLocaleDateString("fr-FR", {
-                        day: "2-digit",
-                        month: "long",
-                        year: "numeric",
-                      })}
+                      <span className="ml-1 inline-flex items-center rounded-full bg-amber-300/40 px-1.5 py-0.5 text-[10px] font-semibold text-amber-900">
+                        Gelé jusqu'au{" "}
+                        {new Date(h.payout_hold_until).toLocaleDateString("fr-FR", {
+                          day: "2-digit",
+                          month: "long",
+                          year: "numeric",
+                        })}
+                      </span>
+                      <HoldCountdown until={h.payout_hold_until} />
                       {" "}· {formatGNF(h.payout_amount)} GNF
                     </li>
                   ))}
