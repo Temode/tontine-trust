@@ -51,6 +51,12 @@ export async function listMyWithdrawals(): Promise<DbWithdrawalRequest[]> {
   return (data ?? []) as DbWithdrawalRequest[];
 }
 
+export async function getPendingPenalty(groupId: string): Promise<number> {
+  const { data, error } = await supabase.rpc("get_pending_penalty", { _group_id: groupId });
+  if (error) throw error;
+  return Number(data ?? 0);
+}
+
 export async function requestWithdrawal(args: {
   groupId: string;
   amount: number;
