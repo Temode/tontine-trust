@@ -5745,6 +5745,16 @@ export type Database = {
         Returns: undefined
       }
       delete_account: { Args: { _reason?: string }; Returns: undefined }
+      enqueue_generic_sms: {
+        Args: {
+          _body: string
+          _group_id?: string
+          _recipients: string[]
+          _sms_kind: string
+          _turn_id?: string
+        }
+        Returns: undefined
+      }
       enqueue_late_payment_alerts: { Args: never; Returns: number }
       enqueue_payment_reminders: { Args: never; Returns: number }
       enqueue_tontine_sms: {
@@ -5756,6 +5766,7 @@ export type Database = {
         Returns: Json
       }
       finalize_deletion_votes: { Args: never; Returns: number }
+      fmt_gnf: { Args: { _n: number }; Returns: string }
       frequency_to_days: {
         Args: { _freq: Database["public"]["Enums"]["group_frequency"] }
         Returns: number
@@ -6321,6 +6332,11 @@ export type Database = {
         | "deposit_status"
         | "payout_hold_extended"
         | "contribution_late"
+        | "withdrawal_requested"
+        | "withdrawal_processing"
+        | "withdrawal_paid"
+        | "withdrawal_failed"
+        | "withdrawal_cancelled"
       payment_method_external:
         | "cash"
         | "bank_transfer"
@@ -6607,6 +6623,11 @@ export const Constants = {
         "deposit_status",
         "payout_hold_extended",
         "contribution_late",
+        "withdrawal_requested",
+        "withdrawal_processing",
+        "withdrawal_paid",
+        "withdrawal_failed",
+        "withdrawal_cancelled",
       ],
       payment_method_external: [
         "cash",
