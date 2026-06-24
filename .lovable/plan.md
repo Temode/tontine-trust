@@ -1,52 +1,44 @@
-# Mode alerte « retard J+1 » sur les cotisations
+## Pourquoi Rougui n'a reçu aucun SMS
 
-## Contexte
-Rougui a 1 jour de retard sur la tontine quotidienne « Epargne » mais aucune alerte n'a été déclenchée : ni notification, ni SMS, ni signal côté organisateur. Le cron de rappels (`db/21_payment_reminders.sql`) existe mais ses buckets ne produisent rien d'utile pour le quotidien, et `tontine_alerts` n'est jamais alimenté pour les retards de paiement.
+J'ai vérifié ses logs : Rougui **a bien payé** (tour #1 « Epargne », confirmé à 21:44). Deux SMS ont été préparés pour elle (`contribution_confirmed` + `payout_released`) — les deux sont en `status = skipped, error = opted_out`.
 
-## Objectif
-À partir de **J+1 (1 jour après la due_date)** sur toute cotisation `pending|rejected` d'un tour `upcoming|collecting` :
-1. Envoyer **une notification in-app + un SMS NimbaSMS** au membre retardataire (sender « Tontine »).
-2. Créer **une entrée `tontine_alerts`** (severity `warning`, code `late_contribution`) visible par l'organisateur, avec **badge rouge** sur le membre dans la liste du tour.
+Cause : dans `notification_preferences`, **tous ses canaux SMS sont désactivés** (`enabled = false` pour les 53 types de notifications, canal `sms`). Le système respecte donc son choix et n'envoie rien par SMS, mais les notifications in-app passent.
 
-Pas de blocage du tour suivant, pas de pré-signalement défaut automatique (l'organisateur garde la main via le flux existant).
+→ Action côté produit : lui suggérer (ou au super-admin) de réactiver les SMS critiques (`contribution_confirmed`, `contribution_due`, `contribution_late`, `payout_released`) depuis « Préférences de notifications ». Pas de bug technique.
 
-## Périmètre — ce qu'on touche
+---
 
-### Base de données — nouvelle migration `db/47_late_payment_alerts.sql`
-- Fonction `public.enqueue_late_payment_alerts() returns int` :
-  - Parcourt `contributions` non payées dont `(current_date - turns.due_date) >= 1`.
-  - Pour chaque (contribution, jour), idempotent via `reminder_log` (bucket `LATE_J+n` où `n = days_late`).
-  - Insert dans `notifications` (`kind = 'contribution_late'`, body localisé GNF + n° tour).
-  - Insert dans `tontine_alerts` (une seule par contribution non résolue : ON CONFLICT DO NOTHING via index unique partiel `(contribution_id) where resolved_at is null and code='late_contribution'`).
-  - Insert dans `sms_logs` via fonction utilitaire existante (déclenche l'envoi NimbaSMS côté edge function `send-tontine-reminders`, qui scanne la queue).
-  - Auto-résolution : quand une contribution passe `confirmed`, trigger qui met `tontine_alerts.resolved_at = now()` pour le code `late_contribution` correspondant.
-- Cron `pg_cron` : remplace l'ancien `tontine_payment_reminders` par un job **toutes les heures** (8h–22h) appelant à la fois `enqueue_payment_reminders()` et `enqueue_late_payment_alerts()` → réactivité < 1h sur le quotidien.
+## Plan — SMS de relance immédiat dès J+1 (tontines quotidiennes)
 
-### Edge function — `supabase/functions/send-tontine-reminders/index.ts`
-- Étendre pour traiter les notifications `contribution_late` non envoyées en SMS : message « Tontine [nom] · Cotisation tour #N en retard de J jours. Pénalité +X% dès demain. Payez ici : [lien Djomy]. »
-- Sender = `Tontine` (déjà en place après le précédent correctif).
+### Constat sur l'existant
+- La fonction `enqueue_late_payment_alerts()` (migration 47) crée bien les notifications in-app + alertes organisateur dès J+1.
+- **Mais** l'edge function `send-tontine-reminders` ne lit que `pending_reminders_view` (rappels `J-2/J-1/J0/J+1/J+3/J+7/J+14`) — elle ne traite pas le kind `contribution_late`. Résultat : aujourd'hui, **aucun SMS de retard n'est réellement envoyé**, même quand l'alerte est créée.
+- Le cron horaire `5 8-22 * * *` détecte donc le retard en < 1 h, mais l'envoi SMS ne suit pas.
 
-### Frontend
-- **`src/components/group/CurrentTurnBanner.tsx`** : ajouter un badge rouge « En retard J+n » sur la ligne du membre quand `status pending|rejected` et `days_late >= 1` (déjà calculé via `overdue`, juste renforcer la pastille avec le nombre de jours).
-- **`src/pages/admin/Defaulters.tsx`** : nouvelle section « Retards en cours » alimentée par `tontine_alerts` code `late_contribution` non résolus, avec lien direct vers le membre + bouton « Relancer maintenant » (appelle la RPC `enqueue_late_payment_alerts` ciblée sur la contribution).
-- **`src/components/notifications/NotificationItem.tsx`** : icône + style dédié pour `contribution_late`.
+### Changements
 
-### Tests E2E — `tests/e2e/late-payment-alert.spec.ts`
-- Seed : 1 groupe quotidien, 1 tour due hier, 1 contribution pending.
-- Exécute la RPC `enqueue_late_payment_alerts()`.
-- Vérifie : notification créée, alerte `tontine_alerts` visible, badge « En retard J+1 » rendu dans le banner, page admin Defaulters liste le membre.
-- Re-exécution → idempotent (pas de doublon le même jour).
+**1. `supabase/functions/send-tontine-reminders/index.ts` — nouveau bloc « late alerts »**
+- Lire les notifications `kind = 'contribution_late'` créées aujourd'hui non encore loguées en SMS (`sms_logs.kind = 'contribution_late_LATE_J<n>'` absente).
+- Joindre `contributions` + `turns` + `groups` pour reconstruire montant, n° tour, jours de retard, pénalité attendue.
+- Construire le message court : `Tontine [groupe] : cotisation #N en retard de J jour(s) (XXX GNF). Pénalité +Y% si non régularisé. Réglez via l'app.` (sender `Tontine`, déjà actif).
+- Respecter `notification_preferences` canal `sms`, type `contribution_late` (défaut ON). Skipper avec `error=no_phone|opted_out` comme les autres buckets.
+- Idempotent : check `sms_logs` pour (`user_id`, `turn_id`, `kind='contribution_late_LATE_J<n>'`, `created_at >= today`).
 
-## Hors périmètre (non demandé)
-- Blocage automatique du prochain tour
-- Pré-création d'un `member_default_reports`
-- Escalade automatique vers défaut après N jours (reste manuel via le flux organisateur)
+**2. `db/48_immediate_late_sms.sql` — déclenchement immédiat**
+- Trigger `AFTER INSERT ON notifications` quand `kind = 'contribution_late'` → `pg_net.http_post` vers `send-tontine-reminders` (fire-and-forget). Garantit l'envoi SMS dans les secondes suivant la création de l'alerte, sans attendre le tick horaire.
+- Resserrer le cron `tontine-late-alerts-hourly` à **toutes les 15 minutes entre 8h–22h** (`*/15 8-22 * * *`) pour la détection (le SMS lui-même se déclenche désormais immédiatement via le trigger).
 
-## Détails techniques
-- Idempotence : clé composite `(contribution_id, sent_on, bucket)` déjà en place sur `reminder_log`, on réutilise.
-- RLS : `tontine_alerts` a déjà les policies (lecture organisateur+admin) — rien à ajouter.
-- GRANT : `enqueue_late_payment_alerts()` `SECURITY DEFINER`, `grant execute ... to authenticated, service_role`.
-- Realtime : `tontine_alerts` déjà dans la publication ? À vérifier dans la migration, sinon `ALTER PUBLICATION supabase_realtime ADD TABLE public.tontine_alerts`.
+**3. `src/pages/admin/Defaulters.tsx` — bouton « Relancer maintenant »**
+- Après `rpc('enqueue_late_payment_alerts')`, invoquer aussi `supabase.functions.invoke('send-tontine-reminders')` pour pousser le SMS dans la foulée (au lieu d'attendre le prochain tick).
 
-## Impact attendu pour Rougui
-Dès le déploiement + premier passage du cron : elle reçoit un SMS + push « Cotisation tour #1 en retard de 1 jour », l'organisateur voit un badge rouge sur sa ligne et une entrée dans Defaulters › Retards en cours.
+**4. Préférences par défaut**
+- Vérifier que les rows `notification_preferences` créées par défaut incluent `('contribution_late', 'sms', true)`. Sinon, ajout via la fonction de seed existante (à confirmer dans `db/26_notification_preferences.sql`).
+
+### Hors périmètre
+- Pas de modification du flux in-app, du badge `CurrentTurnBanner` ni de l'UI Defaulters (déjà livrés à l'étape précédente).
+- Pas d'envoi rétroactif aux retardataires « historiques » — seul le prochain passage du cron + tout nouveau J+1 déclenchera le SMS.
+- Aucune modification des préférences de Rougui (RGPD : c'est son choix explicite).
+
+### Tests
+- Étendre `tests/e2e/late-payment-alert.spec.ts` : vérifier qu'après `enqueue_late_payment_alerts()` + invoke de l'edge function, un `sms_logs` `contribution_late_LATE_J1` est créé (mocké en dry-run).
+- Test manuel : forcer un J+1 sur le groupe « Epargne » (autre membre que Rougui), exécuter l'edge function en `dry_run=true`, valider le preview.
