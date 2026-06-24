@@ -1,50 +1,69 @@
-## Pourquoi Rougui a pu retirer immédiatement alors que la règle existe
+## Geler le payout de Rougui, appliquer la pénalité, et créer une caisse de groupe
 
-La règle « +7 j de blocage si retard » est bien implémentée (voir ma réponse précédente), mais **elle ne s'est pas déclenchée pour Rougui** à cause de la chaîne en amont. Voici l'audit factuel.
+### État actuel (vérifié en base)
+- Demande de retrait `5fddd9e2…` : 30 000 GNF, statut `pending`, **non encore versée**. Le solde a juste été décrémenté côté `beneficiary_balances` (available 0 / withdrawn 30 000).
+- Pénalité due par Rougui : `contributions.penalty_amount = 100` GNF (cotisation 8a7a07c1, non waivée).
+- Aucune table de « caisse de groupe » n'existe aujourd'hui.
 
-### Ce que disent les données
+### Ce qu'il faut faire
 
-**Cycle « Epargne » — fréquence quotidienne**
+#### 1) Nouvelle table `group_treasury` + ledger
+Migration ajoutant :
+- `group_treasury(group_id pk, balance bigint, updated_at)` — solde de la caisse du groupe.
+- `group_treasury_entries(id, group_id, amount, source, contribution_id?, user_id?, created_at)` avec `source ∈ ('late_penalty','manual_credit','manual_debit')` pour la traçabilité.
+- RLS : lecture pour membres du groupe ; admin du groupe pour `manual_*` ; service_role pour le reste.
 
-| Tour | Bénéficiaire | Payeur | Échéance | Confirmé le | Retard |
-|------|--------------|--------|----------|-------------|--------|
-| 1 | Rougui | Hadja Kankou | 22/06 | 22/06 00:02 | non |
-| 1 | Rougui | Elhadj Mamadou | 22/06 | 21/06 23:28 | non |
-| 1 | Rougui | **Rougui** | 22/06 | **24/06 21:44** | **+2 j** |
+#### 2) Évolution de `request_withdrawal`
+Avant l'insert de la demande :
+- Calculer `v_penalty_due = SUM(penalty_amount)` sur les `contributions` du groupe pour ce user, status `confirmed`, `penalty_waived_at IS NULL`, et **non encore prélevées** (nouveau flag `penalty_collected_at timestamptz`).
+- Si `v_penalty_due > 0` :
+  - Vérifier `available_amount >= _amount + v_penalty_due`.
+  - Décrémenter `beneficiary_balances.available_amount` du **montant + pénalité**.
+  - Créditer `group_treasury.balance += v_penalty_due` et insérer une entrée `group_treasury_entries('late_penalty')` par contribution.
+  - Marquer ces `contributions.penalty_collected_at = now()`.
+- Message d'erreur dédié `PENALTY_DUE:<montant>` côté UI pour expliquer la déduction.
 
-- `turns.paid_at` = 24/06 21:44
-- `turns.payout_hold_until` = 24/06 21:44 (= `paid_at + 0 j`)
-- `group_members.was_late_in_cycle` (Rougui) = **false**
+#### 3) Correction rétroactive Rougui (one-shot data fix)
+Comme la demande est encore `pending` (rien envoyé chez Djomy), on peut tout réécrire proprement :
+- `withdrawal_requests.status = 'cancelled'` + note explicative.
+- `beneficiary_balances` : remettre `available_amount = 30 000`, `total_withdrawn = 0`.
+- `group_members.was_late_in_cycle = true`, `was_late_at_turn_number = ARRAY[1]` pour Rougui.
+- `turns.payout_hold_until = paid_at + 7 jours` (passe à 2026-07-01 21:44 UTC).
+- SMS automatique à Rougui : « Suite à un retard de cotisation dans ce cycle, votre retrait est annulé et vos fonds (30 000 GNF) sont remis en attente jusqu'au 01/07/2026. Une pénalité de 100 GNF sera prélevée lors du retrait. »
 
-→ Au moment où `auto_close_turn` a fermé son tour, le flag retard valait `false`, donc `compute_hold_until` a appliqué `standard_days=0` (quotidienne) + `0 j` de pénalité = libération immédiate. Elle a pu demander son retrait.
+#### 4) UI `WithdrawDialog`
+- Charger le montant total de pénalités dues avant le retrait via une petite RPC `get_pending_penalty(_group_id)`.
+- Afficher un panneau « Pénalité de retard : 100 GNF — sera prélevée et versée à la caisse du groupe ».
+- Gérer le nouveau code d'erreur `PENALTY_DUE:`.
 
-### Pourquoi le flag est resté à false
+### Détails techniques
 
-`was_late_in_cycle` n'est pas calculé en direct au moment du paiement. Il est posé **uniquement par le cron `enqueue_payment_reminders`** (cf. `db/26_notification_preferences.sql` + migration `20260623030227`), qui scanne les cotisations en retard à J+1 et met à jour le flag.
+**Schéma**
+```text
+group_treasury           group_treasury_entries
+─────────────            ──────────────────────
+group_id  pk             id              uuid pk
+balance   bigint         group_id        uuid fk
+updated_at               amount          bigint   (signé : + crédit, − débit)
+                         source          text     ('late_penalty'|'manual_credit'|'manual_debit')
+                         contribution_id uuid?    fk
+                         user_id         uuid?    fk
+                         created_by      uuid?    (acteur, NULL pour auto)
+                         note            text?
+                         created_at      timestamptz
+```
 
-Or dans le cas Rougui :
-1. Échéance : 22/06.
-2. Sa cotisation est restée `pending` du 22 au 24/06.
-3. La validation manuelle a probablement été faite **avant** que le cron ne flague son retard (et le cron ignore les `confirmed`).
-4. `auto_close_turn` s'est exécuté juste après → flag toujours `false` → aucun hold.
+`contributions` reçoit une colonne `penalty_collected_at timestamptz` pour éviter de prélever deux fois la même pénalité.
 
-Bref, la règle existe mais **la détection du retard est asynchrone** et ne couvre pas le cas où l'admin confirme une cotisation tardive avant le passage du cron.
+**Fichiers impactés**
+- `supabase/migrations/<ts>_group_treasury_and_penalty_collection.sql` (nouvelle table, colonne, RPC modifiée, RPC `get_pending_penalty`).
+- `supabase/migrations/<ts>_fix_rougui_payout_hold.sql` (data fix one-shot, via `supabase--insert`).
+- `src/lib/api/balances.ts` (gestion `PENALTY_DUE`, exposer `getPendingPenalty`).
+- `src/components/balance/WithdrawDialog.tsx` (affichage du panneau pénalité).
+- Optionnel : page admin « Caisse du groupe » dans `GroupSettings.tsx` pour visualiser `group_treasury` + historique. Je le proposerai en suivi si tu veux.
 
-### Ce qu'il faut décider
+### Hors périmètre
+- UI admin de la caisse du groupe (consultation/débit manuel) — à faire dans un second temps si besoin.
+- Logique de redistribution de la caisse en fin de cycle — non demandée, à définir avec toi plus tard.
 
-Trois options possibles — dis-moi laquelle tu veux :
-
-**(A) Détection synchrone du retard à la confirmation**
-À chaque passage d'une cotisation en `confirmed`, comparer `confirmed_at` (ou `submitted_at`) à `due_date` et poser `was_late_in_cycle = true` immédiatement. Le hold s'appliquera donc systématiquement, même pour les confirmations admin tardives. Recommandé.
-
-**(B) Recalcul du hold après auto_close**
-Garder la détection cron, mais permettre de **prolonger un hold a posteriori** si on découvre un retard rétroactif (et notifier le bénéficiaire). Plus complexe, surtout si la personne a déjà retiré.
-
-**(C) Ne rien changer**
-On considère que les retards confirmés rapidement par l'admin ne « comptent pas ». C'est la situation actuelle.
-
-### Cas Rougui en particulier
-
-Son retrait est déjà parti et son solde est à 0. Aucune correction rétroactive n'est applicable (sauf à ouvrir une dette/régularisation manuelle). Ma recommandation : appliquer **l'option A** pour que ça ne se reproduise plus, sans toucher au passé.
-
-Confirme l'option (A, B ou C) et je passe en build pour l'implémenter.
+Je passe en build dès validation.

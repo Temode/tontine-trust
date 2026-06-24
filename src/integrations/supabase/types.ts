@@ -514,6 +514,7 @@ export type Database = {
           penalty_adjusted_by: string | null
           penalty_adjusted_from: number | null
           penalty_amount: number
+          penalty_collected_at: string | null
           penalty_waive_reason: string | null
           penalty_waived_at: string | null
           penalty_waived_by: string | null
@@ -538,6 +539,7 @@ export type Database = {
           penalty_adjusted_by?: string | null
           penalty_adjusted_from?: number | null
           penalty_amount?: number
+          penalty_collected_at?: string | null
           penalty_waive_reason?: string | null
           penalty_waived_at?: string | null
           penalty_waived_by?: string | null
@@ -562,6 +564,7 @@ export type Database = {
           penalty_adjusted_by?: string | null
           penalty_adjusted_from?: number | null
           penalty_amount?: number
+          penalty_collected_at?: string | null
           penalty_waive_reason?: string | null
           penalty_waived_at?: string | null
           penalty_waived_by?: string | null
@@ -1521,6 +1524,153 @@ export type Database = {
           },
           {
             foreignKeyName: "group_messages_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "my_groups_overview"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      group_treasury: {
+        Row: {
+          balance: number
+          group_id: string
+          updated_at: string
+        }
+        Insert: {
+          balance?: number
+          group_id: string
+          updated_at?: string
+        }
+        Update: {
+          balance?: number
+          group_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_treasury_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: true
+            referencedRelation: "admin_group_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_treasury_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: true
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_treasury_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: true
+            referencedRelation: "my_groups_overview"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      group_treasury_entries: {
+        Row: {
+          amount: number
+          contribution_id: string | null
+          created_at: string
+          created_by: string | null
+          group_id: string
+          id: string
+          note: string | null
+          source: string
+          user_id: string | null
+        }
+        Insert: {
+          amount: number
+          contribution_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          group_id: string
+          id?: string
+          note?: string | null
+          source: string
+          user_id?: string | null
+        }
+        Update: {
+          amount?: number
+          contribution_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          group_id?: string
+          id?: string
+          note?: string | null
+          source?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_treasury_entries_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
+            referencedRelation: "contributions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_treasury_entries_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
+            referencedRelation: "group_defaulters"
+            referencedColumns: ["contribution_id"]
+          },
+          {
+            foreignKeyName: "group_treasury_entries_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
+            referencedRelation: "group_payments_history"
+            referencedColumns: ["contribution_id"]
+          },
+          {
+            foreignKeyName: "group_treasury_entries_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
+            referencedRelation: "my_contributions_due"
+            referencedColumns: ["contribution_id"]
+          },
+          {
+            foreignKeyName: "group_treasury_entries_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
+            referencedRelation: "my_late_contributions"
+            referencedColumns: ["contribution_id"]
+          },
+          {
+            foreignKeyName: "group_treasury_entries_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
+            referencedRelation: "pending_reminders_view"
+            referencedColumns: ["contribution_id"]
+          },
+          {
+            foreignKeyName: "group_treasury_entries_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
+            referencedRelation: "turn_assignment_audit"
+            referencedColumns: ["contribution_id"]
+          },
+          {
+            foreignKeyName: "group_treasury_entries_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "admin_group_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_treasury_entries_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_treasury_entries_group_id_fkey"
             columns: ["group_id"]
             isOneToOne: false
             referencedRelation: "my_groups_overview"
@@ -5810,6 +5960,7 @@ export type Database = {
           withdrawal_locked: boolean
         }[]
       }
+      get_pending_penalty: { Args: { _group_id: string }; Returns: number }
       get_user_default_history: {
         Args: { _user_id?: string }
         Returns: {
