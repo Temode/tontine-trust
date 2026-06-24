@@ -6492,6 +6492,7 @@ export type Database = {
         | "withdrawal_paid"
         | "withdrawal_failed"
         | "withdrawal_cancelled"
+        | "payout_hold_released"
       payment_method_external:
         | "cash"
         | "bank_transfer"
@@ -6783,6 +6784,7 @@ export const Constants = {
         "withdrawal_paid",
         "withdrawal_failed",
         "withdrawal_cancelled",
+        "payout_hold_released",
       ],
       payment_method_external: [
         "cash",
