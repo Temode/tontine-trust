@@ -116,7 +116,7 @@ export function WithdrawDialog({ open, onOpenChange, groupId, groupName, availab
               type="number"
               inputMode="numeric"
               min={1}
-              max={available}
+              max={maxAllowed}
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
               placeholder="Ex : 10000"
@@ -127,7 +127,7 @@ export function WithdrawDialog({ open, onOpenChange, groupId, groupName, availab
                 <button
                   key={pct}
                   type="button"
-                  onClick={() => setAmount(String(Math.floor(available * pct)))}
+                  onClick={() => setAmount(String(Math.floor(maxAllowed * pct)))}
                   className="rounded-full border border-hairline px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground transition hover:text-foreground"
                 >
                   {pct === 1 ? "Tout" : `${pct * 100}%`}
