@@ -284,6 +284,129 @@ Deno.serve(async (req) => {
     }
   }
 
+  // ── 3. Alertes retard (J+1, J+2, ...) — kind 'contribution_late' ────────
+  let sentLate = 0;
+  const sentLateByBucket: Record<string, number> = {};
+  const previewLate: Array<Record<string, unknown>> = [];
+
+  const todayStart = `${today}T00:00:00Z`;
+  const { data: lateNotifs, error: lnErr } = await admin
+    .from("notifications")
+    .select("id, user_id, group_id, turn_id, created_at")
+    .eq("kind", "contribution_late")
+    .gte("created_at", todayStart);
+  if (lnErr) console.error("[reminders] late notifications fetch:", lnErr);
+
+  // Charger contributions + turn + groupe pour reconstituer le contexte
+  const turnIds = Array.from(new Set((lateNotifs ?? []).map((n: any) => n.turn_id).filter(Boolean)));
+  const turnsById = new Map<string, any>();
+  if (turnIds.length > 0) {
+    const { data: tRows } = await admin
+      .from("turns")
+      .select("id, turn_number, due_date, group_id, groups(name, late_penalty_percent)")
+      .in("id", turnIds);
+    for (const t of (tRows ?? []) as any[]) turnsById.set(t.id, t);
+  }
+
+  const lateUsers = Array.from(new Set((lateNotifs ?? []).map((n: any) => n.user_id)));
+  const latePhones = await loadPhones(admin, lateUsers);
+  const latePrefs = await loadSmsPrefs(admin, lateUsers, ["contribution_late"]);
+
+  for (const n of (lateNotifs ?? []) as any[]) {
+    const t = turnsById.get(n.turn_id);
+    if (!t) continue;
+    const dueDate: string = t.due_date;
+    const daysLate = Math.max(
+      1,
+      Math.floor((Date.parse(`${today}T00:00:00Z`) - Date.parse(`${dueDate}T00:00:00Z`)) / 86400000),
+    );
+    const bucket = `LATE_J${daysLate}`;
+    const smsKind = `contribution_late_${bucket}`;
+
+    // Idempotence : déjà envoyé aujourd'hui ?
+    const { count } = await admin
+      .from("sms_logs")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", n.user_id)
+      .eq("turn_id", n.turn_id)
+      .eq("kind", smsKind)
+      .gte("created_at", todayStart);
+    if ((count ?? 0) > 0) continue;
+
+    // Récupérer le montant + pénalité côté contribution
+    const { data: contribRow } = await admin
+      .from("contributions")
+      .select("id, amount, status")
+      .eq("turn_id", n.turn_id)
+      .eq("payer_user_id", n.user_id)
+      .in("status", ["pending", "rejected"])
+      .maybeSingle();
+    if (!contribRow) continue; // déjà payé entre temps
+
+    const groupName = t.groups?.name ?? "Tontine";
+    const latePct = Number(t.groups?.late_penalty_percent ?? 0);
+    const expectedPenalty = Math.round((Number(contribRow.amount) * latePct) / 100);
+    const body = buildReminderSms({
+      groupName,
+      turnNumber: t.turn_number,
+      dueDate,
+      amount: Number(contribRow.amount),
+      expectedPenalty,
+      latePct,
+      bucket: daysLate === 1 ? "J+1" : daysLate <= 6 ? "J+3" : daysLate <= 13 ? "J+7" : "J+14",
+      daysLate,
+    });
+
+    const phone = latePhones.get(n.user_id);
+    const reason = !phone
+      ? "no_phone"
+      : !optedIn(latePrefs, n.user_id, "contribution_late")
+      ? "opted_out"
+      : null;
+
+    if (dryRun) {
+      previewLate.push({
+        notification_id: n.id,
+        user_id: n.user_id,
+        turn_id: n.turn_id,
+        days_late: daysLate,
+        amount: Number(contribRow.amount),
+        phone,
+        body,
+        would_send: !reason,
+        skip_reason: reason,
+      });
+      continue;
+    }
+
+    if (reason) {
+      await logSmsAttempt(
+        { userId: n.user_id, groupId: n.group_id, turnId: n.turn_id, kind: smsKind, triggeredBy },
+        [phone ?? "—"],
+        [phone ?? "—"],
+        body,
+        { status: "skipped", error: reason },
+      );
+      skipped++;
+      continue;
+    }
+
+    const r = await sendMessage({
+      to: phone!,
+      body,
+      logContext: {
+        userId: n.user_id,
+        groupId: n.group_id,
+        turnId: n.turn_id,
+        kind: smsKind,
+      },
+    });
+    if (r.success) {
+      sentLate++;
+      sentLateByBucket[bucket] = (sentLateByBucket[bucket] ?? 0) + 1;
+    }
+  }
+
   return new Response(
     JSON.stringify({
       ok: true,
@@ -291,13 +414,20 @@ Deno.serve(async (req) => {
       base_date: baseDate ?? new Date().toISOString().slice(0, 10),
       target_turn_date,
       target_due_date,
-      sent: { turn_upcoming_j2: sentTurn, contribution_due_total: sentContribution, by_bucket: sentByBucket },
+      sent: {
+        turn_upcoming_j2: sentTurn,
+        contribution_due_total: sentContribution,
+        by_bucket: sentByBucket,
+        contribution_late_total: sentLate,
+        late_by_bucket: sentLateByBucket,
+      },
       skipped,
       ...(dryRun
         ? {
             preview: {
               turn_upcoming_j2: previewTurn,
               contribution_due_j1: previewContribution,
+              contribution_late: previewLate,
             },
           }
         : {}),
