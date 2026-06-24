@@ -1,69 +1,62 @@
-## Geler le payout de Rougui, appliquer la pénalité, et créer une caisse de groupe
+## Libération automatique des fonds gelés en fin de sanction
 
-### État actuel (vérifié en base)
-- Demande de retrait `5fddd9e2…` : 30 000 GNF, statut `pending`, **non encore versée**. Le solde a juste été décrémenté côté `beneficiary_balances` (available 0 / withdrawn 30 000).
-- Pénalité due par Rougui : `contributions.penalty_amount = 100` GNF (cotisation 8a7a07c1, non waivée).
-- Aucune table de « caisse de groupe » n'existe aujourd'hui.
+### Objectif
+À l'expiration de `turns.payout_hold_until`, libérer automatiquement les fonds du bénéficiaire et lui envoyer un SMS de notification.
 
-### Ce qu'il faut faire
+### Mécanisme
 
-#### 1) Nouvelle table `group_treasury` + ledger
-Migration ajoutant :
-- `group_treasury(group_id pk, balance bigint, updated_at)` — solde de la caisse du groupe.
-- `group_treasury_entries(id, group_id, amount, source, contribution_id?, user_id?, created_at)` avec `source ∈ ('late_penalty','manual_credit','manual_debit')` pour la traçabilité.
-- RLS : lecture pour membres du groupe ; admin du groupe pour `manual_*` ; service_role pour le reste.
+**1. Nouvelle RPC `release_due_payout_holds()`** (SECURITY DEFINER)
+- Sélectionne les `turns` où :
+  - `status = 'paid'`
+  - `payout_hold_until <= now()`
+  - `payout_released_at IS NULL` (nouvelle colonne flag)
+- Pour chaque tour :
+  - Marque `payout_released_at = now()`.
+  - S'assure que `beneficiary_balances.available_amount` reflète bien le payout disponible (no-op si déjà crédité — la rétention bloquait juste la demande de retrait, pas le solde affiché ; voir détail technique).
+  - Insère un `notifications` (in-app) "Fonds libérés".
+  - Appelle `send-tontine-sms` (kind `payout_hold_released`) via `pg_net` avec le token interne.
+- Retourne le nombre de tours libérés (pour debug/admin).
 
-#### 2) Évolution de `request_withdrawal`
-Avant l'insert de la demande :
-- Calculer `v_penalty_due = SUM(penalty_amount)` sur les `contributions` du groupe pour ce user, status `confirmed`, `penalty_waived_at IS NULL`, et **non encore prélevées** (nouveau flag `penalty_collected_at timestamptz`).
-- Si `v_penalty_due > 0` :
-  - Vérifier `available_amount >= _amount + v_penalty_due`.
-  - Décrémenter `beneficiary_balances.available_amount` du **montant + pénalité**.
-  - Créditer `group_treasury.balance += v_penalty_due` et insérer une entrée `group_treasury_entries('late_penalty')` par contribution.
-  - Marquer ces `contributions.penalty_collected_at = now()`.
-- Message d'erreur dédié `PENALTY_DUE:<montant>` côté UI pour expliquer la déduction.
+**2. Nouveau kind SMS `payout_hold_released`** dans `supabase/functions/send-tontine-sms/index.ts`
+- Message : « Bonjour, la période de retenue sur votre tour #N de la tontine "X" est terminée. Vos fonds (Y GNF) sont à nouveau disponibles. Demandez votre retrait depuis l'application. Ref: … »
 
-#### 3) Correction rétroactive Rougui (one-shot data fix)
-Comme la demande est encore `pending` (rien envoyé chez Djomy), on peut tout réécrire proprement :
-- `withdrawal_requests.status = 'cancelled'` + note explicative.
-- `beneficiary_balances` : remettre `available_amount = 30 000`, `total_withdrawn = 0`.
-- `group_members.was_late_in_cycle = true`, `was_late_at_turn_number = ARRAY[1]` pour Rougui.
-- `turns.payout_hold_until = paid_at + 7 jours` (passe à 2026-07-01 21:44 UTC).
-- SMS automatique à Rougui : « Suite à un retard de cotisation dans ce cycle, votre retrait est annulé et vos fonds (30 000 GNF) sont remis en attente jusqu'au 01/07/2026. Une pénalité de 100 GNF sera prélevée lors du retrait. »
+**3. Cron pg_cron toutes les 5 minutes**
+- Job `release-payout-holds` qui appelle la RPC `release_due_payout_holds()` directement (pas besoin de `net.http_post`, c'est purement SQL).
 
-#### 4) UI `WithdrawDialog`
-- Charger le montant total de pénalités dues avant le retrait via une petite RPC `get_pending_penalty(_group_id)`.
-- Afficher un panneau « Pénalité de retard : 100 GNF — sera prélevée et versée à la caisse du groupe ».
-- Gérer le nouveau code d'erreur `PENALTY_DUE:`.
+**4. Colonne `turns.payout_released_at timestamptz NULL`**
+- Évite les doubles libérations / doubles SMS.
+- Backfill : pour les tours déjà `paid` sans `payout_hold_until` ou avec hold passé, on **ne renvoie pas** de SMS rétroactif (on positionne juste `payout_released_at = COALESCE(payout_hold_until, paid_at)` pour les anciens).
 
 ### Détails techniques
 
-**Schéma**
 ```text
-group_treasury           group_treasury_entries
-─────────────            ──────────────────────
-group_id  pk             id              uuid pk
-balance   bigint         group_id        uuid fk
-updated_at               amount          bigint   (signé : + crédit, − débit)
-                         source          text     ('late_penalty'|'manual_credit'|'manual_debit')
-                         contribution_id uuid?    fk
-                         user_id         uuid?    fk
-                         created_by      uuid?    (acteur, NULL pour auto)
-                         note            text?
-                         created_at      timestamptz
+turns
+─────
++ payout_released_at  timestamptz NULL
+
+release_due_payout_holds() returns int
+  → boucle sur les turns éligibles
+  → UPDATE turns SET payout_released_at = now()
+  → INSERT notifications(...)
+  → PERFORM net.http_post(send-tontine-sms, {kind:'generic_broadcast', sms_kind:'payout_hold_released', recipients:[benef], body:...})
 ```
 
-`contributions` reçoit une colonne `penalty_collected_at timestamptz` pour éviter de prélever deux fois la même pénalité.
+Cron (via `supabase--insert`, pas migration, car contient l'URL projet et l'anon key) :
+```sql
+select cron.schedule(
+  'release-payout-holds',
+  '*/5 * * * *',
+  $$ select public.release_due_payout_holds(); $$
+);
+```
 
-**Fichiers impactés**
-- `supabase/migrations/<ts>_group_treasury_and_penalty_collection.sql` (nouvelle table, colonne, RPC modifiée, RPC `get_pending_penalty`).
-- `supabase/migrations/<ts>_fix_rougui_payout_hold.sql` (data fix one-shot, via `supabase--insert`).
-- `src/lib/api/balances.ts` (gestion `PENALTY_DUE`, exposer `getPendingPenalty`).
-- `src/components/balance/WithdrawDialog.tsx` (affichage du panneau pénalité).
-- Optionnel : page admin « Caisse du groupe » dans `GroupSettings.tsx` pour visualiser `group_treasury` + historique. Je le proposerai en suivi si tu veux.
+**Note sur le solde** : aujourd'hui `beneficiary_balances.available_amount` est crédité dès `turn_paid` ; la rétention est purement appliquée côté `request_withdrawal` (qui refuse si `payout_hold_until > now()`). Donc « libérer » = simplement laisser passer la condition de date — la RPC n'a pas à recréditer le solde, juste à marquer le tour et notifier. À confirmer en lisant `request_withdrawal` au moment du build.
+
+### Fichiers impactés
+- `supabase/migrations/<ts>_release_payout_holds.sql` — colonne + RPC + backfill.
+- `supabase/functions/send-tontine-sms/index.ts` — branche `payout_hold_released` (ou réutilisation de `generic_broadcast`).
+- Insert SQL (non-migration) — création du cron `release-payout-holds`.
 
 ### Hors périmètre
-- UI admin de la caisse du groupe (consultation/débit manuel) — à faire dans un second temps si besoin.
-- Logique de redistribution de la caisse en fin de cycle — non demandée, à définir avec toi plus tard.
-
-Je passe en build dès validation.
+- Modifier l'UI : rien à changer, les composants `holdPayouts.ts` filtrent déjà sur `payout_hold_until > now()`.
+- Rappels intermédiaires (J-1, etc.) — à voir plus tard si besoin.
