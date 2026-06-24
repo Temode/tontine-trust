@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Wallet } from "lucide-react";
+import { Wallet, AlertTriangle } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -11,7 +11,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { formatGNF } from "@/lib/format";
-import { requestWithdrawal, type WithdrawalMethod } from "@/lib/api/balances";
+import { getPendingPenalty, requestWithdrawal, type WithdrawalMethod } from "@/lib/api/balances";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -34,6 +34,12 @@ export function WithdrawDialog({ open, onOpenChange, groupId, groupName, availab
   const [amount, setAmount] = useState<string>("");
   const [method, setMethod] = useState<WithdrawalMethod>("OM");
   const [destination, setDestination] = useState<string>("");
+
+  const { data: penalty = 0 } = useQuery({
+    queryKey: ["pending-penalty", groupId],
+    queryFn: () => getPendingPenalty(groupId),
+    enabled: open,
+  });
 
   const mut = useMutation({
     mutationFn: () =>
@@ -64,7 +70,8 @@ export function WithdrawDialog({ open, onOpenChange, groupId, groupName, availab
   });
 
   const parsed = Number.parseInt(amount, 10);
-  const valid = Number.isFinite(parsed) && parsed > 0 && parsed <= available;
+  const maxAllowed = Math.max(0, available - penalty);
+  const valid = Number.isFinite(parsed) && parsed > 0 && parsed <= maxAllowed;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -81,6 +88,25 @@ export function WithdrawDialog({ open, onOpenChange, groupId, groupName, availab
           </DialogDescription>
         </DialogHeader>
 
+        {penalty > 0 && (
+          <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <div>
+              <p className="font-semibold">
+                Pénalité de retard : {formatGNF(penalty, { withCurrency: true })}
+              </p>
+              <p>
+                Ce montant sera prélevé en plus du retrait et versé à la caisse du groupe.
+                Montant maximum retirable :{" "}
+                <span className="num font-semibold">
+                  {formatGNF(maxAllowed, { withCurrency: true })}
+                </span>
+                .
+              </p>
+            </div>
+          </div>
+        )}
+
         <div className="space-y-4">
           <div>
             <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -90,7 +116,7 @@ export function WithdrawDialog({ open, onOpenChange, groupId, groupName, availab
               type="number"
               inputMode="numeric"
               min={1}
-              max={available}
+              max={maxAllowed}
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
               placeholder="Ex : 10000"
@@ -101,7 +127,7 @@ export function WithdrawDialog({ open, onOpenChange, groupId, groupName, availab
                 <button
                   key={pct}
                   type="button"
-                  onClick={() => setAmount(String(Math.floor(available * pct)))}
+                  onClick={() => setAmount(String(Math.floor(maxAllowed * pct)))}
                   className="rounded-full border border-hairline px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground transition hover:text-foreground"
                 >
                   {pct === 1 ? "Tout" : `${pct * 100}%`}
