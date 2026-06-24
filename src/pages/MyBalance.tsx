@@ -7,6 +7,7 @@ import { listMyHeldPayouts } from "@/lib/api/holdPayouts";
 import { formatGNF } from "@/lib/format";
 import { WithdrawDialog } from "@/components/balance/WithdrawDialog";
 import { PayoutHoldHistory } from "@/components/balance/PayoutHoldHistory";
+import { computeHoldStatus, formatHoldUntilLabel } from "@/lib/holds/countdown";
 import { useTontineRealtime } from "@/hooks/useTontineRealtime";
 import { cn } from "@/lib/utils";
 
@@ -29,25 +30,17 @@ function useNow(intervalMs = 1000) {
 
 function HoldCountdown({ until }: { until: string }) {
   const now = useNow(1000);
-  const target = new Date(until).getTime();
-  const diff = Math.max(0, target - now);
-  const released = diff === 0;
-  if (released) {
+  const s = computeHoldStatus(until, now);
+  if (s.released) {
     return (
       <span className="ml-1 inline-flex items-center rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700">
         Débloqué
       </span>
     );
   }
-  const totalSec = Math.floor(diff / 1000);
-  const d = Math.floor(totalSec / 86400);
-  const h = Math.floor((totalSec % 86400) / 3600);
-  const m = Math.floor((totalSec % 3600) / 60);
-  const s = totalSec % 60;
-  const txt = d > 0 ? `${d}j ${h}h ${m}m` : h > 0 ? `${h}h ${m}m ${s}s` : `${m}m ${s}s`;
   return (
     <span className="ml-1 inline-flex items-center gap-1 rounded-full bg-amber-200/70 px-1.5 py-0.5 text-[10px] font-semibold text-amber-900 num">
-      ⏳ {txt}
+      ⏳ {s.label}
     </span>
   );
 }
@@ -133,12 +126,7 @@ export default function MyBalance() {
                     <li key={h.id} className="text-xs text-amber-900/90">
                       <span className="font-semibold">{h.group_name ?? "Groupe"}</span> — tour #{h.turn_number} ·
                       <span className="ml-1 inline-flex items-center rounded-full bg-amber-300/40 px-1.5 py-0.5 text-[10px] font-semibold text-amber-900">
-                        Gelé jusqu'au{" "}
-                        {new Date(h.payout_hold_until).toLocaleDateString("fr-FR", {
-                          day: "2-digit",
-                          month: "long",
-                          year: "numeric",
-                        })}
+                        Gelé jusqu'au {formatHoldUntilLabel(h.payout_hold_until)}
                       </span>
                       <HoldCountdown until={h.payout_hold_until} />
                       {" "}· {formatGNF(h.payout_amount)} GNF
