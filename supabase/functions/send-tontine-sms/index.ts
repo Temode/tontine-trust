@@ -342,6 +342,34 @@ Deno.serve(async (req) => {
     }
   }
 
+  // ─────────────────────────────────────────────────────────────────────
+  // Branche générique : payload { kind, sms_kind, recipients:[user_ids], body, group_id?, turn_id? }
+  // Utilisée par les triggers SMS étendus (retraits, validations admin, cycle, etc.)
+  else if (kind === "generic_broadcast") {
+    const smsKind = String(payload.sms_kind ?? "system");
+    const recipients = Array.isArray(payload.recipients)
+      ? (payload.recipients as string[])
+      : [];
+    const body = String(payload.body ?? "").trim();
+    const turnId = (payload.turn_id as string | undefined) ?? null;
+    if (!body) return json({ error: "missing_body" }, 400);
+    for (const uid of recipients) {
+      if (!uid) continue;
+      results.push({
+        target: smsKind,
+        user: uid,
+        ...(await sendOne({
+          admin,
+          userId: uid,
+          groupId,
+          turnId,
+          kind: smsKind,
+          body,
+        })),
+      });
+    }
+  }
+
   else {
     return json({ error: "unknown_kind", kind }, 400);
   }
