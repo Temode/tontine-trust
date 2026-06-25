@@ -15,6 +15,10 @@ const corsHeaders = {
 };
 
 const MAX_PER_RUN = 20;
+// Verrou consultatif global Postgres (clé fixe = 'sms_outbox_worker').
+// Empêche deux invocations simultanées (cron + manuel) de consommer la file
+// en parallèle — garantit le traitement FIFO séquentiel.
+const ADVISORY_LOCK_KEY = 8731298731298731n; // bigint stable
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -29,10 +33,15 @@ Deno.serve(async (req) => {
   }
   const admin = createClient(url, key);
 
-  // Récupère le token interne et le plafond
-  const [{ data: tokRow }, { data: maxRow }] = await Promise.all([
+  // Récupère le token interne, le plafond par run et le plafond global SMS/minute.
+  const [{ data: tokRow }, { data: maxRow }, { data: rateRow }] = await Promise.all([
     admin.from("internal_config").select("value").eq("key", "tontine_sms_token").maybeSingle(),
     admin.from("internal_config").select("value").eq("key", "sms_max_per_run").maybeSingle(),
+    admin
+      .from("internal_config")
+      .select("value")
+      .eq("key", "sms_max_per_minute_global")
+      .maybeSingle(),
   ]);
   const token = (tokRow as { value?: string } | null)?.value;
   if (!token) {
@@ -45,9 +54,44 @@ Deno.serve(async (req) => {
     MAX_PER_RUN,
     Math.max(1, Number((maxRow as { value?: string } | null)?.value ?? MAX_PER_RUN)),
   );
+  const ratePerMin = Math.max(
+    1,
+    Number((rateRow as { value?: string } | null)?.value ?? 30),
+  );
 
-  // Pop FIFO atomique : passe les lignes à 'processing'
-  const { data: rows, error: popErr } = await admin.rpc("sms_outbox_pop", { _limit: cap });
+  // 1) Verrou consultatif : un seul worker actif à la fois (FIFO strict garanti).
+  const { data: lockRow, error: lockErr } = await admin.rpc("sms_outbox_try_lock");
+  const lockAcquired = !lockErr && Boolean(lockRow);
+  if (!lockAcquired) {
+    return new Response(
+      JSON.stringify({ ok: true, skipped: "another_worker_running" }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
+  }
+
+  // 2) Rate limit global : combien de SMS sont déjà partis dans les 60 dernières s ?
+  const { data: sentLastMin } = await admin.rpc("sms_outbox_recent_sent_count", {
+    _minutes: 1,
+  });
+  const alreadySent = Number(sentLastMin ?? 0);
+  const remainingThisMinute = Math.max(0, ratePerMin - alreadySent);
+  if (remainingThisMinute === 0) {
+    return new Response(
+      JSON.stringify({
+        ok: true,
+        skipped: "rate_limit_per_minute",
+        rate_per_min: ratePerMin,
+        sent_last_minute: alreadySent,
+      }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
+  }
+  const effectiveCap = Math.min(cap, remainingThisMinute);
+
+  // 3) Pop FIFO atomique (ordre created_at, `for update skip locked`).
+  const { data: rows, error: popErr } = await admin.rpc("sms_outbox_pop", {
+    _limit: effectiveCap,
+  });
   if (popErr) {
     return new Response(JSON.stringify({ error: "pop_failed", detail: popErr.message }), {
       status: 500,
@@ -64,6 +108,7 @@ Deno.serve(async (req) => {
   let ok = 0;
   let ko = 0;
 
+  // Traitement séquentiel (await dans la boucle) — pas de Promise.all.
   for (const row of queued) {
     try {
       const r = await fetch(sendUrl, {
@@ -96,8 +141,19 @@ Deno.serve(async (req) => {
     }
   }
 
+  // Libère le verrou consultatif (best-effort).
+  await admin.rpc("sms_outbox_unlock").catch(() => null);
+
   return new Response(
-    JSON.stringify({ ok: true, popped: queued.length, sent: ok, failed: ko }),
+    JSON.stringify({
+      ok: true,
+      popped: queued.length,
+      sent: ok,
+      failed: ko,
+      rate_per_min: ratePerMin,
+      sent_last_minute: alreadySent,
+      cap_used: effectiveCap,
+    }),
     { headers: { ...corsHeaders, "Content-Type": "application/json" } },
   );
 });
