@@ -6358,6 +6358,10 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      sms_outbox_recent_sent_count: {
+        Args: { _minutes?: number }
+        Returns: number
+      }
       start_cycle: { Args: { _group_id: string }; Returns: string }
       start_djomy_payment: {
         Args: {
