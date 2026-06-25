@@ -55,6 +55,36 @@ Deno.serve(async (req) => {
 
     const phone = normalizePhone(body.payerPhone);
 
+    // ── Garde-fou métier : on ne peut payer qu'à partir du jour de l'échéance.
+    //    Si le tour est encore 'upcoming' et que due_date > aujourd'hui (UTC),
+    //    on refuse l'init Djomy (évite que le portail ne s'ouvre pour rien).
+    {
+      const adminPre = createClient(url, serviceKey);
+      const { data: contribRow } = await adminPre
+        .from("contributions")
+        .select("id, turn:turns!inner(id, status, due_date)")
+        .eq("id", body.contributionId)
+        .maybeSingle();
+      const t = (contribRow as any)?.turn as
+        | { status?: string; due_date?: string }
+        | undefined;
+      if (t?.due_date) {
+        const today = new Date().toISOString().slice(0, 10);
+        const isFuture = t.due_date > today;
+        const isUpcoming = t.status === "upcoming";
+        if (isFuture && isUpcoming) {
+          return json(
+            {
+              error: "TURN_NOT_OPEN_YET",
+              hint: "Le tour n'est pas encore ouvert à la collecte ; le paiement sera possible à compter de la date d'échéance.",
+              details: { due_date: t.due_date, turn_status: t.status },
+            },
+            409,
+          );
+        }
+      }
+    }
+
     // 1. Crée le payment "initiated" via RPC (vérifie ownership + status).
     //    method peut être NULL : le payeur le choisira sur le portail Djomy.
     const { data: paymentId, error: rpcErr } = await userClient.rpc("start_djomy_payment", {
