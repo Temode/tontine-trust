@@ -258,6 +258,7 @@ export default function Dashboard() {
                   beneficiaryName={d.beneficiary_name}
                   turnNumber={d.turn_number}
                   expectedPenalty={d.expected_penalty}
+                  dueDate={d.due_date}
                 />
               ))}
             </div>

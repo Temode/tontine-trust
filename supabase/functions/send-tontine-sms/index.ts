@@ -15,6 +15,16 @@ import {
   normalizeGNPhone,
   sendMessage,
 } from "../_shared/nimbasms.ts";
+import {
+  buildBeneficiaryPaymentReceivedSms,
+  buildContributionConfirmedSms,
+  buildTurnPaidSms,
+  fmtDateFR,
+  fmtGNF,
+  firstName,
+  makeRef,
+  stripAccents,
+} from "../_shared/smsTemplates.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -27,42 +37,6 @@ function json(payload: unknown, status = 200) {
     status,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
-}
-
-// ── Helpers de formatage style opérateur ──────────────────────────────
-function fmtGNF(n: number | string | null | undefined): string {
-  const v = Number(n ?? 0);
-  if (!Number.isFinite(v)) return "0 GNF";
-  return `${Math.round(v).toString().replace(/\B(?=(\d{3})+(?!\d))/g, "\u00A0")} GNF`;
-}
-function stripAccents(s: string): string {
-  return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-}
-function firstName(full?: string | null): string {
-  if (!full) return "Un membre";
-  const tok = full.trim().split(/\s+/);
-  const first = tok[0] ?? "";
-  const initial = tok[1]?.[0];
-  return stripAccents(initial ? `${first} ${initial}.` : first);
-}
-function fmtDateFR(iso?: string | null): string {
-  if (!iso) return "—";
-  const d = new Date(iso.length <= 10 ? `${iso}T00:00:00Z` : iso);
-  const dd = String(d.getUTCDate()).padStart(2, "0");
-  const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
-  return `${dd}/${mm}/${d.getUTCFullYear()}`;
-}
-function makeRef(): string {
-  const d = new Date();
-  const yy = String(d.getUTCFullYear()).slice(2);
-  const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
-  const dd = String(d.getUTCDate()).padStart(2, "0");
-  const hh = String(d.getUTCHours()).padStart(2, "0");
-  const mi = String(d.getUTCMinutes()).padStart(2, "0");
-  const rand = Array.from(crypto.getRandomValues(new Uint8Array(3)))
-    .map((b) => b.toString(16).toUpperCase().padStart(2, "0"))
-    .join("");
-  return `TD${yy}${mm}${dd}.${hh}${mi}.${rand}`;
 }
 
 type Admin = ReturnType<typeof createClient>;
@@ -285,42 +259,94 @@ Deno.serve(async (req) => {
 
     const total = contribs?.length ?? 0;
     const paidCount = (contribs ?? []).filter((c: any) => c.status === "confirmed").length;
-    const pendingPayers = (contribs ?? [])
-      .filter((c: any) => c.status !== "confirmed")
-      .map((c: any) => c.payer_user_id as string)
-      .filter((id: string) => id !== payerId);
 
-    const benefName = turn?.beneficiary_user_id
-      ? firstName((await getProfile(admin, turn.beneficiary_user_id))?.full_name)
-      : "—";
-    const payerName = firstName((await getProfile(admin, payerId))?.full_name);
-    const due = fmtDateFR(turn?.due_date);
+    const benefProfile = turn?.beneficiary_user_id
+      ? await getProfile(admin, turn.beneficiary_user_id)
+      : null;
+    const payerProfile = await getProfile(admin, payerId);
     const turnNo = turn?.turn_number ?? "?";
 
     // SMS 1 — confirmation au payeur (doctrine Paxefy : 1 SMS = 1 event monétaire)
-    const body1 =
-      `Bonjour, votre cotisation de ${fmtGNF(amount)} pour la tontine "${gname}" ` +
-      `(tour #${turnNo}, beneficiaire ${benefName}) a ete confirmee. ` +
-      `${paidCount}/${total} membres ont cotise. Echeance: ${due}. ` +
-      `Ref: ${ref}. Tontine Digitale vous remercie.`;
+    const msg1 = buildContributionConfirmedSms({
+      payerUserId: payerId,
+      contributionId,
+      turnId,
+      groupId,
+      groupName: gname,
+      amount,
+      turnNumber: turnNo,
+      beneficiaryFullName: benefProfile?.full_name ?? null,
+      dueDate: turn?.due_date ?? null,
+      paidCount,
+      totalCount: total,
+      ref,
+    });
     results.push({
       target: "payer",
       user: payerId,
       ...(await sendOne({
         admin,
         userId: payerId,
-        groupId,
-        turnId,
-        kind: "contribution_confirmed",
-        body: body1,
-        dedupeKey: `contrib_confirmed:${contributionId ?? `${turnId}:${payerId}`}`,
+        groupId: msg1.meta.groupId,
+        turnId: msg1.meta.turnId,
+        kind: msg1.meta.kind,
+        body: msg1.body,
+        dedupeKey: msg1.meta.dedupeKey,
       })),
     });
-    // Note (doctrine Paxefy) : les autres membres "pending" ne reçoivent PAS
-    // de SMS de relance ici. Les notifications in-app les informent que
-    // ${payerName} a payé, sans coûter de SMS supplémentaire.
-    void pendingPayers;
-    void payerName;
+
+    // SMS 2 — bénéficiaire informé qu'un membre a payé sa cotisation pour son tour
+    // (1 SMS par contribution × bénéficiaire grâce au dedupeKey).
+    if (turn?.beneficiary_user_id && turn.beneficiary_user_id !== payerId && contributionId) {
+      // Plus proche échéance où le bénéficiaire est lui-même payeur "pending"
+      const { data: pendingTurns } = await admin
+        .from("contributions")
+        .select("turn_id")
+        .eq("payer_user_id", turn.beneficiary_user_id)
+        .eq("status", "pending");
+      const turnIds = (pendingTurns ?? []).map((r: any) => r.turn_id as string);
+      let nextDue: string | null = null;
+      if (turnIds.length > 0) {
+        const { data: nextTurn } = await admin
+          .from("turns")
+          .select("due_date")
+          .in("id", turnIds)
+          .gte("due_date", new Date().toISOString().slice(0, 10))
+          .order("due_date", { ascending: true })
+          .limit(1)
+          .maybeSingle();
+        nextDue = (nextTurn as { due_date?: string } | null)?.due_date ?? null;
+      }
+
+      const msg2 = buildBeneficiaryPaymentReceivedSms({
+        beneficiaryUserId: turn.beneficiary_user_id,
+        beneficiaryFullName: benefProfile?.full_name ?? null,
+        payerFullName: payerProfile?.full_name ?? null,
+        contributionId,
+        turnId,
+        groupId,
+        groupName: gname,
+        amount,
+        turnNumber: turnNo,
+        nextDueDate: nextDue,
+        ref,
+      });
+      results.push({
+        target: "beneficiary_notice",
+        user: turn.beneficiary_user_id,
+        ...(await sendOne({
+          admin,
+          userId: turn.beneficiary_user_id,
+          groupId: msg2.meta.groupId,
+          turnId: msg2.meta.turnId,
+          // notif_type opt-in : on retombe sur 'contribution_received' qui existe
+          // déjà dans l'enum notification_kind et reflète l'usage utilisateur.
+          kind: "contribution_received",
+          body: msg2.body,
+          dedupeKey: msg2.meta.dedupeKey,
+        })),
+      });
+    }
   }
 
   // ─────────────────────────────────────────────────────────────────────
@@ -330,21 +356,26 @@ Deno.serve(async (req) => {
     const benefId = payload.beneficiary_user_id as string;
     const amount = Number(payload.amount ?? 0);
 
-    const body =
-      `Bonjour, le tour #${turnNo} de la tontine "${gname}" est cloture. ` +
-      `Montant credite sur votre solde Tontine Digitale: ${fmtGNF(amount)}. ` +
-      `Demandez votre retrait depuis l'application. Ref: ${ref}. Tontine Digitale vous remercie.`;
+    const msg = buildTurnPaidSms({
+      beneficiaryUserId: benefId,
+      turnId,
+      groupId,
+      groupName: gname,
+      turnNumber: turnNo as string | number,
+      amount,
+      ref,
+    });
     results.push({
       target: "beneficiary",
       user: benefId,
       ...(await sendOne({
         admin,
         userId: benefId,
-        groupId,
-        turnId,
-        kind: "payout_released",
-        body,
-        dedupeKey: `turn_paid:${turnId}`,
+        groupId: msg.meta.groupId,
+        turnId: msg.meta.turnId,
+        kind: msg.meta.kind,
+        body: msg.body,
+        dedupeKey: msg.meta.dedupeKey,
       })),
     });
   }

@@ -43,6 +43,14 @@ jobs:
       - name: Install Playwright browsers
         run: bunx playwright install --with-deps chromium
 
+      - name: Setup Deno
+        uses: denoland/setup-deno@v1
+        with:
+          deno-version: v2.x
+
+      - name: Run edge-function unit tests (SMS templates + provider simulé)
+        run: deno test --no-check supabase/functions/_shared/__tests__/
+
       - name: Seed deterministic fixtures (Famille Alice)
         run: bun run tests/e2e/fixtures/famille-alice.ts
 
