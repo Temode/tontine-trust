@@ -130,7 +130,10 @@ export default function MyContributions() {
     () => dues.filter((d) => d.status === "defaulted"),
     [dues],
   );
-  const mostUrgent = sortedDues[0] ?? null;
+  // Le bouton "Payer la plus urgente" ne doit cibler qu'une cotisation déjà ouverte.
+  const mostUrgent =
+    sortedDues.find((d) => d.days_to_due <= 0) ?? sortedDues[0] ?? null;
+  const mostUrgentPayable = mostUrgent ? mostUrgent.days_to_due <= 0 : false;
   const upcomingPreview = sortedDues.slice(0, 3);
 
   const filteredDues = useMemo(() => {
