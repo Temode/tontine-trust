@@ -22,6 +22,122 @@ const MAX_RETRIES = 3;
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+// ─── Garde-fous globaux (kill-switch + solde Nimba) ────────────────────────
+// Cache module-scope (60 s) pour éviter de saturer Supabase REST / API Nimba.
+interface SmsGuardCache {
+  fetchedAt: number;
+  paused: boolean;
+  minBalance: number;
+  balance: number | null;
+}
+let _guardCache: SmsGuardCache | null = null;
+const GUARD_TTL_MS = 60_000;
+
+async function loadInternalConfig(): Promise<{ paused: boolean; minBalance: number }> {
+  const url = Deno.env.get("SUPABASE_URL");
+  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  const out = { paused: false, minBalance: 0 };
+  if (!url || !key) return out;
+  try {
+    const res = await fetch(
+      `${url}/rest/v1/internal_config?key=in.(sms_paused,sms_min_balance)&select=key,value`,
+      { headers: { apikey: key, Authorization: `Bearer ${key}` } },
+    );
+    if (!res.ok) return out;
+    const rows = await res.json() as Array<{ key: string; value: string }>;
+    for (const r of rows) {
+      if (r.key === "sms_paused") out.paused = String(r.value).toLowerCase() === "true";
+      if (r.key === "sms_min_balance") out.minBalance = Number(r.value) || 0;
+    }
+  } catch (e) {
+    console.error("[NimbaSMS] loadInternalConfig failed:", e);
+  }
+  return out;
+}
+
+async function fetchNimbaBalance(): Promise<number | null> {
+  const serviceId = Deno.env.get("NIMBA_SERVICE_ID");
+  const secretToken = Deno.env.get("NIMBA_SECRET_TOKEN");
+  if (!serviceId || !secretToken) return null;
+  try {
+    const auth = btoa(`${serviceId}:${secretToken}`);
+    const res = await fetch(`${NIMBA_API_BASE}/accounts/balance`, {
+      headers: { Authorization: `Basic ${auth}` },
+    });
+    if (!res.ok) return null;
+    const data = await res.json().catch(() => null) as any;
+    const b = data?.balance ?? data?.sms_balance ?? data?.amount;
+    return typeof b === "number" ? b : Number(b ?? NaN);
+  } catch (e) {
+    console.error("[NimbaSMS] fetchNimbaBalance failed:", e);
+    return null;
+  }
+}
+
+async function notifyAdminsLowBalance(balance: number, minBalance: number) {
+  const url = Deno.env.get("SUPABASE_URL");
+  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!url || !key) return;
+  try {
+    // Charge les admins
+    const r = await fetch(
+      `${url}/rest/v1/user_roles?role=eq.admin&select=user_id`,
+      { headers: { apikey: key, Authorization: `Bearer ${key}` } },
+    );
+    if (!r.ok) return;
+    const rows = await r.json() as Array<{ user_id: string }>;
+    if (rows.length === 0) return;
+    const payload = rows.map((row) => ({
+      user_id: row.user_id,
+      kind: "nimba_balance_low",
+      title: "Solde SMS Nimba faible",
+      body: `Solde actuel ${balance} (seuil ${minBalance}). Envois SMS suspendus jusqu'à recharge.`,
+      link: "/admin/sms-logs",
+    }));
+    await fetch(`${url}/rest/v1/notifications`, {
+      method: "POST",
+      headers: {
+        apikey: key,
+        Authorization: `Bearer ${key}`,
+        "Content-Type": "application/json",
+        Prefer: "return=minimal",
+      },
+      body: JSON.stringify(payload),
+    });
+  } catch (e) {
+    console.error("[NimbaSMS] notifyAdminsLowBalance failed:", e);
+  }
+}
+
+/**
+ * Vérifie kill-switch (`sms_paused`) et solde Nimba (>= `sms_min_balance`).
+ * Retourne { allowed: false, reason } si l'envoi doit être bloqué.
+ * Résultat mémoïsé 60 s par instance d'edge function.
+ */
+async function checkSmsGuards(): Promise<{ allowed: boolean; reason?: string; balance: number | null }> {
+  const now = Date.now();
+  if (_guardCache && now - _guardCache.fetchedAt < GUARD_TTL_MS) {
+    if (_guardCache.paused) return { allowed: false, reason: "kill_switch", balance: _guardCache.balance };
+    if (_guardCache.balance !== null && _guardCache.balance < _guardCache.minBalance) {
+      return { allowed: false, reason: "low_balance", balance: _guardCache.balance };
+    }
+    return { allowed: true, balance: _guardCache.balance };
+  }
+  const cfg = await loadInternalConfig();
+  let balance: number | null = null;
+  if (!cfg.paused) {
+    balance = await fetchNimbaBalance();
+  }
+  _guardCache = { fetchedAt: now, paused: cfg.paused, minBalance: cfg.minBalance, balance };
+  if (cfg.paused) return { allowed: false, reason: "kill_switch", balance };
+  if (balance !== null && balance < cfg.minBalance) {
+    // Notifie les admins (best-effort, asynchrone)
+    notifyAdminsLowBalance(balance, cfg.minBalance).catch(() => {});
+    return { allowed: false, reason: "low_balance", balance };
+  }
+  return { allowed: true, balance };
+}
+
 /** Formateur de montant pour SMS (ex: 1500000 → "1 500 000"). */
 export function fmtSms(n: number): string {
   return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, "\u00A0");
@@ -126,6 +242,20 @@ export async function sendMessage(params: SendMessageParams): Promise<MessageRes
       });
     }
     return { success: true };
+  }
+
+  // Garde-fous : kill-switch + solde Nimba minimum
+  const guard = await checkSmsGuards();
+  if (!guard.allowed) {
+    console.warn(`[NimbaSMS] Envoi bloqué (${guard.reason}) balance=${guard.balance}`);
+    if (params.logContext) {
+      const raw = Array.isArray(params.to) ? params.to : [params.to];
+      await logSmsAttempt(params.logContext, raw, raw, params.body, {
+        status: "skipped",
+        error: guard.reason,
+      });
+    }
+    return { success: false, error: guard.reason };
   }
 
   const serviceId = Deno.env.get("NIMBA_SERVICE_ID");
