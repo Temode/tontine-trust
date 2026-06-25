@@ -229,12 +229,20 @@ export default function MyContributions() {
                 <div className="mt-auto flex flex-wrap items-center gap-3 pt-6">
                   <button
                     type="button"
-                    onClick={() => mostUrgent && void launchDjomyCheckout(mostUrgent.contribution_id)}
-                    disabled={!mostUrgent}
+                    onClick={() =>
+                      mostUrgentPayable &&
+                      mostUrgent &&
+                      void launchDjomyCheckout(mostUrgent.contribution_id)
+                    }
+                    disabled={!mostUrgent || !mostUrgentPayable}
                     className="inline-flex h-12 min-w-[180px] items-center justify-center gap-2 whitespace-nowrap rounded-md bg-accent px-5 text-sm font-semibold text-accent-foreground shadow-[0_10px_30px_-12px_hsl(var(--accent)/0.7)] transition hover:bg-accent/90 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-primary"
                   >
                     <ShieldCheck className="h-4 w-4" />
-                    {mostUrgent ? "Payer la plus urgente" : "Tout est à jour"}
+                    {!mostUrgent
+                      ? "Tout est à jour"
+                      : mostUrgentPayable
+                        ? "Payer la plus urgente"
+                        : "Aucune cotisation encore ouverte"}
                   </button>
                   {dues.length > 1 && (
                     <button
