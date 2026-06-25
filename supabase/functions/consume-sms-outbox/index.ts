@@ -59,21 +59,10 @@ Deno.serve(async (req) => {
     Number((rateRow as { value?: string } | null)?.value ?? 30),
   );
 
-  // 1) Verrou consultatif : un seul worker actif à la fois.
-  const { data: lockRow, error: lockErr } = await admin.rpc("pg_try_advisory_lock", {
-    key: Number(ADVISORY_LOCK_KEY),
-  } as never);
-  // Fallback : si la RPC n'est pas exposée, on tente via une requête select.
-  let lockAcquired: boolean | null = null;
-  if (!lockErr && lockRow !== null && lockRow !== undefined) {
-    lockAcquired = Boolean(lockRow);
-  }
-  if (lockAcquired === null) {
-    // Sans verrou exposable côté PostgREST, on s'appuie sur `for update skip locked`
-    // de sms_outbox_pop : la concurrence ne provoque pas de doublon mais peut
-    // briser le FIFO strict. On loggue l'info.
-    console.warn("[consume-sms-outbox] advisory lock indisponible, fallback skip-locked");
-  } else if (!lockAcquired) {
+  // 1) Verrou consultatif : un seul worker actif à la fois (FIFO strict garanti).
+  const { data: lockRow, error: lockErr } = await admin.rpc("sms_outbox_try_lock");
+  const lockAcquired = !lockErr && Boolean(lockRow);
+  if (!lockAcquired) {
     return new Response(
       JSON.stringify({ ok: true, skipped: "another_worker_running" }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
@@ -152,12 +141,8 @@ Deno.serve(async (req) => {
     }
   }
 
-  // Libère le verrou consultatif (best-effort, ne bloque jamais la réponse).
-  if (lockAcquired) {
-    await admin
-      .rpc("pg_advisory_unlock", { key: Number(ADVISORY_LOCK_KEY) } as never)
-      .catch(() => null);
-  }
+  // Libère le verrou consultatif (best-effort).
+  await admin.rpc("sms_outbox_unlock").catch(() => null);
 
   return new Response(
     JSON.stringify({
