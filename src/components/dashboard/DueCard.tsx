@@ -1,4 +1,4 @@
-import { ArrowRight, AlertCircle } from "lucide-react";
+import { ArrowRight, AlertCircle, Clock } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { formatGNF, formatRelativeDays } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -11,11 +11,15 @@ interface DueCardProps {
   beneficiaryName?: string | null;
   turnNumber: number;
   expectedPenalty?: number;
+  /** Date d'échéance (yyyy-mm-dd ou ISO). Sert au label "Disponible le …". */
+  dueDate?: string | null;
 }
 
 /**
  * Carte « cotisation à payer » façon Paxefy : bord gauche accentué selon urgence,
  * montant en gros, échéance relative, CTA primaire « Payer maintenant ».
+ * Si le tour n'est pas encore ouvert (échéance dans le futur), le bouton
+ * est désactivé et affiche la date d'ouverture.
  */
 export function DueCard({
   contributionId,
@@ -25,10 +29,19 @@ export function DueCard({
   beneficiaryName,
   turnNumber,
   expectedPenalty = 0,
+  dueDate,
 }: DueCardProps) {
   const navigate = useNavigate();
   const isOverdue = daysToDue < 0;
   const isUrgent = daysToDue >= 0 && daysToDue <= 2;
+  // Règle métier : on ne peut payer qu'à partir du jour de l'échéance.
+  const canPayNow = daysToDue <= 0;
+  const availableLabel = dueDate
+    ? new Date(dueDate.length <= 10 ? `${dueDate}T00:00:00Z` : dueDate).toLocaleDateString(
+        "fr-FR",
+        { day: "2-digit", month: "long" },
+      )
+    : null;
 
   return (
     <article
@@ -79,14 +92,27 @@ export function DueCard({
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={() => navigate(`/cotisations?c=${contributionId}`)}
-          className="inline-flex h-11 shrink-0 items-center justify-center gap-1.5 rounded-md bg-primary px-5 text-sm font-semibold text-primary-foreground shadow-primary transition hover:bg-primary-700"
-        >
-          Payer maintenant
-          <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-        </button>
+        {canPayNow ? (
+          <button
+            type="button"
+            onClick={() => navigate(`/cotisations?c=${contributionId}`)}
+            className="inline-flex h-11 shrink-0 items-center justify-center gap-1.5 rounded-md bg-primary px-5 text-sm font-semibold text-primary-foreground shadow-primary transition hover:bg-primary-700"
+          >
+            Payer maintenant
+            <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+          </button>
+        ) : (
+          <button
+            type="button"
+            disabled
+            aria-disabled="true"
+            title={availableLabel ? `Paiement ouvert le ${availableLabel}` : undefined}
+            className="inline-flex h-11 shrink-0 cursor-not-allowed items-center justify-center gap-1.5 rounded-md border border-hairline bg-muted px-5 text-sm font-semibold text-muted-foreground"
+          >
+            <Clock className="h-4 w-4" />
+            {availableLabel ? `Disponible le ${availableLabel}` : "Pas encore ouvert"}
+          </button>
+        )}
       </div>
     </article>
   );
