@@ -208,6 +208,9 @@ Deno.serve(async (req) => {
       continue;
     }
     if (reason) { skipped++; continue; }
+    // Verrou anti-doublon (atomique) — 1 SMS J-2 max par bénéficiaire/tour/jour
+    const dKey = `turn_upcoming_j2:${t.id}:${t.beneficiary_user_id}:${baseDate ?? new Date().toISOString().slice(0,10)}`;
+    if (!(await claimDedupe(admin, dKey))) { skipped++; continue; }
     const r = await sendMessage({
       to: phone,
       body,
@@ -273,22 +276,16 @@ Deno.serve(async (req) => {
       continue;
     }
 
-    // Idempotence SMS : déjà loggué aujourd'hui pour ce bucket ?
-    const { count } = await admin
-      .from("sms_logs")
-      .select("id", { count: "exact", head: true })
-      .eq("user_id", c.payer_user_id)
-      .eq("turn_id", c.turn_id)
-      .eq("kind", `contribution_due_${c.bucket}`)
-      .gte("created_at", `${today}T00:00:00Z`);
-    if ((count ?? 0) > 0) continue;
-
     const reason = !phone
       ? "no_phone"
       : !optedIn(duePrefs, c.payer_user_id, "contribution_due")
       ? "opted_out"
       : null;
     if (reason) { skipped++; continue; }
+
+    // Verrou anti-doublon (atomique) — 1 SMS de rappel par contribution/bucket/jour
+    const dKey = `contribution_due:${c.contribution_id}:${c.bucket}:${today}`;
+    if (!(await claimDedupe(admin, dKey))) continue;
 
     const r = await sendMessage({
       to: phone,
@@ -344,16 +341,6 @@ Deno.serve(async (req) => {
     );
     const bucket = `LATE_J${daysLate}`;
     const smsKind = `contribution_late_${bucket}`;
-
-    // Idempotence : déjà envoyé aujourd'hui ?
-    const { count } = await admin
-      .from("sms_logs")
-      .select("id", { count: "exact", head: true })
-      .eq("user_id", n.user_id)
-      .eq("turn_id", n.turn_id)
-      .eq("kind", smsKind)
-      .gte("created_at", todayStart);
-    if ((count ?? 0) > 0) continue;
 
     // Récupérer le montant + pénalité côté contribution
     const { data: contribRow } = await admin
@@ -412,6 +399,10 @@ Deno.serve(async (req) => {
       skipped++;
       continue;
     }
+
+    // Verrou anti-doublon (atomique) — 1 SMS de retard par user/tour/bucket/jour
+    const dKey = `contribution_late:${n.user_id}:${n.turn_id}:${bucket}:${today}`;
+    if (!(await claimDedupe(admin, dKey))) continue;
 
     const r = await sendMessage({
       to: phone!,
