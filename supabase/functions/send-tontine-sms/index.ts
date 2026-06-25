@@ -268,6 +268,7 @@ Deno.serve(async (req) => {
   // ─────────────────────────────────────────────────────────────────────
   if (kind === "contribution_confirmed") {
     const turnId = payload.turn_id as string;
+    const contributionId = (payload.contribution_id as string | undefined) ?? null;
     const payerId = payload.payer_user_id as string;
     const amount = Number(payload.amount ?? 0);
 
@@ -312,6 +313,7 @@ Deno.serve(async (req) => {
         turnId,
         kind: "contribution_confirmed",
         body: body1,
+        dedupeKey: `contrib_confirmed:${contributionId ?? `${turnId}:${payerId}`}`,
       })),
     });
 
@@ -338,6 +340,7 @@ Deno.serve(async (req) => {
           turnId,
           kind: "contribution_due",
           body: body2,
+          dedupeKey: `contrib_notify:${contributionId ?? `${turnId}:${payerId}`}:${uid}`,
         })),
       });
     }
@@ -364,6 +367,7 @@ Deno.serve(async (req) => {
         turnId,
         kind: "payout_released",
         body,
+        dedupeKey: `turn_paid:${turnId}`,
       })),
     });
   }
@@ -392,6 +396,7 @@ Deno.serve(async (req) => {
         turnId,
         kind: "payout_hold_extended",
         body,
+        dedupeKey: `hold_extended:${turnId}:${holdUntil}`,
       })),
     });
   }
@@ -430,6 +435,7 @@ Deno.serve(async (req) => {
           turnId: null,
           kind: "cycle_completed",
           body,
+          dedupeKey: `cycle_completed:${groupId ?? "-"}:${uid}`,
         })),
       });
     }
