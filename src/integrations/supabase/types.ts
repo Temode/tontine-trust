@@ -6362,6 +6362,8 @@ export type Database = {
         Args: { _minutes?: number }
         Returns: number
       }
+      sms_outbox_try_lock: { Args: never; Returns: boolean }
+      sms_outbox_unlock: { Args: never; Returns: boolean }
       start_cycle: { Args: { _group_id: string }; Returns: string }
       start_djomy_payment: {
         Args: {
