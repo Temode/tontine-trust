@@ -142,6 +142,35 @@ export default function AdminSmsLogs() {
         );
       })()}
 
+      {/* File outbox SMS — doctrine Paxefy : 1 ligne = 1 SMS à livrer */}
+      {outbox.data && (
+        <div className="rounded-xl border border-slate-700 bg-slate-900/50 p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <Inbox className="h-4 w-4 text-slate-400" />
+            <div className="text-sm font-medium text-white">File d'envoi (sms_outbox)</div>
+          </div>
+          <div className="grid grid-cols-3 gap-3 text-sm">
+            <div>
+              <div className="text-xs text-slate-500">En attente</div>
+              <div className="text-xl font-semibold text-amber-300">{outbox.data.queued}</div>
+            </div>
+            <div>
+              <div className="text-xs text-slate-500">En cours</div>
+              <div className="text-xl font-semibold text-sky-300">{outbox.data.processing}</div>
+            </div>
+            <div>
+              <div className="text-xs text-slate-500">Échec</div>
+              <div className="text-xl font-semibold text-red-300">{outbox.data.failed}</div>
+            </div>
+          </div>
+          <p className="text-xs text-slate-500 mt-2">
+            Consommée séquentiellement toutes les 2 min par le worker
+            <code className="mx-1 text-slate-300">consume-sms-outbox</code>.
+            Clé d'unicité <code>dedupe_key</code> par message : aucun doublon possible.
+          </p>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
