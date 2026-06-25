@@ -451,6 +451,7 @@ Deno.serve(async (req) => {
       : [];
     const body = String(payload.body ?? "").trim();
     const turnId = (payload.turn_id as string | undefined) ?? null;
+    const dedupePrefix = (payload.dedupe_key_prefix as string | undefined) ?? null;
     if (!body) return json({ error: "missing_body" }, 400);
     for (const uid of recipients) {
       if (!uid) continue;
@@ -464,6 +465,7 @@ Deno.serve(async (req) => {
           turnId,
           kind: smsKind,
           body,
+          dedupeKey: dedupePrefix ? `${dedupePrefix}:${uid}` : null,
         })),
       });
     }
