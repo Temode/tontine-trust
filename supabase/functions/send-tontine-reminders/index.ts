@@ -156,13 +156,24 @@ Deno.serve(async (req) => {
   let sentTurn = 0;
   let sentContribution = 0;
   let skipped = 0;
+  // Plafond dur par invocation (filet anti-amplification)
+  const MAX_PER_RUN = Number(Deno.env.get("SMS_MAX_PER_RUN") ?? "60");
+  let smsSent = 0;
+  const overflow = () => smsSent >= MAX_PER_RUN;
+
+  // Charge la liste des groupes de test à exclure
+  const { data: testGroupsRows } = await admin
+    .from("groups")
+    .select("id")
+    .eq("is_test_group", true);
+  const testGroupIds = new Set((testGroupsRows ?? []).map((g: any) => g.id));
   const previewTurn: Array<Record<string, unknown>> = [];
   const previewContribution: Array<Record<string, unknown>> = [];
 
   // ── 1. Prochain tour J-2 ────────────────────────────────────────────────
   const { data: upcomingTurns, error: tErr } = await admin
     .from("turns")
-    .select("id, group_id, turn_number, due_date, payout_amount, beneficiary_user_id, groups(name)")
+    .select("id, group_id, turn_number, due_date, payout_amount, beneficiary_user_id, groups(name, is_test_group)")
     .eq("status", "upcoming")
     .eq("due_date", target_turn_date);
   if (tErr) console.error("[reminders] turns fetch:", tErr);
@@ -172,6 +183,7 @@ Deno.serve(async (req) => {
   const turnPrefs = await loadSmsPrefs(admin, turnUsers, ["turn_started"]);
 
   for (const t of (upcomingTurns ?? []) as any[]) {
+    if (t.groups?.is_test_group) { skipped++; continue; }
     const phone = turnPhones.get(t.beneficiary_user_id);
     const reason =
       !phone ? "no_phone" : !optedIn(turnPrefs, t.beneficiary_user_id, "turn_started") ? "opted_out" : null;
@@ -208,6 +220,7 @@ Deno.serve(async (req) => {
       continue;
     }
     if (reason) { skipped++; continue; }
+    if (overflow()) { skipped++; continue; }
     // Verrou anti-doublon (atomique) — 1 SMS J-2 max par bénéficiaire/tour/jour
     const dKey = `turn_upcoming_j2:${t.id}:${t.beneficiary_user_id}:${baseDate ?? new Date().toISOString().slice(0,10)}`;
     if (!(await claimDedupe(admin, dKey))) { skipped++; continue; }
@@ -221,7 +234,7 @@ Deno.serve(async (req) => {
         kind: "turn_upcoming_j2",
       },
     });
-    if (r.success) sentTurn++;
+    if (r.success) { sentTurn++; smsSent++; }
   }
 
   // ── 2. Rappels de cotisation (tous buckets) ─────────────────────────────
@@ -245,6 +258,7 @@ Deno.serve(async (req) => {
   const sentByBucket: Record<string, number> = {};
 
   for (const c of (pending ?? []) as any[]) {
+    if (testGroupIds.has(c.group_id)) { skipped++; continue; }
     const phone = duePhones.get(c.payer_user_id);
     const body = buildReminderSms({
       groupName: c.group_name ?? "Tontine",
@@ -282,6 +296,7 @@ Deno.serve(async (req) => {
       ? "opted_out"
       : null;
     if (reason) { skipped++; continue; }
+    if (overflow()) { skipped++; continue; }
 
     // Verrou anti-doublon (atomique) — 1 SMS de rappel par contribution/bucket/jour
     const dKey = `contribution_due:${c.contribution_id}:${c.bucket}:${today}`;
@@ -299,6 +314,7 @@ Deno.serve(async (req) => {
     });
     if (r.success) {
       sentContribution++;
+      smsSent++;
       sentByBucket[c.bucket] = (sentByBucket[c.bucket] ?? 0) + 1;
     }
   }
@@ -334,6 +350,7 @@ Deno.serve(async (req) => {
   for (const n of (lateNotifs ?? []) as any[]) {
     const t = turnsById.get(n.turn_id);
     if (!t) continue;
+    if (testGroupIds.has(n.group_id) || testGroupIds.has(t.group_id)) { skipped++; continue; }
     const dueDate: string = t.due_date;
     const daysLate = Math.max(
       1,
@@ -399,6 +416,7 @@ Deno.serve(async (req) => {
       skipped++;
       continue;
     }
+    if (overflow()) { skipped++; continue; }
 
     // Verrou anti-doublon (atomique) — 1 SMS de retard par user/tour/bucket/jour
     const dKey = `contribution_late:${n.user_id}:${n.turn_id}:${bucket}:${today}`;
@@ -416,6 +434,7 @@ Deno.serve(async (req) => {
     });
     if (r.success) {
       sentLate++;
+      smsSent++;
       sentLateByBucket[bucket] = (sentLateByBucket[bucket] ?? 0) + 1;
     }
   }
@@ -427,6 +446,8 @@ Deno.serve(async (req) => {
       base_date: baseDate ?? new Date().toISOString().slice(0, 10),
       target_turn_date,
       target_due_date,
+      max_per_run: MAX_PER_RUN,
+      total_sms_sent: smsSent,
       sent: {
         turn_upcoming_j2: sentTurn,
         contribution_due_total: sentContribution,

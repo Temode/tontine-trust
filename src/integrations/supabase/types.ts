@@ -1695,6 +1695,7 @@ export type Database = {
           description: string | null
           frequency: Database["public"]["Enums"]["group_frequency"]
           id: string
+          is_test_group: boolean
           late_penalty_after_days: number
           late_penalty_percent: number
           max_members: number
@@ -1726,6 +1727,7 @@ export type Database = {
           description?: string | null
           frequency?: Database["public"]["Enums"]["group_frequency"]
           id?: string
+          is_test_group?: boolean
           late_penalty_after_days?: number
           late_penalty_percent?: number
           max_members: number
@@ -1757,6 +1759,7 @@ export type Database = {
           description?: string | null
           frequency?: Database["public"]["Enums"]["group_frequency"]
           id?: string
+          is_test_group?: boolean
           late_penalty_after_days?: number
           late_penalty_percent?: number
           max_members?: number
