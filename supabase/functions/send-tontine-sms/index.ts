@@ -15,6 +15,16 @@ import {
   normalizeGNPhone,
   sendMessage,
 } from "../_shared/nimbasms.ts";
+import {
+  buildBeneficiaryPaymentReceivedSms,
+  buildContributionConfirmedSms,
+  buildTurnPaidSms,
+  fmtDateFR,
+  fmtGNF,
+  firstName,
+  makeRef,
+  stripAccents,
+} from "../_shared/smsTemplates.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -27,42 +37,6 @@ function json(payload: unknown, status = 200) {
     status,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
-}
-
-// ── Helpers de formatage style opérateur ──────────────────────────────
-function fmtGNF(n: number | string | null | undefined): string {
-  const v = Number(n ?? 0);
-  if (!Number.isFinite(v)) return "0 GNF";
-  return `${Math.round(v).toString().replace(/\B(?=(\d{3})+(?!\d))/g, "\u00A0")} GNF`;
-}
-function stripAccents(s: string): string {
-  return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-}
-function firstName(full?: string | null): string {
-  if (!full) return "Un membre";
-  const tok = full.trim().split(/\s+/);
-  const first = tok[0] ?? "";
-  const initial = tok[1]?.[0];
-  return stripAccents(initial ? `${first} ${initial}.` : first);
-}
-function fmtDateFR(iso?: string | null): string {
-  if (!iso) return "—";
-  const d = new Date(iso.length <= 10 ? `${iso}T00:00:00Z` : iso);
-  const dd = String(d.getUTCDate()).padStart(2, "0");
-  const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
-  return `${dd}/${mm}/${d.getUTCFullYear()}`;
-}
-function makeRef(): string {
-  const d = new Date();
-  const yy = String(d.getUTCFullYear()).slice(2);
-  const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
-  const dd = String(d.getUTCDate()).padStart(2, "0");
-  const hh = String(d.getUTCHours()).padStart(2, "0");
-  const mi = String(d.getUTCMinutes()).padStart(2, "0");
-  const rand = Array.from(crypto.getRandomValues(new Uint8Array(3)))
-    .map((b) => b.toString(16).toUpperCase().padStart(2, "0"))
-    .join("");
-  return `TD${yy}${mm}${dd}.${hh}${mi}.${rand}`;
 }
 
 type Admin = ReturnType<typeof createClient>;
