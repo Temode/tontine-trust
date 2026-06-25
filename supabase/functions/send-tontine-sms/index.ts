@@ -297,7 +297,7 @@ Deno.serve(async (req) => {
     const due = fmtDateFR(turn?.due_date);
     const turnNo = turn?.turn_number ?? "?";
 
-    // SMS 1 — confirmation au payeur
+    // SMS 1 — confirmation au payeur (doctrine Paxefy : 1 SMS = 1 event monétaire)
     const body1 =
       `Bonjour, votre cotisation de ${fmtGNF(amount)} pour la tontine "${gname}" ` +
       `(tour #${turnNo}, beneficiaire ${benefName}) a ete confirmee. ` +
@@ -316,34 +316,11 @@ Deno.serve(async (req) => {
         dedupeKey: `contrib_confirmed:${contributionId ?? `${turnId}:${payerId}`}`,
       })),
     });
-
-    // SMS 2 — relance aux autres membres encore pending
-    for (const uid of pendingPayers) {
-      const { data: c } = await admin
-        .from("contributions")
-        .select("amount")
-        .eq("turn_id", turnId)
-        .eq("payer_user_id", uid)
-        .maybeSingle();
-      const ownAmount = Number((c as { amount?: number } | null)?.amount ?? amount);
-      const body2 =
-        `Bonjour, ${payerName} vient de cotiser pour la tontine "${gname}" (tour #${turnNo}). ` +
-        `Votre cotisation de ${fmtGNF(ownAmount)} reste due le ${due}. ` +
-        `Reglez depuis l'application. Ref: ${ref}. Tontine Digitale vous informe.`;
-      results.push({
-        target: "pending_member",
-        user: uid,
-        ...(await sendOne({
-          admin,
-          userId: uid,
-          groupId,
-          turnId,
-          kind: "contribution_due",
-          body: body2,
-          dedupeKey: `contrib_notify:${contributionId ?? `${turnId}:${payerId}`}:${uid}`,
-        })),
-      });
-    }
+    // Note (doctrine Paxefy) : les autres membres "pending" ne reçoivent PAS
+    // de SMS de relance ici. Les notifications in-app les informent que
+    // ${payerName} a payé, sans coûter de SMS supplémentaire.
+    void pendingPayers;
+    void payerName;
   }
 
   // ─────────────────────────────────────────────────────────────────────
