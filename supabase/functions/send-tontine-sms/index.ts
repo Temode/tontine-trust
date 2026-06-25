@@ -299,15 +299,24 @@ Deno.serve(async (req) => {
     // (1 SMS par contribution × bénéficiaire grâce au dedupeKey).
     if (turn?.beneficiary_user_id && turn.beneficiary_user_id !== payerId && contributionId) {
       // Plus proche échéance où le bénéficiaire est lui-même payeur "pending"
-      const { data: nextRow } = await admin
+      const { data: pendingTurns } = await admin
         .from("contributions")
-        .select("id, turn:turns!inner(due_date)")
+        .select("turn_id")
         .eq("payer_user_id", turn.beneficiary_user_id)
-        .eq("status", "pending")
-        .order("turn(due_date)", { ascending: true })
-        .limit(1)
-        .maybeSingle();
-      const nextDue = (nextRow as any)?.turn?.due_date ?? null;
+        .eq("status", "pending");
+      const turnIds = (pendingTurns ?? []).map((r: any) => r.turn_id as string);
+      let nextDue: string | null = null;
+      if (turnIds.length > 0) {
+        const { data: nextTurn } = await admin
+          .from("turns")
+          .select("due_date")
+          .in("id", turnIds)
+          .gte("due_date", new Date().toISOString().slice(0, 10))
+          .order("due_date", { ascending: true })
+          .limit(1)
+          .maybeSingle();
+        nextDue = (nextTurn as { due_date?: string } | null)?.due_date ?? null;
+      }
 
       const msg2 = buildBeneficiaryPaymentReceivedSms({
         beneficiaryUserId: turn.beneficiary_user_id,
