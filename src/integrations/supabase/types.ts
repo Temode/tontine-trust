@@ -3448,6 +3448,42 @@ export type Database = {
           },
         ]
       }
+      sms_outbox: {
+        Row: {
+          attempts: number
+          created_at: string
+          dedupe_key: string
+          id: string
+          kind: string
+          last_error: string | null
+          payload: Json
+          processed_at: string | null
+          status: string
+        }
+        Insert: {
+          attempts?: number
+          created_at?: string
+          dedupe_key: string
+          id?: string
+          kind: string
+          last_error?: string | null
+          payload?: Json
+          processed_at?: string | null
+          status?: string
+        }
+        Update: {
+          attempts?: number
+          created_at?: string
+          dedupe_key?: string
+          id?: string
+          kind?: string
+          last_error?: string | null
+          payload?: Json
+          processed_at?: string | null
+          status?: string
+        }
+        Relationships: []
+      }
       tontine_alerts: {
         Row: {
           code: string
@@ -6297,6 +6333,30 @@ export type Database = {
           _user_agent?: string
         }
         Returns: string
+      }
+      sms_outbox_mark: {
+        Args: { _error?: string; _id: string; _status: string }
+        Returns: undefined
+      }
+      sms_outbox_pop: {
+        Args: { _limit?: number }
+        Returns: {
+          attempts: number
+          created_at: string
+          dedupe_key: string
+          id: string
+          kind: string
+          last_error: string | null
+          payload: Json
+          processed_at: string | null
+          status: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "sms_outbox"
+          isOneToOne: false
+          isSetofReturn: true
+        }
       }
       start_cycle: { Args: { _group_id: string }; Returns: string }
       start_djomy_payment: {
