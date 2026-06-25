@@ -1,92 +1,117 @@
 ## Objectif
 
-1. Éliminer définitivement les SMS dupliqués (capture : 3 fois la même relance à 08:00).
-2. Garantir que chaque cotisation confirmée déclenche **un seul** SMS au payeur (avec nom du bénéficiaire du tour) **et un seul** SMS à chaque autre membre (qui paie + à qui le tour).
-3. Rendre visible et récupérable l'échec d'envoi quand le solde Nimba est insuffisant (cas réel : la confirmation de Rougui a échoué silencieusement).
+Stopper net l'hémorragie SMS et empêcher toute récidive. Trois fronts : (a) supprimer l'amplificateur qui transforme 1 notification en 15 envois parallèles, (b) installer un kill-switch + garde-fou de solde côté edge, (c) isoler/archiver les groupes de test orphelins qui sont la source réelle du volume.
 
-## Diagnostic confirmé
+## Diagnostic vérifié en base
 
-- Cron `send-tontine-reminders-daily` (09:00 UTC, unique) — l'idempotence est en mémoire de boucle : `SELECT count FROM sms_logs WHERE kind=… AND created_at >= today` n'attrape pas les envois faits dans la même exécution (race entre `sendMessage` et insertion du log). Résultat observé : `contribution_late_LATE_J2` envoyé 4× au même utilisateur/tour, et `contribution_due` envoyé plusieurs fois à Rougui.
-- Trigger `sms_on_contribution_confirmed` fonctionne. L'échec pour Rougui (`sms_logs`) est `NimbaSMS 400 — Le solde de votre compte est insuffisant`. Aucun rejeu, aucune notification admin.
-- Le SMS de confirmation contient déjà *bénéficiaire* + *progression* `(tour #N, beneficiaire X) … X/N membres ont cotise` — conforme à la demande, à conserver.
+- 109 SMS du 24/06 ventilés : 95 vers des groupes de test orphelins, 14 vers Epargne.
+- Trigger `public.trg_dispatch_late_sms` (sur table `notifications`) → `net.http_post('send-tontine-reminders')` à chaque insert `contribution_late`. À 08:00, 15 notifications insérées en batch ⇒ 15 invocations parallèles ⇒ 10–11 SMS par utilisateur en quelques secondes (race sur l'ancienne idempotence `sms_logs`).
+- 9 groupes orphelins en `pending` depuis 9 jours, jamais résolus.
 
 ## Changements
 
-### 1) Verrou anti-doublon dur (DB) — table d'unicité
+### 1) Supprimer l'amplificateur (DB)
 
-Nouvelle table `public.sms_dedupe_keys` :
+Migration :
 
-- Colonnes : `dedupe_key text primary key`, `created_at timestamptz default now()`.
-- Pas de RLS publique, accès `service_role` uniquement.
-- TTL : purge `created_at < now() - interval '7 days'` via cron quotidien.
-
-La clé est construite côté edge avant chaque envoi :
-
-```
-{user_id}:{turn_id|'-'}:{kind}:{yyyy-mm-dd}
+```sql
+drop trigger if exists trg_notifications_dispatch_late_sms on public.notifications;
+drop function if exists public.trg_dispatch_late_sms();
 ```
 
-Pour les confirmations qui ne sont pas datées par jour (un payeur peut payer plusieurs cotisations sur le même tour si re-création), la clé inclut l'`contribution_id` :
+L'envoi reste assuré par :
+- le trigger `sms_on_contribution_confirmed` (temps réel, par paiement, déjà déduppé),
+- le cron `send-tontine-reminders-daily` (1× / jour, 09:00 UTC),
+- l'ajout (ci-dessous) d'un cron horaire de retard.
 
+### 2) Cron unique horaire pour les retards (DB)
+
+Remplace le trigger d'amplification par un cron **séquentiel** :
+
+```sql
+select cron.schedule(
+  'send-tontine-reminders-hourly',
+  '10 8-20 * * *',
+  $$ select net.http_post(url := '<functions_url>/send-tontine-reminders',
+        headers := jsonb_build_object('Content-Type','application/json','apikey','<anon>'),
+        body := jsonb_build_object('triggered_by','cron_hourly')); $$
+);
 ```
-contrib_confirmed:{contribution_id}        → SMS payeur
-contrib_notify:{contribution_id}:{user_id} → SMS aux autres membres
+
+Un seul appel par heure → aucune parallélisation. Combiné au `claim_sms_dedupe` déjà déployé : un user/turn/bucket/jour = strictement 1 SMS.
+
+### 3) Kill-switch global (DB + edge)
+
+`public.internal_config` reçoit deux clés (insert idempotent) :
+
+- `sms_paused` : `'true'`/`'false'` (défaut `'false'`).
+- `sms_min_balance` : `'50'` (seuil rouge, par défaut).
+
+Les fonctions `send-tontine-sms` et `send-tontine-reminders` lisent ces clés au démarrage :
+
+- Si `sms_paused = 'true'` → court-circuit immédiat, retour `{ ok:true, paused:true, count:0 }` et trace dans `sms_logs` (`status:skipped, error:'kill_switch'`).
+- Sinon, appel `GET https://api.nimbasms.com/v1/accounts/balance` (endpoint utilisé dans `nimbasms.ts`). Si solde `< sms_min_balance` → court-circuit + notification admin `nimba_balance_low` (enum déjà ajouté) + log skipped `'low_balance'`.
+
+Le check de solde est mis en cache 60 s dans la fonction pour éviter de saturer l'API Nimba.
+
+### 4) Rate limit dur côté edge (filet)
+
+Dans `send-tontine-reminders`, ajout d'un compteur en mémoire d'instance :
+
+- max **30 SMS** par invocation (paramètre `internal_config.key='sms_max_per_run'`).
+- Au-delà : log `skipped:'rate_limit_per_run'` + notification admin `sms_delivery_failed` (enum déjà présent) avec corps `"Plafond de N SMS atteint sur 1 exécution — vérifiez la base."`.
+
+### 5) Isoler les groupes de test orphelins (data)
+
+Migration (data-fix, INSERT/UPDATE seulement) :
+
+```sql
+update public.groups set status = 'archived'
+where (name ilike 'Djomy Audit %' or name ilike 'Audit %' or name ilike 'Teste %' or name ilike 'Tontine Test %' or name ilike 'Test Djomy %')
+  and status <> 'archived';
 ```
 
-Insertion via `INSERT … ON CONFLICT DO NOTHING RETURNING 1`. Si rien n'est retourné → on saute l'envoi. Cela rend l'idempotence atomique et indépendante des logs d'envoi.
+Et filtre dur dans les deux fonctions (lecture des vues `pending_reminders_view` et `contribution_late`) :
 
-### 2) Refactor des deux edge functions
+- `where g.status <> 'archived'` ajouté à chaque join.
+- Ajout d'une colonne `groups.is_test_group boolean default false` ; toutes les fixtures E2E la mettent à `true`. Les reminders excluent `is_test_group = true`.
 
-`supabase/functions/send-tontine-sms/index.ts` :
-- Avant chaque `sendOne`, calculer la clé puis appeler un helper `claimDedupe(key)` (RPC SECURITY DEFINER `public.claim_sms_dedupe(key text) returns boolean`). Si `false` → log `status:skipped, error:'dedupe'` et `continue`.
+### 6) UI Admin — visibilité (1 carte + 1 toggle)
 
-`supabase/functions/send-tontine-reminders/index.ts` :
-- Remplacer le `select count from sms_logs` par le même `claimDedupe`.
-- Couvrir les trois boucles : `turn_upcoming_j2`, `contribution_due_${bucket}`, `contribution_late_${bucket}`.
+`src/pages/admin/SmsLogs.tsx` :
 
-### 3) Robustesse de la confirmation de paiement
+- Carte « État SMS » : badge Solde Nimba (couleur seuil), bouton **Pause envois** (toggle `sms_paused`), bouton **Tester solde maintenant** (force le check).
+- Filtre rapide « Envois du jour par groupe / kind » avec totaux (anti-régression visible en un coup d'œil).
 
-Dans `send-tontine-sms` branche `contribution_confirmed` :
-- Si `sendOne` renvoie `failed` avec un message contenant `solde` / `insufficient` / `balance`, marquer dans `sms_logs.error` `nimba_balance_exhausted` (déjà fait), **et** :
-  - Insérer une `notifications` (`kind: 'sms_delivery_failed'` — ajout à l'ENUM) pour le super-admin (rôle `app_role.admin`), liée au `group_id`/`turn_id`.
-  - Re-tenter une seule fois après 2s (couvre les flaps réseau, n'aggrave pas le solde nul).
-- Ajouter un test SQL `db/tests/sms_dedupe.test.sql` qui :
-  1. Insère 5 contributions confirmées identiques → vérifie qu'un seul SMS log `contribution_confirmed` existe.
-  2. Réinvoque la fonction de reminders 3× → vérifie 1 seul log par bucket/jour.
+### 7) Documentation interne
 
-### 4) Vérification automatique du solde Nimba (préventif)
+Ajout `docs/SMS_ANTI_AMPLIFICATION.md` qui rappelle :
 
-Nouvelle edge function planifiée `nimba-balance-watchdog` (cron toutes les heures, 6h–22h) :
-- Appelle l'endpoint Nimba `/account` (déjà utilisé dans `_shared/nimbasms.ts`), récupère le solde.
-- Si solde < seuil (`internal_config.key='nimba_balance_threshold'`, défaut 500), insère `notifications` pour tous les `app_role='admin'` (`kind: 'nimba_balance_low'`).
-- Expose le solde courant dans `/admin/sms-logs` (carte en haut).
-
-### 5) UI admin — visibilité
-
-Page `src/pages/admin/SmsLogs.tsx` :
-- Badge rouge "Solde Nimba faible" si dernier check < seuil.
-- Filtre rapide "Échecs aujourd'hui" + bouton "Rejouer" qui appelle `send-tontine-sms` avec le même payload reconstitué depuis le log (réservé `admin`).
+- Aucun trigger sur `notifications` ne doit appeler `net.http_post` vers `send-tontine-*`.
+- Tout nouveau cron SMS doit utiliser `claim_sms_dedupe(key)` avant l'appel Nimba.
+- Tout groupe de test doit positionner `is_test_group = true`.
 
 ## Détails techniques
 
-- Migrations : ajout enum values `sms_delivery_failed`, `nimba_balance_low` ; création `sms_dedupe_keys` + fonction `claim_sms_dedupe(text) RETURNS boolean SECURITY DEFINER` ; cron `purge-sms-dedupe-keys` quotidien.
-- Aucune modif du trigger `sms_on_contribution_confirmed` (déjà correct).
-- Le wording des SMS reste identique (déjà conforme à la doctrine : informe le bénéficiaire du tour, ton sobre, signé "Tontine Digitale").
-- Pas de breaking change côté client/app : tout le travail est en DB + edge functions + 1 page admin.
-
-## Fichiers touchés
-
-- `supabase/migrations/<new>.sql` — table dedupe + RPC + enums + cron purge
-- `supabase/functions/send-tontine-sms/index.ts` — claimDedupe + retry + notif admin
-- `supabase/functions/send-tontine-reminders/index.ts` — claimDedupe sur les 3 boucles
-- `supabase/functions/nimba-balance-watchdog/index.ts` — nouvelle
-- `supabase/config.toml` — déclaration de la nouvelle fonction
-- `db/tests/sms_dedupe.test.sql` — nouveau
-- `src/pages/admin/SmsLogs.tsx` — badge solde + bouton rejouer
+- **Pas de modifications du wording SMS**, déjà conformes à la doctrine.
+- Pas de breaking change client.
+- Les fonctions edge restent rétro-compatibles avec leur signature actuelle (paramètres optionnels).
+- Sauvegarde de mémoire projet : nouvelle entrée `mem://features/anti-amplification-sms` (règle Core : « jamais de trigger SMS sur la table notifications »).
 
 ## Critères d'acceptation
 
-- Rejouer 10× la même cotisation confirmée → exactement 1 SMS au payeur, 1 par autre membre.
-- Forcer le cron de reminders à tourner 3× dans la minute → 0 doublon.
-- Couper le solde Nimba → un échec génère 1 notification admin `sms_delivery_failed` et le watchdog lève `nimba_balance_low`.
-- SMS au payeur contient bien `(tour #N, beneficiaire <Prénom>)`. SMS aux autres membres contient `<Payeur> vient de cotiser pour la tontine "<Groupe>" (tour #N)`.
+1. Forcer 20 inserts simultanés de `notifications.kind='contribution_late'` → **0 invocation** de `send-tontine-reminders` (le trigger n'existe plus).
+2. Déclencher le cron horaire 3 fois dans la minute → **0 SMS dupliqué**.
+3. Mettre `sms_paused='true'` puis confirmer une cotisation → **0 SMS envoyé**, 1 log `skipped:'kill_switch'`.
+4. Solde Nimba < 50 → 1 notification admin `nimba_balance_low`, **0 SMS facturé**.
+5. Aucun nouveau SMS vers les 9 groupes orphelins après archivage (vérification par requête `sms_logs` sur 24 h).
+
+## Fichiers touchés
+
+- `supabase/migrations/<new>.sql` — drop trigger amplificateur, cron horaire séquentiel, colonne `groups.is_test_group`, clés `internal_config`, valeur enum déjà OK.
+- `supabase/migrations/<new+1>.sql` — *data* : `update groups set status='archived'` + `update groups set is_test_group=true` pour les 11 groupes listés.
+- `supabase/functions/send-tontine-sms/index.ts` — kill-switch + check solde + filtre `is_test_group`.
+- `supabase/functions/send-tontine-reminders/index.ts` — idem + rate-limit par run.
+- `src/pages/admin/SmsLogs.tsx` — carte État SMS + toggle pause.
+- `docs/SMS_ANTI_AMPLIFICATION.md` — nouveau.
+- `mem://features/anti-amplification-sms` — nouvelle entrée mémoire.
