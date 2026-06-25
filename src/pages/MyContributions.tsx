@@ -610,6 +610,12 @@ function DueContributionCard({ due, onPay, onDispute }: CardProps) {
   const isDefaulted = due.status === "defaulted";
   const isOverdue = due.days_to_due < 0;
   const isUrgent = due.days_to_due >= 0 && due.days_to_due <= 3;
+  // Règle métier : on ne peut payer qu'à partir du jour de l'échéance.
+  const canPayNow = due.days_to_due <= 0;
+  const availableLabel = due.due_date
+    ? new Date(due.due_date.length <= 10 ? `${due.due_date}T00:00:00Z` : due.due_date)
+        .toLocaleDateString("fr-FR", { day: "2-digit", month: "long" })
+    : null;
   return (
     <article
       className={cn(
@@ -664,16 +670,28 @@ function DueContributionCard({ due, onPay, onDispute }: CardProps) {
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={onPay}
-          aria-label={`Payer ${formatGNF(due.amount)} GNF pour ${due.group_name}, tour ${due.turn_number}`}
-          className="mt-auto inline-flex h-12 w-full items-center justify-center gap-1.5 whitespace-nowrap rounded-md bg-primary px-5 text-sm font-semibold text-primary-foreground shadow-primary transition hover:bg-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-        >
-          <ShieldCheck className="h-4 w-4" />
-          Payer maintenant
-          <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-        </button>
+        {canPayNow ? (
+          <button
+            type="button"
+            onClick={onPay}
+            aria-label={`Payer ${formatGNF(due.amount)} GNF pour ${due.group_name}, tour ${due.turn_number}`}
+            className="mt-auto inline-flex h-12 w-full items-center justify-center gap-1.5 whitespace-nowrap rounded-md bg-primary px-5 text-sm font-semibold text-primary-foreground shadow-primary transition hover:bg-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+          >
+            <ShieldCheck className="h-4 w-4" />
+            Payer maintenant
+            <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+          </button>
+        ) : (
+          <button
+            type="button"
+            disabled
+            aria-disabled="true"
+            title={availableLabel ? `Paiement ouvert le ${availableLabel}` : undefined}
+            className="mt-auto inline-flex h-12 w-full cursor-not-allowed items-center justify-center gap-1.5 whitespace-nowrap rounded-md border border-hairline bg-muted px-5 text-sm font-semibold text-muted-foreground"
+          >
+            {availableLabel ? `Disponible le ${availableLabel}` : "Pas encore ouvert"}
+          </button>
+        )}
 
         {(isDefaulted || (isOverdue && (due.late_penalty_percent ?? 0) > 0)) && (
           <PenaltyBreakdown due={due} />
