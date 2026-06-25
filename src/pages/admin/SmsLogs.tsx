@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
 import { fr } from "date-fns/locale";
 import { listSmsLogs, type SmsLog } from "@/lib/api/smsLogs";
-import { Search, RefreshCw, ExternalLink, User } from "lucide-react";
+import { Search, RefreshCw, ExternalLink, User, ShieldAlert, ShieldCheck, Pause, Play } from "lucide-react";
 import { Link } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
 
 const STATUS_TONE: Record<SmsLog["status"], string> = {
   sent: "border-emerald-500/30 bg-emerald-500/10 text-emerald-300",
@@ -34,6 +35,29 @@ export default function AdminSmsLogs() {
   const [status, setStatus] = useState<SmsLog["status"] | "all">("all");
   const [kind, setKind] = useState<string>("all");
   const [search, setSearch] = useState("");
+  const qc = useQueryClient();
+
+  const control = useQuery({
+    queryKey: ["admin-sms-control"],
+    queryFn: async () => {
+      const { data, error } = await supabase.functions.invoke("sms-control", { method: "GET" });
+      if (error) throw error;
+      return data as { paused: boolean; min_balance: number; max_per_run: number; balance: number | null };
+    },
+    refetchInterval: 30_000,
+  });
+
+  const togglePause = useMutation({
+    mutationFn: async (paused: boolean) => {
+      const { data, error } = await supabase.functions.invoke("sms-control", {
+        method: "POST",
+        body: { paused },
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin-sms-control"] }),
+  });
 
   const { data, isLoading, error, refetch, isFetching } = useQuery({
     queryKey: ["admin-sms-logs", status, kind, search],
@@ -56,6 +80,49 @@ export default function AdminSmsLogs() {
           <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} /> Rafraîchir
         </button>
       </header>
+
+      {/* Carte État SMS : kill-switch + solde Nimba */}
+      {control.data && (() => {
+        const c = control.data;
+        const low = c.balance !== null && c.balance < c.min_balance;
+        return (
+          <div className={`rounded-xl border p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3
+            ${c.paused ? "border-amber-500/40 bg-amber-500/5"
+              : low ? "border-red-500/40 bg-red-500/5"
+              : "border-emerald-500/30 bg-emerald-500/5"}`}>
+            <div className="flex items-center gap-3">
+              {c.paused ? <ShieldAlert className="h-5 w-5 text-amber-400" />
+                : low ? <ShieldAlert className="h-5 w-5 text-red-400" />
+                : <ShieldCheck className="h-5 w-5 text-emerald-400" />}
+              <div>
+                <div className="text-sm font-medium text-white">
+                  {c.paused ? "Envois SMS suspendus (kill-switch actif)"
+                    : low ? "Solde Nimba sous le seuil — envois bloqués"
+                    : "Envois SMS opérationnels"}
+                </div>
+                <div className="text-xs text-slate-400 mt-0.5">
+                  Solde Nimba : <span className={low ? "text-red-300 font-medium" : "text-slate-200"}>
+                    {c.balance === null ? "—" : c.balance}
+                  </span>
+                  {" "}· Seuil min : {c.min_balance}
+                  {" "}· Plafond/exécution : {c.max_per_run}
+                </div>
+              </div>
+            </div>
+            <button
+              onClick={() => togglePause.mutate(!c.paused)}
+              disabled={togglePause.isPending}
+              className={`inline-flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium border
+                ${c.paused
+                  ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/20"
+                  : "border-amber-500/40 bg-amber-500/10 text-amber-200 hover:bg-amber-500/20"}`}
+            >
+              {c.paused ? <><Play className="h-4 w-4" /> Reprendre les envois</>
+                        : <><Pause className="h-4 w-4" /> Mettre en pause</>}
+            </button>
+          </div>
+        );
+      })()}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <div className="relative">
