@@ -3326,6 +3326,21 @@ export type Database = {
           },
         ]
       }
+      sms_dedupe_keys: {
+        Row: {
+          created_at: string
+          dedupe_key: string
+        }
+        Insert: {
+          created_at?: string
+          dedupe_key: string
+        }
+        Update: {
+          created_at?: string
+          dedupe_key?: string
+        }
+        Relationships: []
+      }
       sms_logs: {
         Row: {
           body: string
@@ -5886,6 +5901,7 @@ export type Database = {
       auto_close_turn: { Args: { _turn_id: string }; Returns: boolean }
       cancel_my_bid: { Args: { _turn_id: string }; Returns: undefined }
       cancel_turn_swap: { Args: { _request_id: string }; Returns: undefined }
+      claim_sms_dedupe: { Args: { _key: string }; Returns: boolean }
       close_auction: { Args: { _turn_id: string }; Returns: string }
       compute_hold_until: { Args: { _turn_id: string }; Returns: string }
       confirm_external_payment: {
@@ -6113,6 +6129,7 @@ export type Database = {
       }
       preview_group_by_code: { Args: { _code: string }; Returns: Json }
       purge_audit_log: { Args: never; Returns: number }
+      purge_sms_dedupe_keys: { Args: never; Returns: number }
       raise_contribution_dispute: {
         Args: {
           _contribution_id: string
@@ -6493,6 +6510,8 @@ export type Database = {
         | "withdrawal_failed"
         | "withdrawal_cancelled"
         | "payout_hold_released"
+        | "sms_delivery_failed"
+        | "nimba_balance_low"
       payment_method_external:
         | "cash"
         | "bank_transfer"
@@ -6785,6 +6804,8 @@ export const Constants = {
         "withdrawal_failed",
         "withdrawal_cancelled",
         "payout_hold_released",
+        "sms_delivery_failed",
+        "nimba_balance_low",
       ],
       payment_method_external: [
         "cash",

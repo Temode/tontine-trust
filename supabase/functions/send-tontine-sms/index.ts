@@ -67,6 +67,81 @@ function makeRef(): string {
 
 type Admin = ReturnType<typeof createClient>;
 
+/**
+ * Verrou anti-doublon atomique côté base.
+ * Retourne true si la clé a été réservée (envoi autorisé),
+ * false si déjà utilisée (envoi à sauter).
+ */
+async function claimDedupe(admin: Admin, key: string): Promise<boolean> {
+  try {
+    const { data, error } = await admin.rpc("claim_sms_dedupe", { _key: key });
+    if (error) {
+      console.error("[send-tontine-sms] claim_sms_dedupe failed:", error);
+      // En cas d'erreur RPC, on autorise l'envoi pour ne pas bloquer
+      // la communication critique (la table sms_logs gardera trace du doublon).
+      return true;
+    }
+    return data !== false;
+  } catch (e) {
+    console.error("[send-tontine-sms] claim_sms_dedupe exception:", e);
+    return true;
+  }
+}
+
+function isBalanceError(err?: string | null): boolean {
+  if (!err) return false;
+  const s = err.toLowerCase();
+  return (
+    s.includes("solde") ||
+    s.includes("insufficient") ||
+    s.includes("balance") ||
+    s.includes("insuffisant")
+  );
+}
+
+async function notifyAdminsSmsFailure(
+  admin: Admin,
+  args: {
+    groupId: string | null;
+    turnId: string | null;
+    kind: string;
+    userId: string;
+    error: string;
+  },
+) {
+  try {
+    const { data: admins } = await admin
+      .from("user_roles")
+      .select("user_id")
+      .eq("role", "admin");
+    const recipients = (admins ?? []).map((r: any) => r.user_id as string);
+    if (recipients.length === 0) return;
+    const isBalance = isBalanceError(args.error);
+    const title = isBalance ? "Solde SMS épuisé" : "Échec d'envoi SMS";
+    const body = isBalance
+      ? `Le solde NimbaSMS est insuffisant — un SMS "${args.kind}" n'a pas pu être livré. Rechargez le compte opérateur.`
+      : `Échec d'envoi SMS "${args.kind}" : ${args.error}`;
+    const rows = recipients.map((uid) => ({
+      user_id: uid,
+      kind: "sms_delivery_failed",
+      title,
+      body,
+      group_id: args.groupId,
+      turn_id: args.turnId,
+      link: "/admin/sms",
+      data: {
+        target_user_id: args.userId,
+        sms_kind: args.kind,
+        error: args.error,
+        balance_exhausted: isBalance,
+      },
+    }));
+    await admin.from("notifications").insert(rows);
+  } catch (e) {
+    console.error("[send-tontine-sms] notifyAdminsSmsFailure failed:", e);
+  }
+}
+
 async function isSmsOptedIn(
   admin: Admin,
   userId: string,
@@ -98,7 +173,15 @@ async function sendOne(args: {
   turnId: string | null;
   kind: string;
   body: string;
+  dedupeKey?: string | null;
 }) {
+  // 0) Verrou anti-doublon AVANT tout (atomique, ne dépend pas de sms_logs)
+  if (args.dedupeKey) {
+    const ok = await claimDedupe(args.admin, args.dedupeKey);
+    if (!ok) {
+      return { sent: false, reason: "dedupe" };
+    }
+  }
   const profile = await getProfile(args.admin, args.userId);
   const phone = normalizeGNPhone(profile?.phone_number);
   if (!phone) {
@@ -130,6 +213,16 @@ async function sendOne(args: {
       kind: args.kind,
     },
   });
+  // Si échec : alerte admin (et marque balance_exhausted si solde Nimba épuisé)
+  if (!r.success) {
+    await notifyAdminsSmsFailure(args.admin, {
+      groupId: args.groupId,
+      turnId: args.turnId,
+      kind: args.kind,
+      userId: args.userId,
+      error: r.error ?? "unknown",
+    });
+  }
   return { sent: r.success, reason: r.error };
 }
 
@@ -175,6 +268,7 @@ Deno.serve(async (req) => {
   // ─────────────────────────────────────────────────────────────────────
   if (kind === "contribution_confirmed") {
     const turnId = payload.turn_id as string;
+    const contributionId = (payload.contribution_id as string | undefined) ?? null;
     const payerId = payload.payer_user_id as string;
     const amount = Number(payload.amount ?? 0);
 
@@ -219,6 +313,7 @@ Deno.serve(async (req) => {
         turnId,
         kind: "contribution_confirmed",
         body: body1,
+        dedupeKey: `contrib_confirmed:${contributionId ?? `${turnId}:${payerId}`}`,
       })),
     });
 
@@ -245,6 +340,7 @@ Deno.serve(async (req) => {
           turnId,
           kind: "contribution_due",
           body: body2,
+          dedupeKey: `contrib_notify:${contributionId ?? `${turnId}:${payerId}`}:${uid}`,
         })),
       });
     }
@@ -271,6 +367,7 @@ Deno.serve(async (req) => {
         turnId,
         kind: "payout_released",
         body,
+        dedupeKey: `turn_paid:${turnId}`,
       })),
     });
   }
@@ -299,6 +396,7 @@ Deno.serve(async (req) => {
         turnId,
         kind: "payout_hold_extended",
         body,
+        dedupeKey: `hold_extended:${turnId}:${holdUntil}`,
       })),
     });
   }
@@ -337,6 +435,7 @@ Deno.serve(async (req) => {
           turnId: null,
           kind: "cycle_completed",
           body,
+          dedupeKey: `cycle_completed:${groupId ?? "-"}:${uid}`,
         })),
       });
     }
@@ -352,6 +451,7 @@ Deno.serve(async (req) => {
       : [];
     const body = String(payload.body ?? "").trim();
     const turnId = (payload.turn_id as string | undefined) ?? null;
+    const dedupePrefix = (payload.dedupe_key_prefix as string | undefined) ?? null;
     if (!body) return json({ error: "missing_body" }, 400);
     for (const uid of recipients) {
       if (!uid) continue;
@@ -365,6 +465,7 @@ Deno.serve(async (req) => {
           turnId,
           kind: smsKind,
           body,
+          dedupeKey: dedupePrefix ? `${dedupePrefix}:${uid}` : null,
         })),
       });
     }
