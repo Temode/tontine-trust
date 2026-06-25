@@ -107,6 +107,28 @@ async function loadPhones(
   return out;
 }
 
+/**
+ * Verrou anti-doublon atomique côté base.
+ * Retourne true si la clé est nouvelle (envoi autorisé),
+ * false si déjà utilisée (à sauter).
+ */
+async function claimDedupe(
+  admin: ReturnType<typeof createClient>,
+  key: string,
+): Promise<boolean> {
+  try {
+    const { data, error } = await admin.rpc("claim_sms_dedupe", { _key: key });
+    if (error) {
+      console.error("[reminders] claim_sms_dedupe failed:", error);
+      return true;
+    }
+    return data !== false;
+  } catch (e) {
+    console.error("[reminders] claim_sms_dedupe exception:", e);
+    return true;
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
