@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
 import { fr } from "date-fns/locale";
 import { listSmsLogs, type SmsLog } from "@/lib/api/smsLogs";
-import { Search, RefreshCw, ExternalLink, User, ShieldAlert, ShieldCheck, Pause, Play } from "lucide-react";
+import { Search, RefreshCw, ExternalLink, User, ShieldAlert, ShieldCheck, Pause, Play, Inbox } from "lucide-react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -57,6 +57,24 @@ export default function AdminSmsLogs() {
       return data;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["admin-sms-control"] }),
+  });
+
+  // Compteur de la file sms_outbox (doctrine Paxefy : 1 ligne = 1 SMS à envoyer)
+  const outbox = useQuery({
+    queryKey: ["admin-sms-outbox"],
+    queryFn: async () => {
+      const counts = await Promise.all(
+        (["queued", "processing", "failed"] as const).map(async (s) => {
+          const { count } = await (supabase as any)
+            .from("sms_outbox")
+            .select("id", { head: true, count: "exact" })
+            .eq("status", s);
+          return [s, count ?? 0] as const;
+        }),
+      );
+      return Object.fromEntries(counts) as Record<"queued" | "processing" | "failed", number>;
+    },
+    refetchInterval: 30_000,
   });
 
   const { data, isLoading, error, refetch, isFetching } = useQuery({
