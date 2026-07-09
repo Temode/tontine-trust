@@ -8,6 +8,7 @@ import { AuthStepper } from "@/components/auth/AuthStepper";
 import { AuthAlert } from "@/components/auth/AuthAlert";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { invokeAuthOtp } from "@/lib/authOtp";
 
 const RESEND_DELAY = 60;
 
@@ -27,7 +28,12 @@ function maskEmail(email: string): string {
 
 export default function VerifyEmail() {
   const navigate = useNavigate();
-  const location = useLocation() as { state?: { email?: string } };
+  const location = useLocation() as {
+    state?: {
+      email?: string;
+      signupPayload?: { email: string; password: string; fullName: string; phoneNumber?: string | null };
+    };
+  };
   const [params] = useSearchParams();
   const { user, loading } = useAuth();
 
@@ -58,13 +64,18 @@ export default function VerifyEmail() {
       }
       setStatus("verifying");
       setErrorMsg(null);
-      const { error } = await supabase.auth.verifyOtp({ email, token, type: "signup" });
+      const { data, error } = await invokeAuthOtp<{
+        session?: { access_token: string; refresh_token: string };
+      }>({ action: "verify_signup", email, token });
       if (error) {
         setStatus("error");
-        setErrorMsg("Code invalide ou expiré. Vérifiez vos 6 chiffres.");
+        setErrorMsg(error);
         setCode("");
         submittedFor.current = null;
         return;
+      }
+      if (data?.session?.access_token && data.session.refresh_token) {
+        await supabase.auth.setSession(data.session);
       }
       setStatus("success");
       toast.success("Email vérifié");
@@ -87,14 +98,19 @@ export default function VerifyEmail() {
 
   const handleResend = async () => {
     if (countdown > 0 || resending || !email) return;
+    const signupPayload = location.state?.signupPayload;
+    if (!signupPayload) {
+      toast.error("Pour renvoyer un code, reprenez l'inscription depuis le début.");
+      return;
+    }
     setResending(true);
-    const { error } = await supabase.auth.resend({ type: "signup", email });
+    const { error } = await invokeAuthOtp({ action: "signup_start", ...signupPayload });
     setResending(false);
     if (error) {
-      if (/rate limit/i.test(error.message)) {
+      if (/trop d'emails|tentatives|patiente/i.test(error)) {
         toast.error("Trop d'emails envoyés. Patientez quelques minutes.");
       } else {
-        toast.error(error.message);
+        toast.error(error);
       }
       return;
     }

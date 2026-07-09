@@ -122,7 +122,17 @@ export default function Auth() {
     }
     if (needsEmailConfirmation) {
       toast.success("Compte créé. Saisis le code à 6 chiffres reçu par email.");
-      navigate("/auth/verifier-email", { state: { email: parsed.data.email } });
+      navigate("/auth/verifier-email", {
+        state: {
+          email: parsed.data.email,
+          signupPayload: {
+            email: parsed.data.email,
+            password: parsed.data.password,
+            fullName: parsed.data.fullName,
+            phoneNumber: parsed.data.phoneNumber || null,
+          },
+        },
+      });
       return;
     }
     toast.success("Compte créé. Bienvenue !");

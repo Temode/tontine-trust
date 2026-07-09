@@ -10,7 +10,7 @@ import {
 } from "@/components/auth/AuthShell";
 import { AuthStepper } from "@/components/auth/AuthStepper";
 import { AuthAlert } from "@/components/auth/AuthAlert";
-import { supabase } from "@/integrations/supabase/client";
+import { invokeAuthOtp } from "@/lib/authOtp";
 
 const schema = z.object({
   email: z.string().trim().email("Email invalide").max(255),
@@ -43,11 +43,12 @@ export default function ForgotPassword() {
       return;
     }
     setSubmitting(true);
-    const { error } = await supabase.auth.resetPasswordForEmail(parsed.data.email, {
-      redirectTo: `${window.location.origin}/auth/reinitialiser`,
+    const { error } = await invokeAuthOtp({
+      action: "recovery_start",
+      email: parsed.data.email,
     });
     setSubmitting(false);
-    if (error && /rate limit/i.test(error.message)) {
+    if (error && /trop d'emails|tentatives|patiente/i.test(error)) {
       setRateLimited(true);
       return;
     }
@@ -66,17 +67,24 @@ export default function ForgotPassword() {
               Vérifiez votre boîte mail
             </h1>
             <p className="mt-2 text-sm text-foreground/60">
-              Nous vous avons envoyé les instructions de réinitialisation.
+              Nous vous avons envoyé un code de réinitialisation.
             </p>
           </header>
 
           <AuthAlert variant="success" title="Email envoyé">
             Si un compte existe pour{" "}
             <span className="font-semibold text-foreground">{email}</span>, un lien de
-            réinitialisation vient d'être envoyé. Il expire dans 1 heure.
+            code à 6 chiffres vient d'être envoyé. Il expire dans 1 heure.
           </AuthAlert>
 
-          <div className="mt-8">
+          <div className="mt-8 flex flex-col gap-4">
+            <Link
+              to="/auth/reinitialiser"
+              state={{ email }}
+              className={authPrimaryButton}
+            >
+              Saisir le code reçu
+            </Link>
             <Link
               to="/auth"
               className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary hover:underline"
@@ -93,8 +101,7 @@ export default function ForgotPassword() {
               Mot de passe oublié
             </h1>
             <p className="mt-2 text-sm text-foreground/60">
-              Saisissez votre email : nous vous enverrons un lien pour définir un nouveau mot de
-              passe.
+              Saisissez votre email : nous vous enverrons un code pour définir un nouveau mot de passe.
             </p>
           </header>
 
@@ -128,7 +135,7 @@ export default function ForgotPassword() {
 
             <button type="submit" disabled={submitting} className={authPrimaryButton}>
               {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
-              Envoyer le lien de réinitialisation
+              Envoyer le code de réinitialisation
             </button>
           </form>
 
