@@ -1,88 +1,50 @@
-## Objectif
+## Nouveau design `/auth` — direction "Infrastructure calme"
 
-Compléter le flux d'authentification Tontine Digital avec:
-1. Réinitialisation du mot de passe (lien email + page nouveau mot de passe).
-2. Vérification d'email par code OTP 6 chiffres après inscription, avec renvoi possible après 60s.
-3. Protection stricte des routes privées (déjà quasi-en place, à vérifier + polir).
+Direction choisie : v2, avec **Inter uniquement** (pas d'Instrument Serif). Palette lockée : teal `#0D7377`, or `#E8AA14`, off-white `#FAFAF7`, texte `#0E1A1C`.
 
-Fidèle à la doctrine : bleu sarcelle `#0D7377` + or `#E8AA14`, `font-display` bold tracking-tight, une seule action primaire par écran, beaucoup d'air, tokens sémantiques uniquement, skeletons plutôt que spinners.
+## Structure
 
-## 1. Mot de passe oublié
+- **Desktop (≥ md)** : split 5/12 – 7/12. Panneau de gauche en `bg-primary` sticky pleine hauteur avec :
+  - En haut : carré or `bg-accent` 8×8 + wordmark "Tontine Digitale" blanc.
+  - Au milieu : titre `text-4xl md:text-5xl font-bold tracking-tight leading-tight` en blanc — "L'infrastructure de confiance pour l'épargne collective." + sous-titre `text-white/70` — reformulé Guinée : "Rejoignez des milliers de groupes qui gèrent leur tontine avec la sécurité et la clarté d'une institution financière moderne."
+  - En bas : deux KPI ("12 000+ cotisations sécurisées", "99,9% disponibilité") en `text-accent` avec label `uppercase tracking-wider text-white/50`.
+- **Mobile** : panneau caché, logo compact (carré teal + wordmark) au-dessus du formulaire.
+- **Section formulaire** : centré, `max-w-[400px]`, padding généreux (`p-6 sm:p-12 md:p-24`).
 
-### Nouvelle page `/auth/mot-de-passe-oublie` (`src/pages/ForgotPassword.tsx`)
-- Formulaire minimal: email + un seul CTA "Envoyer le lien".
-- Validation client Zod (email, max 255).
-- Appelle `supabase.auth.resetPasswordForEmail(email, { redirectTo: ${origin}/auth/reinitialiser })`.
-- État de succès non-devinable : "Si un compte existe, un lien vient d'être envoyé à cet email" (anti-énumération → validation serveur implicite via Supabase Auth, qui applique aussi rate-limit).
-- Lien discret "Retour à la connexion".
+## Formulaire
 
-### Nouvelle page `/auth/reinitialiser` (`src/pages/ResetPassword.tsx`)
-- Publique (pas derrière ProtectedRoute).
-- Détecte `type=recovery` (hash Supabase). Écoute `onAuthStateChange` pour l'événement `PASSWORD_RECOVERY` afin de récupérer la session temporaire.
-- Deux champs: nouveau mot de passe + confirmation. Zod: min 8, max 72, égalité des deux champs.
-- Appel `supabase.auth.updateUser({ password })` → validation serveur (Supabase).
-- Succès → redirige vers `/dashboard` (session déjà active) avec toast.
-- Erreur si token expiré → CTA "Redemander un lien".
+- Header : `h1 text-4xl font-bold tracking-tight` "Bienvenue" + sous-titre `text-foreground/60` "Gérez votre tontine en toute sérénité."
+- Tabs custom (pas shadcn) : deux boutons, l'actif a `border-b-2 border-primary text-primary`, l'inactif `text-foreground/40 hover:text-foreground/70`. Séparateur `border-b border-foreground/10`.
+- Champs :
+  - Label `text-xs font-semibold uppercase tracking-wider text-foreground/50`.
+  - Input : `bg-white border border-foreground/10 rounded-md px-4 py-3 text-sm`, focus `ring-1 ring-primary border-primary`.
+- Onglet **Se connecter** : Email + Mot de passe (avec lien "Oublié ?" aligné à droite du label, `text-xs text-primary`).
+- Onglet **S'inscrire** : Nom complet, Téléphone (optionnel), Email, Mot de passe + hint "Au moins 8 caractères".
+- CTA primaire : `w-full bg-primary text-primary-foreground py-3.5 rounded-md font-medium text-sm hover:bg-primary/90 shadow-sm active:scale-[0.98]`. Libellé : "Se connecter à mon compte" / "Créer mon compte".
+- Footer : `mt-12 pt-8 border-t border-foreground/5` avec mention légale `text-[11px] text-foreground/40`.
 
-### Lien depuis `/auth`
-- Ajouter sous le champ mot de passe de l'onglet "Se connecter" : petit lien `text-sm text-primary` "Mot de passe oublié ?" → `/auth/mot-de-passe-oublie`.
+## Tokens & implémentation
 
-## 2. Vérification email par OTP 6 chiffres
+- **Aucune couleur hardcodée** : on utilise les tokens existants (`bg-primary`, `text-primary-foreground`, `border-hairline`, etc.). Les hex `#0D7377/#E8AA14/#FAFAF7/#0E1A1C` du prototype existent déjà en tokens (bleu sarcelle + or documentés dans la doctrine).
+- **Police** : Inter uniquement. Vérifier que `font-sans` (Tailwind) → Inter dans la config actuelle. Si pas encore chargée, `bun add @fontsource/inter` + `import "@fontsource/inter/400.css"` (+500/+600) dans `src/main.tsx`, puis `fontFamily.sans = ["Inter", ...]` dans `tailwind.config.ts`. Le `font-display` reste (déjà bold tracking-tight) mais mappé sur Inter aussi pour cette page.
+- **Composant Logo** existant conservé côté mobile ; côté panneau desktop on affiche l'ancre custom (carré or + wordmark blanc) pour matcher le proto.
 
-Supabase envoie déjà, dans l'email de confirmation d'inscription, à la fois un lien et un token 6 chiffres (`{{ .Token }}`). On exploite le token via `supabase.auth.verifyOtp({ email, token, type: 'signup' })`.
+## Comportement
 
-### Modification `useAuth.signUp`
-- Retirer `emailRedirectTo` (on veut pousser l'utilisateur à saisir le code plutôt que cliquer un lien).
-- Continuer à renvoyer `needsEmailConfirmation`.
-
-### Nouvelle page `/auth/verifier-email` (`src/pages/VerifyEmail.tsx`)
-- Reçoit l'email via `location.state.email` (fallback: query string `?email=`).
-- Design "infrastructure financière":
-  - Carte centrée `max-w-md`, coins arrondis `rounded-2xl`, border hairline, ombre légère.
-  - En-tête: logo, `font-display text-2xl` "Vérifie ton email", sous-titre `text-sm text-muted-foreground` avec email masqué (`j***@domaine.com`).
-  - Bloc OTP: 6 slots via `<InputOTP>` de `@/components/ui/input-otp` (shadcn, déjà dispo), taille généreuse (`h-14 w-12 text-2xl font-display tabular-nums`), gap 3, focus ring primary. Auto-submit dès 6 chiffres saisis.
-  - État "vérifié" : icône check dans pastille `bg-primary-50`, message "Email vérifié", redirection auto vers `/dashboard` après 1.2s.
-  - État "en attente" : par défaut, sous-titre "Nous avons envoyé un code à 6 chiffres…".
-  - État "erreur" : message rouge sous les slots, slots reset.
-  - Bouton "Renvoyer le code" désactivé, avec compte à rebours `Renvoyer dans 60s`. Après 60s → actif; nouveau clic redémarre le compteur.
-  - Renvoi via `supabase.auth.resend({ type: 'signup', email })`. Gère erreur `over_email_send_rate_limit` avec message clair.
-  - Une seule action primaire visible (Vérifier — mais auto-submit, donc CTA compact secondaire "Vérifier" en dessous des slots pour accessibilité clavier).
-  - Lien discret "Utiliser un autre email" → retour à `/auth` tab signup.
-
-### Redirection après signup
-- Dans `Auth.tsx` `handleSignUp`, si `needsEmailConfirmation` → `navigate('/auth/verifier-email', { state: { email } })` au lieu de basculer l'onglet.
-- Si l'utilisateur revient à `/auth` avec une session partielle non confirmée: laisser tel quel, Supabase gère.
-
-### Badge "email vérifié / en attente" pour l'utilisateur connecté
-- Petit indicateur dans le menu avatar `AppShell` (si l'espace le permet, sinon dans `/profil`): pastille `bg-primary-50 text-primary` "Email vérifié" ou `bg-amber-50 text-amber-700` "Email en attente" selon `user.email_confirmed_at`. CTA "Renvoyer" qui repointe vers `/auth/verifier-email` avec l'email prérempli. (Uniquement dans `/profil` pour rester sobre — pas dans la TopBar.)
-
-## 3. Protection des routes non connectées
-
-Déjà en place via `ProtectedRoute` (App.tsx wraps `/dashboard`, `/groupes`, `/admin/*`, etc.). Vérifications additionnelles:
-- Ajouter `/auth/reinitialiser` en route publique (hors ProtectedRoute).
-- Ajouter `/auth/verifier-email` en route publique.
-- Ajouter `/auth/mot-de-passe-oublie` en route publique.
-- Confirmer que la redirection `state.from` fonctionne pour un utilisateur qui atterrit sur une deep-link privée (déjà OK dans Auth.tsx via `fromPath`).
-- Aucune route sensible ne doit rester en dehors de `ProtectedRoute` (audit rapide : toutes les routes app/admin sont déjà dedans dans `App.tsx`).
-
-## Fichiers créés
-
-- `src/pages/ForgotPassword.tsx`
-- `src/pages/ResetPassword.tsx`
-- `src/pages/VerifyEmail.tsx`
+- Toute la logique existante (Zod, `useAuth.signIn/signUp`, redirection par rôle, envoi vers `/auth/verifier-email` après signup) est **conservée à l'identique**. Seule la présentation change.
+- États : loading = squelette (déjà en place dans le shell), soumission = CTA disable + spinner interne, erreurs via `toast`.
+- Lien "Mot de passe oublié ?" → `/auth/mot-de-passe-oublie` conservé.
+- Skeleton pendant `loading || rolesLoading` conservé.
 
 ## Fichiers modifiés
 
-- `src/App.tsx` — 3 nouvelles routes publiques.
-- `src/pages/Auth.tsx` — lien "Mot de passe oublié", redirection vers `/auth/verifier-email` après signup.
-- `src/hooks/useAuth.tsx` — retirer `emailRedirectTo` du signUp (on privilégie l'OTP).
-- `src/pages/Profile.tsx` — bloc discret "Email vérifié / en attente" + CTA renvoi.
+- `src/pages/Auth.tsx` — refonte complète du JSX (form logic identique).
+- `src/main.tsx` + `tailwind.config.ts` — ajout Inter via `@fontsource/inter` si nécessaire.
+- Aucune autre page touchée (les autres écrans auth garderont leur design actuel — cohérent avec la même palette).
 
-## Détails techniques
+## Ce qu'on ne fait pas
 
-- OTP: `import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp"`. Composant shadcn déjà présent dans le projet.
-- Validation serveur: assurée par Supabase Auth (rate-limit, token hashé, expiration ~1h par défaut). Pas de fonction edge custom nécessaire.
-- Rate-limit renvoi email: géré côté Supabase; message d'erreur mappé dans `mapAuthError`.
-- Aucune modif de config auth (`configure_auth`) — on garde les paramètres actuels. La confirmation email doit rester activée côté projet pour que le flux OTP soit pertinent (déjà le cas).
-- Skeleton pendant le check de la session recovery sur `/auth/reinitialiser` (pas de spinner).
-- Aucune couleur hardcodée: on utilise `text-primary`, `bg-primary-50`, `text-amber-700`, etc., déjà définis dans `tailwind.config.ts`.
+- Pas de social login.
+- Pas de nouvelles routes.
+- Pas de modif backend / Supabase / edge functions.
+- Pas de changement des libellés fonctionnels (validation Zod, mapAuthError inchangés).
