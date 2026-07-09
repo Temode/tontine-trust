@@ -1,22 +1,33 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { z } from "zod";
-import { toast } from "sonner";
-import { ArrowLeft, Loader2, MailCheck } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Logo } from "@/components/brand/Logo";
+import { ArrowLeft, Loader2 } from "lucide-react";
+import {
+  AuthShell,
+  authFieldInput,
+  authFieldLabel,
+  authPrimaryButton,
+} from "@/components/auth/AuthShell";
+import { AuthStepper } from "@/components/auth/AuthStepper";
+import { AuthAlert } from "@/components/auth/AuthAlert";
 import { supabase } from "@/integrations/supabase/client";
 
 const schema = z.object({
   email: z.string().trim().email("Email invalide").max(255),
 });
 
+const STEPS = [
+  { label: "Email" },
+  { label: "Nouveau mot de passe" },
+  { label: "Terminé" },
+];
+
 export default function ForgotPassword() {
   const [email, setEmail] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [sent, setSent] = useState(false);
+  const [fieldError, setFieldError] = useState<string | null>(null);
+  const [rateLimited, setRateLimited] = useState(false);
 
   useEffect(() => {
     document.title = "Mot de passe oublié · Tontine Digital";
@@ -24,9 +35,11 @@ export default function ForgotPassword() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setFieldError(null);
+    setRateLimited(false);
     const parsed = schema.safeParse({ email });
     if (!parsed.success) {
-      toast.error(parsed.error.issues[0].message);
+      setFieldError(parsed.error.issues[0].message);
       return;
     }
     setSubmitting(true);
@@ -34,81 +47,102 @@ export default function ForgotPassword() {
       redirectTo: `${window.location.origin}/auth/reinitialiser`,
     });
     setSubmitting(false);
-    if (error) {
-      // Ne fuit pas l'existence du compte : on affiche succès sauf sur rate limit.
-      if (/rate limit/i.test(error.message)) {
-        toast.error("Trop de tentatives. Réessaie dans quelques minutes.");
-        return;
-      }
+    if (error && /rate limit/i.test(error.message)) {
+      setRateLimited(true);
+      return;
     }
+    // On n'expose pas l'existence du compte : succès dans tous les autres cas.
     setSent(true);
   };
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background via-background to-secondary/40 px-4 py-10">
-      <div className="w-full max-w-md">
-        <Link to="/" className="mb-8 flex items-center justify-center">
-          <Logo />
-        </Link>
+    <AuthShell>
+      <AuthStepper steps={STEPS} current={sent ? 1 : 0} className="mb-8" />
 
-        <div className="rounded-2xl border border-hairline bg-card p-6 shadow-sm sm:p-8">
-          {sent ? (
-            <div className="text-center">
-              <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary-50 text-primary">
-                <MailCheck className="h-6 w-6" />
-              </div>
-              <h1 className="font-display text-2xl font-bold tracking-tight text-foreground">
-                Vérifie ta boîte mail
-              </h1>
-              <p className="mt-2 text-sm text-muted-foreground">
-                Si un compte existe pour <span className="font-semibold text-foreground">{email}</span>, un lien de réinitialisation vient d'être envoyé. Il expire dans 1 heure.
-              </p>
-              <Link
-                to="/auth"
-                className="mt-6 inline-flex items-center gap-1.5 text-sm font-semibold text-primary hover:underline"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Retour à la connexion
-              </Link>
-            </div>
-          ) : (
-            <>
-              <h1 className="font-display text-2xl font-bold tracking-tight text-foreground">
-                Mot de passe oublié
-              </h1>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Saisis ton email : nous t'enverrons un lien pour définir un nouveau mot de passe.
-              </p>
+      {sent ? (
+        <>
+          <header className="mb-6">
+            <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+              Vérifiez votre boîte mail
+            </h1>
+            <p className="mt-2 text-sm text-foreground/60">
+              Nous vous avons envoyé les instructions de réinitialisation.
+            </p>
+          </header>
 
-              <form onSubmit={handleSubmit} className="mt-6 space-y-5">
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    autoComplete="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                  />
-                </div>
-                <Button type="submit" className="w-full" disabled={submitting}>
-                  {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Envoyer le lien
-                </Button>
-              </form>
+          <AuthAlert variant="success" title="Email envoyé">
+            Si un compte existe pour{" "}
+            <span className="font-semibold text-foreground">{email}</span>, un lien de
+            réinitialisation vient d'être envoyé. Il expire dans 1 heure.
+          </AuthAlert>
 
-              <Link
-                to="/auth"
-                className="mt-6 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Retour à la connexion
-              </Link>
-            </>
+          <div className="mt-8">
+            <Link
+              to="/auth"
+              className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary hover:underline"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Retour à la connexion
+            </Link>
+          </div>
+        </>
+      ) : (
+        <>
+          <header className="mb-8">
+            <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+              Mot de passe oublié
+            </h1>
+            <p className="mt-2 text-sm text-foreground/60">
+              Saisissez votre email : nous vous enverrons un lien pour définir un nouveau mot de
+              passe.
+            </p>
+          </header>
+
+          {rateLimited && (
+            <AuthAlert variant="error" title="Trop de tentatives" className="mb-5">
+              Attendez quelques minutes avant de réessayer.
+            </AuthAlert>
           )}
-        </div>
-      </div>
-    </main>
+
+          <form onSubmit={handleSubmit} className="space-y-5" noValidate>
+            <div className="space-y-1.5">
+              <label htmlFor="fp-email" className={authFieldLabel}>Email</label>
+              <input
+                id="fp-email"
+                type="email"
+                autoComplete="email"
+                value={email}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  if (fieldError) setFieldError(null);
+                }}
+                placeholder="nom@entreprise.com"
+                required
+                aria-invalid={!!fieldError}
+                className={authFieldInput}
+              />
+              {fieldError && (
+                <p className="pt-1 text-[12px] font-medium text-destructive">{fieldError}</p>
+              )}
+            </div>
+
+            <button type="submit" disabled={submitting} className={authPrimaryButton}>
+              {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
+              Envoyer le lien de réinitialisation
+            </button>
+          </form>
+
+          <div className="mt-8">
+            <Link
+              to="/auth"
+              className="inline-flex items-center gap-1.5 text-sm text-foreground/60 hover:text-foreground"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Retour à la connexion
+            </Link>
+          </div>
+        </>
+      )}
+    </AuthShell>
   );
 }
