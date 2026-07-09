@@ -244,14 +244,6 @@ async function handleWebhook(req: Request): Promise<Response> {
 
   const messageId = crypto.randomUUID()
 
-  // Log pending BEFORE enqueue so we have a record even if enqueue crashes
-  await supabase.from('email_send_log').insert({
-    message_id: messageId,
-    template_name: emailType,
-    recipient_email: payload.data.email,
-    status: 'pending',
-  })
-
   // Send directly via Resend gateway (Hostinger DNS does not support NS
   // delegation required by Lovable Emails; the Resend connector already
   // sends from the verified domain tontinedigitale.com).
