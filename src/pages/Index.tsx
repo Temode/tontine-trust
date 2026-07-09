@@ -588,7 +588,7 @@ function Testimonials() {
     { quote: "\"On a créé une tontine entre collègues du bureau. L'application est simple à utiliser et le paiement par Orange Money est instantané. Je recommande !\"", initials: "AC", name: "Aissatou Camara", role: "Comptable, Kaloum", avatarBg: "rgb(33,193,92)" },
   ];
   return (
-    <section style={{ background: C.slate50, padding: t ? "60px 20px" : "84px 64px", textAlign: "center" }}>
+    <section style={{ background: C.slate50, padding: t ? "60px 16px" : "84px 64px", textAlign: "center" }}>
       <Badge text="Témoignages" bg="rgb(230,243,243)" color={C.amberText} />
       <h2 style={{ fontFamily: FONT, fontWeight: 700, fontSize: t ? 32 : 48, color: C.slate900, margin: "24px 0 48px" }}>Ce que disent nos utilisateurs</h2>
       <div style={{ display: "flex", flexDirection: t ? "column" : "row", gap: 28, maxWidth: 1310, margin: "0 auto", textAlign: "left" }}>{items.map((it) => <TestimonialCard key={it.name} {...it} />)}</div>
@@ -599,18 +599,19 @@ function Testimonials() {
 function CTA() {
   const vw = useVW();
   const t = vw <= 720;
+  const cta = useCtaTarget();
   return (
     <section style={{ background: "#fff", padding: t ? "60px 16px" : "114px 65px" }}>
       <div style={{ maxWidth: 1310, margin: "0 auto", borderRadius: t ? 32 : 56, background: C.tealGrad, padding: t ? "48px 24px" : "68px 40px", textAlign: "center" }}>
         <h2 style={{ fontFamily: FONT, fontWeight: 700, fontSize: t ? 28 : 40, color: "#fff", marginBottom: 20 }}>Prêt à digitaliser vos tontines ?</h2>
-        <p style={{ fontFamily: FONT, fontWeight: 400, fontSize: 22, lineHeight: 1.4, color: "rgb(204,242,244)", maxWidth: 900, margin: "0 auto 32px" }}>Rejoignez des milliers d'utilisateurs qui font déjà confiance à Tontine Digital pour gérer leurs épargnes collectives en toute sécurité.</p>
-        <div style={{ display: "flex", gap: 31, justifyContent: "center", flexWrap: "wrap" }}>
-          <Link to="/auth" style={{ textDecoration: "none", display: "inline-flex", alignItems: "center", border: "none", cursor: "pointer", borderRadius: 16, padding: "20px 30px", background: "#fff", fontFamily: FONT, fontWeight: 600, fontSize: 20, color: C.slate500 }}>Créer mon compte gratuit</Link>
-          <a href="tel:+224" style={{ textDecoration: "none", cursor: "pointer", borderRadius: 16, padding: "20px 30px", background: "rgb(43,106,108)", border: "0.5px solid rgb(148,163,184)", fontFamily: FONT, fontWeight: 600, fontSize: 20, color: "rgb(230,243,243)", display: "inline-flex", alignItems: "center", gap: 10 }}>
+        <p style={{ fontFamily: FONT, fontWeight: 400, fontSize: t ? 18 : 22, lineHeight: 1.4, color: "rgb(204,242,244)", maxWidth: 900, margin: "0 auto 32px" }}>Rejoignez des milliers d'utilisateurs qui font déjà confiance à Tontine Digital pour gérer leurs épargnes collectives en toute sécurité.</p>
+        <div style={{ display: "flex", gap: t ? 12 : 31, justifyContent: "center", flexWrap: "wrap" }}>
+          <Link to={cta.href} style={{ textDecoration: "none", display: "inline-flex", alignItems: "center", justifyContent: "center", border: "none", cursor: "pointer", borderRadius: 16, padding: "20px 30px", background: "#fff", fontFamily: FONT, fontWeight: 600, fontSize: 20, color: C.slate500 }}>{cta.heroLabel}</Link>
+          <a href="tel:+224" style={{ textDecoration: "none", cursor: "pointer", borderRadius: 16, padding: "20px 30px", background: "rgb(43,106,108)", border: "0.5px solid rgb(148,163,184)", fontFamily: FONT, fontWeight: 600, fontSize: 20, color: "rgb(230,243,243)", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
             {Ico.phone("#e6f3f3")} Nous contacter
           </a>
         </div>
-        <div style={{ fontFamily: FONT, fontWeight: 400, fontSize: 20, color: "rgb(152,227,231)", marginTop: 25 }}>✓ Gratuit pour commencer&nbsp;&nbsp;&nbsp;&nbsp;✓ Aucune carte bancaire requise&nbsp;&nbsp;&nbsp;&nbsp;✓ Support 24/7</div>
+        <div style={{ fontFamily: FONT, fontWeight: 400, fontSize: t ? 16 : 20, color: "rgb(152,227,231)", marginTop: 25 }}>✓ Gratuit pour commencer&nbsp;&nbsp;&nbsp;&nbsp;✓ Aucune carte bancaire requise&nbsp;&nbsp;&nbsp;&nbsp;✓ Support 24/7</div>
       </div>
     </section>
   );
