@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { z } from "zod";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
+import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import {
   AuthShell,
   authFieldInput,
@@ -11,10 +12,12 @@ import {
 } from "@/components/auth/AuthShell";
 import { AuthStepper } from "@/components/auth/AuthStepper";
 import { AuthAlert } from "@/components/auth/AuthAlert";
-import { supabase } from "@/integrations/supabase/client";
+import { invokeAuthOtp } from "@/lib/authOtp";
 
 const schema = z
   .object({
+    email: z.string().trim().email("Email invalide").max(255),
+    code: z.string().regex(/^\d{6}$/, "Code à 6 chiffres requis"),
     password: z.string().min(8, "Au moins 8 caractères").max(72),
     confirm: z.string().min(8, "Au moins 8 caractères").max(72),
   })
@@ -31,54 +34,58 @@ const STEPS = [
 
 export default function ResetPassword() {
   const navigate = useNavigate();
-  const [ready, setReady] = useState(false);
-  const [hasSession, setHasSession] = useState(false);
+  const location = useLocation() as { state?: { email?: string } };
+  const [params] = useSearchParams();
+  const initialEmail = useMemo(
+    () => location.state?.email ?? params.get("email") ?? "",
+    [location.state?.email, params],
+  );
+  const [email, setEmail] = useState(initialEmail);
+  const [code, setCode] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [errors, setErrors] = useState<{ password?: string; confirm?: string; global?: string }>({});
+  const [errors, setErrors] = useState<{
+    email?: string;
+    code?: string;
+    password?: string;
+    confirm?: string;
+    global?: string;
+  }>({});
   const [done, setDone] = useState(false);
 
   useEffect(() => {
     document.title = "Nouveau mot de passe · Tontine Digital";
   }, []);
 
-  useEffect(() => {
-    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === "PASSWORD_RECOVERY" || session) {
-        setHasSession(true);
-      }
-    });
-    supabase.auth.getSession().then(({ data }) => {
-      setHasSession(!!data.session);
-      setReady(true);
-    });
-    return () => sub.subscription.unsubscribe();
-  }, []);
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrors({});
-    const parsed = schema.safeParse({ password, confirm });
+    const parsed = schema.safeParse({ email, code, password, confirm });
     if (!parsed.success) {
       const fieldErrs: typeof errors = {};
       for (const issue of parsed.error.issues) {
-        const key = issue.path[0] as "password" | "confirm";
+        const key = issue.path[0] as "email" | "code" | "password" | "confirm";
         if (!fieldErrs[key]) fieldErrs[key] = issue.message;
       }
       setErrors(fieldErrs);
       return;
     }
     setSubmitting(true);
-    const { error } = await supabase.auth.updateUser({ password: parsed.data.password });
+    const { error } = await invokeAuthOtp({
+      action: "recovery_complete",
+      email: parsed.data.email,
+      token: parsed.data.code,
+      password: parsed.data.password,
+    });
     setSubmitting(false);
     if (error) {
-      setErrors({ global: error.message });
+      setErrors({ global: error });
       return;
     }
     setDone(true);
     toast.success("Mot de passe mis à jour");
-    setTimeout(() => navigate("/dashboard", { replace: true }), 1400);
+    setTimeout(() => navigate("/auth", { replace: true }), 1400);
   };
 
   const currentStep = done ? 2 : 1;
@@ -87,44 +94,14 @@ export default function ResetPassword() {
     <AuthShell>
       <AuthStepper steps={STEPS} current={currentStep} className="mb-8" />
 
-      {!ready ? (
-        <div className="space-y-4" aria-busy="true">
-          <div className="h-9 w-56 animate-pulse rounded bg-foreground/5" />
-          <div className="h-4 w-72 animate-pulse rounded bg-foreground/5" />
-          <div className="mt-6 h-11 w-full animate-pulse rounded bg-foreground/5" />
-          <div className="h-11 w-full animate-pulse rounded bg-foreground/5" />
-          <div className="h-11 w-full animate-pulse rounded bg-foreground/5" />
-        </div>
-      ) : !hasSession ? (
-        <>
-          <header className="mb-6">
-            <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
-              Lien invalide ou expiré
-            </h1>
-            <p className="mt-2 text-sm text-foreground/60">
-              Ce lien de réinitialisation n'est plus valide. Demandez-en un nouveau.
-            </p>
-          </header>
-
-          <AuthAlert variant="error" title="Réinitialisation impossible">
-            Les liens expirent au bout d'une heure et ne peuvent être utilisés qu'une seule fois.
-          </AuthAlert>
-
-          <Link
-            to="/auth/mot-de-passe-oublie"
-            className={`${authPrimaryButton} mt-6`}
-          >
-            Redemander un lien
-          </Link>
-        </>
-      ) : done ? (
+      {done ? (
         <>
           <header className="mb-6">
             <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
               Mot de passe mis à jour
             </h1>
             <p className="mt-2 text-sm text-foreground/60">
-              Redirection vers votre espace en cours…
+              Redirection vers la connexion en cours…
             </p>
           </header>
           <AuthAlert variant="success" title="Modification confirmée">
@@ -138,7 +115,7 @@ export default function ResetPassword() {
               Nouveau mot de passe
             </h1>
             <p className="mt-2 text-sm text-foreground/60">
-              Choisissez un mot de passe solide, d'au moins 8 caractères.
+              Saisissez le code reçu par email puis choisissez un mot de passe solide.
             </p>
           </header>
 
@@ -149,6 +126,52 @@ export default function ResetPassword() {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-5" noValidate>
+            <div className="space-y-1.5">
+              <label htmlFor="rp-email" className={authFieldLabel}>Email</label>
+              <input
+                id="rp-email"
+                type="email"
+                autoComplete="email"
+                value={email}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  if (errors.email) setErrors((p) => ({ ...p, email: undefined }));
+                }}
+                required
+                aria-invalid={!!errors.email}
+                className={authFieldInput}
+              />
+              {errors.email && (
+                <p className="pt-1 text-[12px] font-medium text-destructive">{errors.email}</p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <p className={authFieldLabel}>Code de réinitialisation</p>
+              <InputOTP
+                maxLength={6}
+                value={code}
+                onChange={(v) => {
+                  setCode(v);
+                  if (errors.code) setErrors((p) => ({ ...p, code: undefined }));
+                }}
+                containerClassName="gap-2 sm:gap-3"
+              >
+                <InputOTPGroup className="gap-2 sm:gap-3">
+                  {[0, 1, 2, 3, 4, 5].map((i) => (
+                    <InputOTPSlot
+                      key={i}
+                      index={i}
+                      className="h-12 w-10 rounded-md border-foreground/15 bg-white text-xl font-bold tabular-nums text-foreground shadow-sm focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 sm:h-14 sm:w-12"
+                    />
+                  ))}
+                </InputOTPGroup>
+              </InputOTP>
+              {errors.code && (
+                <p className="pt-1 text-[12px] font-medium text-destructive">{errors.code}</p>
+              )}
+            </div>
+
             <div className="space-y-1.5">
               <label htmlFor="pw" className={authFieldLabel}>Nouveau mot de passe</label>
               <input
@@ -194,6 +217,15 @@ export default function ResetPassword() {
               Mettre à jour le mot de passe
             </button>
           </form>
+
+          <div className="mt-8">
+            <Link
+              to="/auth/mot-de-passe-oublie"
+              className="text-[12px] text-foreground/50 hover:text-foreground/80"
+            >
+              Demander un nouveau code
+            </Link>
+          </div>
         </>
       )}
     </AuthShell>
