@@ -1,45 +1,88 @@
+## Objectif
 
-## Observations
+Compléter le flux d'authentification Tontine Digital avec:
+1. Réinitialisation du mot de passe (lien email + page nouveau mot de passe).
+2. Vérification d'email par code OTP 6 chiffres après inscription, avec renvoi possible après 60s.
+3. Protection stricte des routes privées (déjà quasi-en place, à vérifier + polir).
 
-- **`/auth` est déjà implémenté** (`src/pages/Auth.tsx` + `src/hooks/useAuth.tsx`) : onglets Connexion / Inscription, validation Zod client (email, mot de passe ≥ 8, nom ≥ 2, téléphone optionnel), validation serveur via Lovable Cloud Auth, création automatique du profil, redirection selon rôle (`super_admin` → `/admin/overview`, sinon `/dashboard`), gestion des erreurs traduites. **Rien à refaire** — je le laisse tel quel.
-- Les CTA de la landing pointent tous vers `/auth` sans tenir compte de l'état d'authentification.
-- La landing utilise des styles inline (fidélité 1:1 avec la maquette Figma), pas Shadcn/UI. Je vais donc conserver la palette et les espacements Figma tout en améliorant le responsive — l'énoncé "styles Shadcn/UI" ne s'applique pas ici (voir note plus bas).
+Fidèle à la doctrine : bleu sarcelle `#0D7377` + or `#E8AA14`, `font-display` bold tracking-tight, une seule action primaire par écran, beaucoup d'air, tokens sémantiques uniquement, skeletons plutôt que spinners.
 
-## Portée
+## 1. Mot de passe oublié
 
-Un seul fichier touché : **`src/pages/Index.tsx`**. Aucun changement backend, aucun changement à `/auth`, aucun autre écran.
+### Nouvelle page `/auth/mot-de-passe-oublie` (`src/pages/ForgotPassword.tsx`)
+- Formulaire minimal: email + un seul CTA "Envoyer le lien".
+- Validation client Zod (email, max 255).
+- Appelle `supabase.auth.resetPasswordForEmail(email, { redirectTo: ${origin}/auth/reinitialiser })`.
+- État de succès non-devinable : "Si un compte existe, un lien vient d'être envoyé à cet email" (anti-énumération → validation serveur implicite via Supabase Auth, qui applique aussi rate-limit).
+- Lien discret "Retour à la connexion".
 
-## 1. CTA sensibles à l'état d'authentification
+### Nouvelle page `/auth/reinitialiser` (`src/pages/ResetPassword.tsx`)
+- Publique (pas derrière ProtectedRoute).
+- Détecte `type=recovery` (hash Supabase). Écoute `onAuthStateChange` pour l'événement `PASSWORD_RECOVERY` afin de récupérer la session temporaire.
+- Deux champs: nouveau mot de passe + confirmation. Zod: min 8, max 72, égalité des deux champs.
+- Appel `supabase.auth.updateUser({ password })` → validation serveur (Supabase).
+- Succès → redirige vers `/dashboard` (session déjà active) avec toast.
+- Erreur si token expiré → CTA "Redemander un lien".
 
-- Lire `user` et `loading` via `useAuth()`.
-- Ajouter un helper `ctaHref` :
-  - non connecté → `/auth`
-  - connecté → `/dashboard` (ou `/admin/overview` si `super_admin`)
-- Appliquer à tous les CTA de la landing : "Commencer" (header), "Créer mon compte gratuit" (hero + CTA final), "Créer mon premier groupe" (comment ça marche).
-- Header : quand l'utilisateur est connecté, le lien texte "Se connecter" devient **"Mon tableau de bord"** et le bouton "Commencer" devient **"Ouvrir mon espace"** — même styles, seuls le libellé et la cible changent.
-- Rien de bloquant pendant `loading` : la landing s'affiche immédiatement, les CTA prennent leur libellé final dès que `user` est résolu (souvent <100ms).
+### Lien depuis `/auth`
+- Ajouter sous le champ mot de passe de l'onglet "Se connecter" : petit lien `text-sm text-primary` "Mot de passe oublié ?" → `/auth/mot-de-passe-oublie`.
 
-## 2. Responsive mobile / tablette / desktop
+## 2. Vérification email par OTP 6 chiffres
 
-Le fichier utilise déjà `useVW()` avec des breakpoints (`≤620`, `≤720`, `≤860`, `≤980`). Points à corriger observés sur la maquette actuelle :
+Supabase envoie déjà, dans l'email de confirmation d'inscription, à la fois un lien et un token 6 chiffres (`{{ .Token }}`). On exploite le token via `supabase.auth.verifyOtp({ email, token, type: 'signup' })`.
 
-- **Header mobile (<860)** : le nom "Tontine Digitale" peut chevaucher le bouton — réduire à `Logo` seul + bouton, cacher le texte de marque sous 420px.
-- **Hero mobile (<620)** : mockup téléphone actuellement scale 0.56 ; le placer en dessous du bloc texte, centré, avec `overflow: hidden` sur le wrapper pour éviter les débordements horizontaux (les cartes flottantes du téléphone débordent aujourd'hui à droite).
-- **Sections `padding` horizontal** : passer partout à un minimum `16px` mobile (aujourd'hui `20px` OK mais Security/HowItWorks utilisent `62-69px` en desktop qui reste hérité en tablet ≤980) → clamp entre 20 et 84px selon `t`/`m`.
-- **Grid "Fonctionnalités" et "Comment ça marche"** : ajouter un breakpoint tablette 720–980 pour passer en 2 colonnes au lieu de 1 sur tablette portrait.
-- **Footer (<860)** : la colonne marque `width: 476` casse déjà — je la passe en 100% mobile (déjà fait à l'étape précédente), mais aussi replacer la ligne "Paiements sécurisés via" en wrap propre (les 3 badges peuvent déborder).
-- **Testimonials tablette** : garder 1 colonne <980 (déjà OK), mais ajuster le padding vertical à `60px` sur mobile pour homogénéité.
-- **CTA final mobile** : gap 31 → 16, boutons pleine largeur (`flex: 1 1 100%`).
-- **Titre Hero** : ajouter un breakpoint intermédiaire ~460 pour éviter le débordement de "Digitalisez vos tontines en toute confiance" sur petits mobiles.
+### Modification `useAuth.signUp`
+- Retirer `emailRedirectTo` (on veut pousser l'utilisateur à saisir le code plutôt que cliquer un lien).
+- Continuer à renvoyer `needsEmailConfirmation`.
 
-Les couleurs, typographies, ombres, radius **ne changent pas** — seuls padding, gap, flexDirection, wrap, tailles de police aux breakpoints sont ajustés.
+### Nouvelle page `/auth/verifier-email` (`src/pages/VerifyEmail.tsx`)
+- Reçoit l'email via `location.state.email` (fallback: query string `?email=`).
+- Design "infrastructure financière":
+  - Carte centrée `max-w-md`, coins arrondis `rounded-2xl`, border hairline, ombre légère.
+  - En-tête: logo, `font-display text-2xl` "Vérifie ton email", sous-titre `text-sm text-muted-foreground` avec email masqué (`j***@domaine.com`).
+  - Bloc OTP: 6 slots via `<InputOTP>` de `@/components/ui/input-otp` (shadcn, déjà dispo), taille généreuse (`h-14 w-12 text-2xl font-display tabular-nums`), gap 3, focus ring primary. Auto-submit dès 6 chiffres saisis.
+  - État "vérifié" : icône check dans pastille `bg-primary-50`, message "Email vérifié", redirection auto vers `/dashboard` après 1.2s.
+  - État "en attente" : par défaut, sous-titre "Nous avons envoyé un code à 6 chiffres…".
+  - État "erreur" : message rouge sous les slots, slots reset.
+  - Bouton "Renvoyer le code" désactivé, avec compte à rebours `Renvoyer dans 60s`. Après 60s → actif; nouveau clic redémarre le compteur.
+  - Renvoi via `supabase.auth.resend({ type: 'signup', email })`. Gère erreur `over_email_send_rate_limit` avec message clair.
+  - Une seule action primaire visible (Vérifier — mais auto-submit, donc CTA compact secondaire "Vérifier" en dessous des slots pour accessibilité clavier).
+  - Lien discret "Utiliser un autre email" → retour à `/auth` tab signup.
 
-## Note sur "styles Shadcn/UI"
+### Redirection après signup
+- Dans `Auth.tsx` `handleSignUp`, si `needsEmailConfirmation` → `navigate('/auth/verifier-email', { state: { email } })` au lieu de basculer l'onglet.
+- Si l'utilisateur revient à `/auth` avec une session partielle non confirmée: laisser tel quel, Supabase gère.
 
-La landing a été implémentée en styles inline pour être fidèle à 100 % à la maquette Figma (validé à l'étape précédente). Convertir vers Shadcn/UI casserait la fidélité et impliquerait de réécrire l'ensemble avec des tokens sémantiques. Je conserve donc les styles inline actuels. Si tu veux à la place une refonte complète en Shadcn/UI (perte de fidélité pixel), dis-le et je fais une passe séparée.
+### Badge "email vérifié / en attente" pour l'utilisateur connecté
+- Petit indicateur dans le menu avatar `AppShell` (si l'espace le permet, sinon dans `/profil`): pastille `bg-primary-50 text-primary` "Email vérifié" ou `bg-amber-50 text-amber-700` "Email en attente" selon `user.email_confirmed_at`. CTA "Renvoyer" qui repointe vers `/auth/verifier-email` avec l'email prérempli. (Uniquement dans `/profil` pour rester sobre — pas dans la TopBar.)
 
-## Vérification
+## 3. Protection des routes non connectées
 
-- Ouvrir `/` en desktop (1280px), tablette (768px), mobile (390px) et comparer.
-- Se connecter puis revenir sur `/` → CTA affichent "Ouvrir mon espace" / "Mon tableau de bord" et pointent vers `/dashboard`.
-- Se déconnecter → CTA reviennent à "Commencer" / "Se connecter" → `/auth`.
+Déjà en place via `ProtectedRoute` (App.tsx wraps `/dashboard`, `/groupes`, `/admin/*`, etc.). Vérifications additionnelles:
+- Ajouter `/auth/reinitialiser` en route publique (hors ProtectedRoute).
+- Ajouter `/auth/verifier-email` en route publique.
+- Ajouter `/auth/mot-de-passe-oublie` en route publique.
+- Confirmer que la redirection `state.from` fonctionne pour un utilisateur qui atterrit sur une deep-link privée (déjà OK dans Auth.tsx via `fromPath`).
+- Aucune route sensible ne doit rester en dehors de `ProtectedRoute` (audit rapide : toutes les routes app/admin sont déjà dedans dans `App.tsx`).
+
+## Fichiers créés
+
+- `src/pages/ForgotPassword.tsx`
+- `src/pages/ResetPassword.tsx`
+- `src/pages/VerifyEmail.tsx`
+
+## Fichiers modifiés
+
+- `src/App.tsx` — 3 nouvelles routes publiques.
+- `src/pages/Auth.tsx` — lien "Mot de passe oublié", redirection vers `/auth/verifier-email` après signup.
+- `src/hooks/useAuth.tsx` — retirer `emailRedirectTo` du signUp (on privilégie l'OTP).
+- `src/pages/Profile.tsx` — bloc discret "Email vérifié / en attente" + CTA renvoi.
+
+## Détails techniques
+
+- OTP: `import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp"`. Composant shadcn déjà présent dans le projet.
+- Validation serveur: assurée par Supabase Auth (rate-limit, token hashé, expiration ~1h par défaut). Pas de fonction edge custom nécessaire.
+- Rate-limit renvoi email: géré côté Supabase; message d'erreur mappé dans `mapAuthError`.
+- Aucune modif de config auth (`configure_auth`) — on garde les paramètres actuels. La confirmation email doit rester activée côté projet pour que le flux OTP soit pertinent (déjà le cas).
+- Skeleton pendant le check de la session recovery sur `/auth/reinitialiser` (pas de spinner).
+- Aucune couleur hardcodée: on utilise `text-primary`, `bg-primary-50`, `text-amber-700`, etc., déjà définis dans `tailwind.config.ts`.
