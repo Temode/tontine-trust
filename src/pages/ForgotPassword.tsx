@@ -73,8 +73,8 @@ export default function ForgotPassword() {
 
           <AuthAlert variant="success" title="Email envoyé">
             Si un compte existe pour{" "}
-            <span className="font-semibold text-foreground">{email}</span>, un lien de
-            code à 6 chiffres vient d'être envoyé. Il expire dans 1 heure.
+            <span className="font-semibold text-foreground">{email}</span>, un code à 6 chiffres
+            vient d'être envoyé. Il expire dans 1 heure.
           </AuthAlert>
 
           <div className="mt-8 flex flex-col gap-4">
