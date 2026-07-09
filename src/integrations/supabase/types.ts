@@ -14,6 +14,24 @@ export type Database = {
   }
   public: {
     Tables: {
+      _email_trigger_debug: {
+        Row: {
+          info: Json | null
+          step: string | null
+          ts: string | null
+        }
+        Insert: {
+          info?: Json | null
+          step?: string | null
+          ts?: string | null
+        }
+        Update: {
+          info?: Json | null
+          step?: string | null
+          ts?: string | null
+        }
+        Relationships: []
+      }
       app_terms_versions: {
         Row: {
           content: string
