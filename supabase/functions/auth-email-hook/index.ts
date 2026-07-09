@@ -17,12 +17,12 @@ const corsHeaders = {
 }
 
 const EMAIL_SUBJECTS: Record<string, string> = {
-  signup: 'Confirm your email',
-  invite: "You've been invited",
-  magiclink: 'Your login link',
-  recovery: 'Reset your password',
-  email_change: 'Confirm your new email',
-  reauthentication: 'Your verification code',
+  signup: 'Votre code de vérification Tontine Digitale',
+  invite: 'Vous êtes invité·e sur Tontine Digitale',
+  magiclink: 'Votre lien de connexion Tontine Digitale',
+  recovery: 'Réinitialiser votre mot de passe',
+  email_change: 'Confirmez votre nouvelle adresse email',
+  reauthentication: 'Votre code de vérification',
 }
 
 // Template mapping
@@ -37,9 +37,9 @@ const EMAIL_TEMPLATES: Record<string, React.ComponentType<any>> = {
 
 // Configuration
 const SITE_NAME = "tontine-digitale"
-const SENDER_DOMAIN = "notify.tontinedigitale.com"
 const ROOT_DOMAIN = "tontinedigitale.com"
-const FROM_DOMAIN = "tontinedigitale.com" // Domain shown in From address (may be root or sender subdomain)
+const FROM_ADDRESS = `Tontine Digitale <noreply@${ROOT_DOMAIN}>`
+const RESEND_GATEWAY_URL = 'https://connector-gateway.lovable.dev/resend/emails'
 
 // Sample data for preview mode ONLY (not used in actual email sending).
 // URLs are baked in at scaffold time from the project's real data.
@@ -244,51 +244,80 @@ async function handleWebhook(req: Request): Promise<Response> {
 
   const messageId = crypto.randomUUID()
 
-  // Log pending BEFORE enqueue so we have a record even if enqueue crashes
-  await supabase.from('email_send_log').insert({
-    message_id: messageId,
-    template_name: emailType,
-    recipient_email: payload.data.email,
-    status: 'pending',
-  })
+  // Send directly via Resend gateway (Hostinger DNS does not support NS
+  // delegation required by Lovable Emails; the Resend connector already
+  // sends from the verified domain tontinedigitale.com).
+  const lovableApiKey = Deno.env.get('LOVABLE_API_KEY')
+  const resendApiKey = Deno.env.get('RESEND_API_KEY')
 
-  const { error: enqueueError } = await supabase.rpc('enqueue_email', {
-    queue_name: 'auth_emails',
-    payload: {
-      run_id,
-      message_id: messageId,
-      to: payload.data.email,
-      from: `${SITE_NAME} <noreply@${FROM_DOMAIN}>`,
-      sender_domain: SENDER_DOMAIN,
-      subject: EMAIL_SUBJECTS[emailType] || 'Notification',
-      html,
-      text,
-      purpose: 'transactional',
-      label: emailType,
-      queued_at: new Date().toISOString(),
-    },
-  })
-
-  if (enqueueError) {
-    console.error('Failed to enqueue auth email', { error: enqueueError, run_id, emailType })
+  if (!lovableApiKey || !resendApiKey) {
+    console.error('Missing Resend gateway credentials', { run_id })
     await supabase.from('email_send_log').insert({
       message_id: messageId,
       template_name: emailType,
       recipient_email: payload.data.email,
       status: 'failed',
-      error_message: 'Failed to enqueue email',
+      error_message: 'Missing Resend gateway credentials',
     })
-    return new Response(JSON.stringify({ error: 'Failed to enqueue email' }), {
+    return new Response(JSON.stringify({ error: 'Email service not configured' }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   }
 
-  console.log('Auth email enqueued', { emailType, email: payload.data.email, run_id })
+  const resendResponse = await fetch(RESEND_GATEWAY_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${lovableApiKey}`,
+      'X-Connection-Api-Key': resendApiKey,
+    },
+    body: JSON.stringify({
+      from: FROM_ADDRESS,
+      to: [payload.data.email],
+      subject: EMAIL_SUBJECTS[emailType] || 'Notification Tontine Digitale',
+      html,
+      text,
+      headers: { 'X-Entity-Ref-ID': messageId },
+      tags: [{ name: 'category', value: emailType }],
+    }),
+  })
+
+  if (!resendResponse.ok) {
+    const errorBody = await resendResponse.text()
+    console.error('Resend send failed', { status: resendResponse.status, errorBody, run_id, emailType })
+    await supabase.from('email_send_log').insert({
+      message_id: messageId,
+      template_name: emailType,
+      recipient_email: payload.data.email,
+      status: 'failed',
+      error_message: `Resend ${resendResponse.status}: ${errorBody.slice(0, 500)}`,
+    })
+    return new Response(
+      JSON.stringify({ error: 'Failed to send email', status: resendResponse.status, details: errorBody }),
+      { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+    )
+  }
+
+  const resendData = await resendResponse.json().catch(() => ({} as any))
+  await supabase.from('email_send_log').insert({
+    message_id: messageId,
+    template_name: emailType,
+    recipient_email: payload.data.email,
+    status: 'sent',
+    error_message: null,
+  })
+
+  console.log('Auth email sent via Resend', {
+    emailType,
+    email: payload.data.email,
+    run_id,
+    resendId: resendData?.id,
+  })
 
   return new Response(
-    JSON.stringify({ success: true, queued: true }),
-    { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    JSON.stringify({ success: true, sent: true, resendId: resendData?.id }),
+    { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
   )
 }
 

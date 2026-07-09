@@ -1,46 +1,45 @@
-## Diagnostic
+# Contexte
 
-Deux problèmes observés :
+Hostinger ne propose pas le type d'enregistrement **NS** dans son gestionnaire DNS. C'est précisément pour cette raison que nous avions déjà mis en place **Resend** avec le domaine `tontinedigitale.com` vérifié, et que l'envoi d'emails transactionnels fonctionne (capture Resend : emails "Cotisation en retard" livrés depuis `noreply@tontinedigitale.com`).
 
-1. **Expéditeur `Tontine-Trust <no-reply@auth.lovable.cloud>`** au lieu de `no-reply@` sur notre domaine configuré dans Resend.
-2. **Aucun code à 6 chiffres** dans l'email — juste un bouton « Verify Email ». Or notre page `/auth/verifier-email` attend un OTP à 6 chiffres (via `supabase.auth.verifyOtp({ type: "signup" })`).
+Le problème actuel : le hook `auth-email-hook` que nous avons déployé pousse les emails dans la file **Lovable Emails**, qui exige une délégation NS vers `notify.tontinedigitale.com`. Cette délégation ne peut pas être créée chez Hostinger → les emails d'authentification (code OTP à 6 chiffres) ne partent pas.
 
-**Cause** : aucun template d'email d'auth personnalisé n'a été scaffoldé. Supabase envoie donc son email par défaut (lien magique, expéditeur `auth.lovable.cloud`), ce qui contourne à la fois notre domaine Resend et notre flux OTP.
+Les enregistrements MX que vous avez ajoutés ne remplacent pas des NS — MX sert à recevoir du mail, NS sert à déléguer une zone DNS. Techniquement, ces MX n'ont aucun effet sur la vérification de Lovable Emails.
 
-## Plan
+# Solution proposée
 
-### 1. Scaffolder les templates d'emails d'auth (managed Lovable)
-Utiliser `email_domain--scaffold_auth_email_templates` — ceci crée :
-- `supabase/functions/auth-email-hook/index.ts` (le hook Supabase qui prend le relais des envois auth)
-- `supabase/functions/_shared/email-templates/*.tsx` (6 templates React Email)
+Faire envoyer les emails d'auth par **Resend** (comme les emails transactionnels qui marchent déjà), au lieu de la file Lovable Emails. Résultat : les codes OTP arrivent depuis `Tontine Digitale <noreply@tontinedigitale.com>` avec le design déjà harmonisé.
 
-Les emails partiront alors du domaine déjà vérifié dans Resend, avec le nom d'expéditeur « Tontine Digitale ».
+## Étapes
 
-### 2. Personnaliser le template `signup.tsx` pour afficher le code à 6 chiffres
-Injecter `{{ .Token }}` (fourni automatiquement par Supabase) dans une carte visuelle typographiée « Infrastructure Calme » — grands chiffres tabulaires, teal + or, note « Ce code expire dans 1 heure ». Retirer le CTA « Verify Email » (bouton lien) qui n'a pas de sens dans notre parcours OTP, garder un lien de secours discret.
+1. **Désactiver la file Lovable Emails** pour ce projet (`toggle_project_emails` off) afin que les auth emails ne retombent pas sur le sender par défaut `auth.lovable.cloud`.
 
-### 3. Harmoniser les 5 autres templates
-Appliquer la charte Tontine Digitale (couleurs `--primary` teal `#0D7377`, `--accent` or `#E8AA14`, Inter, radius, wordmark) à :
-- `recovery.tsx` (mot de passe oublié) — afficher aussi le code OTP pour cohérence avec `/auth/reinitialiser-mot-de-passe`
-- `magic-link.tsx`, `invite.tsx`, `email-change.tsx`, `reauthentication.tsx`
+2. **Réécrire `supabase/functions/auth-email-hook/index.ts`** pour :
+   - Conserver la vérification de signature du webhook Supabase Auth (inchangée).
+   - Conserver le rendu des 6 templates React Email existants (`signup`, `recovery`, `magic-link`, `invite`, `email-change`, `reauthentication`) — aucun changement visuel.
+   - Remplacer l'appel `supabase.rpc('enqueue_email', …)` par un `POST` direct à l'API Resend via la gateway de connecteurs Lovable (`connector-gateway.lovable.dev/resend/emails`), en réutilisant la connexion Resend déjà en place.
+   - `from: "Tontine Digitale <noreply@tontinedigitale.com>"`, `subjects` en français (« Votre code de vérification », « Réinitialiser votre mot de passe », etc.).
+   - Journaliser dans `email_send_log` (statut `sent` / `failed`) pour garder la traçabilité admin.
 
-### 4. Déployer
-`supabase--deploy_edge_functions` sur `auth-email-hook`.
+3. **Redéployer** `auth-email-hook`.
 
-### 5. Vérifier
-- Refaire un signup depuis `/auth` avec un email yopmail.
-- Confirmer que l'expéditeur est `no-reply@<domaine-resend>` avec « Tontine Digitale » comme nom.
-- Confirmer que le mail contient bien 6 chiffres lisibles.
-- Saisir le code dans `/auth/verifier-email` → redirection `/dashboard`.
+4. **Vérifier** :
+   - Créer un compte de test avec un yopmail → l'email « Vérifiez votre adresse email » arrive depuis `noreply@tontinedigitale.com` avec le code à 6 chiffres bien visible.
+   - Le code saisi sur `/auth/verifier-email` valide bien le compte.
+   - Idem pour « mot de passe oublié » (code recovery).
+
+## Ce que ça ne change pas
+
+- Les templates React Email restent identiques (charte Tontine Digitale déjà appliquée).
+- Le flux OTP côté frontend (`Auth.tsx`, `VerifyEmail.tsx`, `ResetPassword.tsx`) n'est pas touché.
+- Les emails transactionnels (rappels de cotisation, etc.) continuent d'utiliser leur pipeline actuel.
+
+## Ce qu'il faudra faire côté vous
+
+Rien — la connexion Resend et le domaine `tontinedigitale.com` sont déjà validés. Les MX ajoutés « à la place des NS » chez Hostinger peuvent être retirés (ils ne servent pas à l'envoi sortant), mais ce n'est pas bloquant.
 
 ## Détails techniques
 
-- Aucun code frontend à changer — le flux OTP existe déjà et attend `type: "signup"`.
-- Aucun changement de `useAuth.signUp` ni des routes.
-- Le hook `auth-email-hook` remplace intégralement l'expéditeur par défaut Supabase dès qu'il est déployé, donc les deux problèmes (expéditeur + contenu) sont résolus en une seule opération.
-- DNS déjà vérifié (domaine actif), donc les emails partiront immédiatement après déploiement.
-
-## Fichiers touchés
-
-- **Créés** par le scaffold : `supabase/functions/auth-email-hook/index.ts`, `supabase/functions/auth-email-hook/deno.json`, `supabase/functions/_shared/email-templates/{signup,recovery,magic-link,invite,email-change,reauthentication}.tsx`
-- **Édités** ensuite : les 6 templates (branding + OTP visible sur signup & recovery)
+- Utilisation de `LOVABLE_API_KEY` + `RESEND_API_KEY` (déjà présents comme secrets) via la gateway — pas de clé Resend en clair.
+- Gestion d'erreur : si Resend renvoie ≠ 2xx, on log dans `email_send_log` avec `error_message` et on renvoie 500 pour que Supabase Auth réessaie.
+- Pas de migration SQL nécessaire.
