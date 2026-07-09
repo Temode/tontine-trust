@@ -13,6 +13,9 @@ import { logCrash } from "@/lib/diagnostics/crashLogger";
 
 // Lazy-loaded pages : un import cassé n'efface plus toute l'app.
 const Auth = lazy(() => import("@/pages/Auth"));
+const ForgotPassword = lazy(() => import("@/pages/ForgotPassword"));
+const ResetPassword = lazy(() => import("@/pages/ResetPassword"));
+const VerifyEmail = lazy(() => import("@/pages/VerifyEmail"));
 const Index = lazy(() => import("@/pages/Index"));
 const CreateGroup = lazy(() => import("@/pages/CreateGroup"));
 const Dashboard = lazy(() => import("@/pages/Dashboard"));
@@ -111,6 +114,30 @@ const App = () => (
                   element={
                     <RouteBoundary name="Connexion">
                       <Auth />
+                    </RouteBoundary>
+                  }
+                />
+                <Route
+                  path="/auth/mot-de-passe-oublie"
+                  element={
+                    <RouteBoundary name="Mot de passe oublié">
+                      <ForgotPassword />
+                    </RouteBoundary>
+                  }
+                />
+                <Route
+                  path="/auth/reinitialiser"
+                  element={
+                    <RouteBoundary name="Nouveau mot de passe">
+                      <ResetPassword />
+                    </RouteBoundary>
+                  }
+                />
+                <Route
+                  path="/auth/verifier-email"
+                  element={
+                    <RouteBoundary name="Vérification email">
+                      <VerifyEmail />
                     </RouteBoundary>
                   }
                 />
