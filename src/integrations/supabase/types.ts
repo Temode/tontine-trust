@@ -119,6 +119,48 @@ export type Database = {
         }
         Relationships: []
       }
+      auth_otp_requests: {
+        Row: {
+          consumed_at: string | null
+          created_at: string
+          email: string
+          email_hash: string
+          error_message: string | null
+          expires_at: string
+          id: string
+          provider_message_id: string | null
+          purpose: string
+          status: string
+          token_hash: string | null
+        }
+        Insert: {
+          consumed_at?: string | null
+          created_at?: string
+          email: string
+          email_hash: string
+          error_message?: string | null
+          expires_at?: string
+          id?: string
+          provider_message_id?: string | null
+          purpose: string
+          status?: string
+          token_hash?: string | null
+        }
+        Update: {
+          consumed_at?: string | null
+          created_at?: string
+          email?: string
+          email_hash?: string
+          error_message?: string | null
+          expires_at?: string
+          id?: string
+          provider_message_id?: string | null
+          purpose?: string
+          status?: string
+          token_hash?: string | null
+        }
+        Relationships: []
+      }
       beneficiary_balances: {
         Row: {
           available_amount: number

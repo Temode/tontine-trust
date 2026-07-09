@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from "
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
+import { invokeAuthOtp, mapAuthOtpError } from "@/lib/authOtp";
 
 export type AppRole = Database["public"]["Enums"]["app_role"];
 import { setAuthSnapshot } from "@/lib/diagnostics/crashLogger";
@@ -41,6 +42,17 @@ function mapAuthError(message: string): string {
     return "Les inscriptions sont désactivées dans la config Supabase.";
   if (m.includes("email not confirmed"))
     return "Email non confirmé. Vérifie ta boîte mail.";
+  if ([
+    "invalid_action",
+    "invalid_email",
+    "invalid_payload",
+    "weak_password",
+    "email_exists",
+    "rate_limited",
+    "email_send_failed",
+    "email_not_configured",
+    "server_error",
+  ].includes(m)) return mapAuthOtpError(m);
   return message;
 }
 
@@ -145,16 +157,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signUp: AuthContextValue["signUp"] = async ({ email, password, fullName, phoneNumber }) => {
-    const { data, error } = await supabase.auth.signUp({
+    const { error } = await invokeAuthOtp({
+      action: "signup_start",
       email,
       password,
-      options: {
-        data: { full_name: fullName, phone_number: phoneNumber ?? null },
-      },
+      fullName,
+      phoneNumber: phoneNumber ?? null,
     });
-    if (error) return { error: mapAuthError(error.message), needsEmailConfirmation: false };
-    const needsEmailConfirmation = !data.session && !!data.user;
-    return { error: null, needsEmailConfirmation };
+    if (error) return { error: mapAuthError(error), needsEmailConfirmation: false };
+    return { error: null, needsEmailConfirmation: true };
   };
 
   const signOut = async () => {
