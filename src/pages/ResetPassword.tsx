@@ -2,22 +2,32 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { z } from "zod";
 import { toast } from "sonner";
-import { Loader2, ShieldCheck } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Logo } from "@/components/brand/Logo";
+import { Loader2 } from "lucide-react";
+import {
+  AuthShell,
+  authFieldInput,
+  authFieldLabel,
+  authPrimaryButton,
+} from "@/components/auth/AuthShell";
+import { AuthStepper } from "@/components/auth/AuthStepper";
+import { AuthAlert } from "@/components/auth/AuthAlert";
 import { supabase } from "@/integrations/supabase/client";
 
 const schema = z
   .object({
     password: z.string().min(8, "Au moins 8 caractères").max(72),
-    confirm: z.string().min(8).max(72),
+    confirm: z.string().min(8, "Au moins 8 caractères").max(72),
   })
   .refine((v) => v.password === v.confirm, {
     message: "Les deux mots de passe ne correspondent pas",
     path: ["confirm"],
   });
+
+const STEPS = [
+  { label: "Email" },
+  { label: "Nouveau mot de passe" },
+  { label: "Terminé" },
+];
 
 export default function ResetPassword() {
   const navigate = useNavigate();
@@ -26,13 +36,14 @@ export default function ResetPassword() {
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [errors, setErrors] = useState<{ password?: string; confirm?: string; global?: string }>({});
+  const [done, setDone] = useState(false);
 
   useEffect(() => {
     document.title = "Nouveau mot de passe · Tontine Digital";
   }, []);
 
   useEffect(() => {
-    // Supabase pousse le token dans le hash; onAuthStateChange émet PASSWORD_RECOVERY.
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === "PASSWORD_RECOVERY" || session) {
         setHasSession(true);
@@ -47,96 +58,144 @@ export default function ResetPassword() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setErrors({});
     const parsed = schema.safeParse({ password, confirm });
     if (!parsed.success) {
-      toast.error(parsed.error.issues[0].message);
+      const fieldErrs: typeof errors = {};
+      for (const issue of parsed.error.issues) {
+        const key = issue.path[0] as "password" | "confirm";
+        if (!fieldErrs[key]) fieldErrs[key] = issue.message;
+      }
+      setErrors(fieldErrs);
       return;
     }
     setSubmitting(true);
     const { error } = await supabase.auth.updateUser({ password: parsed.data.password });
     setSubmitting(false);
     if (error) {
-      toast.error(error.message);
+      setErrors({ global: error.message });
       return;
     }
+    setDone(true);
     toast.success("Mot de passe mis à jour");
-    navigate("/dashboard", { replace: true });
+    setTimeout(() => navigate("/dashboard", { replace: true }), 1400);
   };
 
+  const currentStep = done ? 2 : 1;
+
   return (
-    <main className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background via-background to-secondary/40 px-4 py-10">
-      <div className="w-full max-w-md">
-        <Link to="/" className="mb-8 flex items-center justify-center">
-          <Logo />
-        </Link>
+    <AuthShell>
+      <AuthStepper steps={STEPS} current={currentStep} className="mb-8" />
 
-        <div className="rounded-2xl border border-hairline bg-card p-6 shadow-sm sm:p-8">
-          {!ready ? (
-            <div className="space-y-3">
-              <div className="h-6 w-40 animate-pulse rounded bg-muted" />
-              <div className="h-4 w-64 animate-pulse rounded bg-muted" />
-              <div className="mt-6 h-10 w-full animate-pulse rounded bg-muted" />
-              <div className="h-10 w-full animate-pulse rounded bg-muted" />
-            </div>
-          ) : !hasSession ? (
-            <div className="text-center">
-              <h1 className="font-display text-2xl font-bold tracking-tight text-foreground">
-                Lien invalide ou expiré
-              </h1>
-              <p className="mt-2 text-sm text-muted-foreground">
-                Redemande un nouveau lien de réinitialisation.
-              </p>
-              <Link
-                to="/auth/mot-de-passe-oublie"
-                className="mt-6 inline-flex h-10 items-center justify-center rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
-              >
-                Redemander un lien
-              </Link>
-            </div>
-          ) : (
-            <>
-              <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-full bg-primary-50 text-primary">
-                <ShieldCheck className="h-5 w-5" />
-              </div>
-              <h1 className="font-display text-2xl font-bold tracking-tight text-foreground">
-                Nouveau mot de passe
-              </h1>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Choisis un mot de passe solide, au moins 8 caractères.
-              </p>
-
-              <form onSubmit={handleSubmit} className="mt-6 space-y-5">
-                <div className="space-y-2">
-                  <Label htmlFor="pw">Nouveau mot de passe</Label>
-                  <Input
-                    id="pw"
-                    type="password"
-                    autoComplete="new-password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="pw2">Confirmer</Label>
-                  <Input
-                    id="pw2"
-                    type="password"
-                    autoComplete="new-password"
-                    value={confirm}
-                    onChange={(e) => setConfirm(e.target.value)}
-                    required
-                  />
-                </div>
-                <Button type="submit" className="w-full" disabled={submitting}>
-                  {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Mettre à jour
-                </Button>
-              </form>
-            </>
-          )}
+      {!ready ? (
+        <div className="space-y-4" aria-busy="true">
+          <div className="h-9 w-56 animate-pulse rounded bg-foreground/5" />
+          <div className="h-4 w-72 animate-pulse rounded bg-foreground/5" />
+          <div className="mt-6 h-11 w-full animate-pulse rounded bg-foreground/5" />
+          <div className="h-11 w-full animate-pulse rounded bg-foreground/5" />
+          <div className="h-11 w-full animate-pulse rounded bg-foreground/5" />
         </div>
-      </div>
-    </main>
+      ) : !hasSession ? (
+        <>
+          <header className="mb-6">
+            <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+              Lien invalide ou expiré
+            </h1>
+            <p className="mt-2 text-sm text-foreground/60">
+              Ce lien de réinitialisation n'est plus valide. Demandez-en un nouveau.
+            </p>
+          </header>
+
+          <AuthAlert variant="error" title="Réinitialisation impossible">
+            Les liens expirent au bout d'une heure et ne peuvent être utilisés qu'une seule fois.
+          </AuthAlert>
+
+          <Link
+            to="/auth/mot-de-passe-oublie"
+            className={`${authPrimaryButton} mt-6`}
+          >
+            Redemander un lien
+          </Link>
+        </>
+      ) : done ? (
+        <>
+          <header className="mb-6">
+            <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+              Mot de passe mis à jour
+            </h1>
+            <p className="mt-2 text-sm text-foreground/60">
+              Redirection vers votre espace en cours…
+            </p>
+          </header>
+          <AuthAlert variant="success" title="Modification confirmée">
+            Vous pouvez désormais vous connecter avec votre nouveau mot de passe.
+          </AuthAlert>
+        </>
+      ) : (
+        <>
+          <header className="mb-8">
+            <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+              Nouveau mot de passe
+            </h1>
+            <p className="mt-2 text-sm text-foreground/60">
+              Choisissez un mot de passe solide, d'au moins 8 caractères.
+            </p>
+          </header>
+
+          {errors.global && (
+            <AuthAlert variant="error" title="Impossible de mettre à jour" className="mb-5">
+              {errors.global}
+            </AuthAlert>
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-5" noValidate>
+            <div className="space-y-1.5">
+              <label htmlFor="pw" className={authFieldLabel}>Nouveau mot de passe</label>
+              <input
+                id="pw"
+                type="password"
+                autoComplete="new-password"
+                value={password}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  if (errors.password) setErrors((p) => ({ ...p, password: undefined }));
+                }}
+                required
+                aria-invalid={!!errors.password}
+                className={authFieldInput}
+              />
+              {errors.password && (
+                <p className="pt-1 text-[12px] font-medium text-destructive">{errors.password}</p>
+              )}
+            </div>
+
+            <div className="space-y-1.5">
+              <label htmlFor="pw2" className={authFieldLabel}>Confirmer</label>
+              <input
+                id="pw2"
+                type="password"
+                autoComplete="new-password"
+                value={confirm}
+                onChange={(e) => {
+                  setConfirm(e.target.value);
+                  if (errors.confirm) setErrors((p) => ({ ...p, confirm: undefined }));
+                }}
+                required
+                aria-invalid={!!errors.confirm}
+                className={authFieldInput}
+              />
+              {errors.confirm && (
+                <p className="pt-1 text-[12px] font-medium text-destructive">{errors.confirm}</p>
+              )}
+            </div>
+
+            <button type="submit" disabled={submitting} className={authPrimaryButton}>
+              {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
+              Mettre à jour le mot de passe
+            </button>
+          </form>
+        </>
+      )}
+    </AuthShell>
   );
 }
