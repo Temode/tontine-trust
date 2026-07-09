@@ -239,30 +239,34 @@ function PayBadge({ label, bg, color = "#000", w = 72 }: any) {
 function Header() {
   const vw = useVW();
   const m = vw <= 860;
+  const xs = vw <= 420;
+  const cta = useCtaTarget();
   const nav = ["Fonctionnalités", "Comment ça marche", "Sécurité", "FAQ"];
   return (
     <header style={{
       height: 83, borderBottom: `1px solid rgb(241,245,249)`, background: C.white,
-      display: "flex", alignItems: "center", padding: m ? "0 20px" : "0 70px", boxSizing: "border-box",
+      display: "flex", alignItems: "center", padding: m ? "0 16px" : "0 70px", boxSizing: "border-box",
     }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 48, width: "100%", justifyContent: "space-between" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 16, width: "100%", justifyContent: "space-between" }}>
+        <Link to="/" style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0, textDecoration: "none" }}>
           <Logo size={m ? 42 : 49} />
-          <span style={{ fontFamily: FONT, fontWeight: 700, fontSize: m ? 20 : 24, color: C.ink }}>Tontine Digitale</span>
-        </div>
+          {!xs && (
+            <span style={{ fontFamily: FONT, fontWeight: 700, fontSize: m ? 18 : 24, color: C.ink, whiteSpace: "nowrap" }}>Tontine Digitale</span>
+          )}
+        </Link>
         <nav style={{ display: m ? "none" : "flex", alignItems: "center", gap: 48 }}>
           {nav.map((n) => (
             <a key={n} href="#" style={{ fontFamily: FONT, fontWeight: 400, fontSize: 18, color: C.slate600, textDecoration: "none", whiteSpace: "nowrap" }}>{n}</a>
           ))}
-          <Link to="/auth" style={{ fontFamily: FONT, fontWeight: 400, fontSize: 18, color: C.slate600, textDecoration: "none", whiteSpace: "nowrap" }}>Se connecter</Link>
+          <Link to={cta.href} style={{ fontFamily: FONT, fontWeight: 400, fontSize: 18, color: C.slate600, textDecoration: "none", whiteSpace: "nowrap" }}>{cta.signInLabel}</Link>
         </nav>
-        <Link to="/auth" style={{
+        <Link to={cta.href} style={{
           textDecoration: "none",
           display: "inline-flex", alignItems: "center", justifyContent: "center",
-          border: "none", cursor: "pointer", borderRadius: 16, padding: m ? "8px 18px" : "8px 24px", height: 50,
+          border: "none", cursor: "pointer", borderRadius: 16, padding: m ? "8px 14px" : "8px 24px", height: m ? 44 : 50,
           background: "linear-gradient(102.83deg, rgb(13,115,119) -27.08%, rgb(8,84,86) 147.38%)",
-          fontFamily: FONT, fontWeight: 700, fontSize: m ? 16 : 20, color: "#fff", flexShrink: 0,
-        }}>Commencer</Link>
+          fontFamily: FONT, fontWeight: 700, fontSize: m ? 15 : 20, color: "#fff", flexShrink: 0, whiteSpace: "nowrap",
+        }}>{cta.primaryLabel}</Link>
       </div>
     </header>
   );
