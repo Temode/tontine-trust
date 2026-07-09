@@ -1,49 +1,38 @@
-## Diagnostic
+## Diagnostic provisoire
 
-Do I know what the issue is? Oui.
-
-- Le domaine email `notify.tontinedigitale.com` est encore en attente de DNS, car il attend des enregistrements NS que Hostinger ne permet pas de créer correctement.
-- Le dernier test de création de compte a bien déclenché le hook d’auth, mais il est passé par le service email Lovable par défaut (`auth.lovable.cloud`), pas par notre envoi Resend.
-- Le hook personnalisé `auth-email-hook` n’a aucun log récent : il n’est donc pas celui qui a envoyé l’email reçu.
-- Résultat visible dans ta capture : ancien template “Tontine-Trust”, bouton de confirmation, aucun code OTP.
+- Le domaine email Lovable a bien été supprimé : il ne doit plus piloter les emails Tontine Digitale.
+- Resend envoie bien des emails OTP : le backend a enregistré des envois `signup` et `recovery` acceptés par Resend avec identifiant fournisseur.
+- Les logs récents ne montrent aucun appel au flux OTP depuis l’app au moment du problème signalé : cela indique probablement que le test a été fait sur une version publiée/stale qui utilise encore l’ancien flux natif.
+- Les captures suggèrent aussi une confusion possible entre deux boîtes/adresses différentes : Resend affiche un OTP envoyé à une adresse de test, tandis que Yopmail montre un ancien email “Tontine-Trust” venant du sender Lovable par défaut.
+- Le bouton “Publier la correction” est visible : la correction OTP semble disponible en prévisualisation, mais pas encore appliquée au domaine publié/custom domain.
 
 ## Plan de correction
 
-1. **Arrêter de dépendre du domaine `notify.tontinedigitale.com` pour l’auth**
-   - Ne plus attendre la délégation NS impossible chez Hostinger.
-   - Garder Resend comme canal réel d’envoi, puisque `noreply@tontinedigitale.com` fonctionne déjà pour les emails transactionnels.
+1. **Audit de bout en bout sur la même adresse email**
+   - Tester l’inscription depuis la prévisualisation.
+   - Vérifier que l’app appelle le flux OTP Resend, pas l’ancien flux email natif.
+   - Vérifier que le code reçu dans Resend correspond bien à l’écran “Vérifiez votre email”.
 
-2. **Créer un flux OTP auth propriétaire via Resend**
-   - Ajouter une table sécurisée de codes temporaires : email, usage (`signup` / `recovery`), code haché, expiration, tentatives.
-   - Créer des fonctions backend dédiées :
-     - démarrer une inscription et envoyer un code OTP Resend ;
-     - vérifier le code d’inscription ;
-     - envoyer un code de récupération ;
-     - vérifier le code de récupération et changer le mot de passe.
-   - Les codes seront à 6 chiffres, expirés automatiquement, limités en tentatives, et jamais stockés en clair.
+2. **Verrouiller le flux d’inscription**
+   - S’assurer qu’aucun chemin de signup, reset password ou vérification email ne déclenche encore l’email natif par défaut.
+   - Garder Resend comme canal unique pour les codes OTP d’inscription et de réinitialisation.
+   - Ne pas recréer le domaine email Lovable `notify.tontinedigitale.com`, car Hostinger ne permet pas la délégation NS nécessaire.
 
-3. **Réutiliser les templates Tontine Digitale existants**
-   - Garder la charte email actuelle : bleu sarcelle, or, structure claire, code OTP très visible.
-   - Envoyer depuis `Tontine Digitale <noreply@tontinedigitale.com>` via la connexion Resend déjà configurée.
+3. **Redéployer la partie backend OTP**
+   - Redéployer la fonction d’envoi OTP pour garantir que la version active est bien celle qui utilise Resend.
+   - Vérifier les logs après un test réel : email envoyé, code généré, statut accepté par Resend.
 
-4. **Adapter les écrans `/auth` au vrai flux OTP**
-   - Inscription : après soumission, envoyer notre OTP Resend puis rediriger vers `/auth/verifier-email`.
-   - Vérification email : remplacer la vérification actuelle par notre vérification backend du code reçu.
-   - Mot de passe oublié : envoyer un code OTP au lieu d’un lien classique.
-   - Réinitialisation : saisir code + nouveau mot de passe dans le même parcours, avec messages loading/succès/erreur cohérents.
+4. **Publier la correction sur le domaine public**
+   - Publier l’app pour que `tontinedigitale.com` utilise le même flux OTP que la prévisualisation.
+   - C’est probablement l’étape manquante qui explique pourquoi l’ancien email `auth.lovable.cloud` continue d’arriver côté domaine public.
 
-5. **Déployer et vérifier**
-   - Déployer les nouvelles fonctions backend.
-   - Tester une inscription Yopmail : email reçu depuis `noreply@tontinedigitale.com`, template Tontine Digitale, code OTP visible.
-   - Tester la vérification du code et la récupération de mot de passe.
-   - Si les secrets Resend ne sont pas disponibles côté backend, reconnecter/rafraîchir la connexion Resend avant le test final.
+5. **Validation finale à la hauteur de Tontine Digitale**
+   - Créer un compte test avec une adresse unique.
+   - Confirmer que l’email reçu vient de `Tontine Digitale <noreply@tontinedigitale.com>`.
+   - Confirmer que l’email contient un code OTP à 6 chiffres.
+   - Saisir ce code dans l’app et vérifier l’accès au tableau de bord.
+   - Confirmer qu’aucun nouvel email `Tontine-Trust <no-reply@auth.lovable.cloud>` n’est généré pendant ce test.
 
-## Impact utilisateur
+## Résultat attendu
 
-- Plus besoin d’enregistrements NS Hostinger pour les emails d’auth.
-- Les emails d’auth partiront comme les emails transactionnels qui fonctionnent déjà.
-- Le sender `auth.lovable.cloud` et l’ancien nom “Tontine-Trust” ne seront plus utilisés dans le parcours OTP applicatif.
-
-## Point important
-
-Désactiver simplement les emails Lovable ne suffit pas : cela ferait retomber l’auth sur les emails par défaut. La correction fiable consiste à faire passer l’OTP d’inscription et de récupération par notre propre flux Resend.
+Après approbation, je corrige et vérifie le flux complet : l’inscription et la réinitialisation passent uniquement par Resend, avec code OTP visible, puis je publie la correction pour que le domaine public arrête d’utiliser l’ancien email Lovable.
