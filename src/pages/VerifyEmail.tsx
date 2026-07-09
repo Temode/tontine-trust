@@ -1,14 +1,21 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, Navigate, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
-import { CheckCircle2, Loader2, Mail } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Loader2 } from "lucide-react";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
-import { Logo } from "@/components/brand/Logo";
+import { AuthShell } from "@/components/auth/AuthShell";
+import { AuthStepper } from "@/components/auth/AuthStepper";
+import { AuthAlert } from "@/components/auth/AuthAlert";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 
 const RESEND_DELAY = 60;
+
+const STEPS = [
+  { label: "Compte créé" },
+  { label: "Vérification email" },
+  { label: "Accès à l'espace" },
+];
 
 function maskEmail(email: string): string {
   const [local, domain] = email.split("@");
@@ -45,7 +52,8 @@ export default function VerifyEmail() {
   const verify = useCallback(
     async (token: string) => {
       if (!email) {
-        toast.error("Email manquant. Recommence l'inscription.");
+        setStatus("error");
+        setErrorMsg("Email manquant. Reprenez l'inscription depuis le début.");
         return;
       }
       setStatus("verifying");
@@ -53,20 +61,25 @@ export default function VerifyEmail() {
       const { error } = await supabase.auth.verifyOtp({ email, token, type: "signup" });
       if (error) {
         setStatus("error");
-        setErrorMsg("Code invalide ou expiré. Vérifie tes 6 chiffres.");
+        setErrorMsg("Code invalide ou expiré. Vérifiez vos 6 chiffres.");
         setCode("");
         submittedFor.current = null;
         return;
       }
       setStatus("success");
       toast.success("Email vérifié");
-      setTimeout(() => navigate("/dashboard", { replace: true }), 1200);
+      setTimeout(() => navigate("/dashboard", { replace: true }), 1400);
     },
     [email, navigate],
   );
 
   useEffect(() => {
-    if (code.length === 6 && submittedFor.current !== code && status !== "verifying" && status !== "success") {
+    if (
+      code.length === 6 &&
+      submittedFor.current !== code &&
+      status !== "verifying" &&
+      status !== "success"
+    ) {
       submittedFor.current = code;
       void verify(code);
     }
@@ -79,7 +92,7 @@ export default function VerifyEmail() {
     setResending(false);
     if (error) {
       if (/rate limit/i.test(error.message)) {
-        toast.error("Trop d'emails envoyés. Patiente quelques minutes.");
+        toast.error("Trop d'emails envoyés. Patientez quelques minutes.");
       } else {
         toast.error(error.message);
       }
@@ -95,114 +108,131 @@ export default function VerifyEmail() {
     return <Navigate to="/dashboard" replace />;
   }
 
+  const currentStep = status === "success" ? 2 : 1;
+  const disabled = status === "verifying" || status === "success";
+
   return (
-    <main className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background via-background to-secondary/40 px-4 py-10">
-      <div className="w-full max-w-md">
-        <Link to="/" className="mb-8 flex items-center justify-center">
-          <Logo />
-        </Link>
+    <AuthShell>
+      <AuthStepper steps={STEPS} current={currentStep} className="mb-8" />
 
-        <div className="rounded-2xl border border-hairline bg-card p-6 shadow-sm sm:p-8">
-          {status === "success" ? (
-            <div className="text-center">
-              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary-50 text-primary">
-                <CheckCircle2 className="h-7 w-7" />
-              </div>
-              <h1 className="font-display text-2xl font-bold tracking-tight text-foreground">
-                Email vérifié
-              </h1>
-              <p className="mt-2 text-sm text-muted-foreground">
-                Redirection vers ton espace…
-              </p>
+      {status === "success" ? (
+        <>
+          <header className="mb-6">
+            <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+              Email vérifié
+            </h1>
+            <p className="mt-2 text-sm text-foreground/60">
+              Redirection vers votre espace en cours…
+            </p>
+          </header>
+          <AuthAlert variant="success" title="Compte activé">
+            Votre email a été vérifié avec succès. Bienvenue sur Tontine Digitale.
+          </AuthAlert>
+        </>
+      ) : (
+        <>
+          <header className="mb-8">
+            <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+              Vérifiez votre email
+            </h1>
+            <p className="mt-2 text-sm text-foreground/60">
+              Nous avons envoyé un code à 6 chiffres à
+              {masked ? (
+                <>
+                  {" "}
+                  <span className="font-semibold text-foreground">{masked}</span>.
+                </>
+              ) : (
+                " votre adresse email."
+              )}
+            </p>
+          </header>
+
+          <div className="rounded-xl border border-foreground/10 bg-white p-6 shadow-sm sm:p-8">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-foreground/50">
+              Code de vérification
+            </p>
+
+            <div className="mt-4 flex justify-center">
+              <InputOTP
+                maxLength={6}
+                value={code}
+                onChange={(v) => {
+                  setCode(v);
+                  if (status === "error") {
+                    setStatus("idle");
+                    setErrorMsg(null);
+                  }
+                }}
+                disabled={disabled}
+                autoFocus
+                containerClassName="gap-2 sm:gap-3"
+              >
+                <InputOTPGroup className="gap-2 sm:gap-3">
+                  {[0, 1, 2, 3, 4, 5].map((i) => (
+                    <InputOTPSlot
+                      key={i}
+                      index={i}
+                      className="h-14 w-11 rounded-md border-foreground/15 bg-white text-2xl font-bold tabular-nums text-foreground shadow-sm focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 sm:w-12"
+                    />
+                  ))}
+                </InputOTPGroup>
+              </InputOTP>
             </div>
-          ) : (
-            <>
-              <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-full bg-primary-50 text-primary">
-                <Mail className="h-5 w-5" />
-              </div>
-              <h1 className="font-display text-2xl font-bold tracking-tight text-foreground">
-                Vérifie ton email
-              </h1>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Nous avons envoyé un code à 6 chiffres à
-                {masked ? (
-                  <>
-                    {" "}
-                    <span className="font-semibold text-foreground">{masked}</span>.
-                  </>
-                ) : (
-                  " ton adresse email."
-                )}
-              </p>
 
-              <div className="mt-8 flex flex-col items-center">
-                <InputOTP
-                  maxLength={6}
-                  value={code}
-                  onChange={(v) => {
-                    setCode(v);
-                    if (status === "error") {
-                      setStatus("idle");
-                      setErrorMsg(null);
-                    }
-                  }}
-                  disabled={status === "verifying"}
-                  autoFocus
-                  containerClassName="gap-3"
-                >
-                  <InputOTPGroup className="gap-3">
-                    {[0, 1, 2, 3, 4, 5].map((i) => (
-                      <InputOTPSlot
-                        key={i}
-                        index={i}
-                        className="h-14 w-12 rounded-lg border-hairline bg-background font-display text-2xl font-bold tabular-nums text-foreground shadow-sm focus-within:ring-2 focus-within:ring-primary"
-                      />
-                    ))}
-                  </InputOTPGroup>
-                </InputOTP>
+            <div className="mt-5 min-h-[52px]">
+              {status === "verifying" && (
+                <AuthAlert variant="loading" title="Vérification en cours">
+                  Nous validons votre code auprès de nos serveurs.
+                </AuthAlert>
+              )}
+              {status === "error" && errorMsg && (
+                <AuthAlert variant="error" title="Code incorrect">
+                  {errorMsg}
+                </AuthAlert>
+              )}
+              {status === "idle" && (
+                <p className="text-center text-[12px] text-foreground/45">
+                  Le code se valide automatiquement dès la saisie des 6 chiffres.
+                </p>
+              )}
+            </div>
+          </div>
 
-                <div className="mt-3 h-5 text-sm">
-                  {status === "verifying" && (
-                    <span className="inline-flex items-center gap-2 text-muted-foreground">
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      Vérification…
-                    </span>
-                  )}
-                  {status === "error" && errorMsg && (
-                    <span className="text-destructive">{errorMsg}</span>
-                  )}
-                </div>
-              </div>
+          <div className="mt-6 flex flex-col items-center gap-2 text-center">
+            <button
+              type="button"
+              onClick={handleResend}
+              disabled={countdown > 0 || resending}
+              className="text-sm font-semibold text-primary transition hover:underline disabled:cursor-not-allowed disabled:text-foreground/40 disabled:no-underline"
+            >
+              {resending
+                ? "Envoi en cours…"
+                : countdown > 0
+                ? `Renvoyer le code dans ${countdown}s`
+                : "Renvoyer le code"}
+            </button>
+            <Link
+              to="/auth"
+              className="text-[12px] text-foreground/50 hover:text-foreground/80"
+            >
+              Utiliser une autre adresse email
+            </Link>
+          </div>
 
-              <div className="mt-6 flex flex-col items-center gap-3">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={handleResend}
-                  disabled={countdown > 0 || resending}
-                  className="text-sm"
-                >
-                  {resending
-                    ? "Envoi…"
-                    : countdown > 0
-                    ? `Renvoyer le code dans ${countdown}s`
-                    : "Renvoyer le code"}
-                </Button>
-                <Link
-                  to="/auth"
-                  className="text-xs text-muted-foreground hover:text-foreground"
-                >
-                  Utiliser un autre email
-                </Link>
-              </div>
-            </>
-          )}
+          <p className="mt-8 border-t border-foreground/5 pt-6 text-[11px] leading-relaxed text-foreground/40">
+            Le code expire au bout d'une heure. Pensez à vérifier vos courriers indésirables si
+            vous ne le recevez pas.
+          </p>
+        </>
+      )}
+
+      {loading && status === "idle" && (
+        <div className="mt-4 flex items-center gap-2 text-[12px] text-foreground/40">
+          <Loader2 className="h-3 w-3 animate-spin" />
+          Chargement de la session…
         </div>
-
-        <p className="mt-6 text-center text-xs text-muted-foreground">
-          Le code expire au bout d'une heure. Vérifie tes courriers indésirables si besoin.
-        </p>
-      </div>
-    </main>
+      )}
+    </AuthShell>
   );
 }
