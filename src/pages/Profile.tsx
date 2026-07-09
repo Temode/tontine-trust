@@ -1,4 +1,4 @@
-import { LogOut, RefreshCw, AlertTriangle, Camera, Loader2, Bell, Shield, BadgeCheck } from "lucide-react";
+import { LogOut, RefreshCw, AlertTriangle, Camera, Loader2, Bell, Shield, BadgeCheck, MailCheck, MailWarning } from "lucide-react";
 import { toast } from "sonner";
 import { Link, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -148,6 +148,34 @@ export default function Profile() {
             )}
           </div>
         </article>
+
+        {user?.email && (
+          user.email_confirmed_at ? (
+            <div className="flex items-center gap-3 rounded-xl border border-hairline bg-card p-4">
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary-50 text-primary">
+                <MailCheck className="h-4 w-4" />
+              </div>
+              <p className="text-sm font-semibold text-foreground">Email vérifié</p>
+            </div>
+          ) : (
+            <div className="flex flex-wrap items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-amber-100 text-amber-700">
+                <MailWarning className="h-4 w-4" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-amber-900">Email en attente de vérification</p>
+                <p className="text-xs text-amber-800">Confirme ton adresse pour sécuriser ton compte.</p>
+              </div>
+              <Link
+                to="/auth/verifier-email"
+                state={{ email: user.email }}
+                className="inline-flex h-9 items-center rounded-md bg-primary px-3 text-xs font-semibold text-primary-foreground hover:bg-primary/90"
+              >
+                Vérifier
+              </Link>
+            </div>
+          )
+        )}
 
         <ReliabilityCard
           score={reliability?.score ?? 0}
