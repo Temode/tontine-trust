@@ -487,19 +487,21 @@ function Step({ num, title, text, checks }: any) {
 function HowItWorks() {
   const vw = useVW();
   const t = vw <= 980;
+  const m = vw <= 720;
+  const cta = useCtaTarget();
   const steps = [
     { num: "1", title: "Créez votre groupe", text: "Inscrivez-vous gratuitement, créez votre groupe et définissez les paramètres : montant de cotisation, fréquence et nombre de membres.", checks: ["Inscription gratuite en 2 minutes", "Personnalisez les règles du groupe"] },
     { num: "2", title: "Invitez vos membres", text: "Partagez le lien d'invitation ou ajoutez les membres directement via leur numéro de téléphone. Ils recevront une notification.", checks: ["Invitation par SMS ou WhatsApp", "Validation par l'administrateur"] },
     { num: "3", title: "Cotisez et recevez", text: "Les membres cotisent via Mobile Money. À chaque tour, le bénéficiaire reçoit la cagnotte automatiquement sur son compte.", checks: ["Paiements instantanés", "Historique complet des transactions"] },
   ];
   return (
-    <section style={{ background: C.slate50, padding: t ? "60px 20px" : "84px 69px", textAlign: "center" }}>
+    <section style={{ background: C.slate50, padding: t ? "60px 16px" : "84px 69px", textAlign: "center" }}>
       <Badge text="Comment ça marche" bg={C.amberBg} color={C.amberText} />
       <h2 style={{ fontFamily: FONT, fontWeight: 700, fontSize: t ? 32 : 48, lineHeight: 1.15, color: C.slate900, margin: "24px auto", maxWidth: 729 }}>Lancez votre tontine en 3 étapes simples</h2>
       <p style={{ fontFamily: FONT, fontWeight: 400, fontSize: t ? 18 : 24, color: C.slate600, margin: "0 auto 56px", maxWidth: 995 }}>Pas besoin d'être un expert en technologie. Notre plateforme est conçue pour être simple et intuitive.</p>
-      <div style={{ display: "flex", flexDirection: t ? "column" : "row", gap: 36, maxWidth: 1302, margin: "0 auto", textAlign: "left" }}>{steps.map((s) => <Step key={s.num} {...s} />)}</div>
-      <Link to="/auth" style={{ textDecoration: "none", marginTop: 56, border: "none", cursor: "pointer", borderRadius: 20, padding: "22px 32px", background: C.tealGrad, fontFamily: FONT, fontWeight: 600, fontSize: 18, color: "#fff", display: "inline-flex", alignItems: "center", gap: 12 }}>
-        Créer mon premier groupe {Ico.arrow()}
+      <div style={{ display: "grid", gridTemplateColumns: m ? "1fr" : "repeat(3, 1fr)", gap: 36, maxWidth: 1302, margin: "0 auto", textAlign: "left" }}>{steps.map((s) => <Step key={s.num} {...s} />)}</div>
+      <Link to={cta.href} style={{ textDecoration: "none", marginTop: 56, border: "none", cursor: "pointer", borderRadius: 20, padding: "22px 32px", background: C.tealGrad, fontFamily: FONT, fontWeight: 600, fontSize: 18, color: "#fff", display: "inline-flex", alignItems: "center", gap: 12 }}>
+        {cta.stepLabel} {Ico.arrow()}
       </Link>
     </section>
   );
