@@ -446,6 +446,7 @@ function FeatureCard({ icon, iconBg, iconShadow, title, text }: any) {
 function Features() {
   const vw = useVW();
   const t = vw <= 980;
+  const m = vw <= 720;
   const row1 = [
     { icon: Ico.users("#fff"), iconBg: "rgb(249,155,91)", title: "Gestion de groupes", text: "Créez et gérez vos groupes de tontine facilement. Invitez des membres, définissez les règles et suivez la progression." },
     { icon: Ico.wallet("#fff"), iconBg: C.tealGrad, title: "Paiement Mobile Money", text: "Cotisez instantanément via Orange Money ou MTN Mobile Money. Recevez votre cagnotte directement sur votre compte." },
@@ -457,12 +458,12 @@ function Features() {
     { icon: Ico.chart("#fff"), iconBg: C.slate900, title: "Tableau de bord", text: "Visualisez vos statistiques, l'historique des transactions et la progression de tous vos groupes en un coup d'œil." },
   ];
   return (
-    <section style={{ padding: t ? "60px 20px" : "80px 64px", background: "#fff", textAlign: "center" }}>
+    <section style={{ padding: t ? "60px 16px" : "80px 64px", background: "#fff", textAlign: "center" }}>
       <Badge text="Fonctionnalités" bg="transparent" color={C.ink} />
       <h2 style={{ fontFamily: FONT, fontWeight: 700, fontSize: t ? 32 : 44, lineHeight: 1.15, color: C.ink, margin: "16px auto 24px", maxWidth: 729 }}>Tout ce dont vous avez besoin pour gérer vos tontines</h2>
       <p style={{ fontFamily: FONT, fontWeight: 400, fontSize: t ? 18 : 24, lineHeight: 1.35, color: C.slate900, margin: "0 auto 56px", maxWidth: 995 }}>Une plateforme complète qui modernise la tradition tout en préservant les valeurs de confiance et de solidarité.</p>
-      <div style={{ display: "flex", flexDirection: t ? "column" : "row", gap: 20, maxWidth: 1312, margin: "0 auto 20px" }}>{row1.map((c) => <FeatureCard key={c.title} {...c} />)}</div>
-      <div style={{ display: "flex", flexDirection: t ? "column" : "row", gap: 20, maxWidth: 1312, margin: "0 auto" }}>{row2.map((c) => <FeatureCard key={c.title} {...c} />)}</div>
+      <div style={{ display: "grid", gridTemplateColumns: m ? "1fr" : t ? "1fr 1fr" : "1fr 1fr 1fr", gap: 20, maxWidth: 1312, margin: "0 auto 20px" }}>{row1.map((c) => <FeatureCard key={c.title} {...c} />)}</div>
+      <div style={{ display: "grid", gridTemplateColumns: m ? "1fr" : t ? "1fr 1fr" : "1fr 1fr 1fr", gap: 20, maxWidth: 1312, margin: "0 auto" }}>{row2.map((c) => <FeatureCard key={c.title} {...c} />)}</div>
     </section>
   );
 }
