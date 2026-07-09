@@ -127,9 +127,8 @@ export default function Auth() {
       return;
     }
     if (needsEmailConfirmation) {
-      toast.success("Compte créé. Vérifie ta boîte mail pour confirmer, puis connecte-toi.");
-      setTab("signin");
-      setSiEmail(parsed.data.email);
+      toast.success("Compte créé. Saisis le code à 6 chiffres reçu par email.");
+      navigate("/auth/verifier-email", { state: { email: parsed.data.email } });
       return;
     }
     toast.success("Compte créé. Bienvenue !");
@@ -178,6 +177,14 @@ export default function Auth() {
                     onChange={(e) => setSiPassword(e.target.value)}
                     required
                   />
+                  <div className="flex justify-end">
+                    <Link
+                      to="/auth/mot-de-passe-oublie"
+                      className="text-xs font-medium text-primary hover:underline"
+                    >
+                      Mot de passe oublié ?
+                    </Link>
+                  </div>
                 </div>
                 <Button type="submit" className="w-full" disabled={submitting}>
                   <span className="inline-flex h-4 w-4 items-center justify-center">
