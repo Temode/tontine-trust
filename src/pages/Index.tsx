@@ -6,6 +6,22 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React from "react";
 import { Link } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
+
+/* CTA sensible à l'état d'authentification */
+function useCtaTarget() {
+  const { user, roles } = useAuth();
+  const isAdmin = roles.includes("super_admin");
+  const href = user ? (isAdmin ? "/admin/overview" : "/dashboard") : "/auth";
+  return {
+    isAuthed: !!user,
+    href,
+    primaryLabel: user ? "Ouvrir mon espace" : "Commencer",
+    heroLabel: user ? "Aller à mon tableau de bord" : "Créer mon compte gratuit",
+    signInLabel: user ? "Mon tableau de bord" : "Se connecter",
+    stepLabel: user ? "Créer un nouveau groupe" : "Créer mon premier groupe",
+  };
+}
 
 const FONT =
   'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
