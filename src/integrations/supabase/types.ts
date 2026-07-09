@@ -769,6 +769,42 @@ export type Database = {
         }
         Relationships: []
       }
+      email_outbox: {
+        Row: {
+          attempts: number
+          created_at: string
+          dedupe_key: string
+          id: string
+          kind: string
+          last_error: string | null
+          payload: Json
+          processed_at: string | null
+          status: string
+        }
+        Insert: {
+          attempts?: number
+          created_at?: string
+          dedupe_key: string
+          id?: string
+          kind: string
+          last_error?: string | null
+          payload?: Json
+          processed_at?: string | null
+          status?: string
+        }
+        Update: {
+          attempts?: number
+          created_at?: string
+          dedupe_key?: string
+          id?: string
+          kind?: string
+          last_error?: string | null
+          payload?: Json
+          processed_at?: string | null
+          status?: string
+        }
+        Relationships: []
+      }
       external_payment_proofs: {
         Row: {
           amount: number
@@ -5953,6 +5989,36 @@ export type Database = {
         Returns: undefined
       }
       delete_account: { Args: { _reason?: string }; Returns: undefined }
+      email_outbox_mark: {
+        Args: { _error?: string; _id: string; _status: string }
+        Returns: undefined
+      }
+      email_outbox_pop: {
+        Args: { _limit?: number }
+        Returns: {
+          attempts: number
+          created_at: string
+          dedupe_key: string
+          id: string
+          kind: string
+          last_error: string | null
+          payload: Json
+          processed_at: string | null
+          status: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "email_outbox"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      email_outbox_recent_sent_count: {
+        Args: { _minutes?: number }
+        Returns: number
+      }
+      email_outbox_try_lock: { Args: never; Returns: boolean }
+      email_outbox_unlock: { Args: never; Returns: boolean }
       enqueue_generic_sms: {
         Args: {
           _body: string
