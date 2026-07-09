@@ -347,10 +347,12 @@ function Hero() {
   const vw = useVW();
   const t = vw <= 980;
   const m = vw <= 620;
-  const scale = m ? 0.56 : t ? 0.78 : 1;
+  const xs = vw <= 460;
+  const scale = xs ? 0.48 : m ? 0.56 : t ? 0.78 : 1;
+  const cta = useCtaTarget();
   return (
     <section style={{
-      position: "relative", padding: t ? "40px 20px 0" : "64px 63px 0", boxSizing: "border-box", overflow: "hidden",
+      position: "relative", padding: t ? "40px 16px 0" : "64px 63px 0", boxSizing: "border-box", overflow: "hidden",
       backgroundImage: "linear-gradient(rgba(226,232,240,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(226,232,240,0.5) 1px, transparent 1px)",
       backgroundSize: "48px 48px",
     }}>
@@ -360,14 +362,14 @@ function Hero() {
             <span style={{ width: 12, height: 12, borderRadius: "50%", background: C.teal, display: "inline-block", flexShrink: 0 }} />
             <span style={{ fontFamily: FONT, fontWeight: 600, fontSize: m ? 14 : 16, color: C.ink }}>🇬🇳 Première plateforme de tontine digitale en Guinée</span>
           </div>
-          <h1 style={{ fontFamily: FONT, fontWeight: 700, fontSize: m ? 34 : t ? 46 : 60, lineHeight: 1.1, color: C.ink, margin: "36px 0 0", maxWidth: 583 }}>
+          <h1 style={{ fontFamily: FONT, fontWeight: 700, fontSize: xs ? 30 : m ? 36 : t ? 46 : 60, lineHeight: 1.1, color: C.ink, margin: "36px 0 0", maxWidth: 583 }}>
             Digitalisez vos<br />tontines en toute confiance
           </h1>
           <p style={{ fontFamily: FONT, fontWeight: 400, fontSize: 18, lineHeight: 1.4, color: C.slate600, margin: "28px 0 0", maxWidth: 583 }}>
             Gérez vos groupes d'épargne rotative facilement et en toute sécurité. Cotisez via Orange Money ou MTN Mobile Money, suivez vos tours et recevez votre cagnotte automatiquement.
           </p>
           <div style={{ display: "flex", gap: 16, marginTop: 34, flexWrap: "wrap" }}>
-            <Link to="/auth" style={{ textDecoration: "none", display: "inline-flex", alignItems: "center", border: "none", cursor: "pointer", borderRadius: 16, padding: "20px 30px", background: "linear-gradient(90deg, rgb(13,115,119) -16.34%, rgb(8,84,86) 84.48%)", fontFamily: FONT, fontWeight: 600, fontSize: 18, color: "#fff", boxShadow: "0px 2px 8px rgba(16,185,129,0.19)" }}>Créer mon compte gratuit</Link>
+            <Link to={cta.href} style={{ textDecoration: "none", display: "inline-flex", alignItems: "center", justifyContent: "center", border: "none", cursor: "pointer", borderRadius: 16, padding: "20px 30px", background: "linear-gradient(90deg, rgb(13,115,119) -16.34%, rgb(8,84,86) 84.48%)", fontFamily: FONT, fontWeight: 600, fontSize: 18, color: "#fff", boxShadow: "0px 2px 8px rgba(16,185,129,0.19)" }}>{cta.heroLabel}</Link>
             <button style={{ cursor: "pointer", borderRadius: 16, padding: "20px 30px", background: "#fff", border: "2px solid rgb(100,116,139)", fontFamily: FONT, fontWeight: 600, fontSize: 20, color: C.slate900, display: "flex", alignItems: "center", gap: 10 }}>
               {Ico.play(C.teal)} Voir comment ça marche
             </button>
@@ -389,7 +391,7 @@ function Hero() {
             <span style={{ fontFamily: FONT, fontWeight: 400, fontSize: 16, color: C.ink }}>(500+ avis)</span>
           </div>
         </div>
-        <div style={{ width: 583 * scale, height: 681 * scale, flexShrink: 0, position: "relative" }}>
+        <div style={{ width: 583 * scale, height: 681 * scale, flexShrink: 0, position: "relative", overflow: "hidden", maxWidth: "100%" }}>
           <div style={{ transform: `scale(${scale})`, transformOrigin: "top left" }}>
             <PhoneMock />
           </div>
