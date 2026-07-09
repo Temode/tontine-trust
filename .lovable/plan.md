@@ -1,59 +1,71 @@
+## Objectif
 
-## 1) Test d'intégration SMS avec provider simulé
+Envoyer tous les emails de Tontine Digitale depuis `noreply@tontinedigitale.com` avec le libellé **Tontine Digitale** — sans jamais toucher aux nameservers du domaine chez Hostinger. Pour ça on abandonne Lovable Emails (qui exige une délégation NS impossible chez Hostinger) et on branche **Resend**, qui vérifie le domaine uniquement via des enregistrements **CNAME + TXT + MX** — tous disponibles dans l'éditeur DNS Hostinger.
 
-Créer `supabase/functions/_shared/__tests__/send-tontine-sms.test.ts` (Deno test) qui :
-- Mock `sendMessage` de `_shared/nimbasms.ts` (capture in‑memory : `to`, `body`, `logContext.kind`, `logContext.turnId`, `logContext.userId`, `logContext.groupId`).
-- Mock le client Supabase (stub des tables `profiles`, `notification_preferences`, `turns`, `contributions`, `groups`, RPC `claim_sms_dedupe` avec set en mémoire).
-- Scénarios couverts :
-  1. `contribution_confirmed` envoyé 5× avec mêmes `contribution_id` → **1 seul** appel `sendMessage` ; le body contient le bon montant, n° de tour, nom bénéficiaire, échéance ; `logContext.turnId` + `logContext.userId` = payer ; `kind`=`contribution_confirmed`.
-  2. Même event avec `contribution_id` différents → 2 appels distincts.
-  3. `turn_paid` envoyé 3× même `turn_id` → 1 appel, recipient = `beneficiary_user_id`, body mentionne le montant crédité.
-  4. Utilisateur opted‑out (preference `enabled=false`) → 0 appel, log `skipped/opted_out`.
-- Lancé via `deno test` dans `.github/workflows/e2e.yml` (nouveau job `sms-unit`).
+## Étape 1 — Créer le compte Resend et vérifier le domaine (côté utilisateur)
 
-## 2) Nouveau SMS « bénéficiaire informé d'un paiement reçu »
+Actions que tu fais toi-même, une seule fois :
 
-Ajout d'un **2ᵉ SMS** dans la branche `contribution_confirmed` de `send-tontine-sms` :
-- Destinataire = `turns.beneficiary_user_id` (≠ payeur).
-- Contenu : *« Bonjour {prenom}, {payeurPrenom} a paye sa cotisation de {montant} GNF pour votre tour #{turnNo} de la tontine "{gname}". Votre prochaine cotisation est due le {nextDue}. Ref: {ref}. »*
-- `nextDue` = plus proche `turns.due_date` où le bénéficiaire courant figure comme `contributions.payer_user_id` avec `status='pending'` (sinon "—" et phrase repliée).
-- Enqueue côté DB : `enqueue_tontine_sms('beneficiary_payment_received', …)` ajouté dans le trigger `sms_contribution_paid` (migration), avec `dedupe_key = beneficiary_payment_received:{contribution_id}:{beneficiary_user_id}` → garantit 1 SMS par paiement, par bénéficiaire.
-- Soumis aux mêmes gardes : opt‑in, rate‑limit global, FIFO outbox.
-- Test ajouté dans le fichier de test (point 1) : vérifie destinataire = bénéficiaire, présence de `nextDue`, dédup sur `contribution_id`.
+1. Créer un compte gratuit sur resend.com (plan Free : 3 000 emails/mois, 100/jour — largement suffisant au démarrage).
+2. Dans Resend → **Domains** → **Add Domain**, saisir `tontinedigitale.com` (ou `send.tontinedigitale.com` si tu préfères isoler l'envoi ; je recommande le sous-domaine `send` pour ne pas polluer d'éventuels emails reçus sur le domaine racine).
+3. Resend affiche 3 enregistrements à ajouter (tous supportés par Hostinger) :
+   - 1× **MX** (host `send`, valeur `feedback-smtp.eu-west-1.amazonses.com`, priorité 10)
+   - 1× **TXT** (host `send`, valeur `v=spf1 include:amazonses.com ~all`)
+   - 1× **TXT** DKIM (host `resend._domainkey.send`, long token fourni par Resend)
+4. Coller ces 3 enregistrements dans Hostinger → DNS Zone Editor → Add Record.
+5. Cliquer **Verify DNS Records** dans Resend (propagation : 5 min à 2 h).
+6. Une fois vérifié, générer une **API Key** dans Resend → API Keys → Create → permissions "Sending access" → copier la valeur `re_…`.
 
-## 3) Bloquer « Payer maintenant » avant l'ouverture du tour
+Quand tu me confirmes que le domaine est vérifié dans Resend, je te demande la clé API via le formulaire sécurisé.
 
-Règle métier : un membre ne peut payer que lorsque le tour est **ouvert à la collecte**, c.-à-d. `turn.status = 'collecting'` OU `turn.due_date <= aujourd'hui`. Si `status='upcoming'` et `due_date > today` → paiement interdit.
+## Étape 2 — Brancher Resend dans le code (côté agent)
 
-Front (`src/components/dashboard/DueCard.tsx` + `src/pages/MyContributions.tsx`) :
-- Nouvelle prop `canPayNow: boolean` calculée en amont (déjà accès à `daysToDue` et `turnStatus`).
-- Si `!canPayNow` : bouton remplacé par un état désactivé « Disponible le {due_date} », même style, `aria-disabled`, tooltip explicatif.
-- Étiquette « Bientôt » conservée.
+1. Connecter le connecteur Resend via l'outil `standard_connectors--connect` (ça installe la clé dans les secrets edge functions sans que je la voie).
+2. Créer une edge function unifiée `send-email` (Deno) qui appelle `POST https://connector-gateway.lovable.dev/resend/emails` avec :
+   ```
+   from: "Tontine Digitale <noreply@tontinedigitale.com>"
+   to, subject, html, text, reply_to: "support@tontinedigitale.com"
+   ```
+3. Refactorer les appels existants `send-tontine-sms` / notifications tontines pour utiliser `send-email` pour le canal *email* (le SMS reste sur son propre outbox, inchangé).
+4. Ajouter les mêmes garde-fous que côté SMS : opt-in via `notification_preferences`, déduplication 24 h via `email_outbox.dedupe_key`, rate-limit global.
 
-Back (sécurité) :
-- Garde-fou dans `supabase/functions/djomy-init-payment/index.ts` : avant d'initier Djomy, charger `turns(status, due_date)` via `contribution_id` ; si `status='upcoming'` et `due_date > current_date` (UTC) → renvoyer `409 { error: "turn_not_open_yet", available_on: due_date }`.
-- Mirroir SQL : ajouter une contrainte dans la RPC qui crée le `payment` (si elle existe ; sinon dans la fonction edge uniquement).
+## Étape 3 — Templates email de base
+
+Créer les 4 templates HTML minimalistes (React Email inline styles, palette bleu sarcelle `#0D7377` + or `#E8AA14`) :
+- `contribution_confirmed` — reçu de cotisation
+- `beneficiary_payment_received` — X a payé, prochaine échéance le …
+- `turn_started` — c'est à ton tour, dépôt attendu le …
+- `manual_reminder` — rappel envoyé par l'organisateur
+
+Copie sobre, française, tutoiement, signature "L'équipe Tontine Digitale — support@tontinedigitale.com".
+
+## Étape 4 — Boîte support
+
+`support@tontinedigitale.com` est une **adresse de réception**, pas d'envoi. Deux options :
+- **Forwarding gratuit Hostinger** : configurer un forward `support@tontinedigitale.com` → ton adresse Gmail perso. Zéro coût, tu réponds depuis Gmail avec l'alias.
+- **Boîte mail Hostinger Business** (~1 €/mois) si tu veux une vraie webmail dédiée.
+
+Je te laisse choisir hors code — aucun impact sur l'app.
+
+## Étape 5 — Désactiver Lovable Emails
+
+Une fois Resend opérationnel, désactiver Lovable Emails pour éviter les doublons et les tentatives d'envoi qui échouent en silence. Les emails d'auth Supabase (confirmation d'inscription, reset password) repasseront sur les templates par défaut Lovable jusqu'à ce qu'on les migre aussi vers Resend en Phase 2 si tu veux.
 
 ## Détails techniques
 
-### Fichiers créés
-- `supabase/functions/_shared/__tests__/send-tontine-sms.test.ts` (Deno).
-- `supabase/migrations/<ts>_beneficiary_payment_sms.sql` : modif trigger + nouvel event dans le catalogue.
+**Nouveaux fichiers**
+- `supabase/functions/send-email/index.ts` — wrapper unifié Resend via gateway
+- `supabase/functions/_shared/emailTemplates.ts` — rendu HTML (mirror de `smsTemplates.ts`)
+- `supabase/functions/_shared/__tests__/emailTemplates.test.ts` — tests Deno
+- Migration : table `email_outbox` (même schéma que `sms_outbox` : `dedupe_key unique`, `status`, `attempts`, FIFO)
 
-### Fichiers modifiés
-- `supabase/functions/send-tontine-sms/index.ts` : nouvelle branche/section pour le 2ᵉ SMS bénéficiaire, calcul `nextDue` via `contributions` join `turns`.
-- `supabase/functions/djomy-init-payment/index.ts` : pré‑check `turn_status`/`due_date`.
-- `src/components/dashboard/DueCard.tsx` : prop `canPayNow`, état désactivé.
-- `src/pages/MyContributions.tsx` + `src/pages/Dashboard.tsx` : passent `canPayNow` calculé depuis la requête (déjà charge `turn.status` et `due_date`).
-- `.github/workflows/e2e.yml` : ajoute job `deno test`.
+**Fichiers édités**
+- `supabase/functions/send-tontine-sms/index.ts` — enqueue aussi un email si `notification_preferences.channel='email'.enabled`
+- `supabase/functions/consume-sms-outbox/index.ts` → renommer en `consume-notifications-outbox` (traite SMS + email dans le même worker FIFO)
 
-### Catalogue SMS mis à jour (`mem://features/doctrine-sms-paxefy`)
-Ajout de l'event `beneficiary_payment_received` au catalogue fixe (6ᵉ event). Dédup obligatoire par `contribution_id + beneficiary_user_id`.
+**Secrets ajoutés**
+- `RESEND_API_KEY` (via connecteur, ne transite jamais par le chat)
 
-### Tests
-- Deno unit : 4 cas (cf. point 1) + cas bénéficiaire.
-- SQL existant `sms_outbox_dedupe.test.sql` : ajout d'un cas `beneficiary_payment_received`.
-- Test manuel UX : ouvrir Dashboard avec un tour `upcoming` → bouton désactivé "Disponible le …".
+## Ce que tu dois valider avant que je code
 
-### Impact volume SMS attendu
-+1 SMS par contribution confirmée (vers le bénéficiaire). Pour un groupe de N membres : N-1 SMS bénéficiaire par tour. Reste compatible avec le rate‑limit global (`sms_max_per_minute_global`).
+Confirme juste : **sous-domaine `send.tontinedigitale.com`** (recommandé) ou domaine racine `tontinedigitale.com` pour la vérification Resend ? Ensuite tu crées le compte Resend, tu ajoutes les 3 records dans Hostinger, tu me pings quand c'est vérifié et je démarre l'implémentation.
