@@ -525,28 +525,28 @@ function Security() {
     { icon: Ico.eyeOff(), bg: "rgb(254,243,199)", title: "Protection des données", text: "Vos informations personnelles ne sont jamais partagées avec des tiers." },
   ];
   return (
-    <section style={{ background: "#fff", padding: t ? "60px 20px" : "84px 62px" }}>
+    <section style={{ background: "#fff", padding: t ? "60px 16px" : "84px 62px" }}>
       <div style={{ display: "flex", flexDirection: t ? "column" : "row", gap: 56, maxWidth: 1316, margin: "0 auto", alignItems: t ? "stretch" : "center" }}>
         <div style={{ flex: 1 }}>
           <Badge text="Sécurité & Confiance" bg="rgb(240,253,244)" color={C.greenText} />
-          <h2 style={{ fontFamily: FONT, fontWeight: 700, fontSize: 48, lineHeight: 1.15, color: C.slate900, margin: "24px 0 16px", maxWidth: 530 }}>Vos fonds sont en sécurité avec nous</h2>
-          <p style={{ fontFamily: FONT, fontWeight: 400, fontSize: 24, lineHeight: 1.35, color: C.slate600, maxWidth: 707, marginBottom: 40 }}>Nous utilisons les mêmes standards de sécurité que les banques pour protéger vos transactions et vos données personnelles.</p>
+          <h2 style={{ fontFamily: FONT, fontWeight: 700, fontSize: t ? 32 : 48, lineHeight: 1.15, color: C.slate900, margin: "24px 0 16px", maxWidth: 530 }}>Vos fonds sont en sécurité avec nous</h2>
+          <p style={{ fontFamily: FONT, fontWeight: 400, fontSize: t ? 18 : 24, lineHeight: 1.35, color: C.slate600, maxWidth: 707, marginBottom: 40 }}>Nous utilisons les mêmes standards de sécurité que les banques pour protéger vos transactions et vos données personnelles.</p>
           <div style={{ display: "flex", flexDirection: "column", gap: 32 }}>
             {points.map((p) => (
               <div key={p.title} style={{ display: "flex", gap: 24, alignItems: "flex-start" }}>
                 <div style={{ width: 72, height: 72, borderRadius: 12, background: p.bg, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>{p.icon}</div>
                 <div>
-                  <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 24, color: C.slate900, marginBottom: 12 }}>{p.title}</div>
-                  <div style={{ fontFamily: FONT, fontWeight: 400, fontSize: 24, lineHeight: 1.3, color: C.slate600 }}>{p.text}</div>
+                  <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: t ? 20 : 24, color: C.slate900, marginBottom: 12 }}>{p.title}</div>
+                  <div style={{ fontFamily: FONT, fontWeight: 400, fontSize: t ? 16 : 24, lineHeight: 1.3, color: C.slate600 }}>{p.text}</div>
                 </div>
               </div>
             ))}
           </div>
         </div>
-        <div style={{ width: t ? "100%" : 617, maxWidth: 617, borderRadius: 32, background: "linear-gradient(136.87deg, rgb(33,192,94) -3.91%, rgb(11,94,94) 100.55%)", boxShadow: "0px 4px 12px rgba(33,192,94,0.25)", padding: 42, boxSizing: "border-box" }}>
+        <div style={{ width: t ? "100%" : 617, maxWidth: 617, borderRadius: 32, background: "linear-gradient(136.87deg, rgb(33,192,94) -3.91%, rgb(11,94,94) 100.55%)", boxShadow: "0px 4px 12px rgba(33,192,94,0.25)", padding: t ? 28 : 42, boxSizing: "border-box" }}>
           <div style={{ width: 93, height: 93, borderRadius: 20, background: "rgb(77,194,128)", boxShadow: "0px 20px 30px rgba(77,194,128,0.19)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 28 }}>{Ico.badgeCheck("#fff")}</div>
           <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 24, color: "#fff", marginBottom: 20 }}>Certifié conforme</div>
-          <p style={{ fontFamily: FONT, fontWeight: 400, fontSize: 24, lineHeight: 1.3, color: "rgb(211,239,224)", marginBottom: 28, maxWidth: 483 }}>Notre plateforme respecte les normes de sécurité les plus strictes et est conforme aux réglementations locales.</p>
+          <p style={{ fontFamily: FONT, fontWeight: 400, fontSize: t ? 18 : 24, lineHeight: 1.3, color: "rgb(211,239,224)", marginBottom: 28, maxWidth: 483 }}>Notre plateforme respecte les normes de sécurité les plus strictes et est conforme aux réglementations locales.</p>
           <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
             <div style={{ display: "flex", gap: 28 }}>
               <StatBox big="256-bit" small="Encryption SSL" />
