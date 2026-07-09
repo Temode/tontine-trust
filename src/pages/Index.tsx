@@ -6,6 +6,22 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React from "react";
 import { Link } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
+
+/* CTA sensible à l'état d'authentification */
+function useCtaTarget() {
+  const { user, roles } = useAuth();
+  const isAdmin = roles.includes("super_admin");
+  const href = user ? (isAdmin ? "/admin/overview" : "/dashboard") : "/auth";
+  return {
+    isAuthed: !!user,
+    href,
+    primaryLabel: user ? "Ouvrir mon espace" : "Commencer",
+    heroLabel: user ? "Aller à mon tableau de bord" : "Créer mon compte gratuit",
+    signInLabel: user ? "Mon tableau de bord" : "Se connecter",
+    stepLabel: user ? "Créer un nouveau groupe" : "Créer mon premier groupe",
+  };
+}
 
 const FONT =
   'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
@@ -223,30 +239,34 @@ function PayBadge({ label, bg, color = "#000", w = 72 }: any) {
 function Header() {
   const vw = useVW();
   const m = vw <= 860;
+  const xs = vw <= 420;
+  const cta = useCtaTarget();
   const nav = ["Fonctionnalités", "Comment ça marche", "Sécurité", "FAQ"];
   return (
     <header style={{
       height: 83, borderBottom: `1px solid rgb(241,245,249)`, background: C.white,
-      display: "flex", alignItems: "center", padding: m ? "0 20px" : "0 70px", boxSizing: "border-box",
+      display: "flex", alignItems: "center", padding: m ? "0 16px" : "0 70px", boxSizing: "border-box",
     }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 48, width: "100%", justifyContent: "space-between" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 16, width: "100%", justifyContent: "space-between" }}>
+        <Link to="/" style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0, textDecoration: "none" }}>
           <Logo size={m ? 42 : 49} />
-          <span style={{ fontFamily: FONT, fontWeight: 700, fontSize: m ? 20 : 24, color: C.ink }}>Tontine Digitale</span>
-        </div>
+          {!xs && (
+            <span style={{ fontFamily: FONT, fontWeight: 700, fontSize: m ? 18 : 24, color: C.ink, whiteSpace: "nowrap" }}>Tontine Digitale</span>
+          )}
+        </Link>
         <nav style={{ display: m ? "none" : "flex", alignItems: "center", gap: 48 }}>
           {nav.map((n) => (
             <a key={n} href="#" style={{ fontFamily: FONT, fontWeight: 400, fontSize: 18, color: C.slate600, textDecoration: "none", whiteSpace: "nowrap" }}>{n}</a>
           ))}
-          <Link to="/auth" style={{ fontFamily: FONT, fontWeight: 400, fontSize: 18, color: C.slate600, textDecoration: "none", whiteSpace: "nowrap" }}>Se connecter</Link>
+          <Link to={cta.href} style={{ fontFamily: FONT, fontWeight: 400, fontSize: 18, color: C.slate600, textDecoration: "none", whiteSpace: "nowrap" }}>{cta.signInLabel}</Link>
         </nav>
-        <Link to="/auth" style={{
+        <Link to={cta.href} style={{
           textDecoration: "none",
           display: "inline-flex", alignItems: "center", justifyContent: "center",
-          border: "none", cursor: "pointer", borderRadius: 16, padding: m ? "8px 18px" : "8px 24px", height: 50,
+          border: "none", cursor: "pointer", borderRadius: 16, padding: m ? "8px 14px" : "8px 24px", height: m ? 44 : 50,
           background: "linear-gradient(102.83deg, rgb(13,115,119) -27.08%, rgb(8,84,86) 147.38%)",
-          fontFamily: FONT, fontWeight: 700, fontSize: m ? 16 : 20, color: "#fff", flexShrink: 0,
-        }}>Commencer</Link>
+          fontFamily: FONT, fontWeight: 700, fontSize: m ? 15 : 20, color: "#fff", flexShrink: 0, whiteSpace: "nowrap",
+        }}>{cta.primaryLabel}</Link>
       </div>
     </header>
   );
@@ -327,10 +347,12 @@ function Hero() {
   const vw = useVW();
   const t = vw <= 980;
   const m = vw <= 620;
-  const scale = m ? 0.56 : t ? 0.78 : 1;
+  const xs = vw <= 460;
+  const scale = xs ? 0.48 : m ? 0.56 : t ? 0.78 : 1;
+  const cta = useCtaTarget();
   return (
     <section style={{
-      position: "relative", padding: t ? "40px 20px 0" : "64px 63px 0", boxSizing: "border-box", overflow: "hidden",
+      position: "relative", padding: t ? "40px 16px 0" : "64px 63px 0", boxSizing: "border-box", overflow: "hidden",
       backgroundImage: "linear-gradient(rgba(226,232,240,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(226,232,240,0.5) 1px, transparent 1px)",
       backgroundSize: "48px 48px",
     }}>
@@ -340,14 +362,14 @@ function Hero() {
             <span style={{ width: 12, height: 12, borderRadius: "50%", background: C.teal, display: "inline-block", flexShrink: 0 }} />
             <span style={{ fontFamily: FONT, fontWeight: 600, fontSize: m ? 14 : 16, color: C.ink }}>🇬🇳 Première plateforme de tontine digitale en Guinée</span>
           </div>
-          <h1 style={{ fontFamily: FONT, fontWeight: 700, fontSize: m ? 34 : t ? 46 : 60, lineHeight: 1.1, color: C.ink, margin: "36px 0 0", maxWidth: 583 }}>
+          <h1 style={{ fontFamily: FONT, fontWeight: 700, fontSize: xs ? 30 : m ? 36 : t ? 46 : 60, lineHeight: 1.1, color: C.ink, margin: "36px 0 0", maxWidth: 583 }}>
             Digitalisez vos<br />tontines en toute confiance
           </h1>
           <p style={{ fontFamily: FONT, fontWeight: 400, fontSize: 18, lineHeight: 1.4, color: C.slate600, margin: "28px 0 0", maxWidth: 583 }}>
             Gérez vos groupes d'épargne rotative facilement et en toute sécurité. Cotisez via Orange Money ou MTN Mobile Money, suivez vos tours et recevez votre cagnotte automatiquement.
           </p>
           <div style={{ display: "flex", gap: 16, marginTop: 34, flexWrap: "wrap" }}>
-            <Link to="/auth" style={{ textDecoration: "none", display: "inline-flex", alignItems: "center", border: "none", cursor: "pointer", borderRadius: 16, padding: "20px 30px", background: "linear-gradient(90deg, rgb(13,115,119) -16.34%, rgb(8,84,86) 84.48%)", fontFamily: FONT, fontWeight: 600, fontSize: 18, color: "#fff", boxShadow: "0px 2px 8px rgba(16,185,129,0.19)" }}>Créer mon compte gratuit</Link>
+            <Link to={cta.href} style={{ textDecoration: "none", display: "inline-flex", alignItems: "center", justifyContent: "center", border: "none", cursor: "pointer", borderRadius: 16, padding: "20px 30px", background: "linear-gradient(90deg, rgb(13,115,119) -16.34%, rgb(8,84,86) 84.48%)", fontFamily: FONT, fontWeight: 600, fontSize: 18, color: "#fff", boxShadow: "0px 2px 8px rgba(16,185,129,0.19)" }}>{cta.heroLabel}</Link>
             <button style={{ cursor: "pointer", borderRadius: 16, padding: "20px 30px", background: "#fff", border: "2px solid rgb(100,116,139)", fontFamily: FONT, fontWeight: 600, fontSize: 20, color: C.slate900, display: "flex", alignItems: "center", gap: 10 }}>
               {Ico.play(C.teal)} Voir comment ça marche
             </button>
@@ -369,7 +391,7 @@ function Hero() {
             <span style={{ fontFamily: FONT, fontWeight: 400, fontSize: 16, color: C.ink }}>(500+ avis)</span>
           </div>
         </div>
-        <div style={{ width: 583 * scale, height: 681 * scale, flexShrink: 0, position: "relative" }}>
+        <div style={{ width: 583 * scale, height: 681 * scale, flexShrink: 0, position: "relative", overflow: "hidden", maxWidth: "100%" }}>
           <div style={{ transform: `scale(${scale})`, transformOrigin: "top left" }}>
             <PhoneMock />
           </div>
@@ -424,6 +446,7 @@ function FeatureCard({ icon, iconBg, iconShadow, title, text }: any) {
 function Features() {
   const vw = useVW();
   const t = vw <= 980;
+  const m = vw <= 720;
   const row1 = [
     { icon: Ico.users("#fff"), iconBg: "rgb(249,155,91)", title: "Gestion de groupes", text: "Créez et gérez vos groupes de tontine facilement. Invitez des membres, définissez les règles et suivez la progression." },
     { icon: Ico.wallet("#fff"), iconBg: C.tealGrad, title: "Paiement Mobile Money", text: "Cotisez instantanément via Orange Money ou MTN Mobile Money. Recevez votre cagnotte directement sur votre compte." },
@@ -435,12 +458,12 @@ function Features() {
     { icon: Ico.chart("#fff"), iconBg: C.slate900, title: "Tableau de bord", text: "Visualisez vos statistiques, l'historique des transactions et la progression de tous vos groupes en un coup d'œil." },
   ];
   return (
-    <section style={{ padding: t ? "60px 20px" : "80px 64px", background: "#fff", textAlign: "center" }}>
+    <section style={{ padding: t ? "60px 16px" : "80px 64px", background: "#fff", textAlign: "center" }}>
       <Badge text="Fonctionnalités" bg="transparent" color={C.ink} />
       <h2 style={{ fontFamily: FONT, fontWeight: 700, fontSize: t ? 32 : 44, lineHeight: 1.15, color: C.ink, margin: "16px auto 24px", maxWidth: 729 }}>Tout ce dont vous avez besoin pour gérer vos tontines</h2>
       <p style={{ fontFamily: FONT, fontWeight: 400, fontSize: t ? 18 : 24, lineHeight: 1.35, color: C.slate900, margin: "0 auto 56px", maxWidth: 995 }}>Une plateforme complète qui modernise la tradition tout en préservant les valeurs de confiance et de solidarité.</p>
-      <div style={{ display: "flex", flexDirection: t ? "column" : "row", gap: 20, maxWidth: 1312, margin: "0 auto 20px" }}>{row1.map((c) => <FeatureCard key={c.title} {...c} />)}</div>
-      <div style={{ display: "flex", flexDirection: t ? "column" : "row", gap: 20, maxWidth: 1312, margin: "0 auto" }}>{row2.map((c) => <FeatureCard key={c.title} {...c} />)}</div>
+      <div style={{ display: "grid", gridTemplateColumns: m ? "1fr" : t ? "1fr 1fr" : "1fr 1fr 1fr", gap: 20, maxWidth: 1312, margin: "0 auto 20px" }}>{row1.map((c) => <FeatureCard key={c.title} {...c} />)}</div>
+      <div style={{ display: "grid", gridTemplateColumns: m ? "1fr" : t ? "1fr 1fr" : "1fr 1fr 1fr", gap: 20, maxWidth: 1312, margin: "0 auto" }}>{row2.map((c) => <FeatureCard key={c.title} {...c} />)}</div>
     </section>
   );
 }
@@ -464,19 +487,21 @@ function Step({ num, title, text, checks }: any) {
 function HowItWorks() {
   const vw = useVW();
   const t = vw <= 980;
+  const m = vw <= 720;
+  const cta = useCtaTarget();
   const steps = [
     { num: "1", title: "Créez votre groupe", text: "Inscrivez-vous gratuitement, créez votre groupe et définissez les paramètres : montant de cotisation, fréquence et nombre de membres.", checks: ["Inscription gratuite en 2 minutes", "Personnalisez les règles du groupe"] },
     { num: "2", title: "Invitez vos membres", text: "Partagez le lien d'invitation ou ajoutez les membres directement via leur numéro de téléphone. Ils recevront une notification.", checks: ["Invitation par SMS ou WhatsApp", "Validation par l'administrateur"] },
     { num: "3", title: "Cotisez et recevez", text: "Les membres cotisent via Mobile Money. À chaque tour, le bénéficiaire reçoit la cagnotte automatiquement sur son compte.", checks: ["Paiements instantanés", "Historique complet des transactions"] },
   ];
   return (
-    <section style={{ background: C.slate50, padding: t ? "60px 20px" : "84px 69px", textAlign: "center" }}>
+    <section style={{ background: C.slate50, padding: t ? "60px 16px" : "84px 69px", textAlign: "center" }}>
       <Badge text="Comment ça marche" bg={C.amberBg} color={C.amberText} />
       <h2 style={{ fontFamily: FONT, fontWeight: 700, fontSize: t ? 32 : 48, lineHeight: 1.15, color: C.slate900, margin: "24px auto", maxWidth: 729 }}>Lancez votre tontine en 3 étapes simples</h2>
       <p style={{ fontFamily: FONT, fontWeight: 400, fontSize: t ? 18 : 24, color: C.slate600, margin: "0 auto 56px", maxWidth: 995 }}>Pas besoin d'être un expert en technologie. Notre plateforme est conçue pour être simple et intuitive.</p>
-      <div style={{ display: "flex", flexDirection: t ? "column" : "row", gap: 36, maxWidth: 1302, margin: "0 auto", textAlign: "left" }}>{steps.map((s) => <Step key={s.num} {...s} />)}</div>
-      <Link to="/auth" style={{ textDecoration: "none", marginTop: 56, border: "none", cursor: "pointer", borderRadius: 20, padding: "22px 32px", background: C.tealGrad, fontFamily: FONT, fontWeight: 600, fontSize: 18, color: "#fff", display: "inline-flex", alignItems: "center", gap: 12 }}>
-        Créer mon premier groupe {Ico.arrow()}
+      <div style={{ display: "grid", gridTemplateColumns: m ? "1fr" : "repeat(3, 1fr)", gap: 36, maxWidth: 1302, margin: "0 auto", textAlign: "left" }}>{steps.map((s) => <Step key={s.num} {...s} />)}</div>
+      <Link to={cta.href} style={{ textDecoration: "none", marginTop: 56, border: "none", cursor: "pointer", borderRadius: 20, padding: "22px 32px", background: C.tealGrad, fontFamily: FONT, fontWeight: 600, fontSize: 18, color: "#fff", display: "inline-flex", alignItems: "center", gap: 12 }}>
+        {cta.stepLabel} {Ico.arrow()}
       </Link>
     </section>
   );
@@ -500,28 +525,28 @@ function Security() {
     { icon: Ico.eyeOff(), bg: "rgb(254,243,199)", title: "Protection des données", text: "Vos informations personnelles ne sont jamais partagées avec des tiers." },
   ];
   return (
-    <section style={{ background: "#fff", padding: t ? "60px 20px" : "84px 62px" }}>
+    <section style={{ background: "#fff", padding: t ? "60px 16px" : "84px 62px" }}>
       <div style={{ display: "flex", flexDirection: t ? "column" : "row", gap: 56, maxWidth: 1316, margin: "0 auto", alignItems: t ? "stretch" : "center" }}>
         <div style={{ flex: 1 }}>
           <Badge text="Sécurité & Confiance" bg="rgb(240,253,244)" color={C.greenText} />
-          <h2 style={{ fontFamily: FONT, fontWeight: 700, fontSize: 48, lineHeight: 1.15, color: C.slate900, margin: "24px 0 16px", maxWidth: 530 }}>Vos fonds sont en sécurité avec nous</h2>
-          <p style={{ fontFamily: FONT, fontWeight: 400, fontSize: 24, lineHeight: 1.35, color: C.slate600, maxWidth: 707, marginBottom: 40 }}>Nous utilisons les mêmes standards de sécurité que les banques pour protéger vos transactions et vos données personnelles.</p>
+          <h2 style={{ fontFamily: FONT, fontWeight: 700, fontSize: t ? 32 : 48, lineHeight: 1.15, color: C.slate900, margin: "24px 0 16px", maxWidth: 530 }}>Vos fonds sont en sécurité avec nous</h2>
+          <p style={{ fontFamily: FONT, fontWeight: 400, fontSize: t ? 18 : 24, lineHeight: 1.35, color: C.slate600, maxWidth: 707, marginBottom: 40 }}>Nous utilisons les mêmes standards de sécurité que les banques pour protéger vos transactions et vos données personnelles.</p>
           <div style={{ display: "flex", flexDirection: "column", gap: 32 }}>
             {points.map((p) => (
               <div key={p.title} style={{ display: "flex", gap: 24, alignItems: "flex-start" }}>
                 <div style={{ width: 72, height: 72, borderRadius: 12, background: p.bg, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>{p.icon}</div>
                 <div>
-                  <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 24, color: C.slate900, marginBottom: 12 }}>{p.title}</div>
-                  <div style={{ fontFamily: FONT, fontWeight: 400, fontSize: 24, lineHeight: 1.3, color: C.slate600 }}>{p.text}</div>
+                  <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: t ? 20 : 24, color: C.slate900, marginBottom: 12 }}>{p.title}</div>
+                  <div style={{ fontFamily: FONT, fontWeight: 400, fontSize: t ? 16 : 24, lineHeight: 1.3, color: C.slate600 }}>{p.text}</div>
                 </div>
               </div>
             ))}
           </div>
         </div>
-        <div style={{ width: t ? "100%" : 617, maxWidth: 617, borderRadius: 32, background: "linear-gradient(136.87deg, rgb(33,192,94) -3.91%, rgb(11,94,94) 100.55%)", boxShadow: "0px 4px 12px rgba(33,192,94,0.25)", padding: 42, boxSizing: "border-box" }}>
+        <div style={{ width: t ? "100%" : 617, maxWidth: 617, borderRadius: 32, background: "linear-gradient(136.87deg, rgb(33,192,94) -3.91%, rgb(11,94,94) 100.55%)", boxShadow: "0px 4px 12px rgba(33,192,94,0.25)", padding: t ? 28 : 42, boxSizing: "border-box" }}>
           <div style={{ width: 93, height: 93, borderRadius: 20, background: "rgb(77,194,128)", boxShadow: "0px 20px 30px rgba(77,194,128,0.19)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 28 }}>{Ico.badgeCheck("#fff")}</div>
           <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 24, color: "#fff", marginBottom: 20 }}>Certifié conforme</div>
-          <p style={{ fontFamily: FONT, fontWeight: 400, fontSize: 24, lineHeight: 1.3, color: "rgb(211,239,224)", marginBottom: 28, maxWidth: 483 }}>Notre plateforme respecte les normes de sécurité les plus strictes et est conforme aux réglementations locales.</p>
+          <p style={{ fontFamily: FONT, fontWeight: 400, fontSize: t ? 18 : 24, lineHeight: 1.3, color: "rgb(211,239,224)", marginBottom: 28, maxWidth: 483 }}>Notre plateforme respecte les normes de sécurité les plus strictes et est conforme aux réglementations locales.</p>
           <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
             <div style={{ display: "flex", gap: 28 }}>
               <StatBox big="256-bit" small="Encryption SSL" />
@@ -563,7 +588,7 @@ function Testimonials() {
     { quote: "\"On a créé une tontine entre collègues du bureau. L'application est simple à utiliser et le paiement par Orange Money est instantané. Je recommande !\"", initials: "AC", name: "Aissatou Camara", role: "Comptable, Kaloum", avatarBg: "rgb(33,193,92)" },
   ];
   return (
-    <section style={{ background: C.slate50, padding: t ? "60px 20px" : "84px 64px", textAlign: "center" }}>
+    <section style={{ background: C.slate50, padding: t ? "60px 16px" : "84px 64px", textAlign: "center" }}>
       <Badge text="Témoignages" bg="rgb(230,243,243)" color={C.amberText} />
       <h2 style={{ fontFamily: FONT, fontWeight: 700, fontSize: t ? 32 : 48, color: C.slate900, margin: "24px 0 48px" }}>Ce que disent nos utilisateurs</h2>
       <div style={{ display: "flex", flexDirection: t ? "column" : "row", gap: 28, maxWidth: 1310, margin: "0 auto", textAlign: "left" }}>{items.map((it) => <TestimonialCard key={it.name} {...it} />)}</div>
@@ -574,18 +599,19 @@ function Testimonials() {
 function CTA() {
   const vw = useVW();
   const t = vw <= 720;
+  const cta = useCtaTarget();
   return (
     <section style={{ background: "#fff", padding: t ? "60px 16px" : "114px 65px" }}>
       <div style={{ maxWidth: 1310, margin: "0 auto", borderRadius: t ? 32 : 56, background: C.tealGrad, padding: t ? "48px 24px" : "68px 40px", textAlign: "center" }}>
         <h2 style={{ fontFamily: FONT, fontWeight: 700, fontSize: t ? 28 : 40, color: "#fff", marginBottom: 20 }}>Prêt à digitaliser vos tontines ?</h2>
-        <p style={{ fontFamily: FONT, fontWeight: 400, fontSize: 22, lineHeight: 1.4, color: "rgb(204,242,244)", maxWidth: 900, margin: "0 auto 32px" }}>Rejoignez des milliers d'utilisateurs qui font déjà confiance à Tontine Digital pour gérer leurs épargnes collectives en toute sécurité.</p>
-        <div style={{ display: "flex", gap: 31, justifyContent: "center", flexWrap: "wrap" }}>
-          <Link to="/auth" style={{ textDecoration: "none", display: "inline-flex", alignItems: "center", border: "none", cursor: "pointer", borderRadius: 16, padding: "20px 30px", background: "#fff", fontFamily: FONT, fontWeight: 600, fontSize: 20, color: C.slate500 }}>Créer mon compte gratuit</Link>
-          <a href="tel:+224" style={{ textDecoration: "none", cursor: "pointer", borderRadius: 16, padding: "20px 30px", background: "rgb(43,106,108)", border: "0.5px solid rgb(148,163,184)", fontFamily: FONT, fontWeight: 600, fontSize: 20, color: "rgb(230,243,243)", display: "inline-flex", alignItems: "center", gap: 10 }}>
+        <p style={{ fontFamily: FONT, fontWeight: 400, fontSize: t ? 18 : 22, lineHeight: 1.4, color: "rgb(204,242,244)", maxWidth: 900, margin: "0 auto 32px" }}>Rejoignez des milliers d'utilisateurs qui font déjà confiance à Tontine Digital pour gérer leurs épargnes collectives en toute sécurité.</p>
+        <div style={{ display: "flex", gap: t ? 12 : 31, justifyContent: "center", flexWrap: "wrap" }}>
+          <Link to={cta.href} style={{ textDecoration: "none", display: "inline-flex", alignItems: "center", justifyContent: "center", border: "none", cursor: "pointer", borderRadius: 16, padding: "20px 30px", background: "#fff", fontFamily: FONT, fontWeight: 600, fontSize: 20, color: C.slate500 }}>{cta.heroLabel}</Link>
+          <a href="tel:+224" style={{ textDecoration: "none", cursor: "pointer", borderRadius: 16, padding: "20px 30px", background: "rgb(43,106,108)", border: "0.5px solid rgb(148,163,184)", fontFamily: FONT, fontWeight: 600, fontSize: 20, color: "rgb(230,243,243)", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
             {Ico.phone("#e6f3f3")} Nous contacter
           </a>
         </div>
-        <div style={{ fontFamily: FONT, fontWeight: 400, fontSize: 20, color: "rgb(152,227,231)", marginTop: 25 }}>✓ Gratuit pour commencer&nbsp;&nbsp;&nbsp;&nbsp;✓ Aucune carte bancaire requise&nbsp;&nbsp;&nbsp;&nbsp;✓ Support 24/7</div>
+        <div style={{ fontFamily: FONT, fontWeight: 400, fontSize: t ? 16 : 20, color: "rgb(152,227,231)", marginTop: 25 }}>✓ Gratuit pour commencer&nbsp;&nbsp;&nbsp;&nbsp;✓ Aucune carte bancaire requise&nbsp;&nbsp;&nbsp;&nbsp;✓ Support 24/7</div>
       </div>
     </section>
   );
@@ -600,7 +626,7 @@ function Footer() {
     { title: "Légal", links: ["Conditions d'utilisation", "Politique de confidentialité", "Mentions légales"] },
   ];
   return (
-    <footer style={{ background: C.footer, padding: t ? "46px 20px" : "46px 66px" }}>
+    <footer style={{ background: C.footer, padding: t ? "46px 16px" : "46px 66px" }}>
       <div style={{ maxWidth: 1309, margin: "0 auto" }}>
         <div style={{ display: "flex", gap: 48, justifyContent: "space-between", flexWrap: "wrap" }}>
           <div style={{ width: t ? "100%" : 476 }}>
@@ -611,28 +637,28 @@ function Footer() {
             <p style={{ fontFamily: FONT, fontWeight: 400, fontSize: 18, lineHeight: 1.4, color: C.footerGray, marginBottom: 24, maxWidth: 420 }}>La première plateforme de gestion de tontines digitales en Guinée. Sécurisée, transparente et accessible à tous.</p>
             <div style={{ display: "flex", gap: 20 }}>
               {[Social.facebook, Social.x, Social.instagram, Social.linkedin].map((s, i) => (
-                <div key={i} style={{ width: 70, height: 70, borderRadius: 12, background: C.footerCard, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>{s}</div>
+                <div key={i} style={{ width: t ? 52 : 70, height: t ? 52 : 70, borderRadius: 12, background: C.footerCard, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>{s}</div>
               ))}
             </div>
           </div>
-          <div style={{ display: "flex", gap: 32, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: 32, flexWrap: "wrap", width: t ? "100%" : "auto" }}>
             {cols.map((col) => (
-              <div key={col.title} style={{ width: 209 }}>
-                <div style={{ fontFamily: FONT, fontWeight: 600, fontSize: 20, color: C.slate50, marginBottom: 32 }}>{col.title}</div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              <div key={col.title} style={{ width: t ? "45%" : 209, minWidth: 140 }}>
+                <div style={{ fontFamily: FONT, fontWeight: 600, fontSize: 20, color: C.slate50, marginBottom: t ? 16 : 32 }}>{col.title}</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                   {col.links.map((l) => (
-                    <a key={l} href="#" style={{ fontFamily: FONT, fontWeight: 400, fontSize: 18, color: C.footerGray, textDecoration: "none" }}>{l}</a>
+                    <a key={l} href="#" style={{ fontFamily: FONT, fontWeight: 400, fontSize: 16, color: C.footerGray, textDecoration: "none" }}>{l}</a>
                   ))}
                 </div>
               </div>
             ))}
           </div>
         </div>
-        <div style={{ height: 1, background: C.footerCard, margin: "60px 0 40px" }} />
+        <div style={{ height: 1, background: C.footerCard, margin: t ? "40px 0 24px" : "60px 0 40px" }} />
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 24 }}>
-          <span style={{ fontFamily: FONT, fontWeight: 600, fontSize: 18, color: C.slate500 }}>© 2024 Tontine Digital. Tous droits réservés.</span>
-          <div style={{ display: "flex", alignItems: "center", gap: 28 }}>
-            <span style={{ fontFamily: FONT, fontWeight: 600, fontSize: 18, color: C.slate500 }}>Paiements sécurisés via</span>
+          <span style={{ fontFamily: FONT, fontWeight: 600, fontSize: t ? 14 : 18, color: C.slate500 }}>© 2024 Tontine Digital. Tous droits réservés.</span>
+          <div style={{ display: "flex", alignItems: "center", gap: t ? 12 : 28, flexWrap: "wrap" }}>
+            <span style={{ fontFamily: FONT, fontWeight: 600, fontSize: t ? 14 : 18, color: C.slate500 }}>Paiements sécurisés via</span>
             <PayBadge label="OM" bg="rgb(249,155,91)" color="#000" />
             <PayBadge label="M" bg="rgb(255,204,2)" color="#000" />
             <PayBadge label="VISA" bg="rgb(199,210,254)" color="rgb(30,41,59)" w={88} />
