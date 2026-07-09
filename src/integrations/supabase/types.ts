@@ -4321,6 +4321,32 @@ export type Database = {
           roles: string[] | null
           suspended_at: string | null
         }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string | null
+          deleted_at?: string | null
+          email?: never
+          full_name?: string | null
+          groups_count?: never
+          id?: string | null
+          phone_number?: string | null
+          reliability_score?: number | null
+          roles?: never
+          suspended_at?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string | null
+          deleted_at?: string | null
+          email?: never
+          full_name?: string | null
+          groups_count?: never
+          id?: string | null
+          phone_number?: string | null
+          reliability_score?: number | null
+          roles?: never
+          suspended_at?: string | null
+        }
         Relationships: []
       }
       audit_log_view: {
