@@ -1,38 +1,69 @@
-## Diagnostic provisoire
+## Diagnostic
 
-- Le domaine email Lovable a bien été supprimé : il ne doit plus piloter les emails Tontine Digitale.
-- Resend envoie bien des emails OTP : le backend a enregistré des envois `signup` et `recovery` acceptés par Resend avec identifiant fournisseur.
-- Les logs récents ne montrent aucun appel au flux OTP depuis l’app au moment du problème signalé : cela indique probablement que le test a été fait sur une version publiée/stale qui utilise encore l’ancien flux natif.
-- Les captures suggèrent aussi une confusion possible entre deux boîtes/adresses différentes : Resend affiche un OTP envoyé à une adresse de test, tandis que Yopmail montre un ancien email “Tontine-Trust” venant du sender Lovable par défaut.
-- Le bouton “Publier la correction” est visible : la correction OTP semble disponible en prévisualisation, mais pas encore appliquée au domaine publié/custom domain.
+Les logs de l'edge function `auth-otp` montrent, pour un code fraîchement envoyé et saisi dans les secondes qui suivent :
 
-## Plan de correction
+```
+verify_signup failed { errMessage: "Token has expired or is invalid", errStatus: 403 }
+verify_signup retry(email) failed { errMessage: "Token has expired or is invalid" }
+```
 
-1. **Audit de bout en bout sur la même adresse email**
-   - Tester l’inscription depuis la prévisualisation.
-   - Vérifier que l’app appelle le flux OTP Resend, pas l’ancien flux email natif.
-   - Vérifier que le code reçu dans Resend correspond bien à l’écran “Vérifiez votre email”.
+Le code envoyé par email est bien celui généré côté serveur (`email_otp` de `admin.generateLink`), mais Supabase le refuse immédiatement. La cause quasi-certaine : **le paramètre Auth `auto_confirm_email` est activé** sur le projet. Dans ce mode, `generateLink({type:"signup"})` crée le compte **et le marque confirmé instantanément** → l'OTP renvoyé n'a plus rien à confirmer et sort en `expired/invalid` dès la première tentative.
 
-2. **Verrouiller le flux d’inscription**
-   - S’assurer qu’aucun chemin de signup, reset password ou vérification email ne déclenche encore l’email natif par défaut.
-   - Garder Resend comme canal unique pour les codes OTP d’inscription et de réinitialisation.
-   - Ne pas recréer le domaine email Lovable `notify.tontinedigitale.com`, car Hostinger ne permet pas la délégation NS nécessaire.
+Effet secondaire à connaître : le compte `saaddaan@yopmail.com` existe désormais en base (créé au premier `signup_start`), donc les prochains `signup_start` sur ce mail renverront `email_exists` tant qu'il n'est pas supprimé.
 
-3. **Redéployer la partie backend OTP**
-   - Redéployer la fonction d’envoi OTP pour garantir que la version active est bien celle qui utilise Resend.
-   - Vérifier les logs après un test réel : email envoyé, code généré, statut accepté par Resend.
+## Ce qu'il faut faire
 
-4. **Publier la correction sur le domaine public**
-   - Publier l’app pour que `tontinedigitale.com` utilise le même flux OTP que la prévisualisation.
-   - C’est probablement l’étape manquante qui explique pourquoi l’ancien email `auth.lovable.cloud` continue d’arriver côté domaine public.
+### 1. Désactiver l'auto-confirmation email
 
-5. **Validation finale à la hauteur de Tontine Digitale**
-   - Créer un compte test avec une adresse unique.
-   - Confirmer que l’email reçu vient de `Tontine Digitale <noreply@tontinedigitale.com>`.
-   - Confirmer que l’email contient un code OTP à 6 chiffres.
-   - Saisir ce code dans l’app et vérifier l’accès au tableau de bord.
-   - Confirmer qu’aucun nouvel email `Tontine-Trust <no-reply@auth.lovable.cloud>` n’est généré pendant ce test.
+Appliquer via `supabase--configure_auth` :
 
-## Résultat attendu
+- `auto_confirm_email: false`
+- `disable_signup: false`
+- `external_anonymous_users_enabled: false`
+- `password_hibp_enabled: true` (bonne pratique, laisser tel quel s'il est déjà à true)
 
-Après approbation, je corrige et vérifie le flux complet : l’inscription et la réinitialisation passent uniquement par Resend, avec code OTP visible, puis je publie la correction pour que le domaine public arrête d’utiliser l’ancien email Lovable.
+Après ça, `generateLink({type:"signup"})` retournera un OTP effectivement consommable par `verifyOtp`.
+
+### 2. Nettoyer l'edge function `auth-otp`
+
+Une fois le vrai problème corrigé, le fallback ajouté au tour précédent (`type: "email"`) n'a plus lieu d'être et masque de futurs vrais bugs. Retour à la forme simple :
+
+- `verifyOtp({ email, token, type: "signup" })`
+- En cas d'échec, logger `error.message` et renvoyer `invalid_code`
+- Aucun `retry(email)`
+
+### 3. Purger le compte de test bloqué
+
+Le compte `saaddaan@yopmail.com` a été créé et auto-confirmé pendant le bug. Pour rejouer le test de bout en bout :
+
+- Supprimer l'utilisateur (via `supabase.auth.admin.deleteUser`) — je le ferai en mode build par un appel one-shot, sans exposer l'ID en clair côté utilisateur.
+- Alternative si le compte doit être conservé : tester avec un email neuf (`audit-otp-YYYYMMDD-hhmm@yopmail.com`).
+
+### 4. Vérification
+
+- Redéploiement de `auth-otp`.
+- Test end-to-end via le preview : inscription → réception de l'email Resend → saisie du code copié/collé → arrivée sur `/dashboard`.
+- Lecture des logs `auth-otp` pour confirmer l'absence de `verify_signup failed`.
+
+## Détails techniques
+
+```text
+Cause :   auto_confirm_email = true
+          └─ generateLink(signup) crée + confirme le user
+             └─ email_otp retourné mais déjà "consommé" côté Auth
+                └─ verifyOtp → 403 "Token has expired or is invalid"
+
+Correctif : auto_confirm_email = false
+          └─ user créé mais non confirmé
+             └─ email_otp reste valide 1 h
+                └─ verifyOtp(signup) → session OK
+```
+
+Fichiers touchés :
+- `supabase/functions/auth-otp/index.ts` (retrait du fallback + log net)
+- Aucun changement front, aucune migration SQL
+
+Ce qui n'est pas fait :
+- Pas de changement des templates emails Resend
+- Pas de rotation de clés
+- Pas de republication (la fonction edge est prise en compte automatiquement)

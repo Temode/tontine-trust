@@ -226,19 +226,8 @@ async function verifySignup(admin: ReturnType<typeof createClient>, anon: Return
       email,
       hasSession: !!data?.session,
       errMessage: error?.message,
-      errStatus: (error as { status?: number } | null)?.status,
     });
-    // Fallback: certains projets renvoient l'OTP en type "email" (email confirmation).
-    const retry = await anon.auth.verifyOtp({ email, token, type: "email" });
-    if (retry.error || !retry.data.session) {
-      console.error("[auth-otp] verify_signup retry(email) failed", {
-        errMessage: retry.error?.message,
-      });
-      return json({ error: "invalid_code" }, 400);
-    }
-    const tokenHashRetry = await sha256(`${await sha256(email)}:signup:${token}`);
-    await markConsumed(admin, tokenHashRetry);
-    return json({ success: true, session: retry.data.session });
+    return json({ error: "invalid_code" }, 400);
   }
 
   const tokenHash = await sha256(`${await sha256(email)}:signup:${token}`);
