@@ -626,7 +626,7 @@ function Footer() {
     { title: "Légal", links: ["Conditions d'utilisation", "Politique de confidentialité", "Mentions légales"] },
   ];
   return (
-    <footer style={{ background: C.footer, padding: t ? "46px 20px" : "46px 66px" }}>
+    <footer style={{ background: C.footer, padding: t ? "46px 16px" : "46px 66px" }}>
       <div style={{ maxWidth: 1309, margin: "0 auto" }}>
         <div style={{ display: "flex", gap: 48, justifyContent: "space-between", flexWrap: "wrap" }}>
           <div style={{ width: t ? "100%" : 476 }}>
@@ -637,28 +637,28 @@ function Footer() {
             <p style={{ fontFamily: FONT, fontWeight: 400, fontSize: 18, lineHeight: 1.4, color: C.footerGray, marginBottom: 24, maxWidth: 420 }}>La première plateforme de gestion de tontines digitales en Guinée. Sécurisée, transparente et accessible à tous.</p>
             <div style={{ display: "flex", gap: 20 }}>
               {[Social.facebook, Social.x, Social.instagram, Social.linkedin].map((s, i) => (
-                <div key={i} style={{ width: 70, height: 70, borderRadius: 12, background: C.footerCard, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>{s}</div>
+                <div key={i} style={{ width: t ? 52 : 70, height: t ? 52 : 70, borderRadius: 12, background: C.footerCard, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>{s}</div>
               ))}
             </div>
           </div>
-          <div style={{ display: "flex", gap: 32, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: 32, flexWrap: "wrap", width: t ? "100%" : "auto" }}>
             {cols.map((col) => (
-              <div key={col.title} style={{ width: 209 }}>
-                <div style={{ fontFamily: FONT, fontWeight: 600, fontSize: 20, color: C.slate50, marginBottom: 32 }}>{col.title}</div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              <div key={col.title} style={{ width: t ? "45%" : 209, minWidth: 140 }}>
+                <div style={{ fontFamily: FONT, fontWeight: 600, fontSize: 20, color: C.slate50, marginBottom: t ? 16 : 32 }}>{col.title}</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                   {col.links.map((l) => (
-                    <a key={l} href="#" style={{ fontFamily: FONT, fontWeight: 400, fontSize: 18, color: C.footerGray, textDecoration: "none" }}>{l}</a>
+                    <a key={l} href="#" style={{ fontFamily: FONT, fontWeight: 400, fontSize: 16, color: C.footerGray, textDecoration: "none" }}>{l}</a>
                   ))}
                 </div>
               </div>
             ))}
           </div>
         </div>
-        <div style={{ height: 1, background: C.footerCard, margin: "60px 0 40px" }} />
+        <div style={{ height: 1, background: C.footerCard, margin: t ? "40px 0 24px" : "60px 0 40px" }} />
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 24 }}>
-          <span style={{ fontFamily: FONT, fontWeight: 600, fontSize: 18, color: C.slate500 }}>© 2024 Tontine Digital. Tous droits réservés.</span>
-          <div style={{ display: "flex", alignItems: "center", gap: 28 }}>
-            <span style={{ fontFamily: FONT, fontWeight: 600, fontSize: 18, color: C.slate500 }}>Paiements sécurisés via</span>
+          <span style={{ fontFamily: FONT, fontWeight: 600, fontSize: t ? 14 : 18, color: C.slate500 }}>© 2024 Tontine Digital. Tous droits réservés.</span>
+          <div style={{ display: "flex", alignItems: "center", gap: t ? 12 : 28, flexWrap: "wrap" }}>
+            <span style={{ fontFamily: FONT, fontWeight: 600, fontSize: t ? 14 : 18, color: C.slate500 }}>Paiements sécurisés via</span>
             <PayBadge label="OM" bg="rgb(249,155,91)" color="#000" />
             <PayBadge label="M" bg="rgb(255,204,2)" color="#000" />
             <PayBadge label="VISA" bg="rgb(199,210,254)" color="rgb(30,41,59)" w={88} />
