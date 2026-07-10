@@ -226,18 +226,26 @@ export default function VerifyEmail() {
           </div>
 
           <div className="mt-6 flex flex-col items-center gap-2 text-center">
-            <button
-              type="button"
-              onClick={handleResend}
-              disabled={countdown > 0 || resending}
-              className="text-sm font-semibold text-primary transition hover:underline disabled:cursor-not-allowed disabled:text-foreground/40 disabled:no-underline"
-            >
-              {resending
-                ? "Envoi en cours…"
-                : countdown > 0
-                ? `Renvoyer le code dans ${countdown}s`
-                : "Renvoyer le code"}
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleResend}
+                disabled={countdown > 0 || resending}
+                aria-disabled={countdown > 0 || resending}
+                className="text-sm font-semibold text-primary transition hover:underline disabled:cursor-not-allowed disabled:text-foreground/40 disabled:no-underline"
+              >
+                {resending ? "Envoi en cours…" : "Renvoyer le code"}
+              </button>
+              {countdown > 0 && !resending && (
+                <span
+                  role="timer"
+                  aria-live="polite"
+                  className="inline-flex min-w-[3.5rem] justify-center rounded-full border border-foreground/10 bg-foreground/5 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-foreground/60"
+                >
+                  {countdown}s
+                </span>
+              )}
+            </div>
             <Link
               to="/auth"
               className="text-[12px] text-foreground/50 hover:text-foreground/80"
