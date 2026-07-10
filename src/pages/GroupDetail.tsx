@@ -42,6 +42,7 @@ import { InvitePanel, INVITE_PANEL_ID } from "@/components/groups/InvitePanel";
 import { GroupChat } from "@/components/group/GroupChat";
 import { PayoutHoldHistory } from "@/components/balance/PayoutHoldHistory";
 import { AnnouncementsPanel } from "@/components/group/AnnouncementsPanel";
+import { SmsRechargePanel } from "@/components/group/SmsRechargePanel";
 import { AuditLog } from "@/components/group/AuditLog";
 import { SwapsPanel } from "@/components/group/SwapsPanel";
 import { AuctionPanel } from "@/components/group/AuctionPanel";
@@ -735,6 +736,8 @@ export default function GroupDetail() {
         )}
 
         <AnnouncementsPanel groupId={grp.id} isOrganizer={isOrganizer} />
+
+        <SmsRechargePanel groupId={grp.id} />
 
         <div className="mt-6 inline-flex items-center gap-1 rounded-lg border border-hairline bg-card p-1" role="tablist" aria-label="Sections du groupe">
           {tabs.map((tab) => (

@@ -1,4 +1,4 @@
-import { LogOut, RefreshCw, AlertTriangle, Camera, Loader2, Bell, Shield, BadgeCheck, MailCheck, MailWarning } from "lucide-react";
+import { LogOut, RefreshCw, AlertTriangle, Camera, Loader2, Bell, Shield, BadgeCheck, MailCheck, MailWarning, MessageSquare } from "lucide-react";
 import { toast } from "sonner";
 import { Link, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -13,6 +13,7 @@ import {
 } from "@/lib/api/reliability";
 import { getMyProfile, uploadAvatar, refreshAvatarSignedUrl } from "@/lib/api/profile";
 import { getMyKyc, KYC_LEVEL_LABEL } from "@/lib/api/kyc";
+import { getMySmsWallet, listMySmsOrders } from "@/lib/api/smsWallet";
 import { useRef } from "react";
 import { formatGNF } from "@/lib/format";
 
@@ -24,6 +25,8 @@ export default function Profile() {
 
   const profileQ = useQuery({ queryKey: ["profile", "mine"], queryFn: getMyProfile });
   const kycQ = useQuery({ queryKey: ["kyc", "mine"], queryFn: getMyKyc });
+  const walletQ = useQuery({ queryKey: ["sms-wallet", "mine"], queryFn: getMySmsWallet });
+  const smsOrdersQ = useQuery({ queryKey: ["sms-orders", "mine"], queryFn: () => listMySmsOrders(20) });
 
   const uploadM = useMutation({
     mutationFn: (file: File) => uploadAvatar(file),
@@ -226,6 +229,51 @@ export default function Profile() {
             </ul>
           </SectionCard>
         )}
+
+        <SectionCard
+          title="Forfait SMS"
+          subtitle={`Solde : ${walletQ.data?.balance_remaining ?? 0} SMS · ${walletQ.data?.total_purchased ?? 0} achetés · ${walletQ.data?.total_consumed ?? 0} envoyés`}
+          bare
+        >
+          {(smsOrdersQ.data ?? []).length === 0 ? (
+            <p className="px-5 py-4 text-xs text-muted-foreground lg:px-6">
+              Aucune commande SMS pour l'instant. Rechargez depuis un groupe.
+            </p>
+          ) : (
+            <ul className="divide-y divide-border/60">
+              {(smsOrdersQ.data ?? []).map((o) => {
+                const tone =
+                  o.status === "credited" ? "text-success"
+                  : o.status === "failed" || o.status === "cancelled" ? "text-destructive"
+                  : "text-muted-foreground";
+                const label =
+                  o.status === "credited" ? "Créditée"
+                  : o.status === "paid" ? "Payée"
+                  : o.status === "failed" ? "Échouée"
+                  : o.status === "cancelled" ? "Annulée"
+                  : "En attente";
+                return (
+                  <li key={o.id} className="flex items-center gap-3 px-5 py-3 lg:px-6">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-md bg-primary/10 text-primary">
+                      <MessageSquare className="h-4 w-4" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-foreground">
+                        {o.qty} SMS · {o.pack_id ?? "pack"}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {new Date(o.created_at).toLocaleString("fr-FR")} · <span className={tone}>{label}</span>
+                      </p>
+                    </div>
+                    <p className="font-display text-sm font-semibold text-foreground num">
+                      {formatGNF(o.amount)} GNF
+                    </p>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </SectionCard>
 
         <button
           type="button"

@@ -124,6 +124,30 @@ Deno.serve(async (req) => {
     return json({ ok: true, subscriptionId, status: newStatus });
   }
 
+  // Routage recharge SMS (M5) : purpose=sms_order ou ref = sms_orders.id
+  let smsOrderId: string | null = null;
+  if (purpose === "sms_order" && merchantRef) {
+    smsOrderId = merchantRef;
+  } else if (merchantRef) {
+    const { data: oRow } = await admin
+      .from("sms_orders").select("id")
+      .eq("id", merchantRef).maybeSingle();
+    if (oRow) smsOrderId = oRow.id;
+  }
+  if (smsOrderId) {
+    if (!newStatus) return json({ ok: true, ignored: "unhandled_event" }, 200);
+    const { error: smsErr } = await admin.rpc("apply_sms_order_webhook", {
+      _order_id: smsOrderId,
+      _new_status: newStatus,
+      _djomy_ref: transactionId,
+    });
+    if (smsErr) {
+      console.error("[djomy-webhook] sms order rpc error", smsErr);
+      return json({ ok: false, error: smsErr.message }, 500);
+    }
+    return json({ ok: true, smsOrderId, status: newStatus });
+  }
+
   // Routage cautions : si purpose=deposit ou si le ref correspond à un member_deposit
   let depositId: string | null = null;
   if (purpose === "deposit" && merchantRef) {
