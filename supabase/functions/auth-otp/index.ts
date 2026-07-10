@@ -30,6 +30,16 @@ const RECENT_LIMIT = 3;
 const OTP_TTL_MINUTES = 15;
 
 type Purpose = "signup" | "recovery";
+type TriggerSource =
+  | "signup_start"
+  | "signup_resend_manual"
+  | "signup_resend_legacy_login"
+  | "recovery_start";
+
+function metric(event: string, fields: Record<string, unknown>) {
+  // Log structuré JSON pour ingestion / dashboard monitoring.
+  console.log(JSON.stringify({ metric: `auth_otp.${event}`, ts: new Date().toISOString(), ...fields }));
+}
 
 function normalizeEmail(value: unknown): string | null {
   if (typeof value !== "string") return null;
@@ -67,6 +77,7 @@ async function logOtp(admin: ReturnType<typeof createClient>, args: {
   status: "sent" | "failed" | "consumed";
   errorMessage?: string | null;
   expiresAt?: string;
+  triggerSource?: TriggerSource;
 }) {
   const { error } = await admin.from("auth_otp_requests").insert({
     email: args.email,
@@ -77,6 +88,7 @@ async function logOtp(admin: ReturnType<typeof createClient>, args: {
     status: args.status,
     error_message: args.errorMessage ?? null,
     expires_at: args.expiresAt ?? new Date(Date.now() + OTP_TTL_MINUTES * 60_000).toISOString(),
+    trigger_source: args.triggerSource ?? null,
   });
   if (error) console.error("[auth-otp] log insert failed", error);
 }
@@ -88,6 +100,44 @@ async function markConsumed(admin: ReturnType<typeof createClient>, tokenHash: s
     .eq("token_hash", tokenHash)
     .in("status", ["sent", "failed"]);
   if (error) console.error("[auth-otp] consume update failed", error);
+}
+
+// Invalide toutes les OTP `sent` précédentes pour cet email + purpose,
+// afin qu'un ancien code ne puisse plus être validé après un renvoi.
+async function invalidatePreviousOtps(
+  admin: ReturnType<typeof createClient>,
+  emailHash: string,
+  purpose: Purpose,
+) {
+  const { error, count } = await admin
+    .from("auth_otp_requests")
+    .update({
+      status: "consumed",
+      consumed_at: new Date().toISOString(),
+      error_message: "superseded_by_new_otp",
+    }, { count: "exact" })
+    .eq("email_hash", emailHash)
+    .eq("purpose", purpose)
+    .eq("status", "sent");
+  if (error) {
+    console.error("[auth-otp] invalidate previous failed", error);
+    return 0;
+  }
+  return count ?? 0;
+}
+
+async function isAdminEmail(admin: ReturnType<typeof createClient>, userId: string): Promise<boolean> {
+  const { data, error } = await admin
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", userId);
+  if (error) {
+    console.error("[auth-otp] user_roles lookup failed", error);
+    return false;
+  }
+  return (data ?? []).some((r: { role: string }) =>
+    r.role === "admin" || r.role === "super_admin"
+  );
 }
 
 function generateNumericCode(): string {
@@ -223,10 +273,12 @@ async function findOtpForVerification(
 
 async function issueOtp(
   admin: ReturnType<typeof createClient>,
-  args: { email: string; emailHash: string; purpose: Purpose },
+  args: { email: string; emailHash: string; purpose: Purpose; triggerSource: TriggerSource },
 ) {
+  const superseded = await invalidatePreviousOtps(admin, args.emailHash, args.purpose);
   const token = generateNumericCode();
   const tokenHash = await sha256(`${args.emailHash}:${args.purpose}:${token}`);
+  const expiresAt = new Date(Date.now() + OTP_TTL_MINUTES * 60_000).toISOString();
   const sent = await sendOtpEmail({
     email: args.email,
     purpose: args.purpose,
@@ -241,8 +293,19 @@ async function issueOtp(
     providerMessageId: sent.id,
     status: sent.ok ? "sent" : "failed",
     errorMessage: sent.ok ? null : `Resend ${sent.status}: ${sent.body.slice(0, 500)}`,
+    expiresAt,
+    triggerSource: args.triggerSource,
   });
-  return sent;
+  metric(sent.ok ? "issued" : "issue_failed", {
+    purpose: args.purpose,
+    trigger: args.triggerSource,
+    email_hash: args.emailHash,
+    superseded,
+    resend_status: sent.status,
+    provider_message_id: sent.id,
+    error: sent.ok ? null : sent.body.slice(0, 200),
+  });
+  return { ...sent, expiresAt };
 }
 
 async function startSignup(admin: ReturnType<typeof createClient>, body: Record<string, unknown>) {
@@ -286,20 +349,26 @@ async function startSignup(admin: ReturnType<typeof createClient>, body: Record<
     }
   }
 
-  const sent = await issueOtp(admin, { email, emailHash, purpose: "signup" });
+  const sent = await issueOtp(admin, { email, emailHash, purpose: "signup", triggerSource: "signup_start" });
   if (!sent.ok) {
     console.error("[auth-otp] resend failed (signup)", { status: sent.status, body: sent.body });
     return json({ error: sent.status === 500 ? "email_not_configured" : "email_send_failed" }, 502);
   }
-  return json({ success: true });
+  return json({ success: true, expiresAt: sent.expiresAt });
 }
 
 async function resendSignup(admin: ReturnType<typeof createClient>, body: Record<string, unknown>) {
   const email = normalizeEmail(body.email);
   if (!email) return json({ error: "invalid_email" }, 400);
 
+  const trigger: TriggerSource =
+    body.trigger === "legacy_login" ? "signup_resend_legacy_login" : "signup_resend_manual";
+
   const emailHash = await sha256(email);
-  if (await checkRateLimit(admin, emailHash, "signup")) return json({ error: "rate_limited" }, 429);
+  if (await checkRateLimit(admin, emailHash, "signup")) {
+    metric("rate_limited", { purpose: "signup", trigger, email_hash: emailHash });
+    return json({ error: "rate_limited" }, 429);
+  }
 
   const existing = await findExistingUser(admin, email);
   // On ne divulgue pas l'existence d'un compte confirmé.
@@ -309,12 +378,13 @@ async function resendSignup(admin: ReturnType<typeof createClient>, body: Record
     if (meta?.otp_verified === true) return json({ error: "email_exists" }, 400);
   }
 
-  const sent = await issueOtp(admin, { email, emailHash, purpose: "signup" });
+  const isAdmin = await isAdminEmail(admin, existing.id);
+  const sent = await issueOtp(admin, { email, emailHash, purpose: "signup", triggerSource: trigger });
   if (!sent.ok) {
     console.error("[auth-otp] resend failed (signup resend)", { status: sent.status, body: sent.body });
     return json({ error: sent.status === 500 ? "email_not_configured" : "email_send_failed" }, 502);
   }
-  return json({ success: true });
+  return json({ success: true, expiresAt: sent.expiresAt, isAdmin });
 }
 
 async function startRecovery(admin: ReturnType<typeof createClient>, body: Record<string, unknown>) {
@@ -328,12 +398,12 @@ async function startRecovery(admin: ReturnType<typeof createClient>, body: Recor
   // Ne divulgue pas l'existence du compte.
   if (!existing) return json({ success: true });
 
-  const sent = await issueOtp(admin, { email, emailHash, purpose: "recovery" });
+  const sent = await issueOtp(admin, { email, emailHash, purpose: "recovery", triggerSource: "recovery_start" });
   if (!sent.ok) {
     console.error("[auth-otp] resend failed (recovery)", { status: sent.status, body: sent.body });
     return json({ error: sent.status === 500 ? "email_not_configured" : "email_send_failed" }, 502);
   }
-  return json({ success: true });
+  return json({ success: true, expiresAt: sent.expiresAt });
 }
 
 async function verifySignup(
