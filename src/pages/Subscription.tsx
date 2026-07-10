@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Input } from "@/components/ui/input";
+import { Progress } from "@/components/ui/progress";
 import { TopBar } from "@/components/layout/TopBar";
 import { formatGNF } from "@/lib/format";
 import { toast } from "sonner";
@@ -149,6 +150,21 @@ export default function Subscription() {
 
   const currentPlan = entitlements.plan_code;
 
+  const maxGroups = entitlements.limits.max_groups;
+  const maxMembers = entitlements.limits.max_members_per_group;
+  const groupsUsed = entitlements.usage.groups;
+  const membersUsed = entitlements.usage.max_members_in_group;
+  const groupsRemaining = maxGroups === -1 ? Infinity : Math.max(0, maxGroups - groupsUsed);
+  const membersRemaining = maxMembers === -1 ? Infinity : Math.max(0, maxMembers - membersUsed);
+  const groupsPct = maxGroups === -1 ? 0 : Math.min(100, Math.round((groupsUsed / Math.max(maxGroups, 1)) * 100));
+  const membersPct = maxMembers === -1 ? 0 : Math.min(100, Math.round((membersUsed / Math.max(maxMembers, 1)) * 100));
+  const needsUpgrade =
+    (maxGroups !== -1 && groupsUsed >= maxGroups) ||
+    (maxMembers !== -1 && membersUsed >= maxMembers);
+  const nearLimit =
+    !needsUpgrade &&
+    ((maxGroups !== -1 && groupsPct >= 80) || (maxMembers !== -1 && membersPct >= 80));
+
   return (
     <div className="animate-fade-in">
       <TopBar title="Abonnement" subtitle="Choisissez le plan adapté à vos tontines" />
@@ -158,6 +174,64 @@ export default function Subscription() {
             Votre abonnement est expiré ou en défaut de paiement — l'application est en <strong>mode lecture seule</strong>. Choisissez un plan pour réactiver vos groupes.
           </div>
         )}
+
+        {/* Usage & upgrade hint */}
+        <section
+          data-testid="entitlements-usage"
+          className={`rounded-lg border p-4 lg:p-5 ${
+            needsUpgrade
+              ? "border-destructive/40 bg-destructive/5"
+              : nearLimit
+                ? "border-amber-500/40 bg-amber-500/10"
+                : "border-hairline bg-card"
+          }`}
+        >
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <div className="flex items-baseline justify-between text-sm">
+                <span className="font-medium">Groupes</span>
+                <span className="font-mono text-muted-foreground" data-testid="quota-groups">
+                  {groupsUsed} / {maxGroups === -1 ? "∞" : maxGroups}
+                </span>
+              </div>
+              {maxGroups !== -1 && <Progress value={groupsPct} className="mt-2 h-2" />}
+              <p className="mt-1 text-xs text-muted-foreground">
+                {maxGroups === -1
+                  ? "Illimité avec votre plan actuel."
+                  : groupsRemaining === 0
+                    ? "Quota atteint — upgrade requis pour créer un nouveau groupe."
+                    : `${groupsRemaining} groupe${groupsRemaining > 1 ? "s" : ""} restant${groupsRemaining > 1 ? "s" : ""}.`}
+              </p>
+            </div>
+            <div>
+              <div className="flex items-baseline justify-between text-sm">
+                <span className="font-medium">Membres (plus grand groupe)</span>
+                <span className="font-mono text-muted-foreground" data-testid="quota-members">
+                  {membersUsed} / {maxMembers === -1 ? "∞" : maxMembers}
+                </span>
+              </div>
+              {maxMembers !== -1 && <Progress value={membersPct} className="mt-2 h-2" />}
+              <p className="mt-1 text-xs text-muted-foreground">
+                {maxMembers === -1
+                  ? "Illimité avec votre plan actuel."
+                  : membersRemaining === 0
+                    ? "Quota atteint — upgrade requis pour ajouter un membre supplémentaire."
+                    : `${membersRemaining} membre${membersRemaining > 1 ? "s" : ""} restant${membersRemaining > 1 ? "s" : ""} par groupe.`}
+                {" "}Total actifs : <strong>{entitlements.usage.members_total}</strong>.
+              </p>
+            </div>
+          </div>
+          {(needsUpgrade || nearLimit) && (
+            <p
+              data-testid="upgrade-hint"
+              className={`mt-3 text-sm font-medium ${needsUpgrade ? "text-destructive" : "text-amber-700 dark:text-amber-300"}`}
+            >
+              {needsUpgrade
+                ? "Vous avez atteint la limite de votre plan. Passez au Premium ou Business pour continuer à créer des groupes et ajouter des membres."
+                : "Vous approchez de la limite de votre plan — pensez à passer à un plan supérieur avant d'être bloqué."}
+            </p>
+          )}
+        </section>
 
         <section className="rounded-lg border border-hairline bg-card p-4 lg:p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">

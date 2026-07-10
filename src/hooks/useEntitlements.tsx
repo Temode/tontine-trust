@@ -24,7 +24,7 @@ export interface Entitlements {
   price_monthly: number;
   tier_options: Record<string, number>;
   read_only: boolean;
-  usage: { groups: number };
+  usage: { groups: number; members_total: number; max_members_in_group: number };
 }
 
 const DEFAULT_FREE: Entitlements = {
@@ -44,7 +44,7 @@ const DEFAULT_FREE: Entitlements = {
   price_monthly: 0,
   tier_options: {},
   read_only: false,
-  usage: { groups: 0 },
+  usage: { groups: 0, members_total: 0, max_members_in_group: 0 },
 };
 
 export function useEntitlements() {
