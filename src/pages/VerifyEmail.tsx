@@ -34,6 +34,8 @@ export default function VerifyEmail() {
       signupPayload?: { email: string; password: string; fullName: string; phoneNumber?: string | null };
       reason?: "legacy_verification" | string;
       resendTriggered?: boolean;
+      expiresAt?: string | null;
+      isAdmin?: boolean;
     };
   };
   const [params] = useSearchParams();
@@ -41,6 +43,10 @@ export default function VerifyEmail() {
 
   const email = location.state?.email ?? params.get("email") ?? user?.email ?? "";
   const isLegacyVerification = location.state?.reason === "legacy_verification";
+  const isAdminLegacy = isLegacyVerification && location.state?.isAdmin === true;
+  const [expiresAt, setExpiresAt] = useState<string | null>(
+    location.state?.expiresAt ?? null,
+  );
   const initialCountdown = location.state?.resendTriggered ? RESEND_DELAY : 0;
   const [code, setCode] = useState("");
   const [status, setStatus] = useState<"idle" | "verifying" | "success" | "error">("idle");
@@ -48,6 +54,34 @@ export default function VerifyEmail() {
   const [countdown, setCountdown] = useState(initialCountdown);
   const [resending, setResending] = useState(false);
   const submittedFor = useRef<string | null>(null);
+
+  // Compte à rebours d'expiration du code (mm:ss).
+  const [expiresInSec, setExpiresInSec] = useState<number>(() => {
+    if (!location.state?.expiresAt) return 0;
+    const diff = new Date(location.state.expiresAt).getTime() - Date.now();
+    return Math.max(0, Math.floor(diff / 1000));
+  });
+  useEffect(() => {
+    if (!expiresAt) return;
+    const tick = () => {
+      const diff = new Date(expiresAt).getTime() - Date.now();
+      setExpiresInSec(Math.max(0, Math.floor(diff / 1000)));
+    };
+    tick();
+    const t = setInterval(tick, 1000);
+    return () => clearInterval(t);
+  }, [expiresAt]);
+
+  const expiryLabel = useMemo(() => {
+    if (!expiresAt) return null;
+    const d = new Date(expiresAt);
+    return d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+  }, [expiresAt]);
+  const expiryMmSs = useMemo(() => {
+    const m = Math.floor(expiresInSec / 60);
+    const s = expiresInSec % 60;
+    return `${m}:${s.toString().padStart(2, "0")}`;
+  }, [expiresInSec]);
 
   useEffect(() => {
     document.title = "Vérification de l'email · Tontine Digital";
@@ -108,7 +142,10 @@ export default function VerifyEmail() {
   const handleResend = async () => {
     if (countdown > 0 || resending || !email) return;
     setResending(true);
-    const { error } = await invokeAuthOtp({ action: "signup_resend", email });
+    const { data, error } = await invokeAuthOtp<{ expiresAt?: string }>({
+      action: "signup_resend",
+      email,
+    });
     setResending(false);
     if (error) {
       if (/trop d'emails|tentatives|patiente/i.test(error)) {
@@ -121,6 +158,7 @@ export default function VerifyEmail() {
     }
     toast.success("Nouveau code envoyé. Vérifiez votre boîte mail et vos spams.");
     setCountdown(RESEND_DELAY);
+    if (data?.expiresAt) setExpiresAt(data.expiresAt);
   };
 
   const masked = useMemo(() => (email ? maskEmail(email) : ""), [email]);
