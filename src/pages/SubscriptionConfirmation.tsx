@@ -46,8 +46,9 @@ export default function SubscriptionConfirmation() {
         .eq("user_id", user.id)
         .order("updated_at", { ascending: false })
         .limit(1);
-      const { data, error: err } = planCode
-        ? await query.eq("plan_code", planCode)
+      const isKnownPlan = planCode === "free" || planCode === "premium" || planCode === "business";
+      const { data, error: err } = isKnownPlan
+        ? await query.eq("plan_code", planCode as "free" | "premium" | "business")
         : await query;
       if (cancelled) return;
       if (err) { setError(err.message); return; }
