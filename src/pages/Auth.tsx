@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
+import { invokeAuthOtp } from "@/lib/authOtp";
 import {
   AuthShell,
   authFieldInput,
@@ -67,10 +68,35 @@ export default function Auth() {
       return;
     }
     setSubmitting(true);
-    const { error } = await signIn(parsed.data.email, parsed.data.password);
+    const { error, requiresVerification, email: verifiedEmail } = await signIn(
+      parsed.data.email,
+      parsed.data.password,
+    );
     setSubmitting(false);
     if (error) {
       toast.error(error);
+      return;
+    }
+    if (requiresVerification) {
+      const targetEmail = verifiedEmail ?? parsed.data.email;
+      // Best-effort : on déclenche un nouveau code via Resend puis on redirige,
+      // même si l'envoi échoue (rate-limit, indispo). VerifyEmail permet le renvoi manuel.
+      const { error: resendError } = await invokeAuthOtp({
+        action: "signup_resend",
+        email: targetEmail,
+      });
+      if (resendError) {
+        toast.error(resendError);
+      } else {
+        toast.success("Un nouveau code de vérification vient de vous être envoyé.");
+      }
+      navigate("/auth/verifier-email", {
+        state: {
+          email: targetEmail,
+          reason: "legacy_verification",
+          resendTriggered: !resendError,
+        },
+      });
       return;
     }
     const { data: sess } = await supabase.auth.getUser();
