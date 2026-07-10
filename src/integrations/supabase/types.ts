@@ -6356,6 +6356,24 @@ export type Database = {
         Args: { _body_md: string; _version: string }
         Returns: string
       }
+      admin_publish_sms_pricing: {
+        Args: { _packs: Json; _unit_price: number }
+        Returns: {
+          created_at: string
+          created_by: string | null
+          effective_from: string
+          id: string
+          is_active: boolean
+          packs: Json
+          unit_price: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "sms_pricing"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       admin_refund_member_deposit: {
         Args: { _deposit_id: string; _reason?: string }
         Returns: undefined
@@ -6375,6 +6393,61 @@ export type Database = {
       admin_suspend_user: {
         Args: { _reason?: string; _suspend: boolean; _target_user: string }
         Returns: undefined
+      }
+      admin_update_sms_order: {
+        Args: {
+          _admin_note: string
+          _order_id: string
+          _status: Database["public"]["Enums"]["sms_order_status"]
+        }
+        Returns: {
+          admin_note: string | null
+          amount: number
+          created_at: string
+          djomy_ref: string | null
+          group_id: string | null
+          id: string
+          pack_id: string | null
+          qty: number
+          status: Database["public"]["Enums"]["sms_order_status"]
+          unit_price: number
+          updated_at: string
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "sms_orders"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      admin_update_subscription_plan: {
+        Args: {
+          _base_price: number
+          _code: Database["public"]["Enums"]["subscription_plan_code"]
+          _is_active: boolean
+          _label: string
+          _limits: Json
+          _sms_included: number
+          _tiers: Json
+        }
+        Returns: {
+          base_price: number
+          code: Database["public"]["Enums"]["subscription_plan_code"]
+          created_at: string
+          is_active: boolean
+          label: string
+          limits: Json
+          sms_included: number
+          tiers: Json
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "subscription_plans"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       admin_validate_kyc: {
         Args: { _approve: boolean; _document_id: string; _note?: string }
