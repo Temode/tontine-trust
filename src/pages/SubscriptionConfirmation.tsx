@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { CheckCircle2, Loader2, AlertCircle, XCircle, ArrowRight } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -18,8 +18,8 @@ interface LatestSub {
   updated_at: string;
 }
 
-const POLL_INTERVAL_MS = 2500;
-const POLL_TIMEOUT_MS = 60_000;
+const POLL_INTERVAL_MS = 2000;
+const POLL_TIMEOUT_MS = 30_000;
 
 export default function SubscriptionConfirmation() {
   const [params] = useSearchParams();
@@ -28,48 +28,126 @@ export default function SubscriptionConfirmation() {
 
   const planCode = params.get("plan");
   const [sub, setSub] = useState<LatestSub | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [elapsed, setElapsed] = useState(0);
+  const error: string | null = null;
+  const settledRef = useRef(false);
 
   const status: SubStatus = sub?.status ?? "unknown";
   const isFinal = status === "active" || status === "trialing" || status === "cancelled" || status === "failed";
 
+  // Résout l'ID de l'abonnement à suivre (URL → sessionStorage → dernier pending du user).
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
-    const started = Date.now();
 
-    const tick = async () => {
-      const query = supabase
+    const applyRow = (row: LatestSub | null) => {
+      if (cancelled) return;
+      setSub(row);
+      const s = row?.status;
+      if (s === "active" || s === "trialing") {
+        settledRef.current = true;
+        try {
+          sessionStorage.removeItem(`sub_checkout_opts:${row!.plan_code}`);
+          sessionStorage.removeItem("lastDjomySubscriptionId");
+          sessionStorage.removeItem("lastDjomySubscriptionTxId");
+        } catch { /* ignore */ }
+        void refetchEntitlements();
+      } else if (s === "cancelled" || s === "failed" || s === "past_due") {
+        settledRef.current = true;
+      }
+    };
+
+    const fetchById = async (id: string): Promise<LatestSub | null> => {
+      const { data } = await supabase
+        .from("user_subscriptions")
+        .select("id, plan_code, status, price_monthly, current_period_end, updated_at")
+        .eq("id", id).maybeSingle();
+      return (data as LatestSub | null) ?? null;
+    };
+
+    const fetchLatest = async (): Promise<LatestSub | null> => {
+      const base = supabase
         .from("user_subscriptions")
         .select("id, plan_code, status, price_monthly, current_period_end, updated_at")
         .eq("user_id", user.id)
         .order("updated_at", { ascending: false })
         .limit(1);
-      const isKnownPlan = planCode === "free" || planCode === "premium" || planCode === "business";
-      const { data, error: err } = isKnownPlan
-        ? await query.eq("plan_code", planCode as "free" | "premium" | "business")
-        : await query;
-      if (cancelled) return;
-      if (err) { setError(err.message); return; }
-      const row = (data?.[0] as LatestSub | undefined) ?? null;
-      setSub(row);
-      setElapsed(Date.now() - started);
-
-      const s = row?.status;
-      if (s === "active" || s === "trialing") {
-        try { sessionStorage.removeItem(`sub_checkout_opts:${row!.plan_code}`); } catch { /* ignore */ }
-        void refetchEntitlements();
-        return; // stop polling
-      }
-      if (s === "cancelled" || s === "failed") return;
-      if (Date.now() - started > POLL_TIMEOUT_MS) return;
-      setTimeout(tick, POLL_INTERVAL_MS);
+      const isKnownPlan = planCode === "premium" || planCode === "business";
+      const { data } = isKnownPlan
+        ? await base.eq("plan_code", planCode as "premium" | "business")
+        : await base;
+      return (data?.[0] as LatestSub | undefined) ?? null;
     };
 
-    void tick();
-    return () => { cancelled = true; };
-  }, [user, planCode, refetchEntitlements]);
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    const started = Date.now();
+
+    (async () => {
+      // 1. Résoudre l'ID cible.
+      const urlSid = params.get("sid") ?? params.get("subscriptionId");
+      const storedSid = (() => {
+        try { return sessionStorage.getItem("lastDjomySubscriptionId"); } catch { return null; }
+      })();
+      const urlTx = params.get("transactionId") ?? params.get("transaction_id");
+
+      let row: LatestSub | null = null;
+      const sid = urlSid ?? storedSid;
+      if (sid) row = await fetchById(sid);
+      if (!row) row = await fetchLatest();
+      applyRow(row);
+
+      const targetId = row?.id ?? sid ?? null;
+
+      // 2. Réconciliation active immédiate (aligné sur PaymentReturn).
+      const invokeStatus = async () => {
+        try {
+          await supabase.functions.invoke("djomy-subscription-status", {
+            body: {
+              subscriptionId: targetId ?? undefined,
+              transactionId: urlTx ?? undefined,
+            },
+          });
+        } catch (e) {
+          console.warn("[subscription-confirmation] status invoke failed", e);
+        }
+      };
+      void invokeStatus();
+
+      // 3. Realtime : coupe le spinner dès l'UPDATE.
+      if (targetId) {
+        channel = supabase
+          .channel(`sub-confirm:${targetId}`)
+          .on(
+            "postgres_changes",
+            { event: "UPDATE", schema: "public", table: "user_subscriptions", filter: `id=eq.${targetId}` },
+            (payload) => {
+              const next = payload.new as LatestSub;
+              applyRow(next);
+            },
+          )
+          .subscribe();
+      }
+
+      // 4. Polling de secours (au cas où Realtime + webhook manquent).
+      const tick = async () => {
+        if (cancelled || settledRef.current) return;
+        const fresh = targetId ? await fetchById(targetId) : await fetchLatest();
+        applyRow(fresh);
+        setElapsed(Date.now() - started);
+        if (settledRef.current) return;
+        if (Date.now() - started > POLL_TIMEOUT_MS) return;
+        // Nouvel appel de réconciliation à mi-parcours pour couvrir un webhook manquant.
+        if (Date.now() - started > POLL_TIMEOUT_MS / 2) void invokeStatus();
+        setTimeout(tick, POLL_INTERVAL_MS);
+      };
+      setTimeout(tick, POLL_INTERVAL_MS);
+    })();
+
+    return () => {
+      cancelled = true;
+      if (channel) void supabase.removeChannel(channel);
+    };
+  }, [user, planCode, params, refetchEntitlements]);
 
   const view = useMemo(() => {
     if (error) {
@@ -82,13 +160,15 @@ export default function SubscriptionConfirmation() {
     }
     switch (status) {
       case "active":
-      case "trialing":
+      case "trialing": {
+        const label = sub?.plan_code === "business" ? "Business" : sub?.plan_code === "premium" ? "Premium" : (sub?.plan_code ?? "");
         return {
-          icon: <CheckCircle2 className="h-10 w-10 text-emerald-500" />,
-          title: "Abonnement activé",
-          body: `Votre abonnement ${sub?.plan_code ?? ""} est maintenant actif. Merci !`,
+          icon: <CheckCircle2 className="h-14 w-14 text-emerald-500" />,
+          title: `Félicitations ! Votre abonnement ${label} est activé.`,
+          body: "Vous pouvez profiter de toutes les fonctionnalités de votre plan dès maintenant.",
           tone: "success" as const,
         };
+      }
       case "cancelled":
       case "failed":
         return {
