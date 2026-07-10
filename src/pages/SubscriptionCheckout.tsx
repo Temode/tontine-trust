@@ -141,6 +141,10 @@ export default function SubscriptionCheckout() {
         body: {
           planCode: plan.code,
           tierOptions: plan.code === "premium" ? opts : {},
+          // returnUrl actualisé après l'obtention du subscriptionId n'est pas
+          // possible côté Djomy (fixé au start) — on inclut donc simplement
+          // le plan ; le sid est stocké en sessionStorage + résolu côté
+          // confirmation via le dernier user_subscriptions pending du user.
           returnUrl: `${publicUrl}/abonnement/confirmation?plan=${plan.code}`,
           cancelUrl: `${publicUrl}/abonnement/checkout?plan=${plan.code}`,
         },
@@ -158,8 +162,16 @@ export default function SubscriptionCheckout() {
         } catch { /* ignore */ }
         throw new Error(detail);
       }
-      const res = data as { redirectUrl?: string; error?: string };
+      const res = data as {
+        redirectUrl?: string; error?: string;
+        subscriptionId?: string; transactionId?: string;
+      };
       if (!res?.redirectUrl) throw new Error(res?.error ?? "Redirection Djomy indisponible");
+      // Corrélation retour Djomy → confirmation (aligné sur PaymentReturn).
+      try {
+        if (res.subscriptionId) sessionStorage.setItem("lastDjomySubscriptionId", res.subscriptionId);
+        if (res.transactionId) sessionStorage.setItem("lastDjomySubscriptionTxId", res.transactionId);
+      } catch { /* ignore */ }
       window.location.assign(res.redirectUrl);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
