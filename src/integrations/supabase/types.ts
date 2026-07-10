@@ -6531,6 +6531,18 @@ export type Database = {
         Returns: undefined
       }
       create_group_with_invitation: { Args: { _payload: Json }; Returns: Json }
+      create_solo_group: {
+        Args: {
+          _category: string
+          _contribution: number
+          _description: string
+          _frequency: Database["public"]["Enums"]["group_frequency"]
+          _lock_until: string
+          _mode: Database["public"]["Enums"]["solo_mode"]
+          _name: string
+        }
+        Returns: Json
+      }
       decide_payment_pause_request: {
         Args: { _approve: boolean; _reason?: string; _request_id: string }
         Returns: undefined
@@ -6748,6 +6760,23 @@ export type Database = {
           payout_hold_until: string
           turn_id: string
           turn_number: number
+        }[]
+      }
+      list_my_solo_groups: {
+        Args: never
+        Returns: {
+          category: string
+          contribution_amount: number
+          created_at: string
+          description: string
+          frequency: Database["public"]["Enums"]["group_frequency"]
+          id: string
+          name: string
+          solo_lock_until: string
+          solo_mode: Database["public"]["Enums"]["solo_mode"]
+          status: string
+          target_amount: number
+          total_saved: number
         }[]
       }
       log_audit: {
