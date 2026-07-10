@@ -12,6 +12,29 @@ import { assert, assertEquals, assertStringIncludes } from "https://deno.land/st
 
 const SOURCE_URL = new URL("./index.ts", import.meta.url);
 const source = await Deno.readTextFile(SOURCE_URL);
+const projectRoot = new URL("../../../", import.meta.url);
+
+async function collectProjectFiles(dir: URL, files: string[] = []): Promise<string[]> {
+  for await (const entry of Deno.readDir(dir)) {
+    if (
+      entry.name === "node_modules" ||
+      entry.name === ".git" ||
+      entry.name === "dist" ||
+      entry.name === "build"
+    ) continue;
+
+    const child = new URL(`${entry.name}${entry.isDirectory ? "/" : ""}`, dir);
+    if (entry.isDirectory) {
+      await collectProjectFiles(child, files);
+      continue;
+    }
+
+    if (/\.(ts|tsx|js|jsx)$/.test(entry.name)) {
+      files.push(child.pathname);
+    }
+  }
+  return files;
+}
 
 Deno.test("auth-otp: expéditeur figé sur noreply@tontinedigitale.com", () => {
   assertStringIncludes(source, 'const FROM_EMAIL = "noreply@tontinedigitale.com"');
@@ -59,5 +82,41 @@ Deno.test("auth-otp: création utilisateur n'enclenche pas d'e-mail natif Supaba
   assert(
     !/email_confirm:\s*false/.test(source),
     "email_confirm: false réintroduit l'e-mail natif Supabase",
+  );
+});
+
+Deno.test("projet: aucun flux frontend/backend ne déclenche d'e-mail auth natif", async () => {
+  const forbiddenPatterns: Array<[RegExp, string]> = [
+    [/\.auth\.signUp\s*\(/, "auth.signUp"],
+    [/\.signUp\s*\(/, "signUp natif"],
+    [/resetPasswordForEmail\s*\(/, "resetPasswordForEmail"],
+    [/signInWithOtp\s*\(/, "signInWithOtp"],
+    [/generateLink\s*\(/, "generateLink"],
+    [/inviteUserByEmail\s*\(/, "inviteUserByEmail"],
+    [/\/signup["'`]/, "endpoint /signup natif"],
+    [/\/recover["'`]/, "endpoint /recover natif"],
+  ];
+  const allowedFiles = new Set([
+    new URL("./resend_only_test.ts", import.meta.url).pathname,
+    new URL("../../../src/hooks/useAuth.tsx", import.meta.url).pathname,
+    new URL("../../../src/pages/Auth.tsx", import.meta.url).pathname,
+  ]);
+
+  const files = await collectProjectFiles(projectRoot);
+  const violations: string[] = [];
+  for (const file of files) {
+    if (allowedFiles.has(file)) continue;
+    const text = await Deno.readTextFile(file);
+    for (const [pattern, label] of forbiddenPatterns) {
+      if (pattern.test(text)) {
+        violations.push(`${file.replace(projectRoot.pathname, "")}: ${label}`);
+      }
+    }
+  }
+
+  assertEquals(
+    violations,
+    [],
+    `Des appels auth natifs peuvent envoyer des e-mails Lovable au lieu de Resend:\n${violations.join("\n")}`,
   );
 });
