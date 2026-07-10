@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
-import { ArrowLeft, Check, Loader2, ShieldCheck, Sparkles, Crown } from "lucide-react";
+import { ArrowLeft, Check, Loader2, ShieldCheck, Sparkles, Crown, AlertCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -35,6 +35,18 @@ function toTierOptions(v: unknown): TierOption[] {
   }));
 }
 
+const OPTS_STORAGE_KEY = (plan: string) => `sub_checkout_opts:${plan}`;
+
+function loadStoredOpts(plan: string): Record<string, number> | null {
+  try {
+    const raw = sessionStorage.getItem(OPTS_STORAGE_KEY(plan));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === "object") return parsed as Record<string, number>;
+  } catch { /* ignore */ }
+  return null;
+}
+
 export default function SubscriptionCheckout() {
   const nav = useNavigate();
   const [params] = useSearchParams();
@@ -44,15 +56,25 @@ export default function SubscriptionCheckout() {
   const planCodeParam = params.get("plan");
   const planCode: "premium" | "business" | null =
     planCodeParam === "premium" || planCodeParam === "business" ? planCodeParam : null;
+  const invalidPlan = planCodeParam !== null && planCode === null;
 
   const [plan, setPlan] = useState<Plan | null>(null);
   const [loading, setLoading] = useState(true);
   const [opts, setOpts] = useState<Record<string, number>>({});
   const [busy, setBusy] = useState(false);
+  const [payError, setPayError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!planCode) {
-      nav("/abonnement", { replace: true });
+      // Redirection courte pour que l'utilisateur voit ce qui se passe.
+      const t = setTimeout(() => nav("/abonnement", { replace: true }), 1200);
+      return () => clearTimeout(t);
+    }
+  }, [planCode, nav]);
+
+  useEffect(() => {
+    if (!planCode) {
+      setLoading(false);
       return;
     }
     (async () => {
@@ -67,21 +89,31 @@ export default function SubscriptionCheckout() {
       setPlan((data as Plan) ?? null);
       setLoading(false);
     })();
-  }, [planCode, nav]);
+  }, [planCode]);
 
   const tierOptions = useMemo(
     () => (plan?.code === "premium" ? toTierOptions(plan?.tiers) : []),
     [plan],
   );
 
+  // Init sliders: 1) valeurs stockées (retour Djomy), sinon 2) abonnement actuel, sinon 3) base
   useEffect(() => {
-    if (!tierOptions.length) return;
+    if (!plan || !tierOptions.length) return;
+    const stored = loadStoredOpts(plan.code);
     const init: Record<string, number> = {};
     for (const o of tierOptions) {
-      init[o.key] = Number(entitlements.tier_options?.[o.key] ?? o.base);
+      const v = stored?.[o.key] ?? entitlements.tier_options?.[o.key] ?? o.base;
+      const n = Number(v);
+      init[o.key] = Math.min(Math.max(Number.isFinite(n) ? n : o.base, o.min), o.max);
     }
     setOpts(init);
-  }, [tierOptions, entitlements.tier_options]);
+  }, [plan, tierOptions, entitlements.tier_options]);
+
+  // Persiste les sliders en session : survit à l'aller-retour Djomy.
+  useEffect(() => {
+    if (!plan || plan.code !== "premium" || !Object.keys(opts).length) return;
+    try { sessionStorage.setItem(OPTS_STORAGE_KEY(plan.code), JSON.stringify(opts)); } catch { /* ignore */ }
+  }, [plan, opts]);
 
   const totalPrice = useMemo(() => {
     if (!plan) return 0;
@@ -103,12 +135,13 @@ export default function SubscriptionCheckout() {
     if (!user) { nav("/auth"); return; }
     if (!plan) return;
     setBusy(true);
+    setPayError(null);
     try {
       const { data, error } = await supabase.functions.invoke("djomy-init-subscription", {
         body: {
           planCode: plan.code,
           tierOptions: plan.code === "premium" ? opts : {},
-          returnUrl: `${publicUrl}/paiement/retour`,
+          returnUrl: `${publicUrl}/abonnement/confirmation?plan=${plan.code}`,
           cancelUrl: `${publicUrl}/abonnement/checkout?plan=${plan.code}`,
         },
       });
@@ -117,10 +150,40 @@ export default function SubscriptionCheckout() {
       if (!res?.redirectUrl) throw new Error(res?.error ?? "Redirection Djomy indisponible");
       window.location.assign(res.redirectUrl);
     } catch (e) {
-      toast.error("Paiement impossible", { description: e instanceof Error ? e.message : String(e) });
+      const msg = e instanceof Error ? e.message : String(e);
+      setPayError(msg);
+      toast.error("Paiement impossible", { description: msg });
       setBusy(false);
     }
   };
+
+  if (invalidPlan) {
+    return (
+      <div>
+        <TopBar title="Récapitulatif" subtitle="Plan invalide" />
+        <div className="mx-auto max-w-md px-5 py-10 text-center space-y-3">
+          <AlertCircle className="mx-auto h-10 w-10 text-amber-500" />
+          <p className="font-medium text-foreground">Plan « {planCodeParam} » inconnu.</p>
+          <p className="text-sm text-muted-foreground">Redirection vers la page des abonnements…</p>
+          <Button asChild variant="outline"><Link to="/abonnement"><ArrowLeft className="h-4 w-4 mr-2" />Retour aux plans</Link></Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!planCode) {
+    return (
+      <div>
+        <TopBar title="Récapitulatif" subtitle="Aucun plan sélectionné" />
+        <div className="mx-auto max-w-md px-5 py-10 text-center space-y-3">
+          <AlertCircle className="mx-auto h-10 w-10 text-amber-500" />
+          <p className="font-medium text-foreground">Aucun plan sélectionné.</p>
+          <p className="text-sm text-muted-foreground">Redirection vers la page des abonnements…</p>
+          <Button asChild variant="outline"><Link to="/abonnement"><ArrowLeft className="h-4 w-4 mr-2" />Retour aux plans</Link></Button>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
@@ -240,6 +303,14 @@ export default function SubscriptionCheckout() {
                 </span>
               </div>
 
+              {payError && (
+                <div role="alert" className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-xs text-destructive space-y-2">
+                  <p className="font-medium">Le paiement n'a pas pu démarrer.</p>
+                  <p className="opacity-90 break-words">{payError}</p>
+                  <p className="opacity-80">Vos options sont conservées — vous pouvez réessayer.</p>
+                </div>
+              )}
+
               <Button
                 onClick={pay}
                 disabled={busy || totalPrice <= 0}
@@ -247,7 +318,7 @@ export default function SubscriptionCheckout() {
                 data-testid="checkout-pay"
               >
                 {busy ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                Procéder au paiement
+                {payError ? "Réessayer le paiement" : "Procéder au paiement"}
               </Button>
 
               <p className="inline-flex items-start gap-2 text-[11px] text-muted-foreground">
