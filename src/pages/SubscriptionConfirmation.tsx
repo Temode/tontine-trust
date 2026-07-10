@@ -28,8 +28,8 @@ export default function SubscriptionConfirmation() {
 
   const planCode = params.get("plan");
   const [sub, setSub] = useState<LatestSub | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [elapsed, setElapsed] = useState(0);
+  const error: string | null = null;
   const settledRef = useRef(false);
 
   const status: SubStatus = sub?.status ?? "unknown";
