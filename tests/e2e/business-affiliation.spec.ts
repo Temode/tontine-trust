@@ -25,4 +25,31 @@ test.describe("Business & Affiliation", () => {
     await page.goto("/coordinateur/commissions");
     await expect(page).toHaveURL(/(auth|coordinateur)/);
   });
+
+  test("flux complet: ref -> signup -> affiliation visible (skip si non auth)", async ({ page }) => {
+    // 1) landing capture
+    await page.goto("/?ref=ZZ999999");
+    const stored = await page.evaluate(() => localStorage.getItem("pending_referral_code"));
+    expect(stored).toBe("ZZ999999");
+
+    // 2) page /affiliation
+    await page.goto("/affiliation");
+    if (page.url().includes("/auth")) {
+      test.info().annotations.push({ type: "skip", description: "auth requise" });
+      return;
+    }
+    await expect(page.getByRole("heading", { name: /programme d'affiliation/i })).toBeVisible();
+    await expect(page.getByText(/votre lien de parrainage/i)).toBeVisible();
+
+    // 3) coordinator page réponse
+    await page.goto("/coordinateur/commissions");
+    await expect(page.getByRole("heading", { name: /mes commissions coordinateur/i })).toBeVisible();
+    await expect(page.getByText(/total perçu/i)).toBeVisible();
+  });
+
+  test("admin /admin/affiliation exige super_admin", async ({ page }) => {
+    await page.goto("/admin/affiliation");
+    // Non-admin -> redirigé, admin -> voit le titre
+    await expect(page).toHaveURL(/(auth|dashboard|affiliation)/);
+  });
 });

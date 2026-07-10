@@ -16,6 +16,7 @@ import {
   Package,
   Tag,
   ShoppingCart,
+  Share2,
 } from "lucide-react";
 import { BadgeCheck, Banknote, FileText, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -29,6 +30,7 @@ const ITEMS = [
   { to: "/admin/subscriptions", label: "Abonnements", icon: Package },
   { to: "/admin/sms-pricing", label: "Tarification SMS", icon: Tag },
   { to: "/admin/sms-orders", label: "Commandes SMS", icon: ShoppingCart },
+  { to: "/admin/affiliation", label: "Affiliation", icon: Share2 },
   { to: "/admin/audit", label: "Audit", icon: ScrollText },
   { to: "/admin/integrite", label: "Intégrité tontine", icon: ShieldAlert },
   { to: "/admin/defaillants", label: "Défaillants", icon: AlertOctagon },

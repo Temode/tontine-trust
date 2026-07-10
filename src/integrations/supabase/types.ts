@@ -6359,6 +6359,43 @@ export type Database = {
           was_late_in_cycle: boolean
         }[]
       }
+      admin_list_referral_earnings: {
+        Args: { _paid?: boolean; _referrer_id?: string }
+        Returns: {
+          amount: number
+          created_at: string
+          id: string
+          paid: boolean
+          paid_at: string
+          period: string
+          referred_id: string
+          referred_name: string
+          referrer_id: string
+          referrer_name: string
+          subscription_id: string
+        }[]
+      }
+      admin_list_referrals: {
+        Args: { _search?: string; _status?: string }
+        Returns: {
+          commission_percent: number
+          created_at: string
+          id: string
+          paid_amount: number
+          pending_amount: number
+          referred_id: string
+          referred_name: string
+          referrer_code: string
+          referrer_id: string
+          referrer_name: string
+          status: Database["public"]["Enums"]["referral_status"]
+          total_earned: number
+        }[]
+      }
+      admin_mark_referral_earning_paid: {
+        Args: { _id: string; _paid: boolean }
+        Returns: undefined
+      }
       admin_publish_contract_template: {
         Args: { _body_md: string; _version: string }
         Returns: string
@@ -6388,6 +6425,13 @@ export type Database = {
       admin_resend_payout_hold_notice: {
         Args: { _turn_id: string }
         Returns: boolean
+      }
+      admin_set_referral_status: {
+        Args: {
+          _id: string
+          _status: Database["public"]["Enums"]["referral_status"]
+        }
+        Returns: undefined
       }
       admin_set_user_role: {
         Args: {
@@ -6540,6 +6584,29 @@ export type Database = {
           _transaction_id: string
         }
         Returns: undefined
+      }
+      audit_coordinator_commissions: {
+        Args: never
+        Returns: {
+          coordinator_user_id: string
+          entry_id: string
+          fee_amount: number
+          group_id: string
+          issue: string
+          ledger_user_id: string
+          payment_id: string
+        }[]
+      }
+      audit_referral_earnings: {
+        Args: never
+        Returns: {
+          amount: number
+          earning_id: string
+          issue: string
+          period: string
+          referrer_id: string
+          subscription_id: string
+        }[]
       }
       auto_close_turn: { Args: { _turn_id: string }; Returns: boolean }
       cancel_my_bid: { Args: { _turn_id: string }; Returns: undefined }
