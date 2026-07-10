@@ -3200,6 +3200,7 @@ export type Database = {
           phone_number: string | null
           phone_verified_at: string | null
           phone_visible_in_groups: boolean
+          referral_code: string | null
           reliability_score: number
           suspended_at: string | null
           suspended_by: string | null
@@ -3219,6 +3220,7 @@ export type Database = {
           phone_number?: string | null
           phone_verified_at?: string | null
           phone_visible_in_groups?: boolean
+          referral_code?: string | null
           reliability_score?: number
           suspended_at?: string | null
           suspended_by?: string | null
@@ -3238,6 +3240,7 @@ export type Database = {
           phone_number?: string | null
           phone_verified_at?: string | null
           phone_visible_in_groups?: boolean
+          referral_code?: string | null
           reliability_score?: number
           suspended_at?: string | null
           suspended_by?: string | null
@@ -6275,6 +6278,10 @@ export type Database = {
     Functions: {
       _audit_confirm_test_user: { Args: { _email: string }; Returns: undefined }
       _generate_invite_code: { Args: never; Returns: string }
+      accrue_referral_earning: {
+        Args: { _period: string; _subscription_id: string }
+        Returns: string
+      }
       adjust_penalty: {
         Args: {
           _contribution_id: string
@@ -6467,6 +6474,17 @@ export type Database = {
         }
         Returns: string
       }
+      apply_coordinator_commission: {
+        Args: {
+          _beneficiary_id: string
+          _cycle_id: string
+          _gross_amount: number
+          _group_id: string
+          _payment_id: string
+          _turn_id: string
+        }
+        Returns: Json
+      }
       apply_deposit_webhook: {
         Args: {
           _deposit_id: string
@@ -6533,6 +6551,18 @@ export type Database = {
       confirm_external_payment: {
         Args: { _proof_id: string }
         Returns: undefined
+      }
+      create_business_group: {
+        Args: {
+          _category: string
+          _commission_percent: number
+          _contribution: number
+          _description: string
+          _frequency: Database["public"]["Enums"]["group_frequency"]
+          _max_members: number
+          _name: string
+        }
+        Returns: string
       }
       create_group_with_invitation: { Args: { _payload: Json }; Returns: Json }
       create_solo_group: {
@@ -6668,6 +6698,7 @@ export type Database = {
           withdrawal_locked: boolean
         }[]
       }
+      get_my_affiliate_summary: { Args: never; Returns: Json }
       get_my_entitlements: { Args: never; Returns: Json }
       get_pending_penalty: { Args: { _group_id: string }; Returns: number }
       get_user_default_history: {
@@ -6776,6 +6807,32 @@ export type Database = {
           name: string
           seats_left: number
           status: Database["public"]["Enums"]["group_status"]
+        }[]
+      }
+      list_my_affiliate_earnings: {
+        Args: never
+        Returns: {
+          amount: number
+          created_at: string
+          id: string
+          paid: boolean
+          paid_at: string
+          period: string
+          referred_full_name: string
+          subscription_id: string
+        }[]
+      }
+      list_my_coordinator_commissions: {
+        Args: never
+        Returns: {
+          amount: number
+          created_at: string
+          cycle_id: string
+          entry_id: string
+          group_id: string
+          group_name: string
+          memo: string
+          turn_id: string
         }[]
       }
       list_my_payout_hold_history: {
@@ -6910,6 +6967,7 @@ export type Database = {
         }
         Returns: string
       }
+      register_referral: { Args: { _code: string }; Returns: string }
       reject_external_payment: {
         Args: { _proof_id: string; _reason?: string }
         Returns: undefined
