@@ -14,6 +14,8 @@ interface AuthContextValue {
   loading: boolean;
   rolesLoading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
+  // NB: `requiresVerification` est utilisé pour rediriger les comptes legacy
+  // (créés avant l'OTP obligatoire) vers /auth/verifier-email.
   signUp: (args: {
     email: string;
     password: string;
