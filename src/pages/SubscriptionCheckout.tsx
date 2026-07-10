@@ -145,7 +145,19 @@ export default function SubscriptionCheckout() {
           cancelUrl: `${publicUrl}/abonnement/checkout?plan=${plan.code}`,
         },
       });
-      if (error) throw new Error(error.message);
+      if (error) {
+        // Extraire le vrai message renvoyé par la function (error.context = Response).
+        let detail = error.message ?? "DJOMY_INIT_FAILED";
+        try {
+          const ctx = (error as { context?: Response }).context;
+          if (ctx && typeof ctx.json === "function") {
+            const body = await ctx.clone().json();
+            const parts = [body?.error, body?.message, body?.hint, body?.details && (typeof body.details === "string" ? body.details : JSON.stringify(body.details))].filter(Boolean);
+            if (parts.length) detail = parts.join(" — ");
+          }
+        } catch { /* ignore */ }
+        throw new Error(detail);
+      }
       const res = data as { redirectUrl?: string; error?: string };
       if (!res?.redirectUrl) throw new Error(res?.error ?? "Redirection Djomy indisponible");
       window.location.assign(res.redirectUrl);
