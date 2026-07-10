@@ -7268,6 +7268,7 @@ export type Database = {
         | "refund"
         | "penalty"
         | "adjustment"
+        | "coordinator_fee"
       member_role: "organisateur" | "membre"
       member_status:
         | "active"
@@ -7581,6 +7582,7 @@ export const Constants = {
         "refund",
         "penalty",
         "adjustment",
+        "coordinator_fee",
       ],
       member_role: ["organisateur", "membre"],
       member_status: [
