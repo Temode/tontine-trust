@@ -1,48 +1,21 @@
-## Plan
+## Plan de test end-to-end
 
-### 1. Refonte de la fonction `auth-otp`
+Objectif : prouver que le flux Resend → OTP → session fonctionne sans erreur avec un vrai email.
 
-Remplacer `admin.generateLink({type:"signup"})` — qui crée le compte ET déclenche un email par défaut de Supabase — par un flux 100% contrôlé :
+### Étapes
 
-- `signup_start`
-  - `admin.createUser({ email, password, email_confirm: false, user_metadata })` : crée le compte non vérifié, sans envoyer aucun email.
-  - Si l'email existe déjà :
-    - vérifié → renvoyer `email_exists`
-    - non vérifié → mettre à jour password + metadata et renvoyer un nouveau code.
-  - Générer un code aléatoire à 6 chiffres cryptographiquement sûr.
-  - Stocker `email_hash + purpose + token_hash + expires_at (15 min)` dans `auth_otp_requests`.
-  - Envoyer le code via Resend (gateway déjà en place) avec le template `SignupEmail`.
+1. **Créer un email jetable** `td-verify-<timestamp>@yopmail.com`.
+2. **Appeler `auth-otp` en direct** (via `curl_edge_functions`) avec `action: signup_start` + un mot de passe test + un nom, en simulant l'appel du front.
+3. **Vérifier en base** que la ligne existe dans `auth_otp_requests` avec `purpose=signup`, `status=sent`, `expires_at` à +15 min, et que le user existe dans `auth.users` avec `email_confirmed_at IS NULL`.
+4. **Lire l'inbox yopmail** via Playwright pour confirmer que le mail vient de `noreply@tontinedigitale.com` (et non de `no-reply@auth.lovable.cloud`) et extraire le code à 6 chiffres.
+5. **Appeler `verify_signup`** avec l'email, le code, et le password. Vérifier que la réponse contient une `session` valide.
+6. **Vérifier en base** que `email_confirmed_at` est renseigné et que la ligne OTP est passée à `status=consumed`.
+7. **Test négatif** : rappeler `verify_signup` avec un code faux → 400 `invalid_code`. Rappeler `verify_signup` avec le même code déjà consommé → 400 `invalid_code`.
+8. **Test blocage login pré-vérif** : créer un second user, tenter `signInWithPassword` sans avoir validé l'OTP → doit renvoyer `Email not confirmed`.
+9. **Nettoyage** : supprimer les users de test via l'API admin.
 
-- `verify_signup`
-  - Chercher la dernière ligne active dans `auth_otp_requests` par `email_hash + purpose='signup' + token_hash + status='sent' + expires_at > now()`.
-  - Échec → `invalid_code`.
-  - Succès → `admin.updateUserById(id, { email_confirm: true })` puis marquer la ligne `consumed`.
-  - Si le client renvoie le password (déjà stocké dans `location.state` côté front), ouvrir la session avec `signInWithPassword` et retourner la session — sinon renvoyer juste `success`.
+### Livrables
 
-- `recovery_start` / `recovery_complete`
-  - Même approche maison (code généré et envoyé via Resend, vérification par comparaison de `token_hash`).
-  - `recovery_start` ne divulgue pas l'existence du compte (toujours `success`).
+Rapport clair avec, pour chaque étape : succès/échec, statut HTTP, ID du mail Resend, et capture yopmail montrant l'expéditeur.
 
-### 2. Front `VerifyEmail.tsx`
-
-Ajouter le password (déjà présent dans `location.state.signupPayload`) dans le corps de l'appel `verify_signup`, pour que la session soit ouverte automatiquement à la fin de la vérification.
-
-### 3. Aucun changement de schéma
-
-`auth_otp_requests` possède déjà toutes les colonnes nécessaires (`email_hash`, `purpose`, `token_hash`, `status`, `expires_at`, `consumed_at`, `created_at`).
-
-### 4. Tests
-
-Après déploiement :
-- Nouvelle inscription : un seul mail Resend arrive depuis `noreply@tontinedigitale.com`, avec code à 6 chiffres, aucun email `no-reply@auth.lovable.cloud`.
-- Saisie du code → session ouverte, redirection `/dashboard`.
-- Tentative de `signIn` avant validation → message "Email non confirmé".
-- Code faux ou expiré → message "Code invalide ou expiré".
-
-## Détails techniques
-
-Fichiers touchés :
-- `supabase/functions/auth-otp/index.ts` : refonte des 4 actions.
-- `src/pages/VerifyEmail.tsx` : ajout du password dans le body `verify_signup`.
-
-Aucune migration SQL, aucun changement dans `Auth.tsx`, `useAuth.tsx` ou `authOtp.ts`.
+Aucun changement de code prévu — c'est un plan de validation. Si un test échoue, je préparerai un plan correctif séparé.
