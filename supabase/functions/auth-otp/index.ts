@@ -434,6 +434,8 @@ Deno.serve(async (req) => {
     switch (body.action) {
       case "signup_start":
         return await startSignup(admin, body);
+      case "signup_resend":
+        return await resendSignup(admin, body);
       case "recovery_start":
         return await startRecovery(admin, body);
       case "verify_signup":
