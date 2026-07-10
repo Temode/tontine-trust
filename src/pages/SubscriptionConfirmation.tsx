@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { TopBar } from "@/components/layout/TopBar";
 import { useAuth } from "@/hooks/useAuth";
 import { useEntitlements } from "@/hooks/useEntitlements";
-import { formatGNF } from "@/lib/format";
 
 type SubStatus = "active" | "trialing" | "pending" | "past_due" | "cancelled" | "failed" | "unknown";
 
