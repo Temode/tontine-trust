@@ -1,70 +1,153 @@
 
-## Objectif
+# Roadmap — Tontine Digitale v2
 
-Gérer proprement les comptes existants dont `user_metadata.otp_verified !== true` (legacy, admin, inscriptions antérieures) quand ils tentent de se connecter avec des identifiants corrects. Au lieu d'un simple message "Email non confirmé", on déclenche automatiquement un nouvel OTP via Resend et on redirige vers `/auth/verifier-email` avec un bandeau explicatif.
+Objectif : livrer par incréments testables, sans casser l'existant (auth OTP, groupes, Djomy, back-office). Chaque milestone est indépendante, déployable, testée E2E avant la suivante.
 
-## Comportement cible (inspiré PayPal / Facebook)
+## Vue d'ensemble
 
-1. L'utilisateur saisit email + mot de passe corrects sur `/auth`.
-2. Le backend valide les identifiants. Si `otp_verified !== true` :
-   - déconnecte immédiatement la session (déjà en place),
-   - déclenche `auth-otp` action `signup_resend` (envoi Resend uniquement, rate-limité),
-   - redirige vers `/auth/verifier-email` avec `state.email` et un flag `reason: "legacy_verification"`.
-3. `VerifyEmail.tsx` affiche un bandeau d'information temporaire :
-   > « Pour renforcer la sécurité de votre compte, une vérification e-mail est désormais requise. Un code de validation vient de vous être envoyé à `email@…`. »
-4. Le champ OTP + bouton "Renvoyer le code" + compte à rebours existants restent inchangés.
-
-## Modifications
-
-### 1. `src/hooks/useAuth.tsx` — `signIn`
-
-Actuellement : si `otp_verified !== true`, retourne `"Email non confirmé…"`.
-
-Nouveau contrat de retour :
-```ts
-{ error: string | null; requiresVerification?: boolean; email?: string }
+```text
+M1 Fondations DB (plans, quotas, SMS)   ── prérequis de tout le reste
+      │
+M2 Back-office admin plans & SMS pricing
+      │
+M3 Souscription utilisateur + paiement Djomy + enforcement quotas
+      │
+M4 Notifications : routage E-mail/In-App/SMS selon plan + décrément forfait
+      │
+M5 Recharge SMS depuis un groupe (commande → paiement → crédit)
+      │
+M6 Tontine Solo (Épargne Projet vs Fonds de roulement)
+      │
+M7 Tontine Internationale (annuaire public, anonymisation, validation cycle)
+      │
+M8 Tontine Business (coordinateur + commission + affiliation)
 ```
-Logique :
-- credentials OK + `otp_verified !== true` → `signOut()`, retourne `{ error: null, requiresVerification: true, email }`.
-- credentials KO → comportement inchangé.
-- credentials OK + `otp_verified === true` → comportement inchangé.
 
-Mise à jour du type `AuthContextValue.signIn` en conséquence.
+---
 
-### 2. `src/pages/Auth.tsx` — `handleSignIn`
+## M1 — Fondations base de données
 
-Après `signIn(...)` :
-- si `requiresVerification === true` :
-  - appel `invokeAuthOtp({ action: "signup_resend", email })` (best-effort ; en cas d'erreur `rate_limited`/`email_send_failed`, on redirige quand même et VerifyEmail affichera l'état),
-  - `toast.info("Un nouveau code de vérification vient de vous être envoyé.")`,
-  - `navigate("/auth/verifier-email", { state: { email, reason: "legacy_verification", resendTriggered: true } })`.
-- sinon flux actuel (admin/dashboard) inchangé.
+Une seule migration pour poser toutes les tables/enums utilisés par les modules suivants. Rien côté UI.
 
-Aucun changement dans le formulaire d'inscription.
+Nouveau schéma :
+- `subscription_plans` (code: free|premium|business, base_price, config JSONB des paliers Premium, sms_included, limits JSONB, editable en admin)
+- `subscription_plan_history` (audit des changements de prix/limites)
+- `user_subscriptions` (user_id, plan_code, tier_options JSONB choisis, price_monthly, status, current_period_end, djomy_ref)
+- `sms_pricing` (unit_price, packs JSONB [{qty, price}], effective_from)
+- `sms_wallets` (user_id, balance_remaining, total_purchased, total_consumed)
+- `sms_orders` (user_id, group_id, pack_id, qty, amount, status, djomy_ref, admin_note)
+- `sms_ledger` (wallet_id, delta, reason: purchase|consumption|admin_adjust, ref_id)
+- Extension `groups` : `kind` enum `collective|solo|business`, `solo_mode` enum `project|working_capital`, `solo_lock_until`, `is_public` bool, `coordinator_commission_percent`, `coordinator_user_id`
+- Extension `cycles` : `awaiting_renewal` bool + table `cycle_renewal_votes` (cycle_id, user_id, agreed, voted_at)
+- `referrals` (referrer_id, referred_id, plan_code, commission_percent, status)
+- `referral_earnings` (referrer_id, subscription_id, period, amount, paid)
 
-### 3. `src/pages/VerifyEmail.tsx`
+Grants + RLS + policies pour chaque table (voir doctrine `public.` GRANT).
 
-- Lit `location.state.reason` et `resendTriggered`.
-- Si `reason === "legacy_verification"` : affiche un `AuthAlert variant="info"` en tête de page avec le message :
-  > « Pour renforcer la sécurité de votre compte, une vérification e-mail est désormais requise. Un code de validation vient de vous être envoyé à **{email}**. Saisissez-le ci-dessous pour finaliser la connexion. »
-- Si `resendTriggered === true` au montage : initialiser le compte à rebours du bouton "Renvoyer le code" comme après un resend manuel (empêche un double envoi immédiat).
-- Aucun changement à la logique de vérification OTP ni au garde-fou `onAuthStateChange`.
+Livrable : migration validée, `types.ts` régénéré, aucune régression (les tables `groups`/`profiles` gardent leurs colonnes existantes).
 
-### 4. `supabase/functions/auth-otp/index.ts`
+---
 
-Aucun changement fonctionnel requis : `signup_resend` accepte déjà un email seul, applique le rate-limit (3/10 min), passe uniquement par Resend, et échoue proprement avec `email_send_failed` / `email_not_configured` / `rate_limited`.
+## M2 — Back-office : plans & tarification SMS
 
-Vérification : confirmer que `signup_resend` fonctionne pour un email qui existe déjà dans `auth.users` sans nécessiter `signupPayload` (déjà le cas d'après l'implémentation actuelle). Sinon, ajuster pour tolérer les comptes existants.
+Pages admin (super_admin uniquement) :
+- `/admin/subscriptions` : édition des 3 plans (prix de base, limites, paliers Premium, forfait SMS inclus). Historique versionné.
+- `/admin/sms-pricing` : tarif unitaire + packs, activation d'un nouveau tarif = nouvelle ligne `effective_from`.
+- `/admin/sms-orders` : liste des demandes d'achat SMS, filtres par statut, action « marquer traité ».
 
-## Garde-fous conservés
+RPC sécurisées (`security definer`, check `has_role(super_admin)`) pour update.
 
-- `onAuthStateChange` refuse toujours toute session sans `otp_verified === true`.
-- `auth-otp` reste le seul chemin d'envoi d'email (test anti-régression déjà en place).
-- Rate limit resend inchangé.
-- Aucun impact sur les nouvelles inscriptions.
+Livrable : admin peut configurer sans toucher au code.
 
-## Vérification
+---
 
-- Test manuel via Playwright : connexion avec un compte legacy → redirection vers `/auth/verifier-email`, bandeau visible, email `email@…` pré-rempli, un seul appel à `auth-otp` (action `signup_resend`), aucun appel à `/auth/v1/signup`.
-- Test avec un compte déjà vérifié : flux inchangé (dashboard/admin).
-- Test avec mauvais mot de passe : message d'erreur classique, aucun OTP envoyé.
+## M3 — Souscription utilisateur + enforcement
+
+Frontend :
+- Page `/abonnement` avec 3 cartes (Free / Premium modulable / Business).
+- Premium : sliders (nb groupes 2-8, nb membres jusqu'à 20, Solo 0/1, Internationaux 0-6) → prix calculé côté client + revalidé côté serveur.
+- Paiement via Djomy (init-payment existant), webhook → activation `user_subscriptions`.
+
+Enforcement (guards) :
+- Hook `useEntitlements()` centralisé.
+- Blocage création groupe si quota dépassé (client + RLS/trigger côté DB).
+- Blocage ajout membre au-delà de la limite du plan de l'organisateur.
+- Blocage Tontine Solo / Internationale selon plan.
+
+Tests E2E : Free bloqué au 3e groupe ; Premium avec 8 groupes OK ; downgrade → mode lecture seule.
+
+---
+
+## M4 — Routage des notifications selon plan
+
+Refactor du dispatcher notifications :
+- Nouvelle fonction `dispatch_notification(user_id, event, payload)` qui :
+  1. Lit le plan de l'utilisateur.
+  2. Envoie systématiquement In-App + Email.
+  3. Si plan payant ET wallet SMS > 0 ET événement éligible (rappel paiement, alertes critiques) → enqueue SMS via `sms_outbox` existant + décrément atomique du wallet + entrée `sms_ledger`.
+  4. Si wallet à 0 → notification In-App « forfait SMS épuisé, rechargez ».
+
+Respect doctrine SMS (catalogue figé, outbox, jamais de `net.http_post` dans un trigger).
+
+Tests : compteur wallet cohérent, pas de double envoi, Free jamais de SMS.
+
+---
+
+## M5 — Recharge SMS depuis un groupe
+
+- Bouton « Recharger SMS » dans l'écran groupe (visible plans payants).
+- Dialog : sélection pack (issu de `sms_pricing`), paiement Djomy, webhook → `sms_orders.status=paid` + crédit `sms_wallets` + entrée ledger.
+- Notification admin (in-app + email) à chaque commande.
+- Historique accessible depuis profil utilisateur.
+
+---
+
+## M6 — Tontine Solo
+
+- Extension du flow `CreateGroup` : nouveau choix « Type » (Collective / Solo). Si Solo :
+  - Radio Épargne Projet (date échéance obligatoire, `solo_lock_until`) vs Fonds de roulement.
+- Backend : trigger empêche retrait avant `solo_lock_until` en mode projet.
+- UI dédiée : `/solo` liste des tontines solo, progression vers l'objectif.
+- Adaptation payout : bénéficiaire = organisateur unique, pas de rotation.
+
+---
+
+## M7 — Tontine Internationale
+
+- Colonne `is_public` sur `groups` (déjà `visibility='public-link'|'directory'` existant → réutiliser + nouveau flag « catalogue international »).
+- Page `/international` dans sidebar, vue anonymisée (membres → « Membre A/B/… », scores agrégés).
+- Candidature → notification organisateur → accept/reject via flow existant `join_requests`.
+- Fin de cycle : nouveau flag `awaiting_renewal`, écran « Participer au prochain cycle ? Oui/Non », RPC `vote_cycle_renewal`, l'organisateur ne peut relancer que sur les membres ayant voté Oui.
+
+---
+
+## M8 — Tontine Business
+
+Prérequis : plan Business actif.
+- Création de groupe avec case « Je coordonne sans cotiser » → `coordinator_user_id` + `coordinator_commission_percent`.
+- Adaptation `distribute_payout` : prélève commission avant versement bénéficiaire → ligne `ledger_entries` type `coordinator_fee`.
+- Page « Mes commissions » pour le coordinateur.
+- Affiliation :
+  - Lien unique `?ref=<code>` sur la page marketing.
+  - Signup capture le referrer → table `referrals`.
+  - À chaque paiement d'abonnement du filleul → job crée `referral_earnings`.
+  - Page « Mon programme d'affiliation » (parrains, revenus, payouts).
+
+---
+
+## Détails techniques transverses
+
+- **Tests** : chaque milestone ajoute un fichier `tests/e2e/*.spec.ts` + tests Deno sur les nouvelles edge functions.
+- **Sécurité** : toutes les nouvelles tables ont RLS + GRANT explicites ; les prix/limites ne sont modifiables que via RPC `security definer` avec `has_role(super_admin)`.
+- **Paiements** : réutilise Djomy existant, pas de nouveau provider.
+- **Compat legacy** : les groupes existants sont `kind='collective'` par défaut, aucun downgrade forcé.
+- **Rollback** : chaque migration a son inverse dans un commentaire ; feature flags via `internal_config` pour activer/désactiver progressivement en prod.
+
+---
+
+## Validation demandée
+
+Confirme-moi :
+1. L'ordre des milestones te convient (ou tu veux prioriser Solo / International avant les abonnements ?).
+2. Le périmètre de M1 (une seule grosse migration) est OK, ou tu préfères une migration par milestone.
+3. On démarre M1 dès validation.
