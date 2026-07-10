@@ -152,8 +152,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signIn: AuthContextValue["signIn"] = async (email, password) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    return { error: error ? mapAuthError(error.message) : null };
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) return { error: mapAuthError(error.message) };
+    const verified = data.user?.user_metadata?.otp_verified;
+    if (verified !== true) {
+      await supabase.auth.signOut();
+      return { error: "Email non confirmé. Vérifie ta boîte mail." };
+    }
+    return { error: null };
   };
 
   const signUp: AuthContextValue["signUp"] = async ({ email, password, fullName, phoneNumber }) => {

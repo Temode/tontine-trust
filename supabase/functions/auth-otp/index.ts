@@ -246,7 +246,7 @@ async function startSignup(admin: ReturnType<typeof createClient>, body: Record<
   if (existing) {
     const { error: updErr } = await admin.auth.admin.updateUserById(existing.id, {
       password,
-      user_metadata: { full_name: fullName, phone_number: phoneNumber },
+      user_metadata: { full_name: fullName, phone_number: phoneNumber, otp_verified: false },
     });
     if (updErr) {
       console.error("[auth-otp] refresh unverified user failed", updErr.message);
@@ -256,8 +256,8 @@ async function startSignup(admin: ReturnType<typeof createClient>, body: Record<
     const { error: createErr } = await admin.auth.admin.createUser({
       email,
       password,
-      email_confirm: false,
-      user_metadata: { full_name: fullName, phone_number: phoneNumber },
+      email_confirm: true,
+      user_metadata: { full_name: fullName, phone_number: phoneNumber, otp_verified: false },
     });
     if (createErr) {
       const mapped = mapAuthError(createErr.message);
@@ -311,12 +311,16 @@ async function verifySignup(
   const existing = await findExistingUser(admin, email);
   if (!existing) return json({ error: "invalid_code" }, 400);
 
-  if (!existing.email_confirmed_at) {
+  {
     const { error: updErr } = await admin.auth.admin.updateUserById(existing.id, {
       email_confirm: true,
+      user_metadata: {
+        ...((existing as unknown as { user_metadata?: Record<string, unknown> }).user_metadata ?? {}),
+        otp_verified: true,
+      },
     } as never);
     if (updErr) {
-      console.error("[auth-otp] confirm email failed", updErr.message);
+      console.error("[auth-otp] mark otp_verified failed", updErr.message);
       return json({ error: "server_error" }, 500);
     }
   }
