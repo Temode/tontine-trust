@@ -7268,6 +7268,10 @@ export type Database = {
         | "payout_hold_released"
         | "sms_delivery_failed"
         | "nimba_balance_low"
+        | "sms_wallet_credited"
+        | "sms_order_paid"
+        | "sms_order_failed"
+        | "sms_order_cancelled"
       payment_method_external:
         | "cash"
         | "bank_transfer"
@@ -7579,6 +7583,10 @@ export const Constants = {
         "payout_hold_released",
         "sms_delivery_failed",
         "nimba_balance_low",
+        "sms_wallet_credited",
+        "sms_order_paid",
+        "sms_order_failed",
+        "sms_order_cancelled",
       ],
       payment_method_external: [
         "cash",
