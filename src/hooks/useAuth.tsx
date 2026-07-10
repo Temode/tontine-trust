@@ -141,6 +141,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return;
         }
         setSession(data.session);
+        const initialOtpVerified = data.session?.user?.user_metadata?.otp_verified;
+        if (data.session && initialOtpVerified !== true) {
+          console.warn("[useAuth] session initiale refusée : OTP non validé");
+          supabase.auth.signOut().catch(() => undefined);
+          setSession(null);
+          setUser(null);
+          setRoles([]);
+          setRolesLoading(false);
+          setLoading(false);
+          return;
+        }
         setUser(data.session?.user ?? null);
         const uid = data.session?.user?.id ?? null;
         if (uid && uid !== lastUserId) {
