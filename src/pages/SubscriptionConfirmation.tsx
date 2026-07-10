@@ -192,9 +192,11 @@ export default function SubscriptionConfirmation() {
           icon: timeout
             ? <AlertCircle className="h-10 w-10 text-amber-500" />
             : <Loader2 className="h-10 w-10 animate-spin text-primary" />,
-          title: timeout ? "Confirmation retardée" : "Confirmation en cours…",
+          title: timeout
+            ? "Activation non confirmée dans les délais"
+            : "Confirmation en cours…",
           body: timeout
-            ? "Nous n'avons pas encore reçu la confirmation Djomy. Elle peut arriver dans quelques minutes — consultez cette page à nouveau ou vos notifications."
+            ? "Nous n'avons pas reçu la confirmation Djomy après 30 s. Si vous avez été débité, votre abonnement sera activé dès réception du webhook — actualisez cette page dans quelques minutes, réessayez le paiement, ou contactez le support."
             : "Nous attendons la confirmation Djomy. Cela prend habituellement quelques secondes.",
           tone: "info" as const,
         };
