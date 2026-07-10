@@ -13,9 +13,12 @@ interface AuthContextValue {
   roles: AppRole[];
   loading: boolean;
   rolesLoading: boolean;
-  signIn: (email: string, password: string) => Promise<{ error: string | null }>;
-  // NB: `requiresVerification` est utilisé pour rediriger les comptes legacy
-  // (créés avant l'OTP obligatoire) vers /auth/verifier-email.
+  // `requiresVerification` cible les comptes legacy (créés avant l'OTP obligatoire) :
+  // credentials corrects mais `otp_verified !== true` → redirection vers /auth/verifier-email.
+  signIn: (
+    email: string,
+    password: string,
+  ) => Promise<{ error: string | null; requiresVerification?: boolean; email?: string }>;
   signUp: (args: {
     email: string;
     password: string;
@@ -184,7 +187,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const verified = data.user?.user_metadata?.otp_verified;
     if (verified !== true) {
       await supabase.auth.signOut();
-      return { error: "Email non confirmé. Vérifie ta boîte mail." };
+      return { error: null, requiresVerification: true, email: data.user?.email ?? email };
     }
     return { error: null };
   };
