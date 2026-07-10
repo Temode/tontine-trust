@@ -247,8 +247,9 @@ export default function VerifyEmail() {
           </div>
 
           <p className="mt-8 border-t border-foreground/5 pt-6 text-[11px] leading-relaxed text-foreground/40">
-            Le code expire au bout de 15 minutes. Si vous ne le recevez pas, vérifiez vos courriers
-            indésirables puis cliquez sur « Renvoyer le code ».
+            Le code expire au bout de 15 minutes. Vous ne le recevez pas ? Vérifiez vos courriers
+            indésirables, confirmez que l'adresse ci-dessus est correcte, puis cliquez sur
+            « Renvoyer le code » (limite : 3 envois par 10 minutes).
           </p>
         </>
       )}
