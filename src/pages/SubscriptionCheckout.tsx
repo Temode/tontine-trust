@@ -178,7 +178,7 @@ export default function SubscriptionCheckout() {
                 {isPremium ? <Sparkles className="h-4 w-4 text-primary" /> : <Crown className="h-4 w-4 text-amber-500" />}
                 <h2 className="font-display text-xl font-bold">{plan.label}</h2>
               </div>
-              <p className="text-sm text-muted-foreground">{plan.description ?? (isBusiness ? "Pour les coordinateurs et le programme d'affiliation." : "Pour les utilisateurs actifs, modulable selon vos besoins.")}</p>
+              <p className="text-sm text-muted-foreground">{isBusiness ? "Pour les coordinateurs et le programme d'affiliation." : "Pour les utilisateurs actifs, modulable selon vos besoins."}</p>
               <ul className="space-y-1.5 text-sm pt-1">
                 {included.map((f, i) => (
                   <li key={i} className="flex items-start gap-2">
