@@ -92,6 +92,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const { data: sub } = supabase.auth.onAuthStateChange((_event, newSession) => {
       if (!mounted) return;
+      // Garde-fou : refuse toute session dont l'OTP n'a pas été validé,
+      // même si un chemin natif Supabase parvenait à établir un session token.
+      const otpVerified = newSession?.user?.user_metadata?.otp_verified;
+      if (newSession && otpVerified !== true) {
+        console.warn("[useAuth] session refusée : OTP non validé");
+        supabase.auth.signOut().catch(() => undefined);
+        setSession(null);
+        setUser(null);
+        setRoles([]);
+        setRolesLoading(false);
+        setLoading(false);
+        lastUserId = null;
+        return;
+      }
       setSession(newSession);
       setUser(newSession?.user ?? null);
       setLoading(false);
@@ -127,6 +141,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return;
         }
         setSession(data.session);
+        const initialOtpVerified = data.session?.user?.user_metadata?.otp_verified;
+        if (data.session && initialOtpVerified !== true) {
+          console.warn("[useAuth] session initiale refusée : OTP non validé");
+          supabase.auth.signOut().catch(() => undefined);
+          setSession(null);
+          setUser(null);
+          setRoles([]);
+          setRolesLoading(false);
+          setLoading(false);
+          return;
+        }
         setUser(data.session?.user ?? null);
         const uid = data.session?.user?.id ?? null;
         if (uid && uid !== lastUserId) {

@@ -103,23 +103,19 @@ export default function VerifyEmail() {
 
   const handleResend = async () => {
     if (countdown > 0 || resending || !email) return;
-    const signupPayload = location.state?.signupPayload;
-    if (!signupPayload) {
-      toast.error("Pour renvoyer un code, reprenez l'inscription depuis le début.");
-      return;
-    }
     setResending(true);
-    const { error } = await invokeAuthOtp({ action: "signup_start", ...signupPayload });
+    const { error } = await invokeAuthOtp({ action: "signup_resend", email });
     setResending(false);
     if (error) {
       if (/trop d'emails|tentatives|patiente/i.test(error)) {
-        toast.error("Trop d'emails envoyés. Patientez quelques minutes.");
+        toast.error("Trop d'emails envoyés. Patientez quelques minutes avant un nouvel essai.");
+        setCountdown(RESEND_DELAY);
       } else {
         toast.error(error);
       }
       return;
     }
-    toast.success("Nouveau code envoyé");
+    toast.success("Nouveau code envoyé. Vérifiez votre boîte mail et vos spams.");
     setCountdown(RESEND_DELAY);
   };
 
@@ -251,8 +247,9 @@ export default function VerifyEmail() {
           </div>
 
           <p className="mt-8 border-t border-foreground/5 pt-6 text-[11px] leading-relaxed text-foreground/40">
-            Le code expire au bout de 15 minutes. Si vous ne le recevez pas, vérifiez vos courriers
-            indésirables puis cliquez sur « Renvoyer le code ».
+            Le code expire au bout de 15 minutes. Vous ne le recevez pas ? Vérifiez vos courriers
+            indésirables, confirmez que l'adresse ci-dessus est correcte, puis cliquez sur
+            « Renvoyer le code » (limite : 3 envois par 10 minutes).
           </p>
         </>
       )}

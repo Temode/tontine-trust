@@ -294,6 +294,29 @@ async function startSignup(admin: ReturnType<typeof createClient>, body: Record<
   return json({ success: true });
 }
 
+async function resendSignup(admin: ReturnType<typeof createClient>, body: Record<string, unknown>) {
+  const email = normalizeEmail(body.email);
+  if (!email) return json({ error: "invalid_email" }, 400);
+
+  const emailHash = await sha256(email);
+  if (await checkRateLimit(admin, emailHash, "signup")) return json({ error: "rate_limited" }, 429);
+
+  const existing = await findExistingUser(admin, email);
+  // On ne divulgue pas l'existence d'un compte confirmé.
+  if (!existing) return json({ success: true });
+  if (existing.email_confirmed_at) {
+    const meta = (existing as unknown as { user_metadata?: { otp_verified?: boolean } }).user_metadata;
+    if (meta?.otp_verified === true) return json({ error: "email_exists" }, 400);
+  }
+
+  const sent = await issueOtp(admin, { email, emailHash, purpose: "signup" });
+  if (!sent.ok) {
+    console.error("[auth-otp] resend failed (signup resend)", { status: sent.status, body: sent.body });
+    return json({ error: sent.status === 500 ? "email_not_configured" : "email_send_failed" }, 502);
+  }
+  return json({ success: true });
+}
+
 async function startRecovery(admin: ReturnType<typeof createClient>, body: Record<string, unknown>) {
   const email = normalizeEmail(body.email);
   if (!email) return json({ error: "invalid_email" }, 400);
@@ -411,6 +434,8 @@ Deno.serve(async (req) => {
     switch (body.action) {
       case "signup_start":
         return await startSignup(admin, body);
+      case "signup_resend":
+        return await resendSignup(admin, body);
       case "recovery_start":
         return await startRecovery(admin, body);
       case "verify_signup":
