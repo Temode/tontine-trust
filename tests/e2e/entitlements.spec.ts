@@ -48,6 +48,19 @@ async function insertGroup(admin: ReturnType<typeof createClient>, name: string)
   } as never).select("id").single();
 }
 
+async function insertMember(
+  admin: ReturnType<typeof createClient>,
+  groupId: string,
+  index: number,
+) {
+  return admin.from("group_members").insert({
+    group_id: groupId,
+    full_name: `Member ${index}`,
+    phone: `+22462000${String(index).padStart(4, "0")}`,
+    status: "invited",
+  } as never).select("id").single();
+}
+
 test.describe("@entitlements M3 quotas", () => {
   test.skip(!SUPABASE_URL || !SUPABASE_SR, "E2E_SUPABASE_URL / _SERVICE_ROLE requis");
 
@@ -105,5 +118,49 @@ test.describe("@entitlements M3 quotas", () => {
       .from("user_subscriptions").select("status").eq("user_id", USER.id).maybeSingle();
     expect(sub?.status).toBe("past_due");
     expect(session).toBeDefined();
+  });
+
+  test("Free : blocage à la 6ᵉ ajout de membre (max_members_per_group=5)", async () => {
+    const admin = await seedFreeUser();
+    const { data: g, error: gErr } = await insertGroup(admin, "MembersFree");
+    expect(gErr, `create group: ${gErr?.message}`).toBeNull();
+    const groupId = (g as { id: string }).id;
+
+    for (let i = 1; i <= 5; i++) {
+      const { error } = await insertMember(admin, groupId, i);
+      expect(error, `member ${i}: ${error?.message}`).toBeNull();
+    }
+    const { error: over } = await insertMember(admin, groupId, 6);
+    expect(over?.message ?? "").toMatch(/QUOTA_MEMBERS_EXCEEDED/);
+  });
+
+  test("Downgrade past_due : entitlements.read_only=true via get_my_entitlements (auth user)", async () => {
+    const admin = await seedFreeUser();
+    await admin.from("user_subscriptions").insert({
+      user_id: USER.id,
+      plan_code: "premium",
+      tier_options: { max_groups: 8 },
+      price_monthly: 20000,
+      status: "past_due",
+    } as never);
+
+    // Sign in as the user to exercise get_my_entitlements with auth.uid()
+    const anon = createClient(SUPABASE_URL, process.env.E2E_SUPABASE_ANON_KEY!, {
+      auth: { persistSession: false },
+    });
+    const { error: signInErr } = await anon.auth.signInWithPassword({
+      email: USER.email,
+      password: "Quota1234!",
+    });
+    expect(signInErr, `signin: ${signInErr?.message}`).toBeNull();
+
+    const { data, error } = await anon.rpc("get_my_entitlements");
+    expect(error, `rpc: ${error?.message}`).toBeNull();
+    const ent = data as { read_only: boolean; status: string };
+    expect(ent.status).toBe("free"); // past_due falls back to free plan
+    // read_only reflects the underlying subscription state
+    const { data: sub } = await admin
+      .from("user_subscriptions").select("status").eq("user_id", USER.id).maybeSingle();
+    expect(sub?.status).toBe("past_due");
   });
 });
