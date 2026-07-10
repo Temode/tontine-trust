@@ -8,9 +8,23 @@ import React from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 
+/* M8: capture ?ref=CODE pour l'affiliation, stocké en localStorage jusqu'au signup. */
+function useCaptureReferral() {
+  React.useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const ref = params.get("ref");
+      if (ref && /^[A-Za-z0-9]{4,16}$/.test(ref)) {
+        localStorage.setItem("pending_referral_code", ref.toUpperCase());
+      }
+    } catch { /* ignore */ }
+  }, []);
+}
+
 /* CTA sensible à l'état d'authentification */
 function useCtaTarget() {
   const { user, roles } = useAuth();
+  useCaptureReferral();
   const isAdmin = roles.includes("super_admin");
   const href = user ? (isAdmin ? "/admin/overview" : "/dashboard") : "/auth";
   return {
