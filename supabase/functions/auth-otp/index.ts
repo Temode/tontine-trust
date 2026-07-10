@@ -21,8 +21,8 @@ const SITE_NAME = "Tontine Digitale";
 const SITE_URL = "https://tontinedigitale.com";
 const FROM_EMAIL = "noreply@tontinedigitale.com";
 const FROM_ADDRESS = `Tontine Digitale <${FROM_EMAIL}>`;
-// Garde-fou : toute autre valeur (ex. `no-reply@auth.lovable.cloud`) est refusée
-// pour empêcher la moindre régression vers un autre expéditeur.
+// Garde-fou : toute autre valeur (ex. l'expéditeur par défaut Lovable) est
+// refusée pour empêcher la moindre régression vers un autre expéditeur.
 const ALLOWED_FROM_DOMAIN = "tontinedigitale.com";
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const RECENT_WINDOW_MINUTES = 10;
