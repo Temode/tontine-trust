@@ -126,9 +126,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         try {
           const code = localStorage.getItem("pending_referral_code");
           if (code) {
-            supabase.rpc("register_referral", { _code: code })
-              .then(() => localStorage.removeItem("pending_referral_code"))
-              .catch(() => undefined);
+            void (async () => {
+              try {
+                await supabase.rpc("register_referral", { _code: code });
+              } catch { /* ignore */ }
+              localStorage.removeItem("pending_referral_code");
+            })();
           }
         } catch { /* localStorage unavailable */ }
       } else if (!uid) {
