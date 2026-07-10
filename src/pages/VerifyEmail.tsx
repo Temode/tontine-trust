@@ -66,7 +66,12 @@ export default function VerifyEmail() {
       setErrorMsg(null);
       const { data, error } = await invokeAuthOtp<{
         session?: { access_token: string; refresh_token: string };
-      }>({ action: "verify_signup", email, token });
+      }>({
+        action: "verify_signup",
+        email,
+        token,
+        password: location.state?.signupPayload?.password,
+      });
       if (error) {
         setStatus("error");
         setErrorMsg(error);
@@ -81,7 +86,7 @@ export default function VerifyEmail() {
       toast.success("Email vérifié");
       setTimeout(() => navigate("/dashboard", { replace: true }), 1400);
     },
-    [email, navigate],
+    [email, navigate, location.state],
   );
 
   useEffect(() => {
