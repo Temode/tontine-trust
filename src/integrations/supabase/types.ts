@@ -671,8 +671,48 @@ export type Database = {
           },
         ]
       }
+      cycle_renewal_votes: {
+        Row: {
+          agreed: boolean
+          cycle_id: string
+          id: string
+          user_id: string
+          voted_at: string
+        }
+        Insert: {
+          agreed: boolean
+          cycle_id: string
+          id?: string
+          user_id: string
+          voted_at?: string
+        }
+        Update: {
+          agreed?: boolean
+          cycle_id?: string
+          id?: string
+          user_id?: string
+          voted_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cycle_renewal_votes_cycle_id_fkey"
+            columns: ["cycle_id"]
+            isOneToOne: false
+            referencedRelation: "cycle_open_turn_check"
+            referencedColumns: ["cycle_id"]
+          },
+          {
+            foreignKeyName: "cycle_renewal_votes_cycle_id_fkey"
+            columns: ["cycle_id"]
+            isOneToOne: false
+            referencedRelation: "cycles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cycles: {
         Row: {
+          awaiting_renewal: boolean
           cycle_number: number
           ended_at: string | null
           group_id: string
@@ -680,6 +720,7 @@ export type Database = {
           started_at: string
         }
         Insert: {
+          awaiting_renewal?: boolean
           cycle_number?: number
           ended_at?: string | null
           group_id: string
@@ -687,6 +728,7 @@ export type Database = {
           started_at?: string
         }
         Update: {
+          awaiting_renewal?: boolean
           cycle_number?: number
           ended_at?: string | null
           group_id?: string
@@ -1767,6 +1809,8 @@ export type Database = {
           category: string | null
           co_organizers: string[]
           contribution_amount: number
+          coordinator_commission_percent: number
+          coordinator_user_id: string | null
           created_at: string
           created_by: string
           deleted_at: string | null
@@ -1776,7 +1820,9 @@ export type Database = {
           description: string | null
           frequency: Database["public"]["Enums"]["group_frequency"]
           id: string
+          is_international: boolean
           is_test_group: boolean
+          kind: Database["public"]["Enums"]["group_kind"]
           late_penalty_after_days: number
           late_penalty_percent: number
           max_members: number
@@ -1786,6 +1832,8 @@ export type Database = {
           paused_by: string | null
           paused_reason: string | null
           rotation_order_kind: Database["public"]["Enums"]["rotation_order"]
+          solo_lock_until: string | null
+          solo_mode: Database["public"]["Enums"]["solo_mode"] | null
           status: Database["public"]["Enums"]["group_status"]
           swap_policy: Database["public"]["Enums"]["swap_policy"]
           total_paused_days: number
@@ -1799,6 +1847,8 @@ export type Database = {
           category?: string | null
           co_organizers?: string[]
           contribution_amount: number
+          coordinator_commission_percent?: number
+          coordinator_user_id?: string | null
           created_at?: string
           created_by: string
           deleted_at?: string | null
@@ -1808,7 +1858,9 @@ export type Database = {
           description?: string | null
           frequency?: Database["public"]["Enums"]["group_frequency"]
           id?: string
+          is_international?: boolean
           is_test_group?: boolean
+          kind?: Database["public"]["Enums"]["group_kind"]
           late_penalty_after_days?: number
           late_penalty_percent?: number
           max_members: number
@@ -1818,6 +1870,8 @@ export type Database = {
           paused_by?: string | null
           paused_reason?: string | null
           rotation_order_kind?: Database["public"]["Enums"]["rotation_order"]
+          solo_lock_until?: string | null
+          solo_mode?: Database["public"]["Enums"]["solo_mode"] | null
           status?: Database["public"]["Enums"]["group_status"]
           swap_policy?: Database["public"]["Enums"]["swap_policy"]
           total_paused_days?: number
@@ -1831,6 +1885,8 @@ export type Database = {
           category?: string | null
           co_organizers?: string[]
           contribution_amount?: number
+          coordinator_commission_percent?: number
+          coordinator_user_id?: string | null
           created_at?: string
           created_by?: string
           deleted_at?: string | null
@@ -1840,7 +1896,9 @@ export type Database = {
           description?: string | null
           frequency?: Database["public"]["Enums"]["group_frequency"]
           id?: string
+          is_international?: boolean
           is_test_group?: boolean
+          kind?: Database["public"]["Enums"]["group_kind"]
           late_penalty_after_days?: number
           late_penalty_percent?: number
           max_members?: number
@@ -1850,6 +1908,8 @@ export type Database = {
           paused_by?: string | null
           paused_reason?: string | null
           rotation_order_kind?: Database["public"]["Enums"]["rotation_order"]
+          solo_lock_until?: string | null
+          solo_mode?: Database["public"]["Enums"]["solo_mode"] | null
           status?: Database["public"]["Enums"]["group_status"]
           swap_policy?: Database["public"]["Enums"]["swap_policy"]
           total_paused_days?: number
@@ -3339,6 +3399,80 @@ export type Database = {
           },
         ]
       }
+      referral_earnings: {
+        Row: {
+          amount: number
+          created_at: string
+          id: string
+          paid: boolean
+          paid_at: string | null
+          period: string
+          referrer_id: string
+          subscription_id: string | null
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          id?: string
+          paid?: boolean
+          paid_at?: string | null
+          period: string
+          referrer_id: string
+          subscription_id?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: string
+          paid?: boolean
+          paid_at?: string | null
+          period?: string
+          referrer_id?: string
+          subscription_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "referral_earnings_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "user_subscriptions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      referrals: {
+        Row: {
+          commission_percent: number
+          created_at: string
+          id: string
+          referral_code: string
+          referred_id: string
+          referrer_id: string
+          status: Database["public"]["Enums"]["referral_status"]
+          updated_at: string
+        }
+        Insert: {
+          commission_percent?: number
+          created_at?: string
+          id?: string
+          referral_code: string
+          referred_id: string
+          referrer_id: string
+          status?: Database["public"]["Enums"]["referral_status"]
+          updated_at?: string
+        }
+        Update: {
+          commission_percent?: number
+          created_at?: string
+          id?: string
+          referral_code?: string
+          referred_id?: string
+          referrer_id?: string
+          status?: Database["public"]["Enums"]["referral_status"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
       reminder_log: {
         Row: {
           bucket: string
@@ -3422,6 +3556,36 @@ export type Database = {
         Update: {
           created_at?: string
           dedupe_key?: string
+        }
+        Relationships: []
+      }
+      sms_ledger: {
+        Row: {
+          created_at: string
+          delta: number
+          id: string
+          metadata: Json
+          reason: Database["public"]["Enums"]["sms_ledger_reason"]
+          ref_id: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          delta: number
+          id?: string
+          metadata?: Json
+          reason: Database["public"]["Enums"]["sms_ledger_reason"]
+          ref_id?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          delta?: number
+          id?: string
+          metadata?: Json
+          reason?: Database["public"]["Enums"]["sms_ledger_reason"]
+          ref_id?: string | null
+          user_id?: string
         }
         Relationships: []
       }
@@ -3529,6 +3693,73 @@ export type Database = {
           },
         ]
       }
+      sms_orders: {
+        Row: {
+          admin_note: string | null
+          amount: number
+          created_at: string
+          djomy_ref: string | null
+          group_id: string | null
+          id: string
+          pack_id: string | null
+          qty: number
+          status: Database["public"]["Enums"]["sms_order_status"]
+          unit_price: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          admin_note?: string | null
+          amount: number
+          created_at?: string
+          djomy_ref?: string | null
+          group_id?: string | null
+          id?: string
+          pack_id?: string | null
+          qty: number
+          status?: Database["public"]["Enums"]["sms_order_status"]
+          unit_price: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          admin_note?: string | null
+          amount?: number
+          created_at?: string
+          djomy_ref?: string | null
+          group_id?: string | null
+          id?: string
+          pack_id?: string | null
+          qty?: number
+          status?: Database["public"]["Enums"]["sms_order_status"]
+          unit_price?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sms_orders_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "admin_group_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sms_orders_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sms_orders_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "my_groups_overview"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sms_outbox: {
         Row: {
           attempts: number
@@ -3562,6 +3793,123 @@ export type Database = {
           payload?: Json
           processed_at?: string | null
           status?: string
+        }
+        Relationships: []
+      }
+      sms_pricing: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          effective_from: string
+          id: string
+          is_active: boolean
+          packs: Json
+          unit_price: number
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          effective_from?: string
+          id?: string
+          is_active?: boolean
+          packs?: Json
+          unit_price: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          effective_from?: string
+          id?: string
+          is_active?: boolean
+          packs?: Json
+          unit_price?: number
+        }
+        Relationships: []
+      }
+      sms_wallets: {
+        Row: {
+          balance_remaining: number
+          created_at: string
+          total_consumed: number
+          total_purchased: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          balance_remaining?: number
+          created_at?: string
+          total_consumed?: number
+          total_purchased?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          balance_remaining?: number
+          created_at?: string
+          total_consumed?: number
+          total_purchased?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      subscription_plan_history: {
+        Row: {
+          changed_by: string | null
+          created_at: string
+          id: string
+          plan_code: Database["public"]["Enums"]["subscription_plan_code"]
+          snapshot: Json
+        }
+        Insert: {
+          changed_by?: string | null
+          created_at?: string
+          id?: string
+          plan_code: Database["public"]["Enums"]["subscription_plan_code"]
+          snapshot: Json
+        }
+        Update: {
+          changed_by?: string | null
+          created_at?: string
+          id?: string
+          plan_code?: Database["public"]["Enums"]["subscription_plan_code"]
+          snapshot?: Json
+        }
+        Relationships: []
+      }
+      subscription_plans: {
+        Row: {
+          base_price: number
+          code: Database["public"]["Enums"]["subscription_plan_code"]
+          created_at: string
+          is_active: boolean
+          label: string
+          limits: Json
+          sms_included: number
+          tiers: Json
+          updated_at: string
+        }
+        Insert: {
+          base_price?: number
+          code: Database["public"]["Enums"]["subscription_plan_code"]
+          created_at?: string
+          is_active?: boolean
+          label: string
+          limits?: Json
+          sms_included?: number
+          tiers?: Json
+          updated_at?: string
+        }
+        Update: {
+          base_price?: number
+          code?: Database["public"]["Enums"]["subscription_plan_code"]
+          created_at?: string
+          is_active?: boolean
+          label?: string
+          limits?: Json
+          sms_included?: number
+          tiers?: Json
+          updated_at?: string
         }
         Relationships: []
       }
@@ -4102,6 +4450,48 @@ export type Database = {
           created_at?: string
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_subscriptions: {
+        Row: {
+          cancelled_at: string | null
+          created_at: string
+          current_period_end: string | null
+          djomy_ref: string | null
+          id: string
+          plan_code: Database["public"]["Enums"]["subscription_plan_code"]
+          price_monthly: number
+          status: Database["public"]["Enums"]["subscription_status"]
+          tier_options: Json
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          cancelled_at?: string | null
+          created_at?: string
+          current_period_end?: string | null
+          djomy_ref?: string | null
+          id?: string
+          plan_code?: Database["public"]["Enums"]["subscription_plan_code"]
+          price_monthly?: number
+          status?: Database["public"]["Enums"]["subscription_status"]
+          tier_options?: Json
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          cancelled_at?: string | null
+          created_at?: string
+          current_period_end?: string | null
+          djomy_ref?: string | null
+          id?: string
+          plan_code?: Database["public"]["Enums"]["subscription_plan_code"]
+          price_monthly?: number
+          status?: Database["public"]["Enums"]["subscription_status"]
+          tier_options?: Json
+          updated_at?: string
           user_id?: string
         }
         Relationships: []
@@ -6625,6 +7015,7 @@ export type Database = {
         | "quinzaine"
         | "mensuelle"
         | "quotidienne"
+      group_kind: "collective" | "solo" | "business"
       group_status:
         | "draft"
         | "open"
@@ -6737,6 +7128,7 @@ export type Database = {
         | "failed"
         | "cancelled"
         | "refunded"
+      referral_status: "pending" | "active" | "expired" | "revoked"
       reliability_tier:
         | "nouveau"
         | "risque"
@@ -6746,6 +7138,21 @@ export type Database = {
         | "blocked"
       reminder_channel: "in_app" | "sms" | "whatsapp" | "email"
       rotation_order: "random" | "fixed" | "choice" | "auction"
+      sms_ledger_reason:
+        | "purchase"
+        | "consumption"
+        | "admin_adjust"
+        | "plan_grant"
+        | "refund"
+      sms_order_status: "pending" | "paid" | "credited" | "failed" | "cancelled"
+      solo_mode: "project" | "working_capital"
+      subscription_plan_code: "free" | "premium" | "business"
+      subscription_status:
+        | "active"
+        | "trialing"
+        | "past_due"
+        | "cancelled"
+        | "pending"
       swap_policy: "none" | "with_consent" | "organizer_only"
       swap_status: "pending" | "accepted" | "rejected" | "cancelled"
       turn_status: "upcoming" | "collecting" | "paid" | "skipped"
@@ -6916,6 +7323,7 @@ export const Constants = {
         "mensuelle",
         "quotidienne",
       ],
+      group_kind: ["collective", "solo", "business"],
       group_status: [
         "draft",
         "open",
@@ -7035,6 +7443,7 @@ export const Constants = {
         "cancelled",
         "refunded",
       ],
+      referral_status: ["pending", "active", "expired", "revoked"],
       reliability_tier: [
         "nouveau",
         "risque",
@@ -7045,6 +7454,23 @@ export const Constants = {
       ],
       reminder_channel: ["in_app", "sms", "whatsapp", "email"],
       rotation_order: ["random", "fixed", "choice", "auction"],
+      sms_ledger_reason: [
+        "purchase",
+        "consumption",
+        "admin_adjust",
+        "plan_grant",
+        "refund",
+      ],
+      sms_order_status: ["pending", "paid", "credited", "failed", "cancelled"],
+      solo_mode: ["project", "working_capital"],
+      subscription_plan_code: ["free", "premium", "business"],
+      subscription_status: [
+        "active",
+        "trialing",
+        "past_due",
+        "cancelled",
+        "pending",
+      ],
       swap_policy: ["none", "with_consent", "organizer_only"],
       swap_status: ["pending", "accepted", "rejected", "cancelled"],
       turn_status: ["upcoming", "collecting", "paid", "skipped"],
