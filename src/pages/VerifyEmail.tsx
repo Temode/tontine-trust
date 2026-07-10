@@ -205,9 +205,31 @@ export default function VerifyEmail() {
                 " votre adresse email."
               )}
             </p>
+            {expiryLabel && (
+              <p className="mt-1 text-[12px] text-foreground/50" aria-live="polite">
+                Ce code est valable jusqu'à{" "}
+                <span className="font-semibold tabular-nums text-foreground/70">{expiryLabel}</span>
+                {expiresInSec > 0 ? (
+                  <> — expire dans <span className="font-semibold tabular-nums text-foreground/70">{expiryMmSs}</span>.</>
+                ) : (
+                  <> — <span className="font-semibold text-destructive">expiré</span>. Cliquez sur « Renvoyer le code ».</>
+                )}
+              </p>
+            )}
           </header>
 
-          {isLegacyVerification && (
+          {isAdminLegacy ? (
+            <div className="mb-6">
+              <AuthAlert variant="error" title="Accès administrateur bloqué">
+                Ce compte a des privilèges administrateur. Pour des raisons de sécurité,
+                l'accès reste bloqué tant que l'adresse{" "}
+                {masked ? <span className="font-semibold text-foreground">{masked}</span> : "e-mail"}{" "}
+                n'est pas vérifiée. Saisissez le code à 6 chiffres qui vient d'être envoyé
+                {expiryLabel ? <> (valable jusqu'à {expiryLabel})</> : null}. En cas de non-réception,
+                utilisez « Renvoyer le code » ci-dessous.
+              </AuthAlert>
+            </div>
+          ) : isLegacyVerification && (
             <div className="mb-6">
               <AuthAlert variant="info" title="Vérification e-mail requise">
                 Pour renforcer la sécurité de votre compte, une vérification e-mail est désormais
