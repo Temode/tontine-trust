@@ -1,35 +1,70 @@
-## Constats de l’audit
 
-- Le dernier test ne passe pas par le flux OTP Resend : la table des OTP n’a aucun enregistrement récent pour l’adresse testée, alors que les logs auth montrent un appel natif `POST /signup` à 07:38.
-- Ce `POST /signup` déclenche `user_confirmation_requested`, puis le hook email natif Lovable, ce qui explique l’email envoyé par Lovable au lieu de Resend.
-- Le backend hébergé est sain, mais l’infrastructure email Lovable du projet est dans un état incohérent : le domaine email projet est indiqué comme supprimé/changé (`notify.tontinedigitale.com`), et la table de logs Lovable email n’existe pas. Donc si un chemin natif est déclenché, il retombe sur l’expéditeur/template natif.
-- Le code actuel de `auth-otp` envoie bien via Resend avec `from: Tontine Digitale <noreply@tontinedigitale.com>`, mais il ne suffit pas tant que le chemin natif `/signup` reste autorisé.
+## Objectif
 
-## Plan de correction
+Gérer proprement les comptes existants dont `user_metadata.otp_verified !== true` (legacy, admin, inscriptions antérieures) quand ils tentent de se connecter avec des identifiants corrects. Au lieu d'un simple message "Email non confirmé", on déclenche automatiquement un nouvel OTP via Resend et on redirige vers `/auth/verifier-email` avec un bandeau explicatif.
 
-1. **Bloquer définitivement le signup natif**
-   - Désactiver les inscriptions publiques natives côté auth backend.
-   - Garder le flux `auth-otp` opérationnel, car il crée les utilisateurs côté serveur puis envoie le code via Resend.
-   - Résultat attendu : tout appel accidentel au chemin natif `/signup` échoue et ne peut plus envoyer d’email Lovable.
+## Comportement cible (inspiré PayPal / Facebook)
 
-2. **Supprimer/neutraliser les chemins email auth natifs restants**
-   - Vérifier que les pages inscription, mot de passe oublié et reset utilisent uniquement `auth-otp`.
-   - Retirer ou neutraliser le hook email auth Lovable si nécessaire, afin qu’il ne soit plus considéré comme chemin valide d’envoi.
-   - Garder Resend comme seul chemin applicatif pour inscription/récupération.
+1. L'utilisateur saisit email + mot de passe corrects sur `/auth`.
+2. Le backend valide les identifiants. Si `otp_verified !== true` :
+   - déconnecte immédiatement la session (déjà en place),
+   - déclenche `auth-otp` action `signup_resend` (envoi Resend uniquement, rate-limité),
+   - redirige vers `/auth/verifier-email` avec `state.email` et un flag `reason: "legacy_verification"`.
+3. `VerifyEmail.tsx` affiche un bandeau d'information temporaire :
+   > « Pour renforcer la sécurité de votre compte, une vérification e-mail est désormais requise. Un code de validation vient de vous être envoyé à `email@…`. »
+4. Le champ OTP + bouton "Renvoyer le code" + compte à rebours existants restent inchangés.
 
-3. **Renforcer les tests anti-régression**
-   - Étendre le test existant pour échouer si le code réintroduit un appel client ou serveur à `auth.signUp`, `resetPasswordForEmail`, `signInWithOtp`, `generateLink`, ou tout endpoint natif équivalent.
-   - Ajouter une vérification que `auth-otp` est le seul flux autorisé pour signup/recovery.
-   - Ajouter un test documentaire/CI qui vérifie que le signup natif backend est désactivé ou explicitement bloqué.
+## Modifications
 
-4. **Vérifier en conditions réelles**
-   - Déployer la fonction `auth-otp` après ajustements.
-   - Lancer un test d’inscription.
-   - Contrôler trois signaux :
-     - un nouvel OTP est bien enregistré côté backend ;
-     - aucun log auth `POST /signup` natif n’apparaît ;
-     - l’email reçu vient de `noreply@tontinedigitale.com` via Resend.
+### 1. `src/hooks/useAuth.tsx` — `signIn`
 
-## Point important
+Actuellement : si `otp_verified !== true`, retourne `"Email non confirmé…"`.
 
-Le problème observé n’est pas un échec Resend : c’est un contournement du flux Resend par le chemin d’inscription natif. La correction principale est donc de bloquer ce chemin natif au niveau backend, pas seulement dans le frontend.
+Nouveau contrat de retour :
+```ts
+{ error: string | null; requiresVerification?: boolean; email?: string }
+```
+Logique :
+- credentials OK + `otp_verified !== true` → `signOut()`, retourne `{ error: null, requiresVerification: true, email }`.
+- credentials KO → comportement inchangé.
+- credentials OK + `otp_verified === true` → comportement inchangé.
+
+Mise à jour du type `AuthContextValue.signIn` en conséquence.
+
+### 2. `src/pages/Auth.tsx` — `handleSignIn`
+
+Après `signIn(...)` :
+- si `requiresVerification === true` :
+  - appel `invokeAuthOtp({ action: "signup_resend", email })` (best-effort ; en cas d'erreur `rate_limited`/`email_send_failed`, on redirige quand même et VerifyEmail affichera l'état),
+  - `toast.info("Un nouveau code de vérification vient de vous être envoyé.")`,
+  - `navigate("/auth/verifier-email", { state: { email, reason: "legacy_verification", resendTriggered: true } })`.
+- sinon flux actuel (admin/dashboard) inchangé.
+
+Aucun changement dans le formulaire d'inscription.
+
+### 3. `src/pages/VerifyEmail.tsx`
+
+- Lit `location.state.reason` et `resendTriggered`.
+- Si `reason === "legacy_verification"` : affiche un `AuthAlert variant="info"` en tête de page avec le message :
+  > « Pour renforcer la sécurité de votre compte, une vérification e-mail est désormais requise. Un code de validation vient de vous être envoyé à **{email}**. Saisissez-le ci-dessous pour finaliser la connexion. »
+- Si `resendTriggered === true` au montage : initialiser le compte à rebours du bouton "Renvoyer le code" comme après un resend manuel (empêche un double envoi immédiat).
+- Aucun changement à la logique de vérification OTP ni au garde-fou `onAuthStateChange`.
+
+### 4. `supabase/functions/auth-otp/index.ts`
+
+Aucun changement fonctionnel requis : `signup_resend` accepte déjà un email seul, applique le rate-limit (3/10 min), passe uniquement par Resend, et échoue proprement avec `email_send_failed` / `email_not_configured` / `rate_limited`.
+
+Vérification : confirmer que `signup_resend` fonctionne pour un email qui existe déjà dans `auth.users` sans nécessiter `signupPayload` (déjà le cas d'après l'implémentation actuelle). Sinon, ajuster pour tolérer les comptes existants.
+
+## Garde-fous conservés
+
+- `onAuthStateChange` refuse toujours toute session sans `otp_verified === true`.
+- `auth-otp` reste le seul chemin d'envoi d'email (test anti-régression déjà en place).
+- Rate limit resend inchangé.
+- Aucun impact sur les nouvelles inscriptions.
+
+## Vérification
+
+- Test manuel via Playwright : connexion avec un compte legacy → redirection vers `/auth/verifier-email`, bandeau visible, email `email@…` pré-rempli, un seul appel à `auth-otp` (action `signup_resend`), aucun appel à `/auth/v1/signup`.
+- Test avec un compte déjà vérifié : flux inchangé (dashboard/admin).
+- Test avec mauvais mot de passe : message d'erreur classique, aucun OTP envoyé.

@@ -32,16 +32,20 @@ export default function VerifyEmail() {
     state?: {
       email?: string;
       signupPayload?: { email: string; password: string; fullName: string; phoneNumber?: string | null };
+      reason?: "legacy_verification" | string;
+      resendTriggered?: boolean;
     };
   };
   const [params] = useSearchParams();
   const { user, loading } = useAuth();
 
   const email = location.state?.email ?? params.get("email") ?? user?.email ?? "";
+  const isLegacyVerification = location.state?.reason === "legacy_verification";
+  const initialCountdown = location.state?.resendTriggered ? RESEND_DELAY : 0;
   const [code, setCode] = useState("");
   const [status, setStatus] = useState<"idle" | "verifying" | "success" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [countdown, setCountdown] = useState(RESEND_DELAY);
+  const [countdown, setCountdown] = useState(initialCountdown);
   const [resending, setResending] = useState(false);
   const submittedFor = useRef<string | null>(null);
 
@@ -164,6 +168,21 @@ export default function VerifyEmail() {
               )}
             </p>
           </header>
+
+          {isLegacyVerification && (
+            <div className="mb-6">
+              <AuthAlert variant="info" title="Vérification e-mail requise">
+                Pour renforcer la sécurité de votre compte, une vérification e-mail est désormais
+                requise. Un code de validation vient de vous être envoyé
+                {masked ? (
+                  <>
+                    {" "}à <span className="font-semibold text-foreground">{masked}</span>
+                  </>
+                ) : null}
+                . Saisissez-le ci-dessous pour finaliser votre connexion.
+              </AuthAlert>
+            </div>
+          )}
 
           <div className="rounded-xl border border-foreground/10 bg-white p-6 shadow-sm sm:p-8">
             <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-foreground/50">
