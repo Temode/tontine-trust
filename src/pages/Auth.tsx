@@ -81,9 +81,13 @@ export default function Auth() {
       const targetEmail = verifiedEmail ?? parsed.data.email;
       // Best-effort : on déclenche un nouveau code via Resend puis on redirige,
       // même si l'envoi échoue (rate-limit, indispo). VerifyEmail permet le renvoi manuel.
-      const { error: resendError } = await invokeAuthOtp({
+      const { data: resendData, error: resendError } = await invokeAuthOtp<{
+        expiresAt?: string;
+        isAdmin?: boolean;
+      }>({
         action: "signup_resend",
         email: targetEmail,
+        trigger: "legacy_login",
       });
       if (resendError) {
         toast.error(resendError);
@@ -95,6 +99,8 @@ export default function Auth() {
           email: targetEmail,
           reason: "legacy_verification",
           resendTriggered: !resendError,
+          expiresAt: resendData?.expiresAt ?? null,
+          isAdmin: resendData?.isAdmin === true,
         },
       });
       return;

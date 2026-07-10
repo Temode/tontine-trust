@@ -132,6 +132,7 @@ export type Database = {
           purpose: string
           status: string
           token_hash: string | null
+          trigger_source: string | null
         }
         Insert: {
           consumed_at?: string | null
@@ -145,6 +146,7 @@ export type Database = {
           purpose: string
           status?: string
           token_hash?: string | null
+          trigger_source?: string | null
         }
         Update: {
           consumed_at?: string | null
@@ -158,6 +160,7 @@ export type Database = {
           purpose?: string
           status?: string
           token_hash?: string | null
+          trigger_source?: string | null
         }
         Relationships: []
       }
