@@ -736,6 +736,8 @@ export default function GroupDetail() {
 
         <AnnouncementsPanel groupId={grp.id} isOrganizer={isOrganizer} />
 
+        <SmsRechargePanel groupId={grp.id} />
+
         <div className="mt-6 inline-flex items-center gap-1 rounded-lg border border-hairline bg-card p-1" role="tablist" aria-label="Sections du groupe">
           {tabs.map((tab) => (
             <button
