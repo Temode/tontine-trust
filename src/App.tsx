@@ -62,6 +62,7 @@ const AdminSmsPricing = lazy(() => import("@/pages/admin/SmsPricing"));
 const AdminSmsOrders = lazy(() => import("@/pages/admin/SmsOrders"));
 const Subscription = lazy(() => import("@/pages/Subscription"));
 const Solo = lazy(() => import("@/pages/Solo"));
+const International = lazy(() => import("@/pages/International"));
 import { AdminShell } from "@/components/admin/AdminShell";
 
 const queryClient = new QueryClient({
@@ -171,6 +172,7 @@ const App = () => (
                     <Route path="/nouveau" element={<RouteBoundary name="Créer un groupe"><CreateGroup /></RouteBoundary>} />
                     <Route path="/abonnement" element={<RouteBoundary name="Abonnement"><Subscription /></RouteBoundary>} />
                     <Route path="/solo" element={<RouteBoundary name="Épargne Solo"><Solo /></RouteBoundary>} />
+                    <Route path="/international" element={<RouteBoundary name="Tontines internationales"><International /></RouteBoundary>} />
                     <Route path="/rejoindre" element={<RouteBoundary name="Rejoindre un groupe"><JoinGroup /></RouteBoundary>} />
                     <Route path="/inviter" element={<RouteBoundary name="Inviter"><InviteMembers /></RouteBoundary>} />
                     <Route path="/profil" element={<RouteBoundary name="Profil"><Profile /></RouteBoundary>} />

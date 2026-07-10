@@ -6498,6 +6498,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      apply_to_international_group: {
+        Args: { _group_id: string; _message?: string }
+        Returns: string
+      }
       approve_member: { Args: { _member_id: string }; Returns: undefined }
       archive_group: {
         Args: { _group_id: string; _reason?: string }
@@ -6639,6 +6643,15 @@ export type Database = {
           metadata: Json
         }[]
       }
+      get_international_group_members: {
+        Args: { _group_id: string }
+        Returns: {
+          anon_label: string
+          joined_at: string
+          reliability_score: number
+          role: Database["public"]["Enums"]["member_role"]
+        }[]
+      }
       get_member_position_info: {
         Args: { _group_id: string; _user_id?: string }
         Returns: {
@@ -6748,6 +6761,23 @@ export type Database = {
           turn_number: number
         }[]
       }
+      list_international_groups: {
+        Args: never
+        Returns: {
+          avg_reliability: number
+          category: string
+          contribution_amount: number
+          created_at: string
+          current_members: number
+          description: string
+          frequency: Database["public"]["Enums"]["group_frequency"]
+          group_id: string
+          max_members: number
+          name: string
+          seats_left: number
+          status: Database["public"]["Enums"]["group_status"]
+        }[]
+      }
       list_my_payout_hold_history: {
         Args: never
         Returns: {
@@ -6779,6 +6809,15 @@ export type Database = {
           total_saved: number
         }[]
       }
+      list_renewal_votes: {
+        Args: { _cycle_id: string }
+        Returns: {
+          agreed: boolean
+          full_name: string
+          user_id: string
+          voted_at: string
+        }[]
+      }
       log_audit: {
         Args: {
           _action: string
@@ -6790,6 +6829,10 @@ export type Database = {
         Returns: string
       }
       mark_all_notifications_read: { Args: never; Returns: number }
+      mark_cycle_awaiting_renewal: {
+        Args: { _cycle_id: string }
+        Returns: undefined
+      }
       mark_defaulted_contributions: { Args: never; Returns: number }
       mark_group_read: { Args: { p_group_id: string }; Returns: undefined }
       mark_notification_read: { Args: { _id: string }; Returns: undefined }
@@ -7161,6 +7204,10 @@ export type Database = {
         Returns: undefined
       }
       user_effective_limits: { Args: { _uid: string }; Returns: Json }
+      vote_cycle_renewal: {
+        Args: { _agreed: boolean; _cycle_id: string }
+        Returns: undefined
+      }
       vote_group_deletion: {
         Args: {
           _request_id: string

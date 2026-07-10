@@ -10,6 +10,7 @@ import {
   Users,
   Wallet,
   Target,
+  Globe2,
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { Logo } from "@/components/brand/Logo";
@@ -41,6 +42,7 @@ const sections: NavSection[] = [
       { to: "/cotisations", label: "Payer", icon: Wallet, tourId: "nav-payer" },
       { to: "/solde", label: "Mon solde", icon: PiggyBank },
       { to: "/solo", label: "Épargne Solo", icon: Target },
+      { to: "/international", label: "International", icon: Globe2 },
       { to: "/recus", label: "Historique & reçus", icon: FileCheck2 },
       { to: "/abonnement", label: "Abonnement", icon: Sparkles },
       { to: "/profil", label: "Mon profil", icon: User },
