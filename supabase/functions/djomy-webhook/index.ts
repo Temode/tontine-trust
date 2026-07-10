@@ -121,6 +121,17 @@ Deno.serve(async (req) => {
       console.error("[djomy-webhook] subscription rpc error", subErr);
       return json({ ok: false, error: subErr.message }, 500);
     }
+    // M8: comptabilise la commission d'affiliation sur les paiements confirmés.
+    if (newStatus === "succeeded") {
+      const period = new Date().toISOString().slice(0, 7); // YYYY-MM
+      const { error: refErr } = await admin.rpc("accrue_referral_earning", {
+        _subscription_id: subscriptionId,
+        _period: period,
+      });
+      if (refErr) {
+        console.error("[djomy-webhook] accrue_referral_earning error", refErr);
+      }
+    }
     return json({ ok: true, subscriptionId, status: newStatus });
   }
 
