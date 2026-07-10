@@ -57,6 +57,9 @@ const AdminDeposits = lazy(() => import("@/pages/admin/Deposits"));
 const DepositPayment = lazy(() => import("@/pages/DepositPayment"));
 const AdminContractTemplate = lazy(() => import("@/pages/admin/ContractTemplate"));
 const AdminPayoutHolds = lazy(() => import("@/pages/admin/PayoutHolds"));
+const AdminSubscriptions = lazy(() => import("@/pages/admin/Subscriptions"));
+const AdminSmsPricing = lazy(() => import("@/pages/admin/SmsPricing"));
+const AdminSmsOrders = lazy(() => import("@/pages/admin/SmsOrders"));
 import { AdminShell } from "@/components/admin/AdminShell";
 
 const queryClient = new QueryClient({
@@ -200,6 +203,9 @@ const App = () => (
                     <Route path="/admin/cautions" element={<RouteBoundary name="Cautions"><AdminDeposits /></RouteBoundary>} />
                     <Route path="/admin/contrat" element={<RouteBoundary name="Modèle de contrat"><AdminContractTemplate /></RouteBoundary>} />
                     <Route path="/admin/retentions" element={<RouteBoundary name="Rétentions payout"><AdminPayoutHolds /></RouteBoundary>} />
+                    <Route path="/admin/subscriptions" element={<RouteBoundary name="Plans d'abonnement"><AdminSubscriptions /></RouteBoundary>} />
+                    <Route path="/admin/sms-pricing" element={<RouteBoundary name="Tarification SMS"><AdminSmsPricing /></RouteBoundary>} />
+                    <Route path="/admin/sms-orders" element={<RouteBoundary name="Commandes SMS"><AdminSmsOrders /></RouteBoundary>} />
                   </Route>
                 </Route>
                 <Route path="*" element={<RouteBoundary name="Page introuvable"><NotFound /></RouteBoundary>} />
