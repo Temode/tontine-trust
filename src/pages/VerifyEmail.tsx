@@ -208,7 +208,16 @@ export default function VerifyEmail() {
                 </AuthAlert>
               )}
               {status === "error" && errorMsg && (
-                <AuthAlert variant="error" title="Code incorrect">
+                <AuthAlert
+                  variant="error"
+                  title={
+                    /expiré/i.test(errorMsg)
+                      ? "Code expiré"
+                      : /déjà été utilisé/i.test(errorMsg)
+                      ? "Code déjà utilisé"
+                      : "Code incorrect"
+                  }
+                >
                   {errorMsg}
                 </AuthAlert>
               )}
@@ -242,8 +251,8 @@ export default function VerifyEmail() {
           </div>
 
           <p className="mt-8 border-t border-foreground/5 pt-6 text-[11px] leading-relaxed text-foreground/40">
-            Le code expire au bout d'une heure. Pensez à vérifier vos courriers indésirables si
-            vous ne le recevez pas.
+            Le code expire au bout de 15 minutes. Si vous ne le recevez pas, vérifiez vos courriers
+            indésirables puis cliquez sur « Renvoyer le code ».
           </p>
         </>
       )}
