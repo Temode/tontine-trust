@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowRight, CheckCircle2, ShieldCheck } from "lucide-react";
+import { ArrowRight, CheckCircle2, ShieldCheck, Sparkles } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { createGroup } from "@/lib/api/groups";
+import { useEntitlements } from "@/hooks/useEntitlements";
 import { TopBar } from "@/components/layout/TopBar";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ShareSheet } from "@/components/invite/ShareSheet";
@@ -26,6 +27,9 @@ type WizardState = "drafting" | "submitting" | "issued";
 
 export default function CreateGroup() {
   const [draft, setDraft] = useState<GroupDraft>(DEFAULT_DRAFT);
+  const { entitlements, canCreateGroup } = useEntitlements();
+  const quota = canCreateGroup();
+  const memberLimit = entitlements.limits.max_members_per_group;
   const [step, setStep] = useState(1);
   const [completed, setCompleted] = useState<number[]>([]);
   const [consent, setConsent] = useState(false);
@@ -56,6 +60,21 @@ export default function CreateGroup() {
 
   const handleSubmit = async () => {
     if (state !== "drafting") return;
+    if (!quota.ok) {
+      toast.error(
+        quota.reason === "READ_ONLY"
+          ? "Abonnement expiré"
+          : "Quota de groupes atteint",
+        { description: "Passez à Premium ou Business pour créer un nouveau groupe." },
+      );
+      return;
+    }
+    if (memberLimit !== -1 && draft.members > memberLimit) {
+      toast.error("Trop de membres pour votre plan", {
+        description: `Votre plan ${entitlements.plan_label} autorise ${memberLimit} membres par groupe.`,
+      });
+      return;
+    }
     const validation = validateGroupDraft(draft);
     if (!validation.ok) {
       toast.error("Émission impossible", {
@@ -76,7 +95,12 @@ export default function CreateGroup() {
       });
     } catch (e) {
       setState("drafting");
-      const msg = e instanceof Error ? e.message : "Erreur inconnue";
+      const raw = e instanceof Error ? e.message : String(e);
+      const msg = raw.includes("QUOTA_GROUPS_EXCEEDED")
+        ? "Quota de groupes atteint pour votre plan. Passez à Premium ou Business."
+        : raw.includes("QUOTA_MEMBERS_EXCEEDED")
+          ? "Nombre de membres au-delà de la limite de votre plan."
+          : raw;
       toast.error("Création impossible", { description: msg });
     }
   };
@@ -90,6 +114,27 @@ export default function CreateGroup() {
 
       <div className="mx-auto max-w-6xl space-y-8 px-5 py-6 lg:px-8 lg:py-10">
         <ErrorBoundary fallbackTitle="L'assistant de création a rencontré une erreur">
+        {!quota.ok && (
+          <div className="rounded-md border border-primary/40 bg-primary/5 p-4 text-sm flex items-start gap-3">
+            <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+            <div className="flex-1">
+              <p className="font-semibold text-foreground">
+                {quota.reason === "READ_ONLY"
+                  ? "Votre abonnement est expiré"
+                  : `Vous avez atteint la limite de ${quota.max} groupes du plan ${entitlements.plan_label}`}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Passez à Premium (modulable) ou Business pour créer davantage de tontines.
+              </p>
+            </div>
+            <Link
+              to="/abonnement"
+              className="inline-flex h-9 items-center gap-1 rounded-md bg-primary px-3 text-xs font-semibold text-primary-foreground hover:bg-primary-700"
+            >
+              Voir les plans
+            </Link>
+          </div>
+        )}
         <Stepper current={step} onJump={handleJump} completed={completed} />
 
         <div className="grid grid-cols-1 gap-8 xl:grid-cols-12">
