@@ -6486,6 +6486,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      apply_sms_order_webhook: {
+        Args: { _djomy_ref: string; _new_status: string; _order_id: string }
+        Returns: undefined
+      }
       apply_subscription_webhook: {
         Args: {
           _djomy_ref: string
@@ -6990,6 +6994,16 @@ export type Database = {
       }
       sms_outbox_try_lock: { Args: never; Returns: boolean }
       sms_outbox_unlock: { Args: never; Returns: boolean }
+      sms_wallet_credit: {
+        Args: {
+          _metadata?: Json
+          _qty: number
+          _reason: Database["public"]["Enums"]["sms_ledger_reason"]
+          _ref_id: string
+          _user_id: string
+        }
+        Returns: number
+      }
       sms_wallet_debit: {
         Args: {
           _metadata: Json
@@ -7012,6 +7026,16 @@ export type Database = {
       start_member_deposit: {
         Args: { _group_id: string; _payer_phone?: string }
         Returns: Json
+      }
+      start_sms_order_checkout: {
+        Args: { _group_id?: string; _pack_id: string }
+        Returns: {
+          amount: number
+          id: string
+          pack_id: string
+          qty: number
+          unit_price: number
+        }[]
       }
       start_subscription_checkout: {
         Args: {
