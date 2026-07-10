@@ -44,11 +44,30 @@ Deno.serve(async (req) => {
     const amount = Number(sub.price_monthly);
     if (!amount || amount <= 0) return json({ error: "INVALID_AMOUNT" }, 400);
 
+    // Djomy exige payerNumber. On récupère celui du profil s'il existe,
+    // sinon on envoie un placeholder valide (l'utilisateur pourra le corriger
+    // sur l'écran Djomy). Même logique que djomy-init-payment / cotisations.
+    let payerNumber = "00224000000000";
+    try {
+      const { data: prof } = await admin
+        .from("profiles")
+        .select("phone_number")
+        .eq("id", u.user.id)
+        .maybeSingle();
+      const p = (prof as { phone_number?: string | null } | null)?.phone_number;
+      if (p && p.trim().length >= 8) payerNumber = p.trim();
+    } catch (_) { /* profil optionnel */ }
+
+    console.log("[djomy-init-subscription] init", {
+      subscriptionId: sub.id, planCode: sub.plan_code, amount, hasPhone: payerNumber !== "00224000000000",
+    });
+
     const djomyRes = await djomyFetch("/v1/payments/gateway", {
       method: "POST",
       body: {
         amount,
         countryCode: "GN",
+        payerNumber,
         allowedPaymentMethods: ["OM", "MOMO", "CARD"],
         description: `Abonnement Tontine Digital ${sub.plan_code} (${sub.id})`,
         merchantPaymentReference: sub.id,
@@ -62,13 +81,17 @@ Deno.serve(async (req) => {
       },
     });
 
+    console.log("[djomy-init-subscription] djomy response", {
+      status: djomyRes.status, ok: djomyRes.ok, raw: djomyRes.raw?.slice?.(0, 500),
+    });
+
     if (!djomyRes.ok) {
       await admin.rpc("apply_subscription_webhook", {
         _subscription_id: sub.id,
         _new_status: "failed",
         _djomy_ref: null,
       });
-      return json({ error: "DJOMY_INIT_FAILED", details: djomyRes.data }, 502);
+      return json({ error: "DJOMY_INIT_FAILED", status: djomyRes.status, details: djomyRes.data ?? djomyRes.raw }, 502);
     }
 
     const d = djomyRes.data as Record<string, unknown> & { data?: Record<string, unknown> };
