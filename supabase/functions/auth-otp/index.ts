@@ -19,7 +19,11 @@ const json = (payload: unknown, status = 200) =>
 const RESEND_GATEWAY_URL = "https://connector-gateway.lovable.dev/resend/emails";
 const SITE_NAME = "Tontine Digitale";
 const SITE_URL = "https://tontinedigitale.com";
-const FROM_ADDRESS = "Tontine Digitale <noreply@tontinedigitale.com>";
+const FROM_EMAIL = "noreply@tontinedigitale.com";
+const FROM_ADDRESS = `Tontine Digitale <${FROM_EMAIL}>`;
+// Garde-fou : toute autre valeur (ex. l'expéditeur par défaut Lovable) est
+// refusée pour empêcher la moindre régression vers un autre expéditeur.
+const ALLOWED_FROM_DOMAIN = "tontinedigitale.com";
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const RECENT_WINDOW_MINUTES = 10;
 const RECENT_LIMIT = 3;
@@ -126,6 +130,13 @@ async function sendOtpEmail(args: {
     return { ok: false, status: 500, body: "email_not_configured", id: null };
   }
 
+  // Assertion défensive : jamais d'expéditeur hors domaine Tontine Digitale.
+  const fromDomain = FROM_EMAIL.split("@")[1]?.toLowerCase();
+  if (fromDomain !== ALLOWED_FROM_DOMAIN) {
+    console.error("[auth-otp] refused sending: FROM domain mismatch", { fromDomain });
+    return { ok: false, status: 500, body: "invalid_sender", id: null };
+  }
+
   const Template = args.purpose === "signup" ? SignupEmail : RecoveryEmail;
   const props = {
     siteName: SITE_NAME,
@@ -177,28 +188,37 @@ function mapAuthError(message: string) {
   return "server_error";
 }
 
-async function findActiveOtp(
+type OtpLookup =
+  | { kind: "ok"; id: string }
+  | { kind: "not_found" }
+  | { kind: "expired" }
+  | { kind: "consumed" };
+
+async function findOtpForVerification(
   admin: ReturnType<typeof createClient>,
   emailHash: string,
   purpose: Purpose,
   tokenHash: string,
-) {
+): Promise<OtpLookup> {
   const { data, error } = await admin
     .from("auth_otp_requests")
-    .select("id, expires_at, status")
+    .select("id, expires_at, status, purpose")
     .eq("email_hash", emailHash)
     .eq("purpose", purpose)
     .eq("token_hash", tokenHash)
-    .eq("status", "sent")
-    .gte("expires_at", new Date().toISOString())
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
   if (error) {
     console.error("[auth-otp] find OTP failed", error);
-    return null;
+    return { kind: "not_found" };
   }
-  return data;
+  if (!data) return { kind: "not_found" };
+  if (data.purpose !== purpose) return { kind: "not_found" };
+  if (data.status === "consumed") return { kind: "consumed" };
+  if (new Date(data.expires_at).getTime() < Date.now()) return { kind: "expired" };
+  if (data.status !== "sent") return { kind: "not_found" };
+  return { kind: "ok", id: data.id as string };
 }
 
 async function issueOtp(
@@ -305,8 +325,10 @@ async function verifySignup(
 
   const emailHash = await sha256(email);
   const tokenHash = await sha256(`${emailHash}:signup:${token}`);
-  const otp = await findActiveOtp(admin, emailHash, "signup", tokenHash);
-  if (!otp) return json({ error: "invalid_code" }, 400);
+  const otp = await findOtpForVerification(admin, emailHash, "signup", tokenHash);
+  if (otp.kind === "expired") return json({ error: "code_expired" }, 400);
+  if (otp.kind === "consumed") return json({ error: "code_already_used" }, 400);
+  if (otp.kind !== "ok") return json({ error: "invalid_code" }, 400);
 
   const existing = await findExistingUser(admin, email);
   if (!existing) return json({ error: "invalid_code" }, 400);
@@ -346,8 +368,10 @@ async function completeRecovery(admin: ReturnType<typeof createClient>, body: Re
 
   const emailHash = await sha256(email);
   const tokenHash = await sha256(`${emailHash}:recovery:${token}`);
-  const otp = await findActiveOtp(admin, emailHash, "recovery", tokenHash);
-  if (!otp) return json({ error: "invalid_code" }, 400);
+  const otp = await findOtpForVerification(admin, emailHash, "recovery", tokenHash);
+  if (otp.kind === "expired") return json({ error: "code_expired" }, 400);
+  if (otp.kind === "consumed") return json({ error: "code_already_used" }, 400);
+  if (otp.kind !== "ok") return json({ error: "invalid_code" }, 400);
 
   const existing = await findExistingUser(admin, email);
   if (!existing) return json({ error: "invalid_code" }, 400);

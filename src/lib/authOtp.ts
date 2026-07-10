@@ -10,6 +10,8 @@ const ERROR_MESSAGES: Record<string, string> = {
   email_send_failed: "Impossible d'envoyer l'email pour le moment.",
   email_not_configured: "Le service email n'est pas encore configuré.",
   invalid_code: "Code invalide ou expiré. Vérifiez vos 6 chiffres.",
+  code_expired: "Ce code a expiré. Cliquez sur « Renvoyer le code » pour en recevoir un nouveau.",
+  code_already_used: "Ce code a déjà été utilisé. Demandez un nouveau code pour continuer.",
   password_update_failed: "Impossible de mettre à jour le mot de passe.",
   server_error: "Erreur serveur. Réessaie dans un instant.",
 };
