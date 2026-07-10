@@ -1,153 +1,66 @@
+# Refonte du tunnel d'achat abonnement (modèle Hostinger)
 
-# Roadmap — Tontine Digitale v2
+Objectif : passer d'une page unique combinée (pricing + config + téléphone + CTA) à un parcours en 2 étapes clair et sans friction, en **supprimant définitivement la saisie du numéro** (Djomy la demande de toute façon, et elle est inutile pour un paiement carte).
 
-Objectif : livrer par incréments testables, sans casser l'existant (auth OTP, groupes, Djomy, back-office). Chaque milestone est indépendante, déployable, testée E2E avant la suivante.
+## Étape 1 — Page pricing (`/abonnement`)
 
-## Vue d'ensemble
+Refonte de `src/pages/Subscription.tsx` :
+- Conserve : bandeau usage/quotas, encart plan actuel, alertes read-only.
+- **Supprime** : champ "Téléphone Mobile Money" (state `payerPhone`, `<Input>`, validation).
+- **Supprime** : sliders Premium inline et calcul de prix dynamique (déplacés à l'étape 2).
+- Trois cartes Free / Premium / Business avec un bouton unique chacune :
+  - **Free** → active immédiatement via `start_subscription_checkout` (inchangé).
+  - **Premium** → `navigate("/abonnement/checkout?plan=premium")`. Prix affiché "À partir de {min_price} GNF/mois".
+  - **Business** → `navigate("/abonnement/checkout?plan=business")`. Prix fixe.
 
-```text
-M1 Fondations DB (plans, quotas, SMS)   ── prérequis de tout le reste
-      │
-M2 Back-office admin plans & SMS pricing
-      │
-M3 Souscription utilisateur + paiement Djomy + enforcement quotas
-      │
-M4 Notifications : routage E-mail/In-App/SMS selon plan + décrément forfait
-      │
-M5 Recharge SMS depuis un groupe (commande → paiement → crédit)
-      │
-M6 Tontine Solo (Épargne Projet vs Fonds de roulement)
-      │
-M7 Tontine Internationale (annuaire public, anonymisation, validation cycle)
-      │
-M8 Tontine Business (coordinateur + commission + affiliation)
-```
+## Étape 2 — Page récapitulative (`/abonnement/checkout`)
 
----
+Nouvelle page `src/pages/SubscriptionCheckout.tsx` (route ajoutée dans `src/App.tsx`, sous `AppShell` protégé).
 
-## M1 — Fondations base de données
+Lecture du paramètre `?plan=premium|business`. Si invalide/manquant → redirect `/abonnement`.
 
-Une seule migration pour poser toutes les tables/enums utilisés par les modules suivants. Rien côté UI.
+Layout 2 colonnes desktop / stacked mobile, inspiré cart.hostinger.com :
 
-Nouveau schéma :
-- `subscription_plans` (code: free|premium|business, base_price, config JSONB des paliers Premium, sms_included, limits JSONB, editable en admin)
-- `subscription_plan_history` (audit des changements de prix/limites)
-- `user_subscriptions` (user_id, plan_code, tier_options JSONB choisis, price_monthly, status, current_period_end, djomy_ref)
-- `sms_pricing` (unit_price, packs JSONB [{qty, price}], effective_from)
-- `sms_wallets` (user_id, balance_remaining, total_purchased, total_consumed)
-- `sms_orders` (user_id, group_id, pack_id, qty, amount, status, djomy_ref, admin_note)
-- `sms_ledger` (wallet_id, delta, reason: purchase|consumption|admin_adjust, ref_id)
-- Extension `groups` : `kind` enum `collective|solo|business`, `solo_mode` enum `project|working_capital`, `solo_lock_until`, `is_public` bool, `coordinator_commission_percent`, `coordinator_user_id`
-- Extension `cycles` : `awaiting_renewal` bool + table `cycle_renewal_votes` (cycle_id, user_id, agreed, voted_at)
-- `referrals` (referrer_id, referred_id, plan_code, commission_percent, status)
-- `referral_earnings` (referrer_id, subscription_id, period, amount, paid)
+**Colonne gauche — Configuration**
+- Titre du plan + description + liste des avantages inclus.
+- Si `plan=premium` : sliders `tier_options` (issus de `subscription_plans.tiers`), initialisés avec l'abonnement actuel si applicable, sinon `base`.
+- Si `plan=business` : simple récapitulatif fixe, pas de config.
 
-Grants + RLS + policies pour chaque table (voir doctrine `public.` GRANT).
+**Colonne droite — Résumé de la commande (sticky)**
+- Ligne "Abonnement {label} — mensuel".
+- Prix total en gras, mis à jour dynamiquement à chaque changement de slider (Premium : entre `min_price` et `max_price` de `tiers`, formule identique à celle actuellement dans `Subscription.tsx`).
+- Mention "Facturation mensuelle, résiliable à tout moment · Paiement sécurisé Djomy (OM, MoMo, Carte)".
+- **Bouton unique "Procéder au paiement"** → appelle `supabase.functions.invoke("djomy-init-subscription", { body: { planCode, tierOptions, returnUrl, cancelUrl } })` puis `window.location.assign(redirectUrl)`. Aucun état intermédiaire, aucune modale.
+- Lien discret "← Retour aux plans".
 
-Livrable : migration validée, `types.ts` régénéré, aucune régression (les tables `groups`/`profiles` gardent leurs colonnes existantes).
+## Détails techniques
 
----
+### Edge function `djomy-init-subscription` (Option B — retenue)
+Actuellement `payerPhone` est **obligatoire** (rejet `MISSING_FIELDS` sinon) et est passé à Djomy dans `payerNumber`. Modifications :
+- Retirer `payerPhone` du type `Body`.
+- Retirer la vérification `!body.payerPhone` et l'appel à `normalizePhone`.
+- Ne plus envoyer la clé `payerNumber` dans le body vers `POST /v1/payments/gateway` — Djomy la demandera sur son écran (comme il le fait déjà pour Orange Money / MoMo, et comme elle est inutile pour Carte).
+- Aucun autre changement (auth, RPC `start_subscription_checkout`, webhook restent identiques).
 
-## M2 — Back-office : plans & tarification SMS
+### Routing
+- Nouvelle route `/abonnement/checkout` dans `src/App.tsx` (lazy import + `RouteBoundary`, dans le bloc `AppShell` protégé, à côté de `/abonnement`).
 
-Pages admin (super_admin uniquement) :
-- `/admin/subscriptions` : édition des 3 plans (prix de base, limites, paliers Premium, forfait SMS inclus). Historique versionné.
-- `/admin/sms-pricing` : tarif unitaire + packs, activation d'un nouveau tarif = nouvelle ligne `effective_from`.
-- `/admin/sms-orders` : liste des demandes d'achat SMS, filtres par statut, action « marquer traité ».
+### Types / API
+- Réutilise `subscription_plans` (fetch par `code` dans la page checkout pour supporter le deep-link).
 
-RPC sécurisées (`security definer`, check `has_role(super_admin)`) pour update.
+### Tests
+- Nouveau `tests/e2e/subscription-checkout.spec.ts` : depuis `/abonnement`, clic Premium → arrivée sur `/abonnement/checkout?plan=premium` → sliders visibles → résumé se met à jour → bouton "Procéder au paiement" présent et cliquable. Vérifie aussi qu'aucun champ téléphone n'existe sur `/abonnement`.
 
-Livrable : admin peut configurer sans toucher au code.
+## Fichiers touchés
 
----
+- ✏️ `src/pages/Subscription.tsx` — retire champ tel + sliders inline + logique checkout ; les boutons Premium/Business redirigent vers `/abonnement/checkout`.
+- ➕ `src/pages/SubscriptionCheckout.tsx` — nouvelle page panier/récap avec bouton unique.
+- ✏️ `src/App.tsx` — ajout route + lazy import.
+- ✏️ `supabase/functions/djomy-init-subscription/index.ts` — suppression paramètre `payerPhone` (obligatoire → retiré).
+- ➕ `tests/e2e/subscription-checkout.spec.ts` — parcours 2 étapes.
 
-## M3 — Souscription utilisateur + enforcement
+## Hors périmètre
 
-Frontend :
-- Page `/abonnement` avec 3 cartes (Free / Premium modulable / Business).
-- Premium : sliders (nb groupes 2-8, nb membres jusqu'à 20, Solo 0/1, Internationaux 0-6) → prix calculé côté client + revalidé côté serveur.
-- Paiement via Djomy (init-payment existant), webhook → activation `user_subscriptions`.
-
-Enforcement (guards) :
-- Hook `useEntitlements()` centralisé.
-- Blocage création groupe si quota dépassé (client + RLS/trigger côté DB).
-- Blocage ajout membre au-delà de la limite du plan de l'organisateur.
-- Blocage Tontine Solo / Internationale selon plan.
-
-Tests E2E : Free bloqué au 3e groupe ; Premium avec 8 groupes OK ; downgrade → mode lecture seule.
-
----
-
-## M4 — Routage des notifications selon plan
-
-Refactor du dispatcher notifications :
-- Nouvelle fonction `dispatch_notification(user_id, event, payload)` qui :
-  1. Lit le plan de l'utilisateur.
-  2. Envoie systématiquement In-App + Email.
-  3. Si plan payant ET wallet SMS > 0 ET événement éligible (rappel paiement, alertes critiques) → enqueue SMS via `sms_outbox` existant + décrément atomique du wallet + entrée `sms_ledger`.
-  4. Si wallet à 0 → notification In-App « forfait SMS épuisé, rechargez ».
-
-Respect doctrine SMS (catalogue figé, outbox, jamais de `net.http_post` dans un trigger).
-
-Tests : compteur wallet cohérent, pas de double envoi, Free jamais de SMS.
-
----
-
-## M5 — Recharge SMS depuis un groupe
-
-- Bouton « Recharger SMS » dans l'écran groupe (visible plans payants).
-- Dialog : sélection pack (issu de `sms_pricing`), paiement Djomy, webhook → `sms_orders.status=paid` + crédit `sms_wallets` + entrée ledger.
-- Notification admin (in-app + email) à chaque commande.
-- Historique accessible depuis profil utilisateur.
-
----
-
-## M6 — Tontine Solo
-
-- Extension du flow `CreateGroup` : nouveau choix « Type » (Collective / Solo). Si Solo :
-  - Radio Épargne Projet (date échéance obligatoire, `solo_lock_until`) vs Fonds de roulement.
-- Backend : trigger empêche retrait avant `solo_lock_until` en mode projet.
-- UI dédiée : `/solo` liste des tontines solo, progression vers l'objectif.
-- Adaptation payout : bénéficiaire = organisateur unique, pas de rotation.
-
----
-
-## M7 — Tontine Internationale
-
-- Colonne `is_public` sur `groups` (déjà `visibility='public-link'|'directory'` existant → réutiliser + nouveau flag « catalogue international »).
-- Page `/international` dans sidebar, vue anonymisée (membres → « Membre A/B/… », scores agrégés).
-- Candidature → notification organisateur → accept/reject via flow existant `join_requests`.
-- Fin de cycle : nouveau flag `awaiting_renewal`, écran « Participer au prochain cycle ? Oui/Non », RPC `vote_cycle_renewal`, l'organisateur ne peut relancer que sur les membres ayant voté Oui.
-
----
-
-## M8 — Tontine Business
-
-Prérequis : plan Business actif.
-- Création de groupe avec case « Je coordonne sans cotiser » → `coordinator_user_id` + `coordinator_commission_percent`.
-- Adaptation `distribute_payout` : prélève commission avant versement bénéficiaire → ligne `ledger_entries` type `coordinator_fee`.
-- Page « Mes commissions » pour le coordinateur.
-- Affiliation :
-  - Lien unique `?ref=<code>` sur la page marketing.
-  - Signup capture le referrer → table `referrals`.
-  - À chaque paiement d'abonnement du filleul → job crée `referral_earnings`.
-  - Page « Mon programme d'affiliation » (parrains, revenus, payouts).
-
----
-
-## Détails techniques transverses
-
-- **Tests** : chaque milestone ajoute un fichier `tests/e2e/*.spec.ts` + tests Deno sur les nouvelles edge functions.
-- **Sécurité** : toutes les nouvelles tables ont RLS + GRANT explicites ; les prix/limites ne sont modifiables que via RPC `security definer` avec `has_role(super_admin)`.
-- **Paiements** : réutilise Djomy existant, pas de nouveau provider.
-- **Compat legacy** : les groupes existants sont `kind='collective'` par défaut, aucun downgrade forcé.
-- **Rollback** : chaque migration a son inverse dans un commentaire ; feature flags via `internal_config` pour activer/désactiver progressivement en prod.
-
----
-
-## Validation demandée
-
-Confirme-moi :
-1. L'ordre des milestones te convient (ou tu veux prioriser Solo / International avant les abonnements ?).
-2. Le périmètre de M1 (une seule grosse migration) est OK, ou tu préfères une migration par milestone.
-3. On démarre M1 dès validation.
+- Pas de changement DB / RPC / webhook.
+- Pas de refonte du reste du back-office abonnements.
+- Pas de changement du flux de paiement des cotisations (`launchDjomyCheckout`).

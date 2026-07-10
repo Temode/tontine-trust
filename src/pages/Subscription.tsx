@@ -1,10 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Check, Crown, Sparkles, ShieldCheck, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Slider } from "@/components/ui/slider";
-import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { TopBar } from "@/components/layout/TopBar";
 import { formatGNF } from "@/lib/format";
@@ -16,37 +14,13 @@ import type { Database } from "@/integrations/supabase/types";
 type Plan = Database["public"]["Tables"]["subscription_plans"]["Row"];
 type PlanCode = Plan["code"];
 
-interface PremiumTierOption {
-  key: string;
-  label: string;
-  min: number;
-  max: number;
-  base: number;
-  price_step: number;
-}
-
-function toTierOptions(v: unknown): PremiumTierOption[] {
-  const raw = (v as any)?.options;
-  if (!Array.isArray(raw)) return [];
-  return raw.map((o: any) => ({
-    key: String(o.key),
-    label: String(o.label ?? o.key),
-    min: Number(o.min ?? 0),
-    max: Number(o.max ?? 0),
-    base: Number(o.base ?? 0),
-    price_step: Number(o.price_step ?? 0),
-  }));
-}
-
 export default function Subscription() {
   const nav = useNavigate();
   const { user } = useAuth();
   const { entitlements, refetch } = useEntitlements();
   const [plans, setPlans] = useState<Plan[] | null>(null);
   const [loading, setLoading] = useState(true);
-  const [payerPhone, setPayerPhone] = useState("");
   const [busy, setBusy] = useState<PlanCode | null>(null);
-  const [premiumOpts, setPremiumOpts] = useState<Record<string, number>>({});
 
   useEffect(() => {
     (async () => {
@@ -65,59 +39,9 @@ export default function Subscription() {
   const businessPlan = plans?.find((p) => p.code === "business");
   const freePlan = plans?.find((p) => p.code === "free");
 
-  const tierOptions = useMemo(() => toTierOptions(premiumPlan?.tiers), [premiumPlan]);
-
-  // initialise Premium sliders with current subscription or plan defaults
-  useEffect(() => {
-    if (!tierOptions.length) return;
-    const init: Record<string, number> = {};
-    for (const o of tierOptions) {
-      init[o.key] = Number(entitlements.tier_options?.[o.key] ?? o.base);
-    }
-    setPremiumOpts(init);
-  }, [tierOptions, entitlements.tier_options]);
-
-  const premiumPrice = useMemo(() => {
-    if (!premiumPlan) return 0;
-    const tiers = (premiumPlan.tiers as any) ?? {};
-    const min = Number(tiers.min_price ?? premiumPlan.base_price);
-    const max = Number(tiers.max_price ?? premiumPlan.base_price * 4);
-    let price = min;
-    for (const o of tierOptions) {
-      const chosen = premiumOpts[o.key] ?? o.base;
-      if (chosen > o.base) price += (chosen - o.base) * o.price_step;
-    }
-    return Math.min(Math.max(price, min), max);
-  }, [premiumPlan, tierOptions, premiumOpts]);
-
-  const publicUrl = (import.meta.env.VITE_PUBLIC_APP_URL as string) || window.location.origin;
-
-  const startCheckout = async (planCode: "premium" | "business") => {
+  const goToCheckout = (planCode: "premium" | "business") => {
     if (!user) { nav("/auth"); return; }
-    if (!payerPhone || payerPhone.replace(/\D/g, "").length < 8) {
-      toast.error("Téléphone requis", { description: "Renseignez le numéro Mobile Money du payeur." });
-      return;
-    }
-    setBusy(planCode);
-    try {
-      const { data, error } = await supabase.functions.invoke("djomy-init-subscription", {
-        body: {
-          planCode,
-          tierOptions: planCode === "premium" ? premiumOpts : {},
-          payerPhone,
-          returnUrl: `${publicUrl}/paiement/retour`,
-          cancelUrl: `${publicUrl}/abonnement`,
-        },
-      });
-      if (error) throw new Error(error.message);
-      const res = data as { redirectUrl?: string; error?: string };
-      if (!res?.redirectUrl) throw new Error(res?.error ?? "Redirection Djomy indisponible");
-      window.location.href = res.redirectUrl;
-    } catch (e) {
-      toast.error("Paiement impossible", { description: e instanceof Error ? e.message : String(e) });
-    } finally {
-      setBusy(null);
-    }
+    nav(`/abonnement/checkout?plan=${planCode}`);
   };
 
   const activateFree = async () => {
@@ -149,6 +73,8 @@ export default function Subscription() {
   }
 
   const currentPlan = entitlements.plan_code;
+  const premiumTiers = (premiumPlan?.tiers as any) ?? {};
+  const premiumMinPrice = Number(premiumTiers.min_price ?? premiumPlan?.base_price ?? 0);
 
   const maxGroups = entitlements.limits.max_groups;
   const maxMembers = entitlements.limits.max_members_per_group;
@@ -250,11 +176,6 @@ export default function Subscription() {
           </div>
         </section>
 
-        <section>
-          <label className="text-xs font-medium text-muted-foreground">Téléphone Mobile Money (pour le paiement)</label>
-          <Input value={payerPhone} onChange={(e) => setPayerPhone(e.target.value)} placeholder="+224 XXX XXX XXX" className="mt-1 max-w-xs" />
-        </section>
-
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
           {/* FREE */}
           {freePlan && (
@@ -278,52 +199,24 @@ export default function Subscription() {
 
           {/* PREMIUM */}
           {premiumPlan && (
-            <div className="rounded-xl border-2 border-primary/40 bg-card p-5 space-y-4 shadow-sm">
-              <div className="flex items-start justify-between">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <Sparkles className="h-4 w-4 text-primary" />
-                    <h3 className="font-display text-lg font-bold">{premiumPlan.label}</h3>
-                  </div>
-                  <p className="text-xs text-muted-foreground">Modulez vos quotas</p>
-                </div>
-                {currentPlan === "premium" && <span className="rounded bg-primary/15 px-2 py-0.5 text-[10px] font-semibold text-primary">Actuel</span>}
-              </div>
-
-              <div>
-                <p className="text-3xl font-bold text-foreground">{formatGNF(premiumPrice)} <span className="text-xs font-normal text-muted-foreground">GNF / mois</span></p>
-                <p className="text-[11px] text-muted-foreground">{premiumPlan.sms_included} SMS/mois inclus · calcul instantané ci-dessous</p>
-              </div>
-
-              <div className="space-y-3">
-                {tierOptions.map((o) => (
-                  <div key={o.key}>
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-foreground">{o.label}</span>
-                      <span className="font-mono text-primary">{premiumOpts[o.key] ?? o.base}</span>
-                    </div>
-                    <Slider
-                      value={[premiumOpts[o.key] ?? o.base]}
-                      min={o.min}
-                      max={o.max}
-                      step={1}
-                      onValueChange={(v) => setPremiumOpts((prev) => ({ ...prev, [o.key]: v[0] }))}
-                      className="mt-1"
-                    />
-                    <p className="mt-0.5 text-[10px] text-muted-foreground">Base {o.base} · +{formatGNF(o.price_step)} GNF / unité</p>
-                  </div>
-                ))}
-              </div>
-
-              <Button
-                onClick={() => startCheckout("premium")}
-                disabled={busy !== null}
-                className="w-full"
-              >
-                {busy === "premium" ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                {currentPlan === "premium" ? "Mettre à jour l'abonnement" : "Passer au Premium"}
-              </Button>
-            </div>
+            <PlanCard
+              title={premiumPlan.label}
+              subtitle="Modulez vos quotas selon vos besoins"
+              price={premiumMinPrice}
+              priceSuffix="À partir de"
+              accent="primary"
+              current={currentPlan === "premium"}
+              icon={<Sparkles className="h-4 w-4 text-primary" />}
+              features={[
+                "Quotas modulables (groupes, membres, SMS…)",
+                `${premiumPlan.sms_included} SMS/mois inclus (base)`,
+                "Notifications SMS + e-mail + in-app",
+                "Support prioritaire",
+              ]}
+              cta={currentPlan === "premium" ? "Ajuster mon plan" : "Configurer & payer"}
+              disabled={busy !== null}
+              onClick={() => goToCheckout("premium")}
+            />
           )}
 
           {/* BUSINESS */}
@@ -344,8 +237,7 @@ export default function Subscription() {
               ]}
               cta={currentPlan === "business" ? "Plan actuel" : "Passer au Business"}
               disabled={currentPlan === "business" || busy !== null}
-              loading={busy === "business"}
-              onClick={() => startCheckout("business")}
+              onClick={() => goToCheckout("business")}
             />
           )}
         </div>
@@ -363,6 +255,7 @@ function PlanCard(props: {
   title: string;
   subtitle: string;
   price: number;
+  priceSuffix?: string;
   accent: "secondary" | "primary" | "warning";
   current?: boolean;
   icon?: React.ReactNode;
@@ -384,9 +277,14 @@ function PlanCard(props: {
         </div>
         {props.current && <span className="rounded bg-primary/15 px-2 py-0.5 text-[10px] font-semibold text-primary">Actuel</span>}
       </div>
-      <p className="text-3xl font-bold text-foreground">
-        {props.price === 0 ? "Gratuit" : <>{formatGNF(props.price)} <span className="text-xs font-normal text-muted-foreground">GNF / mois</span></>}
-      </p>
+      <div>
+        {props.priceSuffix && props.price > 0 && (
+          <p className="text-[11px] uppercase tracking-wider text-muted-foreground">{props.priceSuffix}</p>
+        )}
+        <p className="text-3xl font-bold text-foreground">
+          {props.price === 0 ? "Gratuit" : <>{formatGNF(props.price)} <span className="text-xs font-normal text-muted-foreground">GNF / mois</span></>}
+        </p>
+      </div>
       <ul className="space-y-1.5 text-sm">
         {props.features.map((f, i) => (
           <li key={i} className="flex items-start gap-2">
