@@ -6486,6 +6486,14 @@ export type Database = {
         }
         Returns: undefined
       }
+      apply_subscription_webhook: {
+        Args: {
+          _djomy_ref: string
+          _new_status: string
+          _subscription_id: string
+        }
+        Returns: undefined
+      }
       approve_member: { Args: { _member_id: string }; Returns: undefined }
       archive_group: {
         Args: { _group_id: string; _reason?: string }
@@ -6513,6 +6521,7 @@ export type Database = {
       claim_sms_dedupe: { Args: { _key: string }; Returns: boolean }
       close_auction: { Args: { _turn_id: string }; Returns: string }
       compute_hold_until: { Args: { _turn_id: string }; Returns: string }
+      compute_premium_price: { Args: { _options: Json }; Returns: number }
       confirm_external_payment: {
         Args: { _proof_id: string }
         Returns: undefined
@@ -6618,6 +6627,7 @@ export type Database = {
           withdrawal_locked: boolean
         }[]
       }
+      get_my_entitlements: { Args: never; Returns: Json }
       get_pending_penalty: { Args: { _group_id: string }; Returns: number }
       get_user_default_history: {
         Args: { _user_id?: string }
@@ -6977,6 +6987,31 @@ export type Database = {
         Args: { _group_id: string; _payer_phone?: string }
         Returns: Json
       }
+      start_subscription_checkout: {
+        Args: {
+          _plan_code: Database["public"]["Enums"]["subscription_plan_code"]
+          _tier_options?: Json
+        }
+        Returns: {
+          cancelled_at: string | null
+          created_at: string
+          current_period_end: string | null
+          djomy_ref: string | null
+          id: string
+          plan_code: Database["public"]["Enums"]["subscription_plan_code"]
+          price_monthly: number
+          status: Database["public"]["Enums"]["subscription_status"]
+          tier_options: Json
+          updated_at: string
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "user_subscriptions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       submit_external_payment: {
         Args: {
           _amount: number
@@ -7046,6 +7081,7 @@ export type Database = {
         Args: { _visible: boolean }
         Returns: undefined
       }
+      user_effective_limits: { Args: { _uid: string }; Returns: Json }
       vote_group_deletion: {
         Args: {
           _request_id: string

@@ -100,6 +100,30 @@ Deno.serve(async (req) => {
   };
   const newStatus = map[eventType];
 
+  // Routage abonnements (M3) : purpose=subscription ou ref = user_subscriptions.id
+  let subscriptionId: string | null = null;
+  if (purpose === "subscription" && merchantRef) {
+    subscriptionId = merchantRef;
+  } else if (merchantRef) {
+    const { data: sRow } = await admin
+      .from("user_subscriptions").select("id")
+      .eq("id", merchantRef).maybeSingle();
+    if (sRow) subscriptionId = sRow.id;
+  }
+  if (subscriptionId) {
+    if (!newStatus) return json({ ok: true, ignored: "unhandled_event" }, 200);
+    const { error: subErr } = await admin.rpc("apply_subscription_webhook", {
+      _subscription_id: subscriptionId,
+      _new_status: newStatus,
+      _djomy_ref: transactionId,
+    });
+    if (subErr) {
+      console.error("[djomy-webhook] subscription rpc error", subErr);
+      return json({ ok: false, error: subErr.message }, 500);
+    }
+    return json({ ok: true, subscriptionId, status: newStatus });
+  }
+
   // Routage cautions : si purpose=deposit ou si le ref correspond à un member_deposit
   let depositId: string | null = null;
   if (purpose === "deposit" && merchantRef) {
