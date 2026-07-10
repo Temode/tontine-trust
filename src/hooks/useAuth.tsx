@@ -122,6 +122,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // pendant la fenêtre où loadRoles n'est pas encore parti (setTimeout 0).
         setRolesLoading(true);
         setTimeout(() => loadRoles(uid), 0);
+        // M8: enregistre le parrainage capturé sur la landing (?ref=CODE), si présent.
+        try {
+          const code = localStorage.getItem("pending_referral_code");
+          if (code) {
+            supabase.rpc("register_referral", { _code: code })
+              .then(() => localStorage.removeItem("pending_referral_code"))
+              .catch(() => undefined);
+          }
+        } catch { /* localStorage unavailable */ }
       } else if (!uid) {
         lastUserId = null;
         setRoles([]);
