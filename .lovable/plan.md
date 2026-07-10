@@ -1,46 +1,35 @@
-## Problème
+## Constats de l’audit
 
-Test 2 a montré un e-mail envoyé depuis `no-reply@auth.lovable.cloud` au lieu de `noreply@tontinedigitale.com`. Après audit, aucun code frontend n'appelle `supabase.auth.signUp` ni `resetPasswordForEmail` — tout passe par `auth-otp` (Resend). La seule source restante d'e-mail natif est **`admin.createUser({ email_confirm: false })`** dans `auth-otp/index.ts` : Supabase déclenche automatiquement un e-mail de confirmation pour les users non-confirmés, et si le hook `auth-email-hook` échoue ou n'est pas actif, Supabase retombe sur l'expéditeur par défaut `no-reply@auth.lovable.cloud`.
+- Le dernier test ne passe pas par le flux OTP Resend : la table des OTP n’a aucun enregistrement récent pour l’adresse testée, alors que les logs auth montrent un appel natif `POST /signup` à 07:38.
+- Ce `POST /signup` déclenche `user_confirmation_requested`, puis le hook email natif Lovable, ce qui explique l’email envoyé par Lovable au lieu de Resend.
+- Le backend hébergé est sain, mais l’infrastructure email Lovable du projet est dans un état incohérent : le domaine email projet est indiqué comme supprimé/changé (`notify.tontinedigitale.com`), et la table de logs Lovable email n’existe pas. Donc si un chemin natif est déclenché, il retombe sur l’expéditeur/template natif.
+- Le code actuel de `auth-otp` envoie bien via Resend avec `from: Tontine Digitale <noreply@tontinedigitale.com>`, mais il ne suffit pas tant que le chemin natif `/signup` reste autorisé.
 
-Pour le test 1 (Resend OK, mais absent de Yopmail), il s'agit d'un problème connu de délivrabilité côté Yopmail (filtrage/blocage silencieux des e-mails Resend). Rien à corriger côté code — recommander un vrai domaine ou Mailtrap pour les tests.
+## Plan de correction
 
-## Correction
+1. **Bloquer définitivement le signup natif**
+   - Désactiver les inscriptions publiques natives côté auth backend.
+   - Garder le flux `auth-otp` opérationnel, car il crée les utilisateurs côté serveur puis envoie le code via Resend.
+   - Résultat attendu : tout appel accidentel au chemin natif `/signup` échoue et ne peut plus envoyer d’email Lovable.
 
-### 1. Ne plus déclencher d'e-mail natif Supabase
+2. **Supprimer/neutraliser les chemins email auth natifs restants**
+   - Vérifier que les pages inscription, mot de passe oublié et reset utilisent uniquement `auth-otp`.
+   - Retirer ou neutraliser le hook email auth Lovable si nécessaire, afin qu’il ne soit plus considéré comme chemin valide d’envoi.
+   - Garder Resend comme seul chemin applicatif pour inscription/récupération.
 
-Dans `supabase/functions/auth-otp/index.ts` → `startSignup` :
-- Changer `email_confirm: false` en `email_confirm: true` sur `admin.createUser`.
-- Ajouter dans `user_metadata` : `otp_verified: false`.
-- Cela **supprime totalement** l'e-mail automatique envoyé par Supabase lors de la création — Resend devient le seul émetteur.
+3. **Renforcer les tests anti-régression**
+   - Étendre le test existant pour échouer si le code réintroduit un appel client ou serveur à `auth.signUp`, `resetPasswordForEmail`, `signInWithOtp`, `generateLink`, ou tout endpoint natif équivalent.
+   - Ajouter une vérification que `auth-otp` est le seul flux autorisé pour signup/recovery.
+   - Ajouter un test documentaire/CI qui vérifie que le signup natif backend est désactivé ou explicitement bloqué.
 
-Dans `verifySignup`, remplacer la mise à jour `email_confirm: true` (déjà true) par la mise à jour `user_metadata.otp_verified: true`.
+4. **Vérifier en conditions réelles**
+   - Déployer la fonction `auth-otp` après ajustements.
+   - Lancer un test d’inscription.
+   - Contrôler trois signaux :
+     - un nouvel OTP est bien enregistré côté backend ;
+     - aucun log auth `POST /signup` natif n’apparaît ;
+     - l’email reçu vient de `noreply@tontinedigitale.com` via Resend.
 
-### 2. Bloquer la connexion tant que l'OTP n'est pas validé
+## Point important
 
-Puisque `email_confirm` est désormais `true` à la création, Supabase ne bloque plus `signInWithPassword`. On ajoute un garde côté client :
-
-Dans `src/hooks/useAuth.tsx` → `signIn` :
-- Après `signInWithPassword` réussi, lire `user.user_metadata.otp_verified`.
-- Si `false` ou absent, appeler `supabase.auth.signOut()` et renvoyer `{ error: "Email non confirmé. Vérifie ta boîte mail." }`.
-
-### 3. Désactiver définitivement les templates natifs Lovable
-
-Appeler `email_domain--toggle_project_emails` avec `enabled: false` pour couper le hook Lovable Emails. Les e-mails natifs Supabase (que nous ne déclenchons plus) tomberaient sinon toujours sur `no-reply@auth.lovable.cloud`. Après désactivation, si un chemin natif venait à se déclencher accidentellement, il échouerait au lieu d'envoyer via un mauvais expéditeur — comportement plus sûr et détectable.
-
-### 4. Vérification finale
-
-- Redéployer `auth-otp`.
-- Lancer un vrai signup depuis la preview vers une adresse Gmail (pas Yopmail).
-- Vérifier que l'e-mail arrive de `noreply@tontinedigitale.com` et qu'aucun autre e-mail n'est envoyé.
-- Vérifier qu'un `signInWithPassword` avant vérification renvoie l'erreur "Email non confirmé".
-
-## Fichiers touchés
-
-- `supabase/functions/auth-otp/index.ts` (createUser flags + verifySignup metadata)
-- `src/hooks/useAuth.tsx` (garde otp_verified sur signIn)
-- Appel outil : `email_domain--toggle_project_emails { enabled: false }`
-- Redeploy edge function `auth-otp`
-
-## Note sur Yopmail
-
-Yopmail bloque fréquemment les e-mails Resend même quand le dashboard Resend indique "delivered". Ce n'est pas un bug de notre côté. Pour les tests futurs, utiliser une vraie adresse (Gmail, Outlook) ou Mailtrap.
+Le problème observé n’est pas un échec Resend : c’est un contournement du flux Resend par le chemin d’inscription natif. La correction principale est donc de bloquer ce chemin natif au niveau backend, pas seulement dans le frontend.
