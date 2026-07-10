@@ -1,4 +1,4 @@
-import { LogOut, RefreshCw, AlertTriangle, Camera, Loader2, Bell, Shield, BadgeCheck, MailCheck, MailWarning } from "lucide-react";
+import { LogOut, RefreshCw, AlertTriangle, Camera, Loader2, Bell, Shield, BadgeCheck, MailCheck, MailWarning, MessageSquare } from "lucide-react";
 import { toast } from "sonner";
 import { Link, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -13,6 +13,7 @@ import {
 } from "@/lib/api/reliability";
 import { getMyProfile, uploadAvatar, refreshAvatarSignedUrl } from "@/lib/api/profile";
 import { getMyKyc, KYC_LEVEL_LABEL } from "@/lib/api/kyc";
+import { getMySmsWallet, listMySmsOrders } from "@/lib/api/smsWallet";
 import { useRef } from "react";
 import { formatGNF } from "@/lib/format";
 
@@ -24,6 +25,8 @@ export default function Profile() {
 
   const profileQ = useQuery({ queryKey: ["profile", "mine"], queryFn: getMyProfile });
   const kycQ = useQuery({ queryKey: ["kyc", "mine"], queryFn: getMyKyc });
+  const walletQ = useQuery({ queryKey: ["sms-wallet", "mine"], queryFn: getMySmsWallet });
+  const smsOrdersQ = useQuery({ queryKey: ["sms-orders", "mine"], queryFn: () => listMySmsOrders(20) });
 
   const uploadM = useMutation({
     mutationFn: (file: File) => uploadAvatar(file),
