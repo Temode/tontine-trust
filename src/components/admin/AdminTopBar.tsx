@@ -10,6 +10,9 @@ const TITLES: Record<string, { title: string; subtitle: string }> = {
   "/admin/groupes": { title: "Groupes & tontines", subtitle: "Supervision, pause, archivage" },
   "/admin/paiements": { title: "Paiements", subtitle: "Transactions Djomy et preuves externes" },
   "/admin/audit": { title: "Journal d'audit", subtitle: "Historique global des actions" },
+  "/admin/subscriptions": { title: "Plans d'abonnement", subtitle: "Prix, limites et paliers modulables" },
+  "/admin/sms-pricing": { title: "Tarification SMS", subtitle: "Prix unitaire et packs, versionnés" },
+  "/admin/sms-orders": { title: "Commandes SMS", subtitle: "Achats de packs par les utilisateurs" },
 };
 
 export function AdminTopBar() {
