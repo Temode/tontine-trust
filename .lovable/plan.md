@@ -1,69 +1,48 @@
-## Diagnostic
+## Plan
 
-Les logs de l'edge function `auth-otp` montrent, pour un code fraîchement envoyé et saisi dans les secondes qui suivent :
+### 1. Refonte de la fonction `auth-otp`
 
-```
-verify_signup failed { errMessage: "Token has expired or is invalid", errStatus: 403 }
-verify_signup retry(email) failed { errMessage: "Token has expired or is invalid" }
-```
+Remplacer `admin.generateLink({type:"signup"})` — qui crée le compte ET déclenche un email par défaut de Supabase — par un flux 100% contrôlé :
 
-Le code envoyé par email est bien celui généré côté serveur (`email_otp` de `admin.generateLink`), mais Supabase le refuse immédiatement. La cause quasi-certaine : **le paramètre Auth `auto_confirm_email` est activé** sur le projet. Dans ce mode, `generateLink({type:"signup"})` crée le compte **et le marque confirmé instantanément** → l'OTP renvoyé n'a plus rien à confirmer et sort en `expired/invalid` dès la première tentative.
+- `signup_start`
+  - `admin.createUser({ email, password, email_confirm: false, user_metadata })` : crée le compte non vérifié, sans envoyer aucun email.
+  - Si l'email existe déjà :
+    - vérifié → renvoyer `email_exists`
+    - non vérifié → mettre à jour password + metadata et renvoyer un nouveau code.
+  - Générer un code aléatoire à 6 chiffres cryptographiquement sûr.
+  - Stocker `email_hash + purpose + token_hash + expires_at (15 min)` dans `auth_otp_requests`.
+  - Envoyer le code via Resend (gateway déjà en place) avec le template `SignupEmail`.
 
-Effet secondaire à connaître : le compte `saaddaan@yopmail.com` existe désormais en base (créé au premier `signup_start`), donc les prochains `signup_start` sur ce mail renverront `email_exists` tant qu'il n'est pas supprimé.
+- `verify_signup`
+  - Chercher la dernière ligne active dans `auth_otp_requests` par `email_hash + purpose='signup' + token_hash + status='sent' + expires_at > now()`.
+  - Échec → `invalid_code`.
+  - Succès → `admin.updateUserById(id, { email_confirm: true })` puis marquer la ligne `consumed`.
+  - Si le client renvoie le password (déjà stocké dans `location.state` côté front), ouvrir la session avec `signInWithPassword` et retourner la session — sinon renvoyer juste `success`.
 
-## Ce qu'il faut faire
+- `recovery_start` / `recovery_complete`
+  - Même approche maison (code généré et envoyé via Resend, vérification par comparaison de `token_hash`).
+  - `recovery_start` ne divulgue pas l'existence du compte (toujours `success`).
 
-### 1. Désactiver l'auto-confirmation email
+### 2. Front `VerifyEmail.tsx`
 
-Appliquer via `supabase--configure_auth` :
+Ajouter le password (déjà présent dans `location.state.signupPayload`) dans le corps de l'appel `verify_signup`, pour que la session soit ouverte automatiquement à la fin de la vérification.
 
-- `auto_confirm_email: false`
-- `disable_signup: false`
-- `external_anonymous_users_enabled: false`
-- `password_hibp_enabled: true` (bonne pratique, laisser tel quel s'il est déjà à true)
+### 3. Aucun changement de schéma
 
-Après ça, `generateLink({type:"signup"})` retournera un OTP effectivement consommable par `verifyOtp`.
+`auth_otp_requests` possède déjà toutes les colonnes nécessaires (`email_hash`, `purpose`, `token_hash`, `status`, `expires_at`, `consumed_at`, `created_at`).
 
-### 2. Nettoyer l'edge function `auth-otp`
+### 4. Tests
 
-Une fois le vrai problème corrigé, le fallback ajouté au tour précédent (`type: "email"`) n'a plus lieu d'être et masque de futurs vrais bugs. Retour à la forme simple :
-
-- `verifyOtp({ email, token, type: "signup" })`
-- En cas d'échec, logger `error.message` et renvoyer `invalid_code`
-- Aucun `retry(email)`
-
-### 3. Purger le compte de test bloqué
-
-Le compte `saaddaan@yopmail.com` a été créé et auto-confirmé pendant le bug. Pour rejouer le test de bout en bout :
-
-- Supprimer l'utilisateur (via `supabase.auth.admin.deleteUser`) — je le ferai en mode build par un appel one-shot, sans exposer l'ID en clair côté utilisateur.
-- Alternative si le compte doit être conservé : tester avec un email neuf (`audit-otp-YYYYMMDD-hhmm@yopmail.com`).
-
-### 4. Vérification
-
-- Redéploiement de `auth-otp`.
-- Test end-to-end via le preview : inscription → réception de l'email Resend → saisie du code copié/collé → arrivée sur `/dashboard`.
-- Lecture des logs `auth-otp` pour confirmer l'absence de `verify_signup failed`.
+Après déploiement :
+- Nouvelle inscription : un seul mail Resend arrive depuis `noreply@tontinedigitale.com`, avec code à 6 chiffres, aucun email `no-reply@auth.lovable.cloud`.
+- Saisie du code → session ouverte, redirection `/dashboard`.
+- Tentative de `signIn` avant validation → message "Email non confirmé".
+- Code faux ou expiré → message "Code invalide ou expiré".
 
 ## Détails techniques
 
-```text
-Cause :   auto_confirm_email = true
-          └─ generateLink(signup) crée + confirme le user
-             └─ email_otp retourné mais déjà "consommé" côté Auth
-                └─ verifyOtp → 403 "Token has expired or is invalid"
-
-Correctif : auto_confirm_email = false
-          └─ user créé mais non confirmé
-             └─ email_otp reste valide 1 h
-                └─ verifyOtp(signup) → session OK
-```
-
 Fichiers touchés :
-- `supabase/functions/auth-otp/index.ts` (retrait du fallback + log net)
-- Aucun changement front, aucune migration SQL
+- `supabase/functions/auth-otp/index.ts` : refonte des 4 actions.
+- `src/pages/VerifyEmail.tsx` : ajout du password dans le body `verify_signup`.
 
-Ce qui n'est pas fait :
-- Pas de changement des templates emails Resend
-- Pas de rotation de clés
-- Pas de republication (la fonction edge est prise en compte automatiquement)
+Aucune migration SQL, aucun changement dans `Auth.tsx`, `useAuth.tsx` ou `authOtp.ts`.
