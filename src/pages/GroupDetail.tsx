@@ -42,6 +42,7 @@ import { InvitePanel, INVITE_PANEL_ID } from "@/components/groups/InvitePanel";
 import { GroupChat } from "@/components/group/GroupChat";
 import { PayoutHoldHistory } from "@/components/balance/PayoutHoldHistory";
 import { AnnouncementsPanel } from "@/components/group/AnnouncementsPanel";
+import { SmsRechargePanel } from "@/components/group/SmsRechargePanel";
 import { AuditLog } from "@/components/group/AuditLog";
 import { SwapsPanel } from "@/components/group/SwapsPanel";
 import { AuctionPanel } from "@/components/group/AuctionPanel";
