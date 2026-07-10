@@ -10,7 +10,6 @@ import { formatGNF } from "@/lib/format";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import { useEntitlements } from "@/hooks/useEntitlements";
-import { launchDjomyCheckout } from "@/lib/payment/launchDjomyCheckout";
 import type { Database } from "@/integrations/supabase/types";
 
 type Plan = Database["public"]["Tables"]["subscription_plans"]["Row"];
@@ -112,7 +111,7 @@ export default function Subscription() {
       if (error) throw new Error(error.message);
       const res = data as { redirectUrl?: string; error?: string };
       if (!res?.redirectUrl) throw new Error(res?.error ?? "Redirection Djomy indisponible");
-      launchDjomyCheckout(res.redirectUrl);
+      window.location.href = res.redirectUrl;
     } catch (e) {
       toast.error("Paiement impossible", { description: e instanceof Error ? e.message : String(e) });
     } finally {
