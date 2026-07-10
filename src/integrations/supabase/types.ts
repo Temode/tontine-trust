@@ -6532,6 +6532,18 @@ export type Database = {
         Returns: undefined
       }
       delete_account: { Args: { _reason?: string }; Returns: undefined }
+      dispatch_notification: {
+        Args: {
+          _body?: string
+          _data?: Json
+          _group_id?: string
+          _kind: Database["public"]["Enums"]["notification_kind"]
+          _link?: string
+          _title: string
+          _user_id: string
+        }
+        Returns: Json
+      }
       email_outbox_mark: {
         Args: { _error?: string; _id: string; _status: string }
         Returns: undefined
@@ -6754,6 +6766,10 @@ export type Database = {
         Args: { _flag: string; _group: string; _user: string }
         Returns: boolean
       }
+      notification_kind_is_sms_critical: {
+        Args: { _kind: Database["public"]["Enums"]["notification_kind"] }
+        Returns: boolean
+      }
       notify: {
         Args: {
           _body?: string
@@ -6974,6 +6990,16 @@ export type Database = {
       }
       sms_outbox_try_lock: { Args: never; Returns: boolean }
       sms_outbox_unlock: { Args: never; Returns: boolean }
+      sms_wallet_debit: {
+        Args: {
+          _metadata: Json
+          _qty: number
+          _reason: Database["public"]["Enums"]["sms_ledger_reason"]
+          _ref_id: string
+          _user_id: string
+        }
+        Returns: number
+      }
       start_cycle: { Args: { _group_id: string }; Returns: string }
       start_djomy_payment: {
         Args: {
