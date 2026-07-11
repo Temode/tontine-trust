@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { CheckCircle2, Loader2, AlertCircle, XCircle, ArrowRight } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -25,6 +26,7 @@ export default function SubscriptionConfirmation() {
   const [params] = useSearchParams();
   const { user } = useAuth();
   const { refetch: refetchEntitlements } = useEntitlements();
+  const queryClient = useQueryClient();
 
   const planCode = params.get("plan");
   const [sub, setSub] = useState<LatestSub | null>(null);
@@ -33,7 +35,8 @@ export default function SubscriptionConfirmation() {
   const settledRef = useRef(false);
 
   const status: SubStatus = sub?.status ?? "unknown";
-  const isFinal = status === "active" || status === "trialing" || status === "cancelled" || status === "failed";
+  const timedOut = elapsed > POLL_TIMEOUT_MS;
+  const isFinal = status === "active" || status === "trialing" || status === "cancelled" || status === "failed" || timedOut;
 
   // Résout l'ID de l'abonnement à suivre (URL → sessionStorage → dernier pending du user).
   useEffect(() => {
@@ -51,6 +54,7 @@ export default function SubscriptionConfirmation() {
           sessionStorage.removeItem("lastDjomySubscriptionId");
           sessionStorage.removeItem("lastDjomySubscriptionTxId");
         } catch { /* ignore */ }
+        void queryClient.invalidateQueries({ queryKey: ["entitlements", user.id] });
         void refetchEntitlements();
       } else if (s === "cancelled" || s === "failed" || s === "past_due") {
         settledRef.current = true;
@@ -147,7 +151,7 @@ export default function SubscriptionConfirmation() {
       cancelled = true;
       if (channel) void supabase.removeChannel(channel);
     };
-  }, [user, planCode, params, refetchEntitlements]);
+  }, [user, planCode, params, refetchEntitlements, queryClient]);
 
   const view = useMemo(() => {
     if (error) {
@@ -187,24 +191,23 @@ export default function SubscriptionConfirmation() {
       case "pending":
       case "unknown":
       default: {
-        const timeout = elapsed > POLL_TIMEOUT_MS;
         return {
-          icon: timeout
+          icon: timedOut
             ? <AlertCircle className="h-10 w-10 text-amber-500" />
             : <Loader2 className="h-10 w-10 animate-spin text-primary" />,
-          title: timeout
-            ? "Activation non confirmée dans les délais"
+          title: timedOut
+            ? "Confirmation non reçue"
             : "Confirmation en cours…",
-          body: timeout
-            ? "Nous n'avons pas reçu la confirmation Djomy après 30 s. Si vous avez été débité, votre abonnement sera activé dès réception du webhook — actualisez cette page dans quelques minutes, réessayez le paiement, ou contactez le support."
+          body: timedOut
+            ? "Le paiement n'a pas encore été confirmé par Djomy après 30 s. Si vous avez été débité, ne relancez pas immédiatement un second paiement : revenez sur cette page dans quelques minutes ou contactez le support."
             : "Nous attendons la confirmation Djomy. Cela prend habituellement quelques secondes.",
-          tone: "info" as const,
+          tone: timedOut ? "warning" as const : "info" as const,
         };
       }
     }
-  }, [status, error, elapsed, sub?.plan_code]);
+  }, [status, error, timedOut, sub?.plan_code]);
 
-  const canRetry = status === "cancelled" || status === "failed" || (status === "unknown" && elapsed > POLL_TIMEOUT_MS);
+  const canRetry = status === "cancelled" || status === "failed" || timedOut;
 
   return (
     <div className="animate-fade-in">

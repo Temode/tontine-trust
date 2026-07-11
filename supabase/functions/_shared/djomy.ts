@@ -35,6 +35,64 @@ export async function hmacSha256Hex(key: string, message: string): Promise<strin
   return hex(sig);
 }
 
+export function extractDjomyWebhookSignature(header: string | null): string {
+  const raw = String(header ?? "").trim();
+  if (!raw) return "";
+
+  for (const part of raw.split(",").map((p) => p.trim()).filter(Boolean)) {
+    const normalized = part.replace(/^sha256=/i, "");
+    const prefixed = normalized.match(/^v1[:=]([a-f0-9]+)$/i);
+    if (prefixed?.[1]) return prefixed[1].toLowerCase();
+    if (/^[a-f0-9]+$/i.test(normalized)) return normalized.toLowerCase();
+  }
+
+  const fallback = raw.includes(":") ? raw.split(":").slice(-1)[0] : raw;
+  return fallback.trim().replace(/^sha256=/i, "").toLowerCase();
+}
+
+export function mapDjomyEventStatus(eventType: string): string | null {
+  const map: Record<string, string> = {
+    "payment.success": "succeeded",
+    "payment.failed": "failed",
+    "payment.cancelled": "cancelled",
+    "payment.created": "pending",
+    "payment.pending": "pending",
+    "payment.redirected": "pending",
+  };
+  return map[eventType] ?? null;
+}
+
+export function getDjomyWebhookContext(payload: Record<string, unknown>) {
+  const data = (payload.data as Record<string, unknown> | undefined) ?? {};
+  const dataMetadata = (data.metadata as Record<string, unknown> | undefined) ?? {};
+  const rootMetadata = (payload.metadata as Record<string, unknown> | undefined) ?? {};
+  const metadata = { ...dataMetadata, ...rootMetadata };
+  const eventType = String(payload.eventType ?? "unknown");
+
+  const transactionId =
+    (data.transactionId as string | undefined) ??
+    (data.transaction_id as string | undefined) ??
+    (payload.transactionId as string | undefined) ??
+    null;
+  const merchantRef =
+    (data.merchantPaymentReference as string | undefined) ??
+    (payload.merchantPaymentReference as string | undefined) ??
+    (metadata.subscription_id as string | undefined) ??
+    (metadata.payment_id as string | undefined) ??
+    null;
+
+  return {
+    eventId: (payload.eventId as string | undefined) ?? crypto.randomUUID(),
+    eventType,
+    data,
+    metadata,
+    transactionId,
+    merchantRef,
+    purpose: String(metadata.purpose ?? ""),
+    newStatus: mapDjomyEventStatus(eventType),
+  };
+}
+
 export async function buildApiKeyHeader(): Promise<string> {
   const clientId = Deno.env.get("DJOMY_CLIENT_ID");
   const clientSecret = Deno.env.get("DJOMY_CLIENT_SECRET");

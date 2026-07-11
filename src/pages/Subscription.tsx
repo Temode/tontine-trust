@@ -23,6 +23,10 @@ export default function Subscription() {
   const [busy, setBusy] = useState<PlanCode | null>(null);
 
   useEffect(() => {
+    if (user?.id) void refetch();
+  }, [user?.id, refetch]);
+
+  useEffect(() => {
     (async () => {
       setLoading(true);
       const { data, error } = await supabase
