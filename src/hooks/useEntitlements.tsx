@@ -52,7 +52,7 @@ export function useEntitlements() {
   const q = useQuery({
     queryKey: ["entitlements", user?.id ?? "anon"],
     enabled: !!user,
-    staleTime: 60_000,
+    staleTime: 0,
     queryFn: async (): Promise<Entitlements> => {
       const { data, error } = await supabase.rpc("get_my_entitlements");
       if (error) throw error;

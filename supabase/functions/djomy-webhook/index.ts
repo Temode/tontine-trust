@@ -1,6 +1,6 @@
 // redeploy-trigger: 2026-06-16
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { corsHeaders, hmacSha256Hex, json } from "../_shared/djomy.ts";
+import { corsHeaders, extractDjomyWebhookSignature, getDjomyWebhookContext, hmacSha256Hex, json } from "../_shared/djomy.ts";
 import { sendMessageBg, fmtSms, normalizeGNPhone } from "../_shared/nimbasms.ts";
 
 // PUBLIC endpoint : signature HMAC requise. verify_jwt = false dans config.toml.
@@ -17,7 +17,7 @@ Deno.serve(async (req) => {
 
   // Format Djomy : `X-Webhook-Signature: v1:<hex>` — HMAC-SHA256(payload) avec
   // la clé secrète marchand. On accepte aussi un header brut sans préfixe.
-  const provided = (sigHeader.includes(":") ? sigHeader.split(":").slice(-1)[0] : sigHeader).trim().toLowerCase();
+  const provided = extractDjomyWebhookSignature(sigHeader);
   let signatureValid = false;
   let matchedKey: "webhook" | "client" | null = null;
   for (const key of [webhookSecret, clientSecret].filter(Boolean) as string[]) {
@@ -48,13 +48,16 @@ Deno.serve(async (req) => {
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const admin = createClient(url, serviceKey);
 
-  const eventId = (payload.eventId as string) ?? crypto.randomUUID();
-  const eventType = String(payload.eventType ?? "unknown");
-  const data = (payload.data as Record<string, unknown> | undefined) ?? {};
-  const transactionId = (data.transactionId as string) ?? null;
-  const merchantRef = (data.merchantPaymentReference as string) ?? null;
-  const metadata = (data.metadata as Record<string, unknown> | undefined) ?? {};
-  const purpose = String(metadata.purpose ?? "");
+  const {
+    eventId,
+    eventType,
+    data,
+    transactionId,
+    merchantRef,
+    metadata,
+    purpose,
+    newStatus,
+  } = getDjomyWebhookContext(payload);
 
   // Idempotence forte : si l'eventId existe déjà, on a déjà traité — on sort sans rien refaire.
   // (Évite double SMS / double validation de caution en cas de re-livraison Djomy.)
@@ -89,16 +92,6 @@ Deno.serve(async (req) => {
   if (!signatureValid) {
     return json({ ok: true, ignored: "invalid_signature" }, 200);
   }
-
-  const map: Record<string, string> = {
-    "payment.success": "succeeded",
-    "payment.failed": "failed",
-    "payment.cancelled": "cancelled",
-    "payment.pending": "pending",
-    "payment.created": "pending",
-    "payment.redirected": "pending",
-  };
-  const newStatus = map[eventType];
 
   // Routage abonnements (M3) : purpose=subscription ou ref = user_subscriptions.id
   let subscriptionId: string | null = null;

@@ -20,6 +20,7 @@ DECLARE
   v_period_before timestamptz;
   v_period_after timestamptz;
   v_status public.subscription_status;
+  v_ent jsonb;
 BEGIN
   INSERT INTO auth.users (id, instance_id, aud, role, email, encrypted_password,
     email_confirmed_at, created_at, updated_at, raw_app_meta_data, raw_user_meta_data)
@@ -44,6 +45,16 @@ BEGIN
   IF v_status <> 'active' THEN RAISE EXCEPTION 'FAIL (1) prem=%', v_status; END IF;
   SELECT status INTO v_status FROM public.user_subscriptions WHERE id = v_free;
   IF v_status <> 'cancelled' THEN RAISE EXCEPTION 'FAIL (1) free=%', v_status; END IF;
+
+  -- (1b) Même timestamp sur lignes active/cancelled : les droits doivent rester Premium.
+  UPDATE public.user_subscriptions
+     SET updated_at = '2030-01-01 00:00:00+00'::timestamptz
+   WHERE id IN (v_free, v_prem);
+  PERFORM set_config('request.jwt.claim.sub', v_user::text, true);
+  SELECT public.get_my_entitlements() INTO v_ent;
+  IF v_ent->>'plan_code' <> 'premium' OR v_ent->>'status' <> 'active' THEN
+    RAISE EXCEPTION 'FAIL (1b): entitlements=%', v_ent;
+  END IF;
 
   -- (2) Idempotence : rejouer succeeded ne recalcule pas current_period_end.
   SELECT current_period_end INTO v_period_before FROM public.user_subscriptions WHERE id = v_prem;

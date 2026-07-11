@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { CheckCircle2, Loader2, AlertCircle, XCircle, ArrowRight } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -25,6 +26,7 @@ export default function SubscriptionConfirmation() {
   const [params] = useSearchParams();
   const { user } = useAuth();
   const { refetch: refetchEntitlements } = useEntitlements();
+  const queryClient = useQueryClient();
 
   const planCode = params.get("plan");
   const [sub, setSub] = useState<LatestSub | null>(null);
@@ -51,6 +53,7 @@ export default function SubscriptionConfirmation() {
           sessionStorage.removeItem("lastDjomySubscriptionId");
           sessionStorage.removeItem("lastDjomySubscriptionTxId");
         } catch { /* ignore */ }
+        void queryClient.invalidateQueries({ queryKey: ["entitlements", user.id] });
         void refetchEntitlements();
       } else if (s === "cancelled" || s === "failed" || s === "past_due") {
         settledRef.current = true;
@@ -147,7 +150,7 @@ export default function SubscriptionConfirmation() {
       cancelled = true;
       if (channel) void supabase.removeChannel(channel);
     };
-  }, [user, planCode, params, refetchEntitlements]);
+  }, [user, planCode, params, refetchEntitlements, queryClient]);
 
   const view = useMemo(() => {
     if (error) {
