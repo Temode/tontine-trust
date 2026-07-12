@@ -4499,6 +4499,48 @@ export type Database = {
         }
         Relationships: []
       }
+      user_withdrawal_requests: {
+        Row: {
+          amount: number
+          created_at: string
+          id: string
+          payment_details: Json
+          payment_method: Database["public"]["Enums"]["user_withdrawal_channel"]
+          processed_at: string | null
+          processed_by: string | null
+          rejection_reason: string | null
+          status: Database["public"]["Enums"]["user_withdrawal_status"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          id?: string
+          payment_details?: Json
+          payment_method: Database["public"]["Enums"]["user_withdrawal_channel"]
+          processed_at?: string | null
+          processed_by?: string | null
+          rejection_reason?: string | null
+          status?: Database["public"]["Enums"]["user_withdrawal_status"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: string
+          payment_details?: Json
+          payment_method?: Database["public"]["Enums"]["user_withdrawal_channel"]
+          processed_at?: string | null
+          processed_by?: string | null
+          rejection_reason?: string | null
+          status?: Database["public"]["Enums"]["user_withdrawal_status"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       withdrawal_requests: {
         Row: {
           amount: number
@@ -6392,10 +6434,29 @@ export type Database = {
           total_earned: number
         }[]
       }
+      admin_list_withdrawals: {
+        Args: {
+          _status?: Database["public"]["Enums"]["user_withdrawal_status"]
+        }
+        Returns: {
+          amount: number
+          created_at: string
+          full_name: string
+          id: string
+          payment_details: Json
+          payment_method: Database["public"]["Enums"]["user_withdrawal_channel"]
+          phone_number: string
+          processed_at: string
+          rejection_reason: string
+          status: Database["public"]["Enums"]["user_withdrawal_status"]
+          user_id: string
+        }[]
+      }
       admin_mark_referral_earning_paid: {
         Args: { _id: string; _paid: boolean }
         Returns: undefined
       }
+      admin_mark_withdrawal_paid: { Args: { _id: string }; Returns: undefined }
       admin_publish_contract_template: {
         Args: { _body_md: string; _version: string }
         Returns: string
@@ -6420,6 +6481,10 @@ export type Database = {
       }
       admin_refund_member_deposit: {
         Args: { _deposit_id: string; _reason?: string }
+        Returns: undefined
+      }
+      admin_reject_withdrawal: {
+        Args: { _id: string; _reason: string }
         Returns: undefined
       }
       admin_resend_payout_hold_notice: {
@@ -6767,6 +6832,15 @@ export type Database = {
       }
       get_my_affiliate_summary: { Args: never; Returns: Json }
       get_my_entitlements: { Args: never; Returns: Json }
+      get_my_wallet: {
+        Args: never
+        Returns: {
+          available_amount: number
+          locked_amount: number
+          total_credited: number
+          total_withdrawn: number
+        }[]
+      }
       get_pending_penalty: { Args: { _group_id: string }; Returns: number }
       get_user_default_history: {
         Args: { _user_id?: string }
@@ -7070,6 +7144,14 @@ export type Database = {
       }
       request_turn_swap: {
         Args: { _from_turn: string; _reason?: string; _to_turn: string }
+        Returns: string
+      }
+      request_user_withdrawal: {
+        Args: {
+          _amount: number
+          _details: Json
+          _method: Database["public"]["Enums"]["user_withdrawal_channel"]
+        }
         Returns: string
       }
       request_withdrawal: {
@@ -7521,6 +7603,12 @@ export type Database = {
       swap_policy: "none" | "with_consent" | "organizer_only"
       swap_status: "pending" | "accepted" | "rejected" | "cancelled"
       turn_status: "upcoming" | "collecting" | "paid" | "skipped"
+      user_withdrawal_channel:
+        | "mobile_money_om"
+        | "mobile_money_momo"
+        | "card"
+        | "bank_transfer"
+      user_withdrawal_status: "pending" | "completed" | "rejected"
       withdrawal_method: "OM" | "MOMO" | "CARD" | "BANK" | "CASH"
       withdrawal_status:
         | "pending"
@@ -7844,6 +7932,13 @@ export const Constants = {
       swap_policy: ["none", "with_consent", "organizer_only"],
       swap_status: ["pending", "accepted", "rejected", "cancelled"],
       turn_status: ["upcoming", "collecting", "paid", "skipped"],
+      user_withdrawal_channel: [
+        "mobile_money_om",
+        "mobile_money_momo",
+        "card",
+        "bank_transfer",
+      ],
+      user_withdrawal_status: ["pending", "completed", "rejected"],
       withdrawal_method: ["OM", "MOMO", "CARD", "BANK", "CASH"],
       withdrawal_status: [
         "pending",
