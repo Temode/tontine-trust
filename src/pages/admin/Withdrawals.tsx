@@ -1,15 +1,16 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { CheckCircle2, XCircle, Loader2 } from "lucide-react";
+import { CheckCircle2, XCircle, Loader2, Search, RotateCcw, ChevronLeft, ChevronRight } from "lucide-react";
 import {
-  adminListWithdrawals,
+  adminListWithdrawalsV2,
   adminMarkWithdrawalPaid,
   adminRejectWithdrawal,
   CHANNEL_LABEL,
   formatDestination,
   type AdminWithdrawalRow,
   type UserWithdrawalStatus,
+  type WithdrawalChannel,
 } from "@/lib/api/wallet";
 import { formatGNF } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -21,16 +22,50 @@ const TABS: { id: UserWithdrawalStatus | "all"; label: string }[] = [
   { id: "all", label: "Toutes" },
 ];
 
+const METHOD_OPTIONS: { id: WithdrawalChannel | "all"; label: string }[] = [
+  { id: "all", label: "Toutes méthodes" },
+  { id: "mobile_money_om", label: "Orange Money" },
+  { id: "mobile_money_momo", label: "MTN MoMo" },
+  { id: "card", label: "Carte" },
+  { id: "bank_transfer", label: "Virement" },
+];
+
+const PAGE_SIZE = 20;
+
 export default function AdminWithdrawals() {
   const [tab, setTab] = useState<UserWithdrawalStatus | "all">("pending");
+  const [method, setMethod] = useState<WithdrawalChannel | "all">("all");
+  const [from, setFrom] = useState<string>("");
+  const [to, setTo] = useState<string>("");
+  const [searchInput, setSearchInput] = useState<string>("");
+  const [search, setSearch] = useState<string>("");
+  const [page, setPage] = useState<number>(0);
   const qc = useQueryClient();
 
+  const params = useMemo(() => ({
+    status: tab === "all" ? undefined : tab,
+    method: method === "all" ? undefined : method,
+    from: from ? new Date(from).toISOString() : undefined,
+    to: to ? new Date(new Date(to).getTime() + 86400000).toISOString() : undefined,
+    search: search || undefined,
+    limit: PAGE_SIZE,
+    offset: page * PAGE_SIZE,
+  }), [tab, method, from, to, search, page]);
+
   const q = useQuery({
-    queryKey: ["admin-withdrawals", tab],
-    queryFn: () => adminListWithdrawals(tab === "all" ? undefined : tab),
+    queryKey: ["admin-withdrawals-v2", params],
+    queryFn: () => adminListWithdrawalsV2(params),
   });
 
-  const rows = q.data ?? [];
+  const rows = q.data?.rows ?? [];
+  const total = q.data?.total ?? 0;
+  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
+  const resetFilters = () => {
+    setMethod("all"); setFrom(""); setTo(""); setSearch(""); setSearchInput(""); setPage(0);
+  };
+
+  const applySearch = () => { setSearch(searchInput.trim()); setPage(0); };
 
   return (
     <div className="p-6">
@@ -45,7 +80,7 @@ export default function AdminWithdrawals() {
         {TABS.map((t) => (
           <button
             key={t.id}
-            onClick={() => setTab(t.id)}
+            onClick={() => { setTab(t.id); setPage(0); }}
             className={cn(
               "rounded-md px-3 py-1.5 text-sm font-semibold transition",
               tab === t.id
@@ -56,6 +91,47 @@ export default function AdminWithdrawals() {
             {t.label}
           </button>
         ))}
+      </div>
+
+      <div className="mb-4 grid gap-2 md:grid-cols-[1fr_auto_auto_auto_auto] md:items-end">
+        <div>
+          <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-slate-500">Recherche (nom, téléphone, user_id)</label>
+          <div className="flex gap-2">
+            <input
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && applySearch()}
+              placeholder="ex. 6220..., Aïssatou, ou UUID utilisateur"
+              className="flex-1 rounded-md border border-slate-700 bg-slate-950 px-3 py-1.5 text-sm text-slate-200"
+            />
+            <button onClick={applySearch} className="inline-flex items-center gap-1 rounded-md bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-200 hover:bg-slate-700">
+              <Search className="h-3 w-3" /> Chercher
+            </button>
+          </div>
+        </div>
+        <div>
+          <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-slate-500">Méthode</label>
+          <select
+            value={method}
+            onChange={(e) => { setMethod(e.target.value as WithdrawalChannel | "all"); setPage(0); }}
+            className="rounded-md border border-slate-700 bg-slate-950 px-2 py-1.5 text-sm text-slate-200"
+          >
+            {METHOD_OPTIONS.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-slate-500">Du</label>
+          <input type="date" value={from} onChange={(e) => { setFrom(e.target.value); setPage(0); }}
+            className="rounded-md border border-slate-700 bg-slate-950 px-2 py-1.5 text-sm text-slate-200" />
+        </div>
+        <div>
+          <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-slate-500">Au</label>
+          <input type="date" value={to} onChange={(e) => { setTo(e.target.value); setPage(0); }}
+            className="rounded-md border border-slate-700 bg-slate-950 px-2 py-1.5 text-sm text-slate-200" />
+        </div>
+        <button onClick={resetFilters} className="inline-flex h-[34px] items-center gap-1 rounded-md border border-slate-700 px-3 text-xs font-semibold text-slate-300 hover:bg-slate-800">
+          <RotateCcw className="h-3 w-3" /> Réinitialiser
+        </button>
       </div>
 
       <div className="overflow-x-auto rounded-lg border border-slate-800 bg-slate-900/60">
@@ -76,12 +152,32 @@ export default function AdminWithdrawals() {
             {q.isLoading ? (
               <tr><td colSpan={8} className="p-8 text-center text-slate-500"><Loader2 className="mx-auto h-5 w-5 animate-spin" /></td></tr>
             ) : rows.length === 0 ? (
-              <tr><td colSpan={8} className="p-8 text-center text-slate-500">Aucune demande dans cet onglet.</td></tr>
+              <tr><td colSpan={8} className="p-8 text-center text-slate-500">Aucune demande ne correspond aux filtres.</td></tr>
             ) : (
-              rows.map((r) => <Row key={r.id} row={r} onDone={() => qc.invalidateQueries({ queryKey: ["admin-withdrawals"] })} />)
+              rows.map((r) => <Row key={r.id} row={r} onDone={() => qc.invalidateQueries({ queryKey: ["admin-withdrawals-v2"] })} />)
             )}
           </tbody>
         </table>
+      </div>
+
+      <div className="mt-3 flex items-center justify-between text-xs text-slate-400">
+        <span>{total} demande{total > 1 ? "s" : ""} · page {page + 1} / {pageCount}</span>
+        <div className="flex gap-2">
+          <button
+            disabled={page === 0 || q.isLoading}
+            onClick={() => setPage((p) => Math.max(0, p - 1))}
+            className="inline-flex items-center gap-1 rounded-md border border-slate-700 px-2.5 py-1 disabled:opacity-40"
+          >
+            <ChevronLeft className="h-3 w-3" /> Précédent
+          </button>
+          <button
+            disabled={page + 1 >= pageCount || q.isLoading}
+            onClick={() => setPage((p) => p + 1)}
+            className="inline-flex items-center gap-1 rounded-md border border-slate-700 px-2.5 py-1 disabled:opacity-40"
+          >
+            Suivant <ChevronRight className="h-3 w-3" />
+          </button>
+        </div>
       </div>
     </div>
   );
