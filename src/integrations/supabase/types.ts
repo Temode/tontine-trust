@@ -6452,6 +6452,31 @@ export type Database = {
           user_id: string
         }[]
       }
+      admin_list_withdrawals_v2: {
+        Args: {
+          _from?: string
+          _limit?: number
+          _method?: Database["public"]["Enums"]["user_withdrawal_channel"]
+          _offset?: number
+          _search?: string
+          _status?: Database["public"]["Enums"]["user_withdrawal_status"]
+          _to?: string
+        }
+        Returns: {
+          amount: number
+          created_at: string
+          full_name: string
+          id: string
+          payment_details: Json
+          payment_method: Database["public"]["Enums"]["user_withdrawal_channel"]
+          phone_number: string
+          processed_at: string
+          rejection_reason: string
+          status: Database["public"]["Enums"]["user_withdrawal_status"]
+          total_count: number
+          user_id: string
+        }[]
+      }
       admin_mark_referral_earning_paid: {
         Args: { _id: string; _paid: boolean }
         Returns: undefined
