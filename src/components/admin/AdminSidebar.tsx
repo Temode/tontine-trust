@@ -18,7 +18,7 @@ import {
   ShoppingCart,
   Share2,
 } from "lucide-react";
-import { BadgeCheck, Banknote, FileText, Lock, Send } from "lucide-react";
+import { BadgeCheck, Banknote, FileText, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const ITEMS = [
