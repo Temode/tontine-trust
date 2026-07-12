@@ -93,6 +93,41 @@ export async function adminListWithdrawals(
   return (data ?? []) as AdminWithdrawalRow[];
 }
 
+export interface AdminWithdrawalListParams {
+  status?: UserWithdrawalStatus;
+  method?: WithdrawalChannel;
+  from?: string;
+  to?: string;
+  search?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export interface AdminWithdrawalListResult {
+  rows: AdminWithdrawalRow[];
+  total: number;
+}
+
+export async function adminListWithdrawalsV2(
+  params: AdminWithdrawalListParams = {},
+): Promise<AdminWithdrawalListResult> {
+  const { data, error } = await supabase.rpc("admin_list_withdrawals_v2", {
+    _status: params.status ?? null,
+    _method: params.method ?? null,
+    _from: params.from ?? null,
+    _to: params.to ?? null,
+    _search: params.search ?? null,
+    _limit: params.limit ?? 20,
+    _offset: params.offset ?? 0,
+  });
+  if (error) throw error;
+  const rows = (data ?? []) as (AdminWithdrawalRow & { total_count: number })[];
+  return {
+    rows: rows.map(({ total_count, ...r }) => r),
+    total: Number(rows[0]?.total_count ?? 0),
+  };
+}
+
 export async function adminMarkWithdrawalPaid(id: string): Promise<void> {
   const { error } = await supabase.rpc("admin_mark_withdrawal_paid", { _id: id });
   if (error) throw error;
