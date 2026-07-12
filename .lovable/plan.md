@@ -1,31 +1,104 @@
-## Audit constaté
+## Objectif
 
-- Le paiement Djomy de `moncomptepaypal5@gmail.com` existe bien côté webhook : événement `payment.success` reçu pour la transaction `13c3720c-24b7-4cb0-b8e9-9598960e1f36`.
-- La ligne `user_subscriptions` est bien passée en `premium / active`, avec échéance au `09/08/2026`.
-- Le problème visible dans l’application vient très probablement de deux faiblesses restantes :
-  1. la fonction d’éligibilité choisit simplement la dernière ligne modifiée (`ORDER BY updated_at DESC`) et peut retomber sur une ligne `cancelled` si plusieurs lignes ont le même `updated_at` ;
-  2. la page `/abonnement` utilise un cache d’éligibilité avec `staleTime: 60s`, donc après paiement elle peut encore afficher Free sans rafraîchissement manuel.
-- Autre point critique : les webhooks Djomy enregistrés ont `signature_valid = false`, donc le webhook ne traite pas réellement l’activation ; l’activation actuelle vient de la réconciliation manuelle/status. Il faut auditer la vérification de signature Djomy pour ne pas dépendre uniquement du polling.
+Ajouter un **portefeuille utilisateur consolidé** (Disponible / Bloqué) et un **flux de retrait global** avec formulaire sécurisé, table dédiée, notifications, et backoffice admin — sans casser les retraits par groupe existants (cotisations, payout-holds, tests E2E).
 
-## Plan de correction
+## 1. Architecture données
 
-1. **Corriger la source de vérité des droits utilisateur**
-   - Modifier la RPC `get_my_entitlements` pour sélectionner en priorité un abonnement `active` ou `trialing`, puis `past_due`, puis `pending`, et seulement ensuite `cancelled`.
-   - Ajouter un ordre stable avec `updated_at DESC, created_at DESC` pour éviter qu’une ligne annulée avec le même timestamp masque le Premium actif.
+### Nouvelle vue `public.user_wallet`
+Agrège en lecture seule à partir des tables existantes (`beneficiary_balances`, ledger, retraits en cours) :
+- `user_id`
+- `available_amount` = Σ `beneficiary_balances.available_amount` (groupes actifs, hors pénalités payout-hold en cours) − Σ retraits globaux `pending`
+- `locked_amount` = fonds Tontine Solo « Épargne Projet » non échus + retraits globaux `pending` (gel)
+- `total_credited`, `total_withdrawn`
 
-2. **Rendre l’interface immédiatement cohérente après paiement**
-   - Sur la page `/abonnement`, forcer un `refetch()` des entitlements au montage et/ou réduire le cache pour que le plan Premium apparaisse sans rechargement manuel.
-   - Après succès sur `/abonnement/confirmation`, invalider/refetcher explicitement les entitlements pour que le dashboard et la page abonnement voient Premium immédiatement.
+Exposée via **RPC `get_my_wallet()`** (SECURITY DEFINER, scoped `auth.uid()`).
 
-3. **Renforcer le webhook abonnement**
-   - Vérifier pourquoi les événements Djomy reçus sont marqués `signature_valid = false`.
-   - Ajuster la lecture du `metadata` : Djomy envoie le `metadata` au niveau racine dans les événements observés, alors que le code lit surtout `data.metadata`; cela peut empêcher le routage direct abonnement selon le payload.
-   - Garder l’idempotence et l’activation atomique via `apply_subscription_webhook`.
+### Nouvelle table `public.user_withdrawal_requests` (parallèle, n'affecte pas `withdrawal_requests` existante)
+| colonne | type | notes |
+|---|---|---|
+| id | uuid PK | |
+| user_id | uuid → auth.users | not null |
+| amount | bigint | > 0 |
+| payment_method | enum `withdrawal_channel` (`mobile_money_om`, `mobile_money_momo`, `card`, `bank_transfer`) | |
+| payment_details | jsonb | schéma validé côté RPC selon method |
+| status | enum `user_withdrawal_status` (`pending`, `completed`, `rejected`) | default `pending` |
+| rejection_reason | text | |
+| processed_by | uuid | admin qui clique « Marquer payé » |
+| processed_at | timestamptz | |
+| created_at / updated_at | timestamptz | |
 
-4. **Compléter les tests**
-   - Étendre les tests SQL pour couvrir la sélection `get_my_entitlements` quand un utilisateur a une ligne Premium active et des lignes Premium/Free annulées au même timestamp.
-   - Ajouter un test webhook/scénario payload Djomy abonnement montrant que `merchantPaymentReference` + `metadata.purpose = subscription` active correctement Premium et ne recrée pas de doublon.
+Grants: `authenticated` (SELECT/INSERT own), `service_role` ALL. RLS: user voit ses lignes ; admins (`has_role(uid,'admin')`) voient tout et peuvent `UPDATE status`.
 
-5. **Vérification finale**
-   - Relire en base `moncomptepaypal5@gmail.com` après correction : confirmer une seule ligne active Premium.
-   - Vérifier que `/abonnement` affiche Premium actif sans action manuelle côté utilisateur.
+### Gel du solde (atomique)
+- RPC **`request_user_withdrawal(_amount, _method, _details jsonb)`** :
+  1. Validation JSON schema par method (double numéro identique déjà validé côté UI, re-vérifié serveur).
+  2. Lock `SELECT ... FOR UPDATE` sur agrégat, vérifie `amount ≤ available`.
+  3. INSERT ligne `pending` → le montant devient automatiquement « bloqué » (la vue déduit les `pending` de disponible).
+  4. Retourne l'id.
+- RPC **`admin_mark_withdrawal_paid(_id)`** :
+  1. Vérifie `has_role(admin)`.
+  2. Passe `completed` + insère `ledger_entries` de type `user_withdrawal` pour matérialiser la sortie définitive sur les `beneficiary_balances` sous-jacents (répartition FIFO par groupe le plus ancien crédité, documentée dans le code).
+  3. Trigger notification.
+- RPC **`admin_reject_withdrawal(_id, _reason)`** : passe `rejected`, libère le gel (rien à défaire, la vue exclut `pending|rejected` du blocage).
+
+## 2. Interface utilisateur
+
+### Page `Mon solde` (`src/pages/MyBalance.tsx`)
+- **Bandeau portefeuille** en haut : « Solde disponible » (gros, or) + « Solde bloqué » (secondaire) via `get_my_wallet()`.
+- Bouton **« Faire une demande de retrait »** → ouvre `GlobalWithdrawDialog`.
+- Section historique : liste des `user_withdrawal_requests` avec badges (pending amber, completed green, rejected red).
+- Le `WithdrawDialog` par-groupe existant reste accessible depuis chaque carte de groupe (inchangé).
+
+### Nouveau `src/components/balance/GlobalWithdrawDialog.tsx`
+Formulaire multi-étapes, validation Zod :
+1. **Montant** : input numérique, live check `≤ available_amount`, boutons 25/50/100 %.
+2. **Méthode** : radio-cards Orange Money / MTN MoMo / Carte / Virement bancaire.
+3. **Détails conditionnels** :
+   - **Mobile Money** : `phone` + `phone_confirm` (blocage si ≠), format Guinée `+224…`.
+   - **Carte** : `cardholder_name`, `card_number` (masqué, Luhn), *pas de CVV/expiration stockés* (l'admin traite hors-plateforme).
+   - **Virement bancaire** : `bank_name`, `bank_code`, `account_number_or_iban`, `account_holder`.
+4. **Récapitulatif** + bouton « Valider la demande » → `request_user_withdrawal`.
+Toast succès + invalidation `useQuery(['user-wallet'])` + `['user-withdrawals']`.
+
+## 3. Notifications
+
+### Edge function `notify-withdrawal-submitted` (déclenchée par trigger `AFTER INSERT` via `pg_net` ou appel direct après RPC)
+- **User** : email `withdrawal-submitted` (template React Email) + SMS via `nimbasms.sendMessage` avec `smsTemplates.buildWithdrawalSubmittedSms`.
+- **Admins** : liste dynamique = `profiles` joints `user_roles WHERE role='admin'` → email à chacun + SMS à `phone_number` si présent. Pas de hardcoding, pas de variable d'env.
+
+### Edge function `notify-withdrawal-completed`
+- Appelée dans `admin_mark_withdrawal_paid` (via `pg_net` async).
+- **User** : email + SMS « retrait traité avec succès ».
+
+Nouveaux templates : `withdrawal-submitted.tsx`, `withdrawal-completed.tsx`, `withdrawal-rejected.tsx` dans `_shared/transactional-email-templates/` + registry. SMS builders ajoutés à `_shared/smsTemplates.ts` avec `dedupeKey` = `withdrawal_submitted:<id>` etc.
+
+## 4. Backoffice admin
+
+### Nouvelle page `src/pages/admin/Withdrawals.tsx` + entrée sidebar « Gestion des retraits »
+- Table dense (style tableur) triée par `created_at DESC`, filtre statut (Pending par défaut).
+- Colonnes : Date, Utilisateur (nom + téléphone), Montant (GNF), Méthode (badge), **Détails de destination** (rendu conditionnel lisible : numéro MoMo, IBAN + banque, ou numéro carte + titulaire), Statut, Actions.
+- Actions par ligne :
+  - **« Marquer comme payé »** → confirm dialog → `admin_mark_withdrawal_paid` → la ligne quitte l'onglet Pending (visible dans onglet « Traitées »).
+  - **« Rejeter »** → dialog avec motif obligatoire → `admin_reject_withdrawal`.
+- Onglets : `En attente` / `Traitées` / `Rejetées` / `Toutes`.
+- Export CSV.
+- Protection route via `RoleGuard allowedRoles={['admin','super_admin']}`.
+
+## 5. Découpage technique (ordre d'implémentation)
+
+1. **Migration SQL** : enums, table `user_withdrawal_requests`, vue `user_wallet`, RPCs (`get_my_wallet`, `request_user_withdrawal`, `admin_mark_withdrawal_paid`, `admin_reject_withdrawal`), RLS, GRANTs, trigger notif.
+2. **Edge functions** : `notify-withdrawal-submitted`, `notify-withdrawal-completed` + templates email + templates SMS + registry.
+3. **API client** : `src/lib/api/wallet.ts` (nouveau) — types + wrappers RPC.
+4. **UI utilisateur** : `GlobalWithdrawDialog.tsx` + refonte bandeau `MyBalance.tsx` + section historique.
+5. **UI admin** : `pages/admin/Withdrawals.tsx` + route + entrée `AdminSidebar`.
+6. **Tests** : SQL tests (idempotence gel, rejet, ledger cohérent), unitaires templates SMS, E2E Playwright happy-path (demande → admin paie → user reçoit notif fictive).
+
+## Points de vigilance
+
+- La vue `user_wallet` doit rester cohérente avec `beneficiary_balances` : tests d'invariant `Σ balances − Σ withdrawals.completed = wallet.total_credited − wallet.total_withdrawn`.
+- La répartition FIFO sur les `beneficiary_balances` lors du `completed` doit être atomique (transaction unique) sinon un crash laisse le solde global juste mais les sous-comptes incohérents.
+- Ne pas exposer `service_role`. Les edge functions notif utilisent l'auth admin JWT du webhook trigger.
+- Aucun stockage de CVV / date d'expiration carte — précisé dans le formulaire côté UX (« L'admin vous contactera si besoin »).
+- L'ancien `WithdrawDialog` par-groupe et son RPC `request_withdrawal` restent en place ; on n'y touche pas (tests E2E `payout-hold`, `deposits`, `solo` verts).
+
+Feu vert pour lancer l'implémentation dans cet ordre ?

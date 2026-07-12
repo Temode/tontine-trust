@@ -61,6 +61,7 @@ const AdminSubscriptions = lazy(() => import("@/pages/admin/Subscriptions"));
 const AdminSmsPricing = lazy(() => import("@/pages/admin/SmsPricing"));
 const AdminSmsOrders = lazy(() => import("@/pages/admin/SmsOrders"));
 const AdminAffiliation = lazy(() => import("@/pages/admin/AffiliationAdmin"));
+const AdminWithdrawals = lazy(() => import("@/pages/admin/Withdrawals"));
 const Subscription = lazy(() => import("@/pages/Subscription"));
 const SubscriptionCheckout = lazy(() => import("@/pages/SubscriptionCheckout"));
 const SubscriptionConfirmation = lazy(() => import("@/pages/SubscriptionConfirmation"));
@@ -222,6 +223,7 @@ const App = () => (
                     <Route path="/admin/sms-pricing" element={<RouteBoundary name="Tarification SMS"><AdminSmsPricing /></RouteBoundary>} />
                     <Route path="/admin/sms-orders" element={<RouteBoundary name="Commandes SMS"><AdminSmsOrders /></RouteBoundary>} />
                     <Route path="/admin/affiliation" element={<RouteBoundary name="Affiliation admin"><AdminAffiliation /></RouteBoundary>} />
+                    <Route path="/admin/retraits" element={<RouteBoundary name="Gestion des retraits"><AdminWithdrawals /></RouteBoundary>} />
                   </Route>
                 </Route>
                 <Route path="*" element={<RouteBoundary name="Page introuvable"><NotFound /></RouteBoundary>} />

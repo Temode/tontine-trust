@@ -1,15 +1,23 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Wallet, TrendingUp, History, CheckCircle2, Clock, XCircle, Lock } from "lucide-react";
+import { ArrowLeft, Wallet, TrendingUp, History, CheckCircle2, Clock, XCircle, Lock, Send } from "lucide-react";
 import { Link } from "react-router-dom";
 import { listMyBalances, listMyWithdrawals, type DbMyBalance, type DbWithdrawalRequest } from "@/lib/api/balances";
 import { listMyHeldPayouts } from "@/lib/api/holdPayouts";
 import { formatGNF } from "@/lib/format";
 import { WithdrawDialog } from "@/components/balance/WithdrawDialog";
+import { GlobalWithdrawDialog } from "@/components/balance/GlobalWithdrawDialog";
 import { PayoutHoldHistory } from "@/components/balance/PayoutHoldHistory";
 import { computeHoldStatus, formatHoldUntilLabel } from "@/lib/holds/countdown";
 import { useTontineRealtime } from "@/hooks/useTontineRealtime";
 import { cn } from "@/lib/utils";
+import {
+  getMyWallet,
+  listMyUserWithdrawals,
+  CHANNEL_LABEL,
+  formatDestination,
+  type UserWithdrawal,
+} from "@/lib/api/wallet";
 
 const METHOD_LABEL: Record<string, string> = {
   OM: "Orange Money",
@@ -48,6 +56,7 @@ function HoldCountdown({ until }: { until: string }) {
 export default function MyBalance() {
   useTontineRealtime();
   const [selected, setSelected] = useState<DbMyBalance | null>(null);
+  const [globalOpen, setGlobalOpen] = useState(false);
 
   const balancesQ = useQuery({
     queryKey: ["my-balances"],
@@ -61,9 +70,15 @@ export default function MyBalance() {
     queryKey: ["my-held-payouts"],
     queryFn: listMyHeldPayouts,
   });
+  const walletQ = useQuery({ queryKey: ["user-wallet"], queryFn: getMyWallet });
+  const userWithdrawalsQ = useQuery({
+    queryKey: ["user-withdrawals"],
+    queryFn: listMyUserWithdrawals,
+  });
 
   const balances = balancesQ.data ?? [];
-  const totalAvailable = balances.reduce((s, b) => s + b.available_amount, 0);
+  const totalAvailable = walletQ.data?.available_amount ?? balances.reduce((s, b) => s + b.available_amount, 0);
+  const totalLocked = walletQ.data?.locked_amount ?? 0;
   const totalCredited = balances.reduce((s, b) => s + b.total_credited, 0);
   const totalWithdrawn = balances.reduce((s, b) => s + b.total_withdrawn, 0);
   const heldPayouts = heldQ.data ?? [];
@@ -99,6 +114,23 @@ export default function MyBalance() {
               {formatGNF(totalAvailable)}
               <span className="ml-2 text-base font-medium text-accent">GNF</span>
             </p>
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setGlobalOpen(true)}
+                disabled={totalAvailable <= 0}
+                className="inline-flex h-11 items-center gap-2 rounded-md bg-accent px-5 text-sm font-bold text-slate-900 shadow transition hover:bg-accent/90 disabled:opacity-50"
+              >
+                <Send className="h-4 w-4" />
+                Faire une demande de retrait
+              </button>
+              {totalLocked > 0 && (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-primary-foreground/15 px-3 py-1 text-xs font-semibold text-primary-foreground">
+                  <Lock className="h-3 w-3" />
+                  Bloqué : <span className="num">{formatGNF(totalLocked)}</span> GNF
+                </span>
+              )}
+            </div>
             <dl className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
               <Metric label="Total crédité" value={`${formatGNF(totalCredited)} GNF`} icon={TrendingUp} />
               <Metric label="Total retiré" value={`${formatGNF(totalWithdrawn)} GNF`} icon={History} />
@@ -192,7 +224,26 @@ export default function MyBalance() {
         )}
 
         {/* Historique des retraits */}
-        <h2 className="mt-8 font-display text-base font-bold text-foreground">Historique des retraits</h2>
+        <h2 className="mt-8 font-display text-base font-bold text-foreground">Historique de mes demandes de retrait</h2>
+        {userWithdrawalsQ.isLoading ? (
+          <div className="mt-3 space-y-2">
+            {[0, 1].map((i) => (
+              <div key={i} className="h-14 animate-pulse rounded-xl bg-secondary/50" />
+            ))}
+          </div>
+        ) : (userWithdrawalsQ.data ?? []).length === 0 ? (
+          <p className="mt-3 rounded-xl border border-hairline bg-card p-5 text-sm text-muted-foreground">
+            Aucune demande de retrait pour l'instant.
+          </p>
+        ) : (
+          <ul className="mt-3 divide-y divide-border/60 overflow-hidden rounded-xl border border-hairline bg-card">
+            {(userWithdrawalsQ.data ?? []).map((w) => (
+              <UserWithdrawalRow key={w.id} w={w} />
+            ))}
+          </ul>
+        )}
+
+        <h2 className="mt-8 font-display text-base font-bold text-foreground">Retraits par groupe (historique)</h2>
         {withdrawalsQ.isLoading ? (
           <div className="mt-3 space-y-2">
             {[0, 1].map((i) => (
@@ -221,6 +272,11 @@ export default function MyBalance() {
           available={selected.available_amount}
         />
       )}
+      <GlobalWithdrawDialog
+        open={globalOpen}
+        onOpenChange={setGlobalOpen}
+        available={totalAvailable}
+      />
     </div>
   );
 }
@@ -298,6 +354,39 @@ function statusLabel(s: DbWithdrawalRequest["status"]): string {
     default:
       return s;
   }
+}
+
+function UserWithdrawalRow({ w }: { w: UserWithdrawal }) {
+  const Icon =
+    w.status === "completed" ? CheckCircle2 : w.status === "rejected" ? XCircle : Clock;
+  const tone =
+    w.status === "completed" ? "text-success" : w.status === "rejected" ? "text-destructive" : "text-primary";
+  const label =
+    w.status === "completed" ? "Traité" : w.status === "rejected" ? "Rejeté" : "En attente";
+  return (
+    <li className="flex items-center gap-3 px-4 py-3 lg:px-5">
+      <span className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-secondary", tone)}>
+        <Icon className="h-4 w-4" />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-semibold text-foreground">
+          {CHANNEL_LABEL[w.payment_method]}
+          <span className="ml-1 text-muted-foreground">· {formatDestination(w.payment_method, w.payment_details)}</span>
+        </p>
+        <p className="text-xs text-muted-foreground">
+          {new Date(w.created_at).toLocaleString("fr-FR", {
+            day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit",
+          })}
+          {" · "}
+          <span className={cn("font-semibold", tone)}>{label}</span>
+          {w.rejection_reason ? ` · ${w.rejection_reason}` : ""}
+        </p>
+      </div>
+      <span className="num shrink-0 font-display text-sm font-bold text-foreground">
+        {formatGNF(w.amount, { withCurrency: true })}
+      </span>
+    </li>
+  );
 }
 
 function EmptyState() {
