@@ -18,7 +18,7 @@ import {
   ShoppingCart,
   Share2,
 } from "lucide-react";
-import { BadgeCheck, Banknote, FileText, Lock } from "lucide-react";
+import { BadgeCheck, Banknote, FileText, Lock, Send } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const ITEMS = [
@@ -27,6 +27,7 @@ const ITEMS = [
   { to: "/admin/utilisateurs", label: "Utilisateurs", icon: Users },
   { to: "/admin/groupes", label: "Groupes & tontines", icon: Layers },
   { to: "/admin/paiements", label: "Paiements", icon: CreditCard },
+  { to: "/admin/retraits", label: "Gestion des retraits", icon: Send },
   { to: "/admin/subscriptions", label: "Abonnements", icon: Package },
   { to: "/admin/sms-pricing", label: "Tarification SMS", icon: Tag },
   { to: "/admin/sms-orders", label: "Commandes SMS", icon: ShoppingCart },
