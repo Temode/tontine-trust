@@ -5,7 +5,7 @@ import { CheckCheck, Inbox } from "lucide-react";
 import { TopBar } from "@/components/layout/TopBar";
 import { NotificationItem } from "@/components/notifications/NotificationItem";
 import {
-  listMyNotifications, markAllRead, markRead,
+  listMyNotifications, markAllRead, markRead, resolveNotificationLink,
   type DbNotification,
 } from "@/lib/api/notifications";
 import { cn } from "@/lib/utils";
@@ -60,7 +60,7 @@ export default function Notifications() {
 
   const handleClick = (n: DbNotification) => {
     if (!n.read_at) readOne.mutate(n.id);
-    if (n.link) navigate(n.link);
+    navigate(resolveNotificationLink(n));
   };
 
   return (

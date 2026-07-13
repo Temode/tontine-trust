@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { useTour } from "@/components/tour/useTour";
+import { MobileMenu } from "@/components/layout/MobileMenu";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -59,6 +60,9 @@ export function TopBar({
   return (
     <header className="sticky top-0 z-30 border-b border-hairline bg-card">
       <div className="flex h-16 items-center justify-between gap-4 px-6 lg:px-8">
+        {/* Menu mobile */}
+        <MobileMenu />
+
         {/* Titre */}
         <div className="min-w-0 flex-1">
           <h1 className="truncate font-display text-[22px] font-bold leading-tight tracking-tight text-foreground">

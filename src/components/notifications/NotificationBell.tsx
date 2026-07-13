@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { NotificationItem } from "./NotificationItem";
 import {
-  countUnread, listMyNotifications, markAllRead, markRead,
+  countUnread, listMyNotifications, markAllRead, markRead, resolveNotificationLink,
   type DbNotification,
 } from "@/lib/api/notifications";
 import { useState } from "react";
@@ -37,7 +37,7 @@ export function NotificationBell() {
   const handleClick = (n: DbNotification) => {
     if (!n.read_at) readOne.mutate(n.id);
     setOpen(false);
-    navigate(n.link ?? "/notifications");
+    navigate(resolveNotificationLink(n));
   };
 
   return (
