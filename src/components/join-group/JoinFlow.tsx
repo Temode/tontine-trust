@@ -170,31 +170,6 @@ export function JoinFlow({
               )}
             </section>
 
-            {kycBlocked && (
-              <section className="rounded-lg border-2 border-amber-400 bg-amber-50 p-4">
-                <div className="flex items-start gap-3">
-                  <BadgeAlert className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
-                  <div className="text-sm">
-                    <p className="font-semibold text-amber-900">
-                      Vérification d'identité requise
-                    </p>
-                    <p className="mt-1 text-amber-900/80">
-                      Cette tontine ({formatGNF(summary!.contribution!)} GNF/cotisation) dépasse
-                      le plafond de votre palier actuel
-                      {cap > 0 ? ` (${formatGNF(cap)} GNF)` : ""}. Validez votre identité
-                      pour la rejoindre.
-                    </p>
-                    <Link
-                      to="/profil/kyc"
-                      className="mt-2 inline-flex h-9 items-center rounded-md bg-amber-600 px-3 text-xs font-semibold text-white hover:bg-amber-700"
-                    >
-                      Vérifier mon identité
-                    </Link>
-                  </div>
-                </div>
-              </section>
-            )}
-
             {/* Opérateur Mobile Money */}
             <section>
               <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -292,10 +267,10 @@ export function JoinFlow({
               <button
                 type="button"
                 onClick={handleSubmit}
-                disabled={!consent || submitting || kycBlocked}
+                disabled={!consent || submitting}
                 className={cn(
                   "inline-flex h-11 min-w-11 items-center gap-2 rounded-md px-4 text-sm font-semibold transition",
-                  consent && !submitting && !kycBlocked
+                  consent && !submitting
                     ? "bg-primary text-primary-foreground hover:bg-primary-700"
                     : "cursor-not-allowed bg-muted text-muted-foreground",
                 )}
