@@ -4,6 +4,8 @@ import {
   CheckCircle2,
   CircleAlert,
   CircleHelp,
+  ChevronDown,
+  ChevronUp,
   Mic,
   MicOff,
   MonitorOff,
@@ -54,6 +56,7 @@ export function MicPermissionGate({ onGranted, onCancel, withVideo = true }: Pro
   const [previewStream, setPreviewStream] = useState<MediaStream | null>(null);
   const [screenTestStatus, setScreenTestStatus] = useState<CheckStatus>("pending");
   const [screenTestDetail, setScreenTestDetail] = useState<string>("");
+  const [showChecklist, setShowChecklist] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const rafRef = useRef<number | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
@@ -204,7 +207,7 @@ export function MicPermissionGate({ onGranted, onCancel, withVideo = true }: Pro
   }, []);
 
   return (
-    <div className="mx-auto flex w-full max-w-md flex-col gap-5 px-6 py-8">
+    <div className="mx-auto flex max-h-[85dvh] w-full max-w-md flex-col gap-4 overflow-y-auto px-5 py-6">
       <div className="flex items-center gap-3">
         <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
           <Mic className="h-5 w-5 text-primary" />
@@ -220,7 +223,7 @@ export function MicPermissionGate({ onGranted, onCancel, withVideo = true }: Pro
       </div>
 
       {/* Live preview */}
-      <div className="relative aspect-video w-full overflow-hidden rounded-xl border border-hairline bg-black">
+      <div className="relative aspect-video max-h-56 w-full overflow-hidden rounded-xl border border-hairline bg-black sm:max-h-none">
         {previewStream && hasCam ? (
           <video
             ref={videoRef}
@@ -334,13 +337,30 @@ export function MicPermissionGate({ onGranted, onCancel, withVideo = true }: Pro
       )}
 
       {/* Diagnostic checklist */}
-      <DiagnosticChecklist
-        hasMic={hasMic}
-        hasCam={hasCam}
-        micLevel={micLevel}
-        screenStatus={screenTestStatus}
-        screenDetail={screenTestDetail}
-        onTestScreen={async () => {
+      <button
+        type="button"
+        onClick={() => setShowChecklist((v) => !v)}
+        className="flex items-center justify-between rounded-lg border border-hairline bg-card/40 px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-foreground hover:bg-secondary"
+        aria-expanded={showChecklist}
+      >
+        <span className="flex items-center gap-1.5">
+          <ShieldCheck className="h-3.5 w-3.5 text-primary" />
+          Checklist diagnostique
+        </span>
+        {showChecklist ? (
+          <ChevronUp className="h-3.5 w-3.5" />
+        ) : (
+          <ChevronDown className="h-3.5 w-3.5" />
+        )}
+      </button>
+      {showChecklist && (
+        <DiagnosticChecklist
+          hasMic={hasMic}
+          hasCam={hasCam}
+          micLevel={micLevel}
+          screenStatus={screenTestStatus}
+          screenDetail={screenTestDetail}
+          onTestScreen={async () => {
           setScreenTestStatus("pending");
           setScreenTestDetail("Sélectionnez une fenêtre à partager…");
           if (!navigator.mediaDevices?.getDisplayMedia) {
@@ -363,8 +383,9 @@ export function MicPermissionGate({ onGranted, onCancel, withVideo = true }: Pro
                 : err.message || "Échec du test.",
             );
           }
-        }}
-      />
+          }}
+        />
+      )}
 
       <ul className="space-y-1.5 text-[11px] text-muted-foreground">
         <li className="flex gap-1.5">
@@ -377,7 +398,7 @@ export function MicPermissionGate({ onGranted, onCancel, withVideo = true }: Pro
         </li>
       </ul>
 
-      <div className="flex gap-3 pt-1">
+      <div className="sticky bottom-0 -mx-5 flex gap-3 border-t border-hairline bg-background px-5 pt-3 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
         <button
           type="button"
           onClick={() => {

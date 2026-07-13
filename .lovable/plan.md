@@ -1,46 +1,76 @@
-## Audit
+## Audit — ce qui casse aujourd'hui
 
-**1. Menu mobile absent.** La `DesktopSidebar` est en `hidden lg:flex`. La `BottomNav` mobile n'expose que 4 liens (Accueil, Tontines, Créer, Discussions). Toutes les autres sections (Mon solde, Payer, Épargne Solo, International, Commissions, Affiliation, Reçus, Abonnement, Profil, Notifications, Admin…) sont donc inaccessibles depuis mobile — sauf en tapant l'URL manuellement.
+**1. `CallRequestDialog`** (`sm:max-w-md`) — OK en soi, mais quand il bascule sur `MicPermissionGate` le contenu déborde le viewport (voir #2).
 
-**2. Notifications non cliquables.** Le composant `NotificationItem` navigue seulement si `n.link` est défini. Or les notifs d'`invitation_accepted` (« Nouvelle candidature ») insérées par `join_group_with_code` (db/13 et db/42) n'écrivent **jamais** de `link`. Résultat : sur la page `/notifications`, cliquer sur une candidature marque comme lu mais ne redirige nulle part. Idem pour toute notif historique sans `link`.
+**2. `MicPermissionGate`** (525 l., affichée dans un `Dialog` puis dans la salle d'appel)
+- Contenu très long : preview vidéo aspect-video + 2 tuiles statut + 3 gros boutons + checklist 6 lignes + tips + footer.
+- Le `DialogContent` n'a pas de `max-h`/`overflow` → sur mobile (et même laptop 800 px) le bas (boutons Annuler/Continuer) est **inaccessible**.
+- Padding `px-6 py-8` + `max-w-md` = marges cassées dans le Dialog (double padding).
 
-## Plan
+**3. `CallRoom`** (dialog plein écran)
+- **Footer** : 6 contrôles (mute, cam, screen, record avec libellé long "Consentements 2/3", diag, Quitter avec libellé) alignés `flex justify-center gap-4` → **wrap sale ou débordement horizontal < 420 px**. Le bouton record change de largeur selon l'état = layout instable.
+- **Header** : `groupName + topic` à gauche, puis REC + dot + label statut + durée à droite = **débordement sur mobile étroit**, pas de troncature.
+- **Body** : `px-6 py-8` figé, pas de safe-area iOS ; le diagnostic drawer est empilé sous les tuiles → oblige un scroll long.
+- Pas de `env(safe-area-inset-bottom)` : la barre de contrôles est masquée par la home-bar iOS.
 
-### A. Menu mobile — Drawer accessible depuis la TopBar
+**4. `IncomingCallScreen`** (portail plein écran)
+- Avatar `h-44 w-44` + titre `text-3xl` + gros CTA `h-20 w-20` sur `min-h` implicite → sur mobiles courts (iPhone SE, Android 640 px) **le bouton "Rejoindre" passe sous la home-bar**.
+- Utilise `inset-0` sans `min-h-dvh` ni safe-area.
 
-1. Ajouter un bouton hamburger dans `TopBar.tsx`, visible uniquement `lg:hidden`, positionné à gauche du titre.
-2. Créer `src/components/layout/MobileMenu.tsx` : un `Sheet` (shadcn) côté gauche qui réutilise **la même liste `sections`** que `DesktopSidebar` (extraite dans `src/components/layout/navSections.ts` pour éviter la duplication). Contenu :
-   - Bloc marque (logo + nom).
-   - Liste des entrées « Essentiel » (mêmes libellés/icônes/routes que desktop).
-   - Bloc utilisateur en bas (nom, rôle, bouton « Se déconnecter »).
-   - Fermeture automatique du Sheet au clic sur un lien (`onOpenChange`).
-3. Refactor : `DesktopSidebar` importe les sections depuis `navSections.ts` (pas de changement visuel desktop).
+**5. `CallParticipantTile`** — OK, mais grille parent `grid-cols-2 sm:grid-cols-3 max-w-3xl` : sur écran > 1280 px les tuiles restent minuscules et perdues au centre.
 
-### B. Notifications cliquables partout
+---
 
-1. **Correctif backend (migration SQL)** — redéployer `join_group_with_code` (dernière version, celle de la migration KYC optionnelle) en ajoutant `link := '/groupes/' || v_invitation.group_id || '/membres'` sur la notif `invitation_accepted` pour que l'organisateur atterrisse sur la page membres (candidatures visibles via `JoinRequestsCard`).
-2. **Backfill** : `update public.notifications set link = '/groupes/' || group_id || '/membres' where kind = 'invitation_accepted' and link is null;`
-3. **Filet de sécurité frontend** — dans `NotificationItem.tsx` + `Notifications.tsx` + `NotificationBell.tsx`, si `n.link` est `null`, dériver un fallback :
-   - `invitation_accepted`, `member_joined` → `/groupes/<group_id>/membres`
-   - `cycle_started`, `turn_started`, `turn_paid`, `announcement`, `group_completed` → `/groupes/<group_id>`
-   - `contribution_due`, `contribution_received`, `contribution_confirmed` → `/cotisations`
-   - `payout_released` → `/solde`
-   - `receipt_ready` → `/recus`
-   - `reliability_changed` → `/profil`
-   - sinon → `/notifications`
+## Corrections proposées
 
-Ainsi toute notification devient cliquable, y compris les anciennes.
+### A. `MicPermissionGate` — rendre scrollable et compacte
+- Envelopper le contenu dans un conteneur `max-h-[85dvh] overflow-y-auto` (le `DialogContent` reçoit `p-0` pour éviter le double padding, la modale entière tient dans 85 dvh avec scroll interne).
+- Réduire les paddings : `px-5 py-6` (au lieu de `px-6 py-8`) et `gap-4` (au lieu de `gap-5`).
+- **Rendre la "Checklist diagnostique" repliable** (fermée par défaut, chevron pour ouvrir) → gain d'espace immédiat sur mobile.
+- Réduire la preview à `max-h-56` en mobile (portrait) pour laisser la place aux CTA.
+- Footer sticky : `sticky bottom-0 bg-background pt-3 border-t border-hairline` pour que "Continuer" reste toujours visible.
 
-### Fichiers touchés
+### B. `CallRoom` — footer mobile-first + header condensé
+- **Footer refactor** (`flex-wrap` interdit → on regroupe par cluster) :
+  ```text
+  Mobile (<640): grille 4 icônes principales (mute/cam/screen/quitter),
+                 record + diag dans un menu "…" (Sheet).
+                 Bouton Quitter icône seule sur mobile, avec libellé ≥ sm.
+  ≥ sm:         layout actuel amélioré (gap-3, boutons uniformes h-11).
+  ```
+- Réduire toutes les icônes à `h-11 w-11` (au lieu de 12) pour uniformiser avec les tokens shadcn.
+- Bouton record : label court "REC" en mobile (au lieu de "Consentements 2/3") ; le compteur passe dans un tooltip / description sous l'icône.
+- Ajouter `pb-[env(safe-area-inset-bottom)]` sur le footer.
+- **Header** : `flex-col gap-1 sm:flex-row sm:items-center sm:justify-between`, `truncate` sur `groupName`, masquer le libellé "En direct/Connexion…" en < sm (garder juste le dot + durée).
+- Body : `px-4 sm:px-6 py-6`, garder scroll interne, retirer `max-w-3xl` figé → utiliser `max-w-5xl` pour respirer sur desktop large.
+- Le "diagnostic drawer" passe en `Sheet` latéral (droite) au lieu d'être empilé dans le flux → moins de scroll, cohérent avec la doctrine "une seule vue active".
 
-- créer `src/components/layout/navSections.ts`
-- créer `src/components/layout/MobileMenu.tsx`
-- éditer `src/components/layout/TopBar.tsx` (bouton hamburger + montage du Sheet)
-- éditer `src/components/layout/DesktopSidebar.tsx` (import des sections partagées)
-- éditer `src/components/notifications/NotificationItem.tsx` (fallback link)
-- éditer `src/pages/Notifications.tsx` et `src/components/notifications/NotificationBell.tsx` (fallback dans `handleClick`)
-- nouvelle migration `supabase/migrations/…_notifications_click_through.sql` : refresh `join_group_with_code` avec `link` + backfill.
+### C. `IncomingCallScreen` — safe-area + compacité verticale
+- `min-h-dvh`, `pt-[max(2.5rem,env(safe-area-inset-top))] pb-[max(2.5rem,env(safe-area-inset-bottom))]`.
+- Avatar : `h-32 w-32 sm:h-40 sm:h-40` (au lieu de `h-44` fixe).
+- Titre : `text-2xl sm:text-3xl`.
+- CTA Rejoindre : `h-16 w-16 sm:h-20 sm:w-20`, écart entre boutons `gap-16 sm:gap-24` (plus lisible que `justify-around`).
 
-### Hors périmètre
+### D. `CallRequestDialog` — cohérence
+- `DialogContent` : `max-h-[90dvh] overflow-y-auto` pour héberger le `MicPermissionGate` sans clipping.
+- Boutons footer : `flex-col-reverse gap-2 sm:flex-row sm:justify-end` (le CTA primaire en bas sur mobile = pouce accessible).
 
-Pas de refonte de la `BottomNav` (elle reste à 4 items). Pas de changement du contenu ni du look du sidebar desktop. Aucune modif de la logique de rejoindre / KYC.
+### E. Grille des tuiles participants (`CallRoom`)
+- `grid-cols-1 xs:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4`, `max-w-6xl`, `gap-3 sm:gap-4`.
+- Sur mobile portrait, tuiles pleine largeur = visages lisibles.
+
+---
+
+## Fichiers touchés
+
+- `src/components/messages/MicPermissionGate.tsx` — scroll interne, checklist repliable, paddings, footer sticky.
+- `src/components/messages/CallRoom.tsx` — header/footer responsive, safe-area, grille tuiles, diagnostic en Sheet.
+- `src/components/messages/CallRequestDialog.tsx` — `max-h-[90dvh] overflow-y-auto` + footer mobile.
+- `src/components/messages/IncomingCallScreen.tsx` — safe-area, tailles adaptatives.
+- (Aucun changement logique / RPC / hook `useWebRTCCall` — pure UI.)
+
+## Hors périmètre
+
+- Pas de changement de logique WebRTC, signaling, enregistrement, RLS.
+- Pas de refonte visuelle de la doctrine (couleurs, typo, tokens inchangés).
+- `CallDiagnosticPanel` (bouton flottant) : déjà responsive, pas touché.

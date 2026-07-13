@@ -107,7 +107,7 @@ export function CallRequestDialog({ open, onOpenChange, groupId, groupName, onDo
         onOpenChange(v);
       }}
     >
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-md">
         {showPreCall ? (
           <>
             <DialogTitle className="sr-only">Préparer l'appel</DialogTitle>
@@ -182,11 +182,11 @@ export function CallRequestDialog({ open, onOpenChange, groupId, groupName, onDo
           )}
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <button
             type="button"
             onClick={() => onOpenChange(false)}
-            className="h-10 rounded-md border border-hairline px-4 text-sm font-semibold text-foreground hover:bg-secondary"
+            className="h-10 w-full rounded-md border border-hairline px-4 text-sm font-semibold text-foreground hover:bg-secondary sm:w-auto"
           >
             Annuler
           </button>
@@ -201,7 +201,7 @@ export function CallRequestDialog({ open, onOpenChange, groupId, groupName, onDo
               }
             }}
             disabled={mut.isPending || (mode === "schedule" && !datetime)}
-            className="h-10 rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-primary transition hover:bg-primary-700 disabled:opacity-50"
+            className="h-10 w-full whitespace-nowrap rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-primary transition hover:bg-primary-700 disabled:opacity-50 sm:w-auto"
           >
             {mut.isPending ? "Envoi…" : mode === "now" ? "Tester puis lancer" : "Envoyer la demande"}
           </button>

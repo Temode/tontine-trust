@@ -185,7 +185,7 @@ export function CallRoom({ open, onOpenChange, callId, groupName, groupId, initi
           if (!v) onOpenChange(false);
         }}
       >
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="max-h-[95dvh] overflow-hidden p-0 sm:max-w-md">
           <DialogTitle className="sr-only">Autorisation micro</DialogTitle>
           <MicPermissionGate
             onGranted={(prefs) => {
@@ -214,18 +214,18 @@ export function CallRoom({ open, onOpenChange, callId, groupName, groupId, initi
         <DialogTitle className="sr-only">Appel audio en cours</DialogTitle>
 
         {/* Header */}
-        <header className="flex items-center justify-between border-b border-hairline px-6 py-4">
-          <div>
-            <p className="font-display text-sm font-semibold text-foreground">
+        <header className="flex items-center justify-between gap-3 border-b border-hairline px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))] sm:px-6 sm:py-4">
+          <div className="min-w-0 flex-1">
+            <p className="truncate font-display text-sm font-semibold text-foreground">
               {groupName ?? "Appel audio"}
             </p>
             {call?.topic && (
-              <p className="text-xs text-muted-foreground">{call.topic}</p>
+              <p className="truncate text-xs text-muted-foreground">{call.topic}</p>
             )}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-2">
             {isRecording && (
-              <span className="mr-2 inline-flex items-center gap-1 rounded-full bg-destructive/15 px-2 py-0.5 text-[10px] font-bold text-destructive">
+              <span className="inline-flex items-center gap-1 rounded-full bg-destructive/15 px-2 py-0.5 text-[10px] font-bold text-destructive">
                 <Circle className="h-2 w-2 animate-pulse fill-current" />
                 REC
               </span>
@@ -236,17 +236,17 @@ export function CallRoom({ open, onOpenChange, callId, groupName, groupId, initi
                 status === "live" ? "animate-pulse bg-primary" : "bg-muted-foreground/40",
               )}
             />
-            <span className="text-xs font-semibold text-foreground">
+            <span className="hidden text-xs font-semibold text-foreground sm:inline">
               {status === "live" ? "En direct" : status === "connecting" ? "Connexion…" : status === "requesting-mic" ? "Micro…" : "—"}
             </span>
-            <span className="ml-3 tabular-nums text-sm font-semibold text-foreground">
+            <span className="tabular-nums text-sm font-semibold text-foreground">
               {duration}
             </span>
           </div>
         </header>
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto px-6 py-8">
+        <div className="flex-1 overflow-y-auto px-4 py-6 sm:px-6 sm:py-8">
           {showError && error && (
             <div className="mx-auto mb-6 max-w-md rounded-lg border border-destructive/40 bg-destructive/5 p-4 text-center text-sm text-destructive">
               {error}
@@ -258,7 +258,7 @@ export function CallRoom({ open, onOpenChange, callId, groupName, groupId, initi
             </p>
           )}
 
-          <div className="mx-auto grid max-w-3xl grid-cols-2 gap-4 sm:grid-cols-3">
+          <div className="mx-auto grid max-w-6xl grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
             <CallParticipantTile
               name={user?.user_metadata?.full_name ?? "Vous"}
               initials={getInitials(user?.user_metadata?.full_name ?? "Moi") ?? "··"}
@@ -284,7 +284,7 @@ export function CallRoom({ open, onOpenChange, callId, groupName, groupId, initi
               );
             })}
             {remoteParticipants.length === 0 && status === "live" && (
-              <div className="col-span-2 flex h-40 items-center justify-center rounded-xl border border-dashed border-hairline text-center text-sm text-muted-foreground sm:col-span-2">
+              <div className="flex h-40 items-center justify-center rounded-xl border border-dashed border-hairline p-6 text-center text-sm text-muted-foreground sm:col-span-2 lg:col-span-3 xl:col-span-4">
                 En attente d'autres participants…
               </div>
             )}
@@ -390,13 +390,13 @@ export function CallRoom({ open, onOpenChange, callId, groupName, groupId, initi
         </div>
 
         {/* Footer / controls */}
-        <footer className="flex items-center justify-center gap-4 border-t border-hairline bg-card px-6 py-5">
+        <footer className="grid grid-cols-4 items-center justify-items-center gap-2 border-t border-hairline bg-card px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:flex sm:justify-center sm:gap-3 sm:px-6 sm:py-5">
           <button
             type="button"
             onClick={toggleMute}
             disabled={status !== "live"}
             className={cn(
-              "inline-flex h-12 w-12 items-center justify-center rounded-full border border-hairline transition hover:bg-secondary",
+              "inline-flex h-11 w-11 items-center justify-center rounded-full border border-hairline transition hover:bg-secondary",
               isMuted && "border-destructive/40 bg-destructive/10 text-destructive",
             )}
             aria-label={isMuted ? "Réactiver le micro" : "Couper le micro"}
@@ -408,7 +408,7 @@ export function CallRoom({ open, onOpenChange, callId, groupName, groupId, initi
             onClick={toggleCam}
             disabled={status !== "live" || !localStream?.getVideoTracks().length}
             className={cn(
-              "inline-flex h-12 w-12 items-center justify-center rounded-full border border-hairline transition hover:bg-secondary disabled:opacity-50",
+              "inline-flex h-11 w-11 items-center justify-center rounded-full border border-hairline transition hover:bg-secondary disabled:opacity-50",
               isCamOff && "border-destructive/40 bg-destructive/10 text-destructive",
             )}
             aria-label={isCamOff ? "Réactiver la caméra" : "Couper la caméra"}
@@ -424,7 +424,7 @@ export function CallRoom({ open, onOpenChange, callId, groupName, groupId, initi
             }}
             disabled={status !== "live"}
             className={cn(
-              "inline-flex h-12 w-12 items-center justify-center rounded-full border border-hairline transition hover:bg-secondary disabled:opacity-50",
+              "hidden h-11 w-11 items-center justify-center rounded-full border border-hairline transition hover:bg-secondary disabled:opacity-50 sm:inline-flex",
               isScreenSharing && "border-primary/40 bg-primary/10 text-primary",
             )}
             aria-label={isScreenSharing ? "Arrêter le partage d'écran" : "Partager mon écran"}
@@ -437,10 +437,19 @@ export function CallRoom({ open, onOpenChange, callId, groupName, groupId, initi
             onClick={requestRecording}
             disabled={status !== "live"}
             className={cn(
-              "inline-flex h-12 items-center gap-2 rounded-full border border-hairline px-4 text-xs font-semibold transition hover:bg-secondary",
+              "hidden h-11 items-center gap-2 rounded-full border border-hairline px-4 text-xs font-semibold transition hover:bg-secondary sm:inline-flex",
               isRecording && "border-destructive/40 bg-destructive/10 text-destructive",
             )}
             aria-label="Enregistrer l'appel"
+            title={
+              !myConsent
+                ? "Consentir à l'enregistrement"
+                : allConsented
+                  ? isRecording
+                    ? "Arrêter l'enregistrement"
+                    : "Démarrer l'enregistrement"
+                  : `Consentements ${consentCount}/${totalParticipants}`
+            }
           >
             {isRecording ? <Square className="h-4 w-4" /> : <Circle className="h-4 w-4" />}
             {isRecording
@@ -452,11 +461,30 @@ export function CallRoom({ open, onOpenChange, callId, groupName, groupId, initi
                   : `Consentements ${consentCount}/${totalParticipants}`}
             {!allConsented && myConsent && <ShieldAlert className="h-3.5 w-3.5" />}
           </button>
+          {/* Mobile-only: record icon (compact) */}
+          <button
+            type="button"
+            onClick={requestRecording}
+            disabled={status !== "live"}
+            className={cn(
+              "inline-flex h-11 w-11 items-center justify-center rounded-full border border-hairline transition hover:bg-secondary disabled:opacity-50 sm:hidden",
+              isRecording && "border-destructive/40 bg-destructive/10 text-destructive",
+            )}
+            aria-label={
+              isRecording
+                ? "Arrêter l'enregistrement"
+                : !myConsent
+                  ? "Consentir à l'enregistrement"
+                  : "Démarrer l'enregistrement"
+            }
+          >
+            {isRecording ? <Square className="h-4 w-4" /> : <Circle className="h-4 w-4" />}
+          </button>
           <button
             type="button"
             onClick={() => setShowDiag((v) => !v)}
             className={cn(
-              "inline-flex h-12 w-12 items-center justify-center rounded-full border border-hairline transition hover:bg-secondary",
+              "hidden h-11 w-11 items-center justify-center rounded-full border border-hairline transition hover:bg-secondary sm:inline-flex",
               showDiag && "border-primary/40 bg-primary/10 text-primary",
             )}
             aria-label="Diagnostic WebRTC"
@@ -467,10 +495,11 @@ export function CallRoom({ open, onOpenChange, callId, groupName, groupId, initi
           <button
             type="button"
             onClick={handleLeave}
-            className="inline-flex h-12 items-center gap-2 rounded-full bg-accent px-6 text-sm font-semibold text-accent-foreground shadow-md transition hover:opacity-90"
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-accent px-4 text-sm font-semibold text-accent-foreground shadow-md transition hover:opacity-90 sm:px-6"
+            aria-label="Quitter l'appel"
           >
             <PhoneOff className="h-5 w-5" />
-            Quitter
+            <span className="hidden sm:inline">Quitter</span>
           </button>
         </footer>
       </DialogContent>
