@@ -89,7 +89,7 @@ export function IncomingCallScreen() {
               role="dialog"
               aria-modal="true"
               aria-label="Appel entrant"
-              className="fixed inset-0 z-[100] flex flex-col items-center justify-between overflow-hidden px-6 py-10 sm:py-14"
+              className="fixed inset-0 z-[100] flex min-h-[100dvh] flex-col items-center justify-between overflow-hidden px-6 pt-[max(2rem,env(safe-area-inset-top))] pb-[max(2rem,env(safe-area-inset-bottom))] sm:pt-14 sm:pb-14"
               style={{
                 background:
                   "radial-gradient(120% 80% at 50% 10%, hsl(var(--primary) / 0.55) 0%, hsl(var(--primary-900)) 55%, #04161a 100%)",
@@ -107,7 +107,7 @@ export function IncomingCallScreen() {
 
               {/* Avatar + halo */}
               <div className="relative z-10 flex flex-col items-center">
-                <div className="relative flex h-44 w-44 items-center justify-center">
+                <div className="relative flex h-32 w-32 items-center justify-center sm:h-44 sm:w-44">
                   {/* Or pulsé */}
                   <span
                     aria-hidden
@@ -124,7 +124,7 @@ export function IncomingCallScreen() {
                   />
                   {/* Avatar */}
                   <div
-                    className="call-breathe relative flex h-32 w-32 items-center justify-center overflow-hidden rounded-full bg-primary-foreground/10 ring-2 ring-accent/70"
+                    className="call-breathe relative flex h-24 w-24 items-center justify-center overflow-hidden rounded-full bg-primary-foreground/10 ring-2 ring-accent/70 sm:h-32 sm:w-32"
                     style={{
                       boxShadow:
                         "0 30px 80px -20px hsl(var(--accent) / 0.45), inset 0 0 0 1px hsl(var(--accent) / 0.25)",
@@ -138,14 +138,14 @@ export function IncomingCallScreen() {
                         className="h-full w-full object-cover"
                       />
                     ) : (
-                      <span className="font-display text-4xl font-bold text-primary-foreground">
+                      <span className="font-display text-3xl font-bold text-primary-foreground sm:text-4xl">
                         {initials(current.requester_name)}
                       </span>
                     )}
                   </div>
                 </div>
 
-                <h2 className="font-display mt-8 text-3xl font-bold tracking-tight text-primary-foreground">
+                <h2 className="font-display mt-6 text-2xl font-bold tracking-tight text-primary-foreground sm:mt-8 sm:text-3xl">
                   {current.requester_name}
                 </h2>
                 {current.topic ? (
@@ -163,7 +163,7 @@ export function IncomingCallScreen() {
               </div>
 
               {/* Actions */}
-              <div className="z-10 flex w-full max-w-sm items-end justify-around">
+              <div className="z-10 flex w-full max-w-sm items-end justify-center gap-16 sm:gap-24">
                 <button
                   type="button"
                   onClick={() => decline.mutate(current.id)}
@@ -171,8 +171,8 @@ export function IncomingCallScreen() {
                   className="group flex flex-col items-center gap-3 outline-none"
                   aria-label="Refuser l'appel"
                 >
-                  <span className="flex h-16 w-16 items-center justify-center rounded-full bg-destructive text-destructive-foreground shadow-lg transition group-hover:scale-105 group-active:scale-95 group-disabled:opacity-50">
-                    <PhoneOff className="h-7 w-7" />
+                  <span className="flex h-14 w-14 items-center justify-center rounded-full bg-destructive text-destructive-foreground shadow-lg transition group-hover:scale-105 group-active:scale-95 group-disabled:opacity-50 sm:h-16 sm:w-16">
+                    <PhoneOff className="h-6 w-6 sm:h-7 sm:w-7" />
                   </span>
                   <span className="text-xs font-semibold text-primary-foreground/85">
                     Refuser
@@ -193,7 +193,7 @@ export function IncomingCallScreen() {
                   aria-label="Rejoindre l'appel"
                 >
                   <span
-                    className="flex h-20 w-20 items-center justify-center rounded-full text-primary-foreground transition group-hover:scale-105 group-active:scale-95"
+                    className="flex h-16 w-16 items-center justify-center rounded-full text-primary-foreground transition group-hover:scale-105 group-active:scale-95 sm:h-20 sm:w-20"
                     style={{
                       background:
                         "linear-gradient(140deg, hsl(var(--accent)) 0%, hsl(var(--accent-600)) 100%)",
@@ -202,7 +202,7 @@ export function IncomingCallScreen() {
                       color: "hsl(var(--accent-foreground))",
                     }}
                   >
-                    <Phone className="h-8 w-8" />
+                    <Phone className="h-7 w-7 sm:h-8 sm:w-8" />
                   </span>
                   <span className="text-xs font-semibold text-primary-foreground">
                     Rejoindre
