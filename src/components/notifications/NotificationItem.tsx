@@ -4,7 +4,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { KIND_LABEL, type DbNotification, type NotificationKind } from "@/lib/api/notifications";
+import { KIND_LABEL, resolveNotificationLink, type DbNotification, type NotificationKind } from "@/lib/api/notifications";
 
 const KIND_ICON: Record<NotificationKind, LucideIcon> = {
   invitation_received: Mail,
@@ -85,8 +85,5 @@ export function NotificationItem({ notification: n, onClick, dense }: Props) {
       </button>
     );
   }
-  if (n.link) {
-    return <Link to={n.link} className="block">{inner}</Link>;
-  }
-  return inner;
+  return <Link to={resolveNotificationLink(n)} className="block">{inner}</Link>;
 }
