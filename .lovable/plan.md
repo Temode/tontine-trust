@@ -1,29 +1,52 @@
-## Problème
+# Rendre le KYC optionnel pour rejoindre une tontine
 
-La RPC `request_user_withdrawal` échoue en **HTTP 400 / SQLSTATE 22003 « integer out of range »** dès son entrée.
+## Constat de l'audit
 
-Cause exacte : le verrou de sérialisation utilise
-```sql
-pg_advisory_xact_lock(4242, hashtextextended(v_uid::text, 0)::int)
+Aujourd'hui, la vérification d'identité (KYC) est **bloquante** à deux endroits pour rejoindre un groupe :
+
+1. **Frontend** — `src/components/join-group/JoinFlow.tsx`
+   - Requête `getMyKyc` + `listKycLevels` au chargement du dialogue.
+   - Encart d'alerte « Vérification d'identité requise » (bandeau ambre avec bouton « Vérifier mon identité »).
+   - Bouton « Confirmer mon adhésion » désactivé si `kycBlocked = true` (cotisation > plafond du palier KYC).
+
+2. **Backend** — RPC `public.join_group_with_code` (dernière définition dans la migration `20260623023245_...sql`, lignes 233–273)
+   - Charge `profiles.kyc_level`, compare la cotisation au `max_contribution_amount` du palier, et lève `RAISE EXCEPTION 'KYC_INSUFFICIENT'` si dépassé.
+   - Cette exception remonte au client même si l'UI est masquée → adhésion impossible.
+
+La modale rapide `JoinGroupDialog` (aperçu par code) n'affiche déjà rien de KYC : rien à changer.
+
+## Ce que je vais faire
+
+### 1. Frontend — `src/components/join-group/JoinFlow.tsx`
+- Supprimer les requêtes `kycQ` / `levelsQ` et les imports associés (`getMyKyc`, `listKycLevels`, icône `BadgeAlert`, `Link` s'il n'est plus utilisé).
+- Retirer complètement le bloc d'alerte « Vérification d'identité requise » (lignes 185–208).
+- Retirer `kycBlocked` de la condition `disabled` du bouton de confirmation et du style conditionnel.
+- Aucun autre changement UX/visuel : le flux « Rejoindre » devient purement consentement + opérateur + message.
+
+### 2. Backend — nouvelle migration SQL
+Redéployer `public.join_group_with_code` à l'identique **sauf** que le bloc de vérification KYC (chargement de `v_kyc_level`, `v_cap` et le `RAISE EXCEPTION 'KYC_INSUFFICIENT'`) est retiré. Le reste (invitation, quorum, terms, insertion `group_members`) est inchangé.
+
+### 3. Nettoyage léger
+- Laisser en place la page `/profil/kyc`, la table `kyc_levels_config`, la logique KYC côté admin et le libellé `KYC_INSUFFICIENT` dans `RPC_ERROR_LABELS` : le KYC restera activable plus tard sans nouveau schéma.
+- Mettre à jour la mémoire projet pour rappeler que le KYC est **désactivé volontairement** à l'adhésion (design decision temporaire) afin d'éviter une future régression.
+
+## Hors périmètre
+
+- Aucune modification des tests existants qui ne testent pas ce chemin.
+- Aucun changement à `JoinGroupDialog` (aperçu code) ni aux quick actions.
+- Pas de suppression de la page KYC ni des composants d'upload : réversibilité totale.
+
+## Détails techniques
+
+Migration attendue (résumé) :
+
+```text
+CREATE OR REPLACE FUNCTION public.join_group_with_code(...)
+  → identique à la version actuelle
+  → supprime uniquement :
+      SELECT kyc_level ... ; v_kyc_level := COALESCE(...);
+      SELECT max_contribution_amount ... ;
+      IF v_amount > COALESCE(v_cap, 0) THEN RAISE 'KYC_INSUFFICIENT'; END IF;
 ```
-`hashtextextended()` renvoie un **bigint** (souvent > 2 147 483 647). Le cast `::int` fait overflow → 22003, et l'exception remonte avant même la vérification du solde. Aucune demande de retrait ne peut aboutir aujourd'hui, quel que soit le montant ou le moyen de paiement.
 
-## Correctif
-
-Une **migration SQL unique** qui remplace la RPC `request_user_withdrawal` par la même logique, mais avec un verrou 64-bit valide :
-
-```sql
-PERFORM pg_advisory_xact_lock(hashtextextended('user_withdrawal:' || v_uid::text, 0));
-```
-
-- Signature à un seul argument `bigint` → aucun cast risqué.
-- Le préfixe `user_withdrawal:` scope le namespace applicatif (remplace le `4242`).
-- Comportement identique : sérialise les demandes concurrentes du même utilisateur (test `db/tests/user_withdrawals_flow.test.sql` reste vert).
-
-Aucun autre changement (UI, edge functions, autres RPC) — le bug est 100 % côté SQL.
-
-## Vérification
-
-1. Recharger `/solde`, faire une demande de retrait valide → doit renvoyer un `uuid` (200).
-2. Rejouer `db/tests/user_withdrawals_flow.test.sql` pour confirmer la non-régression (gel, rejet/dégel, completed FIFO, `INSUFFICIENT_BALANCE`).
-3. Vérifier dans les logs qu'aucun `22003` ne réapparaît sur `/rpc/request_user_withdrawal`.
+Après approbation, je pousse la migration puis j'édite `JoinFlow.tsx`.
