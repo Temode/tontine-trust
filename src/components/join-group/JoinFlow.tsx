@@ -1,11 +1,8 @@
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { Check, Loader2, ShieldCheck, X, BadgeAlert } from "lucide-react";
+import { Check, Loader2, ShieldCheck, X } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { formatGNF } from "@/lib/format";
-import { getMyKyc, listKycLevels } from "@/lib/api/kyc";
 
 export type JoinOperator = "orange" | "mtn";
 
@@ -73,15 +70,6 @@ export function JoinFlow({
   const [operator, setOperator] = useState<JoinOperator>("orange");
   const [message, setMessage] = useState("");
   const [consent, setConsent] = useState(false);
-
-  const kycQ = useQuery({ queryKey: ["kyc", "mine"], queryFn: getMyKyc, enabled: open });
-  const levelsQ = useQuery({ queryKey: ["kyc", "levels"], queryFn: listKycLevels, enabled: open });
-
-  const userLevel = kycQ.data?.kyc_level ?? 0;
-  const cap =
-    levelsQ.data?.find((l) => l.level === userLevel)?.max_contribution_amount ?? 0;
-  const kycBlocked =
-    !!summary?.contribution && summary.contribution > cap;
 
   useEffect(() => {
     if (open) {
