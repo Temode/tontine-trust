@@ -47,11 +47,15 @@ function onlyDigits(raw: string | null | undefined): string {
 
 /** Vérifie qu'une partie nationale correspond aux règles d'un pays. */
 export function isValidNational(national: string, country: CountryDef): boolean {
-  const d = onlyDigits(national).replace(/^0+/, "");
+  const d = onlyDigits(national);
   const lens = Array.isArray(country.nationalLength) ? country.nationalLength : [country.nationalLength];
-  if (!lens.includes(d.length)) return false;
-  if (country.nationalPrefixes && !country.nationalPrefixes.some((p) => d.startsWith(p))) return false;
-  return true;
+  const candidates = [d];
+  if (d.startsWith("0")) candidates.push(d.replace(/^0+/, ""));
+  return candidates.some((cand) => {
+    if (!lens.includes(cand.length)) return false;
+    if (country.nationalPrefixes && !country.nationalPrefixes.some((p) => cand.startsWith(p))) return false;
+    return true;
+  });
 }
 
 /**
@@ -61,9 +65,13 @@ export function isValidNational(national: string, country: CountryDef): boolean 
 export function normalizePhone(national: string, dial: string): string | null {
   const country = findCountryByDial(dial);
   if (!country) return null;
-  const d = onlyDigits(national).replace(/^0+/, "");
-  if (!isValidNational(d, country)) return null;
-  return `${country.dial}${d}`;
+  const raw = onlyDigits(national);
+  if (!isValidNational(raw, country)) return null;
+  const lens = Array.isArray(country.nationalLength) ? country.nationalLength : [country.nationalLength];
+  const stripped = raw.replace(/^0+/, "");
+  // On garde la forme dont la longueur correspond au pays
+  const chosen = lens.includes(raw.length) ? raw : stripped;
+  return `${country.dial}${chosen}`;
 }
 
 /**
