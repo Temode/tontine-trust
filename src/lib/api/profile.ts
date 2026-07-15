@@ -20,6 +20,27 @@ export async function getMyProfile(): Promise<DbProfile | null> {
   return (data ?? null) as DbProfile | null;
 }
 
+export async function updateMyProfile(input: {
+  full_name?: string | null;
+  phone_number?: string | null;
+}): Promise<DbProfile> {
+  const { data: u } = await supabase.auth.getUser();
+  const uid = u.user?.id;
+  if (!uid) throw new Error("Non authentifié");
+  const patch: Record<string, string | null> = {};
+  if (input.full_name !== undefined) patch.full_name = input.full_name?.trim() || null;
+  if (input.phone_number !== undefined) patch.phone_number = input.phone_number?.trim() || null;
+  const { data, error } = await supabase
+    .from("profiles")
+    .update(patch)
+    .eq("id", uid)
+    .select("id, full_name, phone_number, avatar_url")
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) throw new Error("Profil introuvable");
+  return data as DbProfile;
+}
+
 async function resizeImage(file: File, maxSize = 512): Promise<Blob> {
   const bmp = await createImageBitmap(file);
   const ratio = Math.min(1, maxSize / Math.max(bmp.width, bmp.height));
