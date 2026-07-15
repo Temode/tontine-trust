@@ -144,18 +144,38 @@ export function fmtSms(n: number): string {
 }
 
 /**
- * Normalise un numéro guinéen au format Nimba (224XXXXXXXXX, sans "+").
- * Renvoie null si le numéro n'est pas exploitable.
+ * Indicatifs pays supportés (doit rester aligné avec src/lib/phone.ts).
+ */
+const KNOWN_DIAL_CODES = [
+  "224", "225", "221", "223", "226", "227", "228", "229",
+  "33", "32", "1",
+];
+
+/**
+ * Normalise un numéro pour Nimba au format international sans "+".
+ *
+ * - "+224611599395" / "00224611599395" / "224611599395" → "224611599395"
+ * - "611599395" (fallback GN 9 chiffres commençant par 6) → "224611599395"
+ * - Tout numéro déjà E.164 plausible (8–15 chiffres, indicatif connu) est accepté.
+ *
+ * Renvoie `null` uniquement si le numéro n'a pas de forme téléphonique exploitable.
  */
 export function normalizeGNPhone(raw: string | null | undefined): string | null {
   if (!raw) return null;
-  const digits = String(raw).replace(/[\s\-().+]/g, "");
+  let digits = String(raw).replace(/[\s\-().+]/g, "");
   if (!digits) return null;
-  if (digits.startsWith("00224")) return `224${digits.slice(5)}`;
-  if (digits.startsWith("224")) return digits;
-  // Format local guinéen (9 chiffres commençant par 6)
+  if (digits.startsWith("00")) digits = digits.slice(2);
+  // Fallback historique : numéro guinéen local
   if (/^6\d{8}$/.test(digits)) return `224${digits}`;
-  return null;
+  // Longueur E.164 raisonnable
+  if (digits.length < 8 || digits.length > 15) return null;
+  // Si l'indicatif est connu, on retourne tel quel
+  const knownStart = KNOWN_DIAL_CODES
+    .sort((a, b) => b.length - a.length)
+    .find((d) => digits.startsWith(d));
+  if (knownStart) return digits;
+  // Numéro plausible mais indicatif inconnu — on laisse passer pour ne pas bloquer.
+  return digits;
 }
 
 export type NimbaChannel = "sms" | "whatsapp" | "email";

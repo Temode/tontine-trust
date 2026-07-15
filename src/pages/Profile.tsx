@@ -1,4 +1,4 @@
-import { LogOut, RefreshCw, AlertTriangle, Camera, Loader2, Bell, Shield, BadgeCheck, MailCheck, MailWarning, MessageSquare } from "lucide-react";
+import { LogOut, RefreshCw, AlertTriangle, Camera, Loader2, Bell, Shield, BadgeCheck, MailCheck, MailWarning, MessageSquare, Pencil, Check, X } from "lucide-react";
 import { toast } from "sonner";
 import { Link, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -11,11 +11,13 @@ import {
   listMyLateContributions,
   recomputeMyReliability,
 } from "@/lib/api/reliability";
-import { getMyProfile, uploadAvatar, refreshAvatarSignedUrl } from "@/lib/api/profile";
+import { getMyProfile, uploadAvatar, refreshAvatarSignedUrl, updateMyProfile } from "@/lib/api/profile";
 import { getMyKyc, KYC_LEVEL_LABEL } from "@/lib/api/kyc";
 import { getMySmsWallet, listMySmsOrders } from "@/lib/api/smsWallet";
-import { useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { formatGNF } from "@/lib/format";
+import { PhoneInput, type PhoneInputValue } from "@/components/ui/PhoneInput";
+import { DEFAULT_COUNTRY, findCountryByDial, isValidNational, normalizePhone, parseE164, formatPhone } from "@/lib/phone";
 
 export default function Profile() {
   const { user, signOut } = useAuth();
@@ -50,6 +52,50 @@ export default function Profile() {
     onError: (e: Error) => toast.error("Réactivation impossible", { description: e.message }),
   });
 
+  const [editing, setEditing] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [editPhone, setEditPhone] = useState<PhoneInputValue>({ dial: DEFAULT_COUNTRY.dial, national: "" });
+
+  useEffect(() => {
+    if (!profileQ.data) return;
+    setEditName(profileQ.data.full_name ?? "");
+    const parsed = parseE164(profileQ.data.phone_number ?? "");
+    setEditPhone({ dial: parsed.dial, national: parsed.national });
+  }, [profileQ.data]);
+
+  const updateM = useMutation({
+    mutationFn: updateMyProfile,
+    onSuccess: () => {
+      toast.success("Profil mis à jour");
+      qc.invalidateQueries({ queryKey: ["profile", "mine"] });
+      setEditing(false);
+    },
+    onError: (e: Error) => toast.error("Mise à jour impossible", { description: e.message }),
+  });
+
+  const handleSaveProfile = () => {
+    const name = editName.trim();
+    if (name.length < 2) {
+      toast.error("Nom requis (au moins 2 caractères)");
+      return;
+    }
+    let phoneE164: string | null = null;
+    if (editPhone.national.trim().length > 0) {
+      const country = findCountryByDial(editPhone.dial);
+      if (!country || !isValidNational(editPhone.national, country)) {
+        toast.error("Numéro invalide pour le pays sélectionné.");
+        return;
+      }
+      const norm = normalizePhone(editPhone.national, editPhone.dial);
+      if (!norm) {
+        toast.error("Numéro invalide.");
+        return;
+      }
+      phoneE164 = `+${norm}`;
+    }
+    updateM.mutate({ full_name: name, phone_number: phoneE164 });
+  };
+
   const { data: reliability } = useQuery({
     queryKey: ["reliability", "mine"],
     queryFn: getMyReliability,
@@ -70,7 +116,8 @@ export default function Profile() {
   const fullName =
     profileQ.data?.full_name ??
     (user?.user_metadata?.full_name as string | undefined) ?? user?.email ?? "Utilisateur";
-  const phone = profileQ.data?.phone_number ?? (user?.user_metadata?.phone_number as string | undefined) ?? "—";
+  const phoneRaw = profileQ.data?.phone_number ?? (user?.user_metadata?.phone_number as string | undefined) ?? "";
+  const phone = phoneRaw ? formatPhone(phoneRaw) : "—";
   const email = user?.email ?? "—";
   const avatarUrl = profileQ.data?.avatar_url ?? null;
   const initials = fullName
@@ -95,7 +142,8 @@ export default function Profile() {
       />
 
       <div className="space-y-6 px-5 py-6 lg:px-8 lg:py-8">
-        <article className="flex items-center gap-4 rounded-xl border border-hairline bg-card p-5">
+        <article className="rounded-xl border border-hairline bg-card p-5">
+         <div className="flex items-center gap-4">
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
@@ -150,6 +198,66 @@ export default function Profile() {
               </button>
             )}
           </div>
+          {!editing && (
+            <button
+              type="button"
+              onClick={() => setEditing(true)}
+              className="inline-flex h-9 items-center gap-1.5 rounded-md border border-hairline bg-card px-3 text-xs font-semibold text-foreground transition hover:bg-secondary"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+              Modifier
+            </button>
+          )}
+         </div>
+
+         {editing && (
+          <div className="mt-5 space-y-4 border-t border-hairline pt-5">
+            <div className="space-y-1.5">
+              <label htmlFor="edit-name" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Nom complet
+              </label>
+              <input
+                id="edit-name"
+                type="text"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                className="h-11 w-full rounded-md border border-foreground/10 bg-background px-3 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Téléphone
+              </label>
+              <PhoneInput value={editPhone} onChange={setEditPhone} />
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={handleSaveProfile}
+                disabled={updateM.isPending}
+                className="inline-flex h-10 items-center gap-2 rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 disabled:opacity-60"
+              >
+                {updateM.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                Enregistrer
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setEditing(false);
+                  if (profileQ.data) {
+                    setEditName(profileQ.data.full_name ?? "");
+                    const parsed = parseE164(profileQ.data.phone_number ?? "");
+                    setEditPhone({ dial: parsed.dial, national: parsed.national });
+                  }
+                }}
+                className="inline-flex h-10 items-center gap-2 rounded-md border border-hairline bg-card px-4 text-sm font-semibold text-foreground transition hover:bg-secondary"
+              >
+                <X className="h-4 w-4" />
+                Annuler
+              </button>
+            </div>
+          </div>
+         )}
         </article>
 
         {user?.email && (
