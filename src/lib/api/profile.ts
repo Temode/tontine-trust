@@ -27,7 +27,7 @@ export async function updateMyProfile(input: {
   const { data: u } = await supabase.auth.getUser();
   const uid = u.user?.id;
   if (!uid) throw new Error("Non authentifié");
-  const patch: Record<string, string | null> = {};
+  const patch: { full_name?: string | null; phone_number?: string | null } = {};
   if (input.full_name !== undefined) patch.full_name = input.full_name?.trim() || null;
   if (input.phone_number !== undefined) patch.phone_number = input.phone_number?.trim() || null;
   const { data, error } = await supabase
