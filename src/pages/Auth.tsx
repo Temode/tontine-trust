@@ -13,6 +13,8 @@ import {
   authFooterLegal,
   authPrimaryButton,
 } from "@/components/auth/AuthShell";
+import { PhoneInput, type PhoneInputValue } from "@/components/ui/PhoneInput";
+import { DEFAULT_COUNTRY, isValidNational, findCountryByDial, normalizePhone } from "@/lib/phone";
 
 const signInSchema = z.object({
   email: z.string().trim().email("Email invalide").max(255),
@@ -21,7 +23,6 @@ const signInSchema = z.object({
 
 const signUpSchema = z.object({
   fullName: z.string().trim().min(2, "Nom requis").max(100),
-  phoneNumber: z.string().trim().max(20).optional().or(z.literal("")),
   email: z.string().trim().email("Email invalide").max(255),
   password: z.string().min(8, "Au moins 8 caractères").max(72),
 });
@@ -42,7 +43,7 @@ export default function Auth() {
   const [siPassword, setSiPassword] = useState("");
 
   const [suFullName, setSuFullName] = useState("");
-  const [suPhone, setSuPhone] = useState("");
+  const [suPhone, setSuPhone] = useState<PhoneInputValue>({ dial: DEFAULT_COUNTRY.dial, national: "" });
   const [suEmail, setSuEmail] = useState("");
   const [suPassword, setSuPassword] = useState("");
 
@@ -132,7 +133,6 @@ export default function Auth() {
     e.preventDefault();
     const parsed = signUpSchema.safeParse({
       fullName: suFullName,
-      phoneNumber: suPhone,
       email: suEmail,
       password: suPassword,
     });
@@ -140,12 +140,26 @@ export default function Auth() {
       toast.error(parsed.error.issues[0].message);
       return;
     }
+    let phoneE164: string | null = null;
+    if (suPhone.national.trim().length > 0) {
+      const country = findCountryByDial(suPhone.dial);
+      if (!country || !isValidNational(suPhone.national, country)) {
+        toast.error("Numéro de téléphone invalide pour le pays sélectionné.");
+        return;
+      }
+      const norm = normalizePhone(suPhone.national, suPhone.dial);
+      if (!norm) {
+        toast.error("Numéro de téléphone invalide.");
+        return;
+      }
+      phoneE164 = `+${norm}`;
+    }
     setSubmitting(true);
     const { error, needsEmailConfirmation } = await signUp({
       email: parsed.data.email,
       password: parsed.data.password,
       fullName: parsed.data.fullName,
-      phoneNumber: parsed.data.phoneNumber || undefined,
+      phoneNumber: phoneE164 ?? undefined,
     });
     setSubmitting(false);
     if (error) {
@@ -161,7 +175,7 @@ export default function Auth() {
             email: parsed.data.email,
             password: parsed.data.password,
             fullName: parsed.data.fullName,
-            phoneNumber: parsed.data.phoneNumber || null,
+            phoneNumber: phoneE164,
           },
         },
       });
@@ -285,15 +299,7 @@ export default function Auth() {
               Téléphone{" "}
               <span className="normal-case tracking-normal text-foreground/30">(optionnel)</span>
             </label>
-            <input
-              id="su-phone"
-              type="tel"
-              autoComplete="tel"
-              value={suPhone}
-              onChange={(e) => setSuPhone(e.target.value)}
-              placeholder="+224 ..."
-              className={authFieldInput}
-            />
+            <PhoneInput id="su-phone" value={suPhone} onChange={setSuPhone} />
           </div>
 
           <div className="space-y-1.5">
