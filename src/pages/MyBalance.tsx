@@ -2,10 +2,9 @@ import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Wallet, TrendingUp, History, CheckCircle2, Clock, XCircle, Lock, Send } from "lucide-react";
 import { Link } from "react-router-dom";
-import { listMyBalances, listMyWithdrawals, type DbMyBalance, type DbWithdrawalRequest } from "@/lib/api/balances";
+import { listMyBalances } from "@/lib/api/balances";
 import { listMyHeldPayouts } from "@/lib/api/holdPayouts";
 import { formatGNF } from "@/lib/format";
-import { WithdrawDialog } from "@/components/balance/WithdrawDialog";
 import { GlobalWithdrawDialog } from "@/components/balance/GlobalWithdrawDialog";
 import { PayoutHoldHistory } from "@/components/balance/PayoutHoldHistory";
 import { computeHoldStatus, formatHoldUntilLabel } from "@/lib/holds/countdown";
@@ -18,14 +17,6 @@ import {
   formatDestination,
   type UserWithdrawal,
 } from "@/lib/api/wallet";
-
-const METHOD_LABEL: Record<string, string> = {
-  OM: "Orange Money",
-  MOMO: "MTN MoMo",
-  CARD: "Carte",
-  BANK: "Virement",
-  CASH: "Espèces",
-};
 
 function useNow(intervalMs = 1000) {
   const [now, setNow] = useState(() => Date.now());
@@ -55,21 +46,10 @@ function HoldCountdown({ until }: { until: string }) {
 
 export default function MyBalance() {
   useTontineRealtime();
-  const [selected, setSelected] = useState<DbMyBalance | null>(null);
   const [globalOpen, setGlobalOpen] = useState(false);
 
-  const balancesQ = useQuery({
-    queryKey: ["my-balances"],
-    queryFn: listMyBalances,
-  });
-  const withdrawalsQ = useQuery({
-    queryKey: ["my-withdrawals"],
-    queryFn: listMyWithdrawals,
-  });
-  const heldQ = useQuery({
-    queryKey: ["my-held-payouts"],
-    queryFn: listMyHeldPayouts,
-  });
+  const balancesQ = useQuery({ queryKey: ["my-balances"], queryFn: listMyBalances });
+  const heldQ = useQuery({ queryKey: ["my-held-payouts"], queryFn: listMyHeldPayouts });
   const walletQ = useQuery({ queryKey: ["user-wallet"], queryFn: getMyWallet });
   const userWithdrawalsQ = useQuery({
     queryKey: ["user-withdrawals"],
@@ -83,6 +63,8 @@ export default function MyBalance() {
   const totalWithdrawn = balances.reduce((s, b) => s + b.total_withdrawn, 0);
   const heldPayouts = heldQ.data ?? [];
   const totalHeld = heldPayouts.reduce((s, h) => s + h.payout_amount, 0);
+
+  const withdrawals = userWithdrawalsQ.data ?? [];
 
   return (
     <div className="animate-fade-in">
@@ -103,7 +85,6 @@ export default function MyBalance() {
       </header>
 
       <div className="px-5 py-6 lg:px-8 lg:py-8">
-        {/* Hero solde total */}
         <article className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-primary-700 p-6 text-primary-foreground shadow-[0_24px_60px_-30px_hsl(var(--primary)/0.7)] lg:p-8">
           <div aria-hidden className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-accent/30 blur-3xl" />
           <div className="relative">
@@ -139,7 +120,6 @@ export default function MyBalance() {
           </div>
         </article>
 
-        {/* Fonds en attente de libération */}
         {heldPayouts.length > 0 && (
           <section className="mt-5 rounded-xl border-2 border-amber-400 bg-amber-50/60 p-4">
             <div className="flex items-start gap-3">
@@ -173,57 +153,8 @@ export default function MyBalance() {
           </section>
         )}
 
-        {/* Historique complet des rétentions (libérées + en cours) */}
         <PayoutHoldHistory />
 
-        {/* Liste des soldes par groupe */}
-        <h2 className="mt-8 font-display text-base font-bold text-foreground">Par groupe</h2>
-        {balancesQ.isLoading ? (
-          <div className="mt-3 space-y-2">
-            {[0, 1, 2].map((i) => (
-              <div key={i} className="h-20 animate-pulse rounded-xl bg-secondary/50" />
-            ))}
-          </div>
-        ) : balances.length === 0 ? (
-          <EmptyState />
-        ) : (
-          <ul className="mt-3 space-y-2">
-            {balances.map((b) => (
-              <li
-                key={b.id}
-                className="flex flex-wrap items-center gap-3 rounded-xl border border-hairline bg-card p-4 lg:p-5"
-              >
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-primary-50 text-primary">
-                  <Wallet className="h-5 w-5" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-display text-sm font-bold text-foreground">{b.group_name}</p>
-                  <p className="text-xs text-muted-foreground">
-                    Crédité <span className="num">{formatGNF(b.total_credited)}</span> ·
-                    Retiré <span className="num">{formatGNF(b.total_withdrawn)}</span>
-                  </p>
-                </div>
-                <div className="text-right">
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Disponible</p>
-                  <p className="num font-display text-lg font-bold text-accent">
-                    {formatGNF(b.available_amount)}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setSelected(b)}
-                  disabled={b.available_amount <= 0}
-                  className="inline-flex h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground transition hover:bg-primary-700 disabled:opacity-40"
-                >
-                  <Wallet className="h-4 w-4" />
-                  Retirer
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-
-        {/* Historique des retraits */}
         <h2 className="mt-8 font-display text-base font-bold text-foreground">Historique de mes demandes de retrait</h2>
         {userWithdrawalsQ.isLoading ? (
           <div className="mt-3 space-y-2">
@@ -231,47 +162,23 @@ export default function MyBalance() {
               <div key={i} className="h-14 animate-pulse rounded-xl bg-secondary/50" />
             ))}
           </div>
-        ) : (userWithdrawalsQ.data ?? []).length === 0 ? (
-          <p className="mt-3 rounded-xl border border-hairline bg-card p-5 text-sm text-muted-foreground">
-            Aucune demande de retrait pour l'instant.
-          </p>
+        ) : withdrawals.length === 0 ? (
+          totalAvailable === 0 && totalCredited === 0 ? (
+            <EmptyState />
+          ) : (
+            <p className="mt-3 rounded-xl border border-hairline bg-card p-5 text-sm text-muted-foreground">
+              Aucune demande de retrait pour l'instant. Utilisez le bouton « Faire une demande de retrait » ci-dessus.
+            </p>
+          )
         ) : (
           <ul className="mt-3 divide-y divide-border/60 overflow-hidden rounded-xl border border-hairline bg-card">
-            {(userWithdrawalsQ.data ?? []).map((w) => (
+            {withdrawals.map((w) => (
               <UserWithdrawalRow key={w.id} w={w} />
-            ))}
-          </ul>
-        )}
-
-        <h2 className="mt-8 font-display text-base font-bold text-foreground">Retraits par groupe (historique)</h2>
-        {withdrawalsQ.isLoading ? (
-          <div className="mt-3 space-y-2">
-            {[0, 1].map((i) => (
-              <div key={i} className="h-14 animate-pulse rounded-xl bg-secondary/50" />
-            ))}
-          </div>
-        ) : (withdrawalsQ.data ?? []).length === 0 ? (
-          <p className="mt-3 rounded-xl border border-hairline bg-card p-5 text-sm text-muted-foreground">
-            Aucun retrait pour l'instant.
-          </p>
-        ) : (
-          <ul className="mt-3 divide-y divide-border/60 overflow-hidden rounded-xl border border-hairline bg-card">
-            {(withdrawalsQ.data ?? []).map((w) => (
-              <WithdrawalRow key={w.id} w={w} />
             ))}
           </ul>
         )}
       </div>
 
-      {selected && (
-        <WithdrawDialog
-          open={!!selected}
-          onOpenChange={(o) => !o && setSelected(null)}
-          groupId={selected.group_id}
-          groupName={selected.group_name}
-          available={selected.available_amount}
-        />
-      )}
       <GlobalWithdrawDialog
         open={globalOpen}
         onOpenChange={setGlobalOpen}
@@ -299,61 +206,6 @@ function Metric({
       <p className="num mt-0.5 text-base font-bold">{value}</p>
     </div>
   );
-}
-
-function WithdrawalRow({ w }: { w: DbWithdrawalRequest }) {
-  const Icon =
-    w.status === "paid" ? CheckCircle2 : w.status === "failed" || w.status === "cancelled" ? XCircle : Clock;
-  const tone =
-    w.status === "paid"
-      ? "text-success"
-      : w.status === "failed" || w.status === "cancelled"
-      ? "text-destructive"
-      : "text-primary";
-  return (
-    <li className="flex items-center gap-3 px-4 py-3 lg:px-5">
-      <span className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-secondary", tone)}>
-        <Icon className="h-4 w-4" />
-      </span>
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-semibold text-foreground">
-          {METHOD_LABEL[w.method] ?? w.method}
-          {w.destination ? ` · ${w.destination}` : ""}
-        </p>
-        <p className="text-xs text-muted-foreground">
-          {new Date(w.created_at).toLocaleString("fr-FR", {
-            day: "2-digit",
-            month: "short",
-            year: "numeric",
-            hour: "2-digit",
-            minute: "2-digit",
-          })}
-          {" · "}
-          <span className={cn("font-semibold", tone)}>{statusLabel(w.status)}</span>
-        </p>
-      </div>
-      <span className="num shrink-0 font-display text-sm font-bold text-foreground">
-        {formatGNF(w.amount, { withCurrency: true })}
-      </span>
-    </li>
-  );
-}
-
-function statusLabel(s: DbWithdrawalRequest["status"]): string {
-  switch (s) {
-    case "pending":
-      return "En attente";
-    case "processing":
-      return "En traitement";
-    case "paid":
-      return "Payé";
-    case "failed":
-      return "Échoué";
-    case "cancelled":
-      return "Annulé";
-    default:
-      return s;
-  }
 }
 
 function UserWithdrawalRow({ w }: { w: UserWithdrawal }) {

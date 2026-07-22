@@ -1,67 +1,46 @@
-## Objectifs
 
-1. Permettre à l'utilisateur d'éditer ses informations depuis la page Profil (nom, téléphone avec indicatif pays).
-2. Ajouter un sélecteur d'indicatif pays lors de l'inscription (Auth) + validation du format national par pays.
-3. Fiabiliser l'envoi SMS : normalisation qui accepte tous les formats E.164 (pas uniquement guinéen) pour éviter les échecs "numéro invalide". (Nimba sms ne peut envoyer de sms que pour ceux qui sont en guinée, donc pour les numeros etranger cela est un cas à gerer plustard)
+## 1. Suppression du parcours "Retrait par groupe" (UI) + remboursement Rouguiatou
 
-## Détail des changements
+**Audit effectué en base :**
+- Rouguiatou Alas Bah (`b9857ed1-…`) a un solde groupe "Epargne" : crédité 30 000, retiré 29 900, disponible 0.
+- Deux demandes dans la table héritée `withdrawal_requests` : une `cancelled` (30 000, 24/06) et **une `pending` de 29 900 datée du 16/07** — jamais traitée par le back-office (qui gère `user_withdrawal_requests`, pas cette table héritée).
+- Aucune ligne dans `user_withdrawal_requests` (le nouveau flux consolidé).
+- Conclusion : son argent n'a pas été volé mais **gelé** dans une demande fantôme du parcours par groupe qui n'est plus supervisée.
 
-### 1. Nouvelle librairie phone multi-pays — `src/lib/phone.ts`
+**Actions UI (`src/pages/MyBalance.tsx`) :**
+- Retirer la section "Par groupe" (liste avec bouton "Retirer" par tontine, lignes 179–224).
+- Retirer la section "Retraits par groupe (historique)" (lignes 246–263).
+- Retirer les états, requêtes et dialogue devenus inutiles : `selected`, `WithdrawDialog`, `balancesQ.queryFn=listMyBalances`, `withdrawalsQ.queryFn=listMyWithdrawals`, `EmptyState`, `WithdrawalRow`, `statusLabel`, `METHOD_LABEL`, imports associés.
+- Le hero (solde consolidé) et le bouton unique "Faire une demande de retrait" restent. Ajout d'un `EmptyState` léger quand `totalAvailable = 0` et aucune demande.
+- On garde `listMyBalances` uniquement pour agréger `total_credited` / `total_withdrawn` / nombre de groupes affichés dans le Hero (aucun changement backend).
 
-- Ajouter une liste `COUNTRIES` (Guinée en tête, puis autres pays Afrique de l'Ouest + France : GN +224, CI +225, SN +221, ML +223, BF +226, TG +228, BJ +229, NE +227, FR +33, BE +32, CA +1) : `{ code, name, dial, flag, nationalLength, nationalPrefixes }`.
-- `normalizePhone(national, dialCode)` → renvoie `"611599395"` (sans `+`) ou `null` si longueur ne correspond pas au pays.
-- `parseE164(raw)` → détecte pays et partie nationale à partir d'un numéro complet stocké.
-- `formatPhone(raw)` → affichage `+224 611 59 93 95`.
-- Conserver `normalizeGNPhone` (compat rétro : délègue à `normalizePhone` avec `+224`).
+**Action data (insert tool) :**
+- Marquer la demande fantôme `7337e12f-f7cc-4387-99be-8affed2b371e` comme `cancelled` avec motif "Migration vers portefeuille consolidé" et **restaurer** 29 900 dans `beneficiary_balances.available_amount` de la ligne `52e943d1-…`. Le solde consolidé sera alors immédiatement retirable via le nouveau flux.
 
-### 2. Composant réutilisable — `src/components/ui/PhoneInput.tsx`
+## 2. Annuaire "Internationale" : inclure toutes les tontines publiques
 
-- Combobox `<select>` compact (drapeau + indicatif) + `<input type="tel">` pour la partie nationale.
-- Valeurs contrôlées : `value: { dial: string; national: string }`, `onChange`.
-- Auto-suppression du `0`/`+dial` en tête si l'utilisateur colle un numéro complet.
-- Affiche une aide contextuelle : ex. « Guinée : 9 chiffres commençant par 6 ».
+Migration SQL : `list_international_groups` élargie —
+- Actuellement filtre `is_international=true AND status IN ('draft','open')`.
+- Nouveau : inclut aussi `visibility IN ('directory','public-link')`, ajoute `status='active'`, exclut `kind='solo'`, exclut `archived_at`/`deleted_at`. Trois groupes publics existants apparaîtront (Epargne, Tontine Test rapide, Tontine teste).
 
-### 3. Inscription — `src/pages/Auth.tsx`
+## 3. Bug création Tontine Solo — enum "archived" inexistant
 
-- Remplacer l'input téléphone unique par `PhoneInput` (défaut Guinée `+224`).
-- Sur submit : appeler `normalizePhone` → stocker E.164 (`+224611599395`) dans `phoneNumber`.
-- Toast d'erreur si numéro rempli mais invalide pour le pays sélectionné.
+**Cause :** `create_solo_group` fait `WHERE status <> 'archived'` pour compter les Solo actives, mais l'enum `group_status` ne contient pas `archived` (seulement draft/open/active/completed/cancelled/paused). Postgres lève `invalid input value for enum group_status: "archived"`.
 
-### 4. Page Profil éditable — `src/pages/Profile.tsx`
+**Fix migration SQL :** remplacer `status <> 'archived'` par `archived_at IS NULL AND deleted_at IS NULL` (colonnes existantes sur `groups`). Aligne aussi `src/pages/Solo.tsx` (filtre `g.status !== "archived"`) → filtrer plutôt sur `!g.archived_at` — nécessite d'exposer `archived_at` dans `list_my_solo_groups` si absent (à vérifier après migration, sinon on garde le filtre côté client sur `status !== 'cancelled'`).
 
-- Ajouter un mode édition (bouton « Modifier ») qui bascule le bloc en formulaire :
-  - Champ **Nom complet** (input texte).
-  - Champ **Téléphone** via `PhoneInput` (pré-rempli à partir de `profileQ.data.phone_number` parsé avec `parseE164`).
-  - Boutons **Enregistrer** / **Annuler**.
-- Nouvelle fonction `updateMyProfile({ full_name, phone_number })` dans `src/lib/api/profile.ts` (UPDATE sur `profiles` où id = auth.uid, aucune migration RLS nécessaire — la policy existante autorise déjà l'auto-update).
-- Mutation React Query + toast succès/erreur + invalidation `["profile","mine"]`.
-- L'email reste non-modifiable ici (redirection vers flux Auth existant).
+## Détails techniques
 
-### 5. Fiabilité SMS — `supabase/functions/_shared/nimbasms.ts`
+- Une seule migration regroupant `create_solo_group` (corrigée) + `list_international_groups` (élargie).
+- Un seul appel `insert` pour le remboursement Rouguiatou (UPDATE `withdrawal_requests` + UPDATE `beneficiary_balances`).
+- Édition de `src/pages/MyBalance.tsx` uniquement pour la partie UI.
+- Aucun changement aux tables, RLS ou GRANTs.
 
-- Généraliser `normalizeGNPhone` (renommer en interne `normalizePhoneForNimba`, garder export nom) :
-  - Accepter tout numéro déjà E.164 (`+CCXXXX…`, `00CCXXXX…)` où CC est un indicatif connu).
-  - Fallback historique : 9 chiffres commençant par 6 → préfixer +`224`.
-  - Retourner le numéro nettoyé (sans `+`) plutôt que `null` quand le format est E.164 plausible (8-15 chiffres) — évite les rejets silencieux qui font échouer l'envoi.
-- Log clair (`recipient_normalized`) en cas de fallback.
-- Aucune modif de la logique retry / kill-switch.
+## Ordre d'exécution
 
-### 6. Alignement client `src/lib/phone.ts`
+1. Migration SQL (fixe Solo + Internationale).
+2. Insert tool (rembourse Rouguiatou).
+3. Édition `src/pages/MyBalance.tsx`.
+4. Vérification build.
 
-- La normalisation Nimba doit être cohérente avec celle du client : exporter une même fonction pure (dupliquée côté Deno vu la contrainte no cross-import) et couvrir par tests unitaires `src/lib/phone.test.ts` (Vitest) : cas GN local, GN international, CI, FR, invalides.
-
-## Ce qui NE change pas
-
-- Aucune migration SQL (colonnes `profiles.full_name`, `phone_number` déjà présentes).
-- Aucun changement des politiques RLS.
-- Le fournisseur SMS reste Nimba ; l'envoi vers un numéro non-guinéen reste sujet à la couverture Nimba mais ne sera plus bloqué côté application.
-
-## Fichiers touchés
-
-- `src/lib/phone.ts` (refonte + garde compat)
-- `src/lib/phone.test.ts` (nouveau)
-- `src/components/ui/PhoneInput.tsx` (nouveau)
-- `src/pages/Auth.tsx`
-- `src/pages/Profile.tsx`
-- `src/lib/api/profile.ts` (ajout `updateMyProfile`)
-- `supabase/functions/_shared/nimbasms.ts` (normalisation élargie)
+Prêt à basculer en mode build ?
