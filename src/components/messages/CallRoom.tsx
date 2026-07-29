@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   Activity,
+  AlertTriangle,
   Circle,
   Mic,
   MicOff,
@@ -63,6 +64,8 @@ export function CallRoom({ open, onOpenChange, callId, groupName, groupId, initi
     audioInputs,
     currentMicId,
     switchMicrophone,
+    refreshAllPeerStats,
+    logClientAudioEvent,
   } = useWebRTCCall({
     callId,
     enabled: open && micGranted,
@@ -113,6 +116,14 @@ export function CallRoom({ open, onOpenChange, callId, groupName, groupId, initi
 
   const activeParticipants = participants.filter((p) => !p.left_at);
   const remoteParticipants = activeParticipants.filter((p) => p.user_id !== user?.id);
+  const peersList = Object.values(peers);
+  const networkBlockedPeers = peersList.filter(
+    (p) =>
+      p.lastError?.includes("TURN absent") ||
+      p.connectionState === "failed" ||
+      p.iceConnectionState === "failed" ||
+      (p.iceConnectionState === "disconnected" && !turnAvailable),
+  );
 
   // Realtime participant events → toast feed
   const prevRef = useRef<Map<string, { is_muted: boolean; left_at: string | null }>>(new Map());
@@ -256,9 +267,21 @@ export function CallRoom({ open, onOpenChange, callId, groupName, groupId, initi
             </div>
           )}
           {!turnAvailable && status === "live" && (
-            <p className="mx-auto mb-4 max-w-md text-center text-[11px] text-muted-foreground">
-              Mode STUN uniquement — si vous n'entendez personne, contactez votre admin pour activer TURN (Twilio).
-            </p>
+            <div
+              className={cn(
+                "mx-auto mb-4 flex max-w-xl items-start gap-2 rounded-lg border p-3 text-xs",
+                networkBlockedPeers.length > 0
+                  ? "border-destructive/40 bg-destructive/5 text-destructive"
+                  : "border-hairline bg-secondary/50 text-muted-foreground",
+              )}
+            >
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              <p>
+                {networkBlockedPeers.length > 0
+                  ? "Connexion audio impossible sans relais réseau. Le diagnostic indique STUN seul : activez TURN pour transporter la voix entre ces réseaux."
+                  : "Mode STUN uniquement — certains réseaux mobiles/Wi‑Fi bloquent la voix sans relais TURN."}
+              </p>
+            </div>
           )}
 
           <div className="mx-auto grid max-w-6xl grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
@@ -279,10 +302,12 @@ export function CallRoom({ open, onOpenChange, callId, groupName, groupId, initi
                   key={p.user_id}
                   name={p.profile?.full_name ?? "Membre"}
                   stream={peer?.stream ?? null}
+                  peerId={p.user_id}
                   isMuted={peer?.micMuted ?? p.is_muted}
                   isCamOff={peer?.camOff}
                   isScreenSharing={peer?.screenSharing}
                   connectionState={peer?.connectionState ?? "connecting"}
+                  onAudioEvent={logClientAudioEvent}
                 />
               );
             })}
@@ -332,6 +357,21 @@ export function CallRoom({ open, onOpenChange, callId, groupName, groupId, initi
                       {p.lastError && (
                         <p className="mt-1 text-destructive">{p.lastError}</p>
                       )}
+                      {p.stats && (
+                        <div className="mt-2 space-y-1 rounded-md bg-muted/40 p-2 font-mono text-[10px] text-muted-foreground">
+                          <p>
+                            candidates: local={p.stats.candidateTypes.local.join(",") || "—"} · remote={p.stats.candidateTypes.remote.join(",") || "—"}
+                          </p>
+                          <p>
+                            pair: {p.stats.selectedCandidatePair
+                              ? `${p.stats.selectedCandidatePair.localCandidateType ?? "?"}→${p.stats.selectedCandidatePair.remoteCandidateType ?? "?"}`
+                              : "aucune paire sélectionnée"}
+                          </p>
+                          <p>
+                            audio: sent={p.stats.audio.bytesSent}B/{p.stats.audio.packetsSent}pkt · recv={p.stats.audio.bytesReceived}B/{p.stats.audio.packetsReceived}pkt · muted={String(p.stats.audio.receiverMuted)}
+                          </p>
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -359,7 +399,15 @@ export function CallRoom({ open, onOpenChange, callId, groupName, groupId, initi
               </div>
               <button
                 type="button"
-                onClick={() => {
+                onClick={() => void refreshAllPeerStats()}
+                className="mt-3 h-8 w-full rounded-md border border-hairline text-[11px] font-semibold text-foreground hover:bg-secondary"
+              >
+                Rafraîchir les stats média
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  await refreshAllPeerStats();
                   const blob = new Blob(
                     [
                       JSON.stringify(
@@ -368,6 +416,7 @@ export function CallRoom({ open, onOpenChange, callId, groupName, groupId, initi
                           timestamp: new Date().toISOString(),
                           status,
                           turnAvailable,
+                          networkBlocked: networkBlockedPeers.length > 0,
                           peers,
                           events: diagEvents,
                         },
