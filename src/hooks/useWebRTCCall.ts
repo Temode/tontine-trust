@@ -1112,5 +1112,8 @@ export function useWebRTCCall({
     turnAvailable,
     localStream,
     diagEvents,
+    audioInputs,
+    currentMicId,
+    switchMicrophone,
   };
 }
