@@ -108,6 +108,9 @@ export function useIncomingCalls(): {
     const setup = async () => {
       setStatus("connecting");
       pushEvent("status", "connecting");
+      // Best-effort : expire les demandes d'appel restées "pending" plus de 2 min
+      // afin d'éviter d'afficher un appel fantôme après un reload.
+      void supabase.rpc("expire_stale_call_requests").then(() => {}, () => {});
       const { data: members } = await supabase
         .from("group_members")
         .select("group_id")
