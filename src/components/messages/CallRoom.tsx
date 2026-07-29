@@ -60,6 +60,9 @@ export function CallRoom({ open, onOpenChange, callId, groupName, groupId, initi
     turnAvailable,
     localStream,
     diagEvents,
+    audioInputs,
+    currentMicId,
+    switchMicrophone,
   } = useWebRTCCall({
     callId,
     enabled: open && micGranted,
