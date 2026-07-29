@@ -79,8 +79,8 @@ export function CallRoom({ open, onOpenChange, callId, groupName, initialPrefs }
     };
   }, [open, callId, displayName]);
 
-  const startVideo = initialPrefs?.videoEnabled ?? false;
-  const startAudio = initialPrefs?.micEnabled ?? true;
+  const startVideo = initialPrefs ? !initialPrefs.camOff : false;
+  const startAudio = initialPrefs ? !initialPrefs.micMuted : true;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
