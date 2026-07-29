@@ -274,6 +274,7 @@ export type Database = {
           ended_at: string | null
           group_id: string
           id: string
+          is_locked: boolean
           recording_consent_user_ids: string[]
           recording_duration_seconds: number | null
           recording_size: number | null
@@ -290,6 +291,7 @@ export type Database = {
           ended_at?: string | null
           group_id: string
           id?: string
+          is_locked?: boolean
           recording_consent_user_ids?: string[]
           recording_duration_seconds?: number | null
           recording_size?: number | null
@@ -306,6 +308,7 @@ export type Database = {
           ended_at?: string | null
           group_id?: string
           id?: string
+          is_locked?: boolean
           recording_consent_user_ids?: string[]
           recording_duration_seconds?: number | null
           recording_size?: number | null
@@ -6700,6 +6703,7 @@ export type Database = {
       }
       auto_close_turn: { Args: { _turn_id: string }; Returns: boolean }
       can_join_call: { Args: { p_call_id: string }; Returns: boolean }
+      can_moderate_call: { Args: { p_call_id: string }; Returns: boolean }
       cancel_my_bid: { Args: { _turn_id: string }; Returns: undefined }
       cancel_turn_swap: { Args: { _request_id: string }; Returns: undefined }
       claim_sms_dedupe: { Args: { _key: string }; Returns: boolean }
@@ -6817,6 +6821,14 @@ export type Database = {
           is_default: boolean
           published_at: string
           version: string
+        }[]
+      }
+      get_call_context: {
+        Args: { p_call_id: string }
+        Returns: {
+          allowed: boolean
+          is_host: boolean
+          locked: boolean
         }[]
       }
       get_default_report_audit: {
@@ -7224,6 +7236,10 @@ export type Database = {
       }
       send_payout_hold_extended_if_needed: {
         Args: { _actor?: string; _force?: boolean; _turn_id: string }
+        Returns: boolean
+      }
+      set_call_lock: {
+        Args: { p_call_id: string; p_locked: boolean }
         Returns: boolean
       }
       set_call_mute: {
