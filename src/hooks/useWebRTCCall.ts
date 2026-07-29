@@ -515,15 +515,21 @@ export function useWebRTCCall({
   const scheduleRetry = useCallback(
     (peerId: string, reason: string) => {
       if (retryTimersRef.current[peerId]) return;
+      if (turnAvailable && !usedRelayRef.current.has(peerId)) {
+        usedRelayRef.current.add(peerId);
+        retryCountRef.current[peerId] = 0;
+        logDiag({ peer: peerId, type: "retry", detail: `switch to TURN-only (${reason})` });
+        void rebuildPeer(peerId);
+        return;
+      }
+      if (!turnAvailable) {
+        const msg = "Connexion audio impossible sans relais réseau (TURN absent).";
+        updatePeer(peerId, { lastError: msg, retries: retryCountRef.current[peerId] ?? 0 });
+        logDiag({ peer: peerId, type: "error", detail: `${msg} ${reason}` });
+        return;
+      }
       const attempt = (retryCountRef.current[peerId] ?? 0) + 1;
       if (attempt > MAX_RETRIES) {
-        if (turnAvailable && !usedRelayRef.current.has(peerId)) {
-          usedRelayRef.current.add(peerId);
-          retryCountRef.current[peerId] = 0;
-          logDiag({ peer: peerId, type: "retry", detail: "switch to TURN-only" });
-          void rebuildPeer(peerId);
-          return;
-        }
         updatePeer(peerId, { lastError: `Échec après ${MAX_RETRIES} tentatives (${reason})` });
         logDiag({ peer: peerId, type: "error", detail: `give up after ${MAX_RETRIES} (${reason})` });
         removePeer(peerId);
@@ -598,33 +604,48 @@ export function useWebRTCCall({
    */
   const renegotiate = useCallback(
     async (peerId: string, reason: string) => {
-      const pc = pcsRef.current[peerId];
-      const channel = channelRef.current;
-      if (!pc || !channel || !myId) return;
-      // Convention initiateur : le user_id le plus petit envoie l'offre.
-      if (myId < peerId) {
-        try {
-          const offer = await pc.createOffer();
-          await pc.setLocalDescription(offer);
-          channel.send({
-            type: "broadcast",
-            event: "offer",
-            payload: { from: myId, to: peerId, sdp: offer, reason },
-          });
-          logDiag({ peer: peerId, type: "offer", detail: `renegotiate: ${reason}` });
-        } catch (e) {
-          logDiag({ peer: peerId, type: "error", detail: `renegotiate: ${(e as Error).message}` });
-        }
-      } else {
-        channel.send({
-          type: "broadcast",
-          event: "need-restart",
-          payload: { from: myId, to: peerId, reason },
+      const previous = negotiationLocksRef.current[peerId] ?? Promise.resolve();
+      const task = previous
+        .catch(() => {
+          /* keep queue alive */
+        })
+        .then(async () => {
+          const pc = pcsRef.current[peerId];
+          const channel = channelRef.current;
+          if (!pc || !channel || !myId || pc.connectionState === "closed") return;
+          const stable = await waitForStableSignaling(pc);
+          if (!stable) {
+            logDiag({ peer: peerId, type: "error", detail: `renegotiate blocked: signaling=${pc.signalingState}` });
+            return;
+          }
+          // Convention initiateur : le user_id le plus petit envoie l'offre.
+          if (myId < peerId) {
+            try {
+              const offer = await pc.createOffer();
+              await pc.setLocalDescription(offer);
+              channel.send({
+                type: "broadcast",
+                event: "offer",
+                payload: { from: myId, to: peerId, sdp: offer, reason },
+              });
+              logDiag({ peer: peerId, type: "offer", detail: `renegotiate: ${reason}` });
+              window.setTimeout(() => void refreshPeerStats(peerId), 300);
+            } catch (e) {
+              logDiag({ peer: peerId, type: "error", detail: `renegotiate: ${(e as Error).message}` });
+            }
+          } else {
+            channel.send({
+              type: "broadcast",
+              event: "need-restart",
+              payload: { from: myId, to: peerId, reason },
+            });
+            logDiag({ peer: peerId, type: "info", detail: `need-offer: ${reason}` });
+          }
         });
-        logDiag({ peer: peerId, type: "info", detail: `need-restart: ${reason}` });
-      }
+      negotiationLocksRef.current[peerId] = task;
+      await task;
     },
-    [myId, logDiag],
+    [myId, logDiag, refreshPeerStats],
   );
 
   /**
@@ -673,6 +694,7 @@ export function useWebRTCCall({
           try {
             await sender.replaceTrack(newTrack);
             logDiag({ peer: peerId, type: "info", detail: "audio sender replaceTrack" });
+            window.setTimeout(() => void refreshPeerStats(peerId), 300);
             continue;
           } catch (e) {
             logDiag({
