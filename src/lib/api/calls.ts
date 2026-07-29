@@ -203,21 +203,4 @@ export async function getRecordingSignedUrl(path: string): Promise<string> {
   return data.signedUrl;
 }
 
-// ---------------- ICE servers (STUN + optional TURN) ----------------
-
-export async function fetchIceServers(): Promise<{ iceServers: RTCIceServer[]; turn: boolean; reason?: string }> {
-  try {
-    const { data, error } = await supabase.functions.invoke("get-ice-servers");
-    if (error || !data) throw error ?? new Error("no data");
-    return data as { iceServers: RTCIceServer[]; turn: boolean; reason?: string };
-  } catch (e) {
-    console.warn("fetchIceServers fallback to STUN", e);
-    return {
-      iceServers: [
-        { urls: "stun:stun.l.google.com:19302" },
-        { urls: "stun:stun1.l.google.com:19302" },
-      ],
-      turn: false,
-    };
-  }
-}
+// ICE servers retirés : la fonctionnalité d'appel utilise désormais LiveKit (SFU).
