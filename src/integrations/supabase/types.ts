@@ -6802,6 +6802,7 @@ export type Database = {
         Args: { _kind: string; _payload: Json }
         Returns: undefined
       }
+      expire_stale_call_requests: { Args: never; Returns: number }
       explain_contribution: {
         Args: { _contribution_id: string }
         Returns: Json
