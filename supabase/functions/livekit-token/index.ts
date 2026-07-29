@@ -77,8 +77,8 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Vérifie que l'utilisateur est bien membre actif du groupe cible
-    const { data: allowed, error: rpcError } = await supabase.rpc('can_join_call', {
+    // Contexte d'appel : autorisation, rôle hôte, verrou de la salle
+    const { data: ctxRows, error: rpcError } = await supabase.rpc('get_call_context', {
       p_call_id: callId,
     })
     if (rpcError) {
@@ -87,9 +87,17 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
-    if (!allowed) {
+    const ctx = Array.isArray(ctxRows) ? ctxRows[0] : ctxRows
+    if (!ctx?.allowed) {
       return new Response(JSON.stringify({ error: 'Accès refusé à cet appel' }), {
         status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+    const isHost = !!ctx.is_host
+    if (ctx.locked && !isHost) {
+      return new Response(JSON.stringify({ error: 'La salle est verrouillée par l\u2019hôte.' }), {
+        status: 423,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
@@ -105,19 +113,21 @@ Deno.serve(async (req) => {
       nbf: now,
       exp: now + ttlSeconds,
       name: displayName,
+      metadata: JSON.stringify({ role: isHost ? 'host' : 'participant' }),
       video: {
         room: roomName,
         roomJoin: true,
         canPublish: true,
         canSubscribe: true,
         canPublishData: true,
+        roomAdmin: isHost,
       },
     }
 
     const jwt = await signJwtHS256(payload, apiSecret)
 
     return new Response(
-      JSON.stringify({ token: jwt, wsUrl, roomName, identity: userId }),
+      JSON.stringify({ token: jwt, wsUrl, roomName, identity: userId, isHost }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     )
   } catch (err) {
