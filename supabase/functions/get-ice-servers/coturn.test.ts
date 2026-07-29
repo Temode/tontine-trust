@@ -15,13 +15,10 @@ Deno.test("Coturn credential — déterministe pour un même username+secret", a
   assertEquals(a, b);
 });
 
-Deno.test("Coturn credential — RFC 8489 test vector (HMAC-SHA1)", async () => {
-  // Reference: known HMAC-SHA1("key","The quick brown fox jumps over the lazy dog")
-  // = de7c9b85b8b78aa6bc8a7a36f70a90701c9db4d9
-  const cred = await buildCoturnCredential(
-    "key",
-    "The quick brown fox jumps over the lazy dog",
-  );
-  // base64(hex de7c9b85b8b78aa6bc8a7a36f70a90701c9db4d9) = 3nybhbi3iqa8ino2ffcJcBydtNk=
-  assertEquals(cred, "3nybhbi3iqa8ino2b/cJcBydtNk=");
+Deno.test("Coturn credential — RFC 2202 test vector (HMAC-SHA1)", async () => {
+  // HMAC-SHA1("Jefe", "what do ya want for nothing?")
+  // = effcdf6ae5eb2fa2d27416d5f184df9c259a7c79
+  // base64 = 7/zfauXrL6LSdBbV8YTfnCWafHk=
+  const cred = await buildCoturnCredential("Jefe", "what do ya want for nothing?");
+  assertEquals(cred, "7/zfauXrL6LSdBbV8YTfnCWafHk=");
 });
