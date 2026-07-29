@@ -407,7 +407,7 @@ export function CallRoom({ open, onOpenChange, callId, groupName, groupId, initi
               <button
                 type="button"
                 onClick={async () => {
-                  await refreshAllPeerStats();
+                  const freshStats = await refreshAllPeerStats();
                   const blob = new Blob(
                     [
                       JSON.stringify(
@@ -417,7 +417,12 @@ export function CallRoom({ open, onOpenChange, callId, groupName, groupId, initi
                           status,
                           turnAvailable,
                           networkBlocked: networkBlockedPeers.length > 0,
-                          peers,
+                          peers: Object.fromEntries(
+                            Object.entries(peers).map(([peerId, peer]) => [
+                              peerId,
+                              { ...peer, stats: freshStats[peerId] ?? peer.stats ?? null },
+                            ]),
+                          ),
                           events: diagEvents,
                         },
                         null,

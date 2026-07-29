@@ -822,8 +822,20 @@ export function useWebRTCCall({
   }, [status, localStream, logDiag, refreshPeerStats, renegotiate]);
 
   const refreshAllPeerStats = useCallback(async () => {
-    await Promise.all(Object.keys(pcsRef.current).map((peerId) => refreshPeerStats(peerId)));
-  }, [refreshPeerStats]);
+    const entries = await Promise.all(
+      Object.entries(pcsRef.current).map(async ([peerId, pc]) => {
+        try {
+          const stats = await collectPeerStats(pc);
+          updatePeer(peerId, { stats });
+          return [peerId, stats] as const;
+        } catch (e) {
+          logDiag({ peer: peerId, type: "error", detail: `getStats: ${(e as Error).message}` });
+          return [peerId, null] as const;
+        }
+      }),
+    );
+    return Object.fromEntries(entries);
+  }, [logDiag, updatePeer]);
 
   const logClientAudioEvent = useCallback(
     (peerId: string, detail: string) => {
