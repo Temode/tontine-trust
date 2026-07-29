@@ -115,6 +115,21 @@ export function CallDiagnosticPanel() {
     }
   };
 
+  // Force play() sur tous les <audio> distants — débloque l'autoplay quand
+  // aucun geste utilisateur n'a encore été capté sur cet onglet.
+  const unblockRemoteAudio = () => {
+    const els = document.querySelectorAll<HTMLAudioElement>("audio");
+    let attempted = 0;
+    els.forEach((el) => {
+      if (!el.srcObject) return;
+      attempted += 1;
+      el.play().catch(() => {
+        /* déjà signalé dans la tuile */
+      });
+    });
+    setAudio(attempted > 0 ? "ok" : "untested");
+  };
+
   const rtTone =
     status === "subscribed"
       ? "ok"
@@ -338,6 +353,14 @@ export function CallDiagnosticPanel() {
                 >
                   <Volume2 className="h-3 w-3" />
                   Tester la sonnerie
+                </button>
+                <button
+                  type="button"
+                  onClick={unblockRemoteAudio}
+                  className="ml-1 mt-1 inline-flex items-center gap-1 rounded-md border border-hairline px-2 py-1 text-[10px] font-semibold hover:bg-secondary"
+                >
+                  <Volume2 className="h-3 w-3" />
+                  Débloquer audio distants
                 </button>
               </div>
             </li>
