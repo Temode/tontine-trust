@@ -506,8 +506,7 @@ function AudioOutputMenu({ room }: { room: Room }) {
 
   const supported =
     typeof HTMLMediaElement !== "undefined" &&
-    // @ts-expect-error - vendor prop
-    typeof HTMLMediaElement.prototype.setSinkId === "function";
+    typeof (HTMLMediaElement.prototype as unknown as { setSinkId?: unknown }).setSinkId === "function";
 
   if (!supported || devices.length === 0) return null;
 
