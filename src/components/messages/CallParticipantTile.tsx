@@ -1,5 +1,5 @@
-import { useEffect, useRef } from "react";
-import { Mic, MicOff, MonitorUp, VideoOff, Wifi, WifiOff } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Mic, MicOff, MonitorUp, VideoOff, Volume2, Wifi, WifiOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getInitials } from "@/lib/format";
 
@@ -28,17 +28,48 @@ export function CallParticipantTile({
 }: Props) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [audioBlocked, setAudioBlocked] = useState(false);
 
   const hasVideo = !!stream && stream.getVideoTracks().some((t) => t.enabled);
 
   useEffect(() => {
-    if (stream && videoRef.current) {
-      videoRef.current.srcObject = stream;
+    if (videoRef.current) {
+      videoRef.current.srcObject = stream ?? null;
     }
-    if (stream && audioRef.current && !isLocal) {
-      audioRef.current.srcObject = stream;
+    if (audioRef.current && !isLocal) {
+      audioRef.current.srcObject = stream ?? null;
+      // Force play — autoplay peut être bloqué même si le geste initial a
+      // déverrouillé l'AudioContext ; on capture le blocage pour proposer un
+      // bouton "Activer le son" à l'utilisateur.
+      const el = audioRef.current;
+      const attemptPlay = () => {
+        el.play()
+          .then(() => setAudioBlocked(false))
+          .catch(() => setAudioBlocked(true));
+      };
+      attemptPlay();
+      if (!stream) return;
+      // Rejouer si une piste audio arrive plus tard (SDP renegotiation, mute distant levé).
+      const onAdd = () => {
+        el.srcObject = stream;
+        attemptPlay();
+      };
+      stream.addEventListener("addtrack", onAdd);
+      stream.addEventListener("removetrack", onAdd);
+      return () => {
+        stream.removeEventListener("addtrack", onAdd);
+        stream.removeEventListener("removetrack", onAdd);
+      };
     }
   }, [stream, isLocal]);
+
+  const unblockAudio = () => {
+    const el = audioRef.current;
+    if (!el) return;
+    el.play()
+      .then(() => setAudioBlocked(false))
+      .catch(() => setAudioBlocked(true));
+  };
 
   const ini = initials ?? getInitials(name) ?? "··";
   const bad =
@@ -60,7 +91,7 @@ export function CallParticipantTile({
           ref={videoRef}
           autoPlay
           playsInline
-          muted={isLocal}
+          muted
           className={cn("h-full w-full object-cover", isLocal && "scale-x-[-1]")}
         />
       ) : (
@@ -77,9 +108,22 @@ export function CallParticipantTile({
         </div>
       )}
 
-      {/* Always sink remote audio so even camera-off peers are heard. */}
-      {!isLocal && stream && (
+      {/* Sink audio dédié pour tout pair distant — monté en permanence pour
+          éviter les remounts qui perdent le srcObject à l'arrivée tardive
+          d'une piste audio. La balise <video> est toujours mutée. */}
+      {!isLocal && (
         <audio ref={audioRef} autoPlay playsInline className="hidden" />
+      )}
+
+      {!isLocal && audioBlocked && (
+        <button
+          type="button"
+          onClick={unblockAudio}
+          className="absolute right-2 top-2 z-10 inline-flex items-center gap-1 rounded-full bg-accent px-2.5 py-1 text-[10px] font-bold text-accent-foreground shadow-md"
+        >
+          <Volume2 className="h-3 w-3" />
+          Activer le son
+        </button>
       )}
 
       {/* Overlay : name + status */}
