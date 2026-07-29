@@ -7,24 +7,28 @@ interface Props {
   name: string;
   initials?: string;
   stream?: MediaStream | null;
+  peerId?: string;
   isLocal?: boolean;
   isMuted?: boolean;
   isCamOff?: boolean;
   connectionState?: RTCPeerConnectionState;
   speaking?: boolean;
   isScreenSharing?: boolean;
+  onAudioEvent?: (peerId: string, detail: string) => void;
 }
 
 export function CallParticipantTile({
   name,
   initials,
   stream,
+  peerId,
   isLocal,
   isMuted,
   isCamOff,
   connectionState = "connected",
   speaking,
   isScreenSharing,
+  onAudioEvent,
 }: Props) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -44,8 +48,14 @@ export function CallParticipantTile({
       const el = audioRef.current;
       const attemptPlay = () => {
         el.play()
-          .then(() => setAudioBlocked(false))
-          .catch(() => setAudioBlocked(true));
+          .then(() => {
+            setAudioBlocked(false);
+            if (peerId) onAudioEvent?.(peerId, "audio play ok");
+          })
+          .catch((err: DOMException) => {
+            setAudioBlocked(true);
+            if (peerId) onAudioEvent?.(peerId, `audio play blocked: ${err.name}`);
+          });
       };
       attemptPlay();
       if (!stream) return;
@@ -61,14 +71,20 @@ export function CallParticipantTile({
         stream.removeEventListener("removetrack", onAdd);
       };
     }
-  }, [stream, isLocal]);
+  }, [stream, isLocal, onAudioEvent, peerId]);
 
   const unblockAudio = () => {
     const el = audioRef.current;
     if (!el) return;
     el.play()
-      .then(() => setAudioBlocked(false))
-      .catch(() => setAudioBlocked(true));
+      .then(() => {
+        setAudioBlocked(false);
+        if (peerId) onAudioEvent?.(peerId, "audio play ok (manual)");
+      })
+      .catch((err: DOMException) => {
+        setAudioBlocked(true);
+        if (peerId) onAudioEvent?.(peerId, `audio play blocked manual: ${err.name}`);
+      });
   };
 
   const ini = initials ?? getInitials(name) ?? "··";
