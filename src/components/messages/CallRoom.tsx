@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   LiveKitRoom,
   GridLayout,
@@ -23,7 +23,7 @@ import {
   Users,
 } from "lucide-react";
 import { toast } from "sonner";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import type { PreCallDevicePrefs } from "./MicPermissionGate";
@@ -36,6 +36,8 @@ interface Props {
   groupName?: string;
   groupId?: string;
   initialPrefs?: PreCallDevicePrefs | null;
+  cancelOnCloseBeforeJoin?: boolean;
+  manageLifecycle?: boolean;
 }
 
 interface TokenResponse {
@@ -46,11 +48,28 @@ interface TokenResponse {
   isHost: boolean;
 }
 
-export function CallRoom({ open, onOpenChange, callId, groupName, initialPrefs }: Props) {
+type ManagedCallStatus = "accepted" | "cancelled" | "ended";
+
+function updateCallStatusBestEffort(callId: string, status: ManagedCallStatus): void {
+  void supabase
+    .rpc("respond_call_request", { p_id: callId, p_status: status })
+    .then(() => {}, () => {});
+}
+
+export function CallRoom({
+  open,
+  onOpenChange,
+  callId,
+  groupName,
+  initialPrefs,
+  cancelOnCloseBeforeJoin = false,
+  manageLifecycle = false,
+}: Props) {
   const { user } = useAuth();
   const [tokenData, setTokenData] = useState<TokenResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const hasConnectedRef = useRef(false);
 
   const displayName = useMemo(() => {
     const meta = (user?.user_metadata ?? {}) as Record<string, unknown>;
@@ -66,6 +85,7 @@ export function CallRoom({ open, onOpenChange, callId, groupName, initialPrefs }
     if (!open || !callId) {
       setTokenData(null);
       setError(null);
+      hasConnectedRef.current = false;
       return;
     }
     let cancelled = false;
@@ -82,9 +102,7 @@ export function CallRoom({ open, onOpenChange, callId, groupName, initialPrefs }
           setTokenData(null);
           // Rollback : évite les appels fantômes côté destinataires si
           // l'accès LiveKit échoue avant qu'aucun participant n'ait rejoint.
-          void supabase
-            .rpc("respond_call_request", { p_id: callId, p_status: "cancelled" })
-            .then(() => {}, () => {});
+          updateCallStatusBestEffort(callId, "cancelled");
         } else {
           setTokenData(data);
         }
@@ -99,13 +117,33 @@ export function CallRoom({ open, onOpenChange, callId, groupName, initialPrefs }
 
   const startVideo = initialPrefs ? !initialPrefs.camOff : false;
   const startAudio = initialPrefs ? !initialPrefs.micMuted : true;
+  const handleOpenChange = (nextOpen: boolean) => {
+    if (!nextOpen && open && callId) {
+      if (manageLifecycle && hasConnectedRef.current) {
+        updateCallStatusBestEffort(callId, "ended");
+      } else if (cancelOnCloseBeforeJoin && !hasConnectedRef.current) {
+        updateCallStatusBestEffort(callId, "cancelled");
+      }
+    }
+    onOpenChange(nextOpen);
+  };
+
+  const handleConnected = () => {
+    hasConnectedRef.current = true;
+    if (manageLifecycle && callId) {
+      updateCallStatusBestEffort(callId, "accepted");
+    }
+  };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="flex h-[90vh] max-w-5xl flex-col gap-0 overflow-hidden p-0 sm:h-[85vh]">
         <DialogTitle className="sr-only">
           Appel {groupName ? `— ${groupName}` : ""}
         </DialogTitle>
+        <DialogDescription className="sr-only">
+          Salle d'appel audio et vidéo de la tontine, avec contrôles de micro, caméra et sortie.
+        </DialogDescription>
 
         <header className="flex items-center justify-between border-b border-hairline bg-card px-4 py-3">
           <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
@@ -114,7 +152,7 @@ export function CallRoom({ open, onOpenChange, callId, groupName, initialPrefs }
           </div>
           <button
             type="button"
-            onClick={() => onOpenChange(false)}
+            onClick={() => handleOpenChange(false)}
             className="inline-flex h-9 items-center gap-2 rounded-md border border-hairline px-3 text-xs font-semibold text-foreground hover:bg-secondary"
           >
             <PhoneOff className="h-4 w-4" />
@@ -135,27 +173,28 @@ export function CallRoom({ open, onOpenChange, callId, groupName, initialPrefs }
               <p className="max-w-sm text-sm text-foreground">{error}</p>
               <button
                 type="button"
-                onClick={() => onOpenChange(false)}
+                onClick={() => handleOpenChange(false)}
                 className="mt-2 inline-flex h-10 items-center rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground"
               >
                 Fermer
               </button>
             </div>
           )}
-          {tokenData && !error && (
+          {tokenData && !error && callId && (
             <LiveKitRoom
               token={tokenData.token}
               serverUrl={tokenData.wsUrl}
               connect
               audio={startAudio}
               video={startVideo}
-              onDisconnected={() => onOpenChange(false)}
+              onConnected={handleConnected}
+              onDisconnected={() => handleOpenChange(false)}
               onError={(e) => setError(e.message)}
               className={cn("flex h-full w-full flex-col")}
               data-lk-theme="default"
             >
               <RoomAudioRenderer />
-              <RoomStage callId={callId!} isHost={tokenData.isHost} groupName={groupName} />
+              <RoomStage callId={callId} isHost={tokenData.isHost} groupName={groupName} />
               <div className="border-t border-hairline bg-card/95 px-2 py-2">
                 <ControlBar
                   controls={{
