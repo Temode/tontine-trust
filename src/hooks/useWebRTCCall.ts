@@ -719,7 +719,7 @@ export function useWebRTCCall({
         }
       }
     },
-    [logDiag, renegotiate],
+    [logDiag, refreshPeerStats, renegotiate],
   );
 
   /**
@@ -800,6 +800,7 @@ export function useWebRTCCall({
               detail: "audio auto-attach (replaceTrack post-start)",
             }),
           )
+          .then(() => refreshPeerStats(peerId))
           .catch((e: Error) =>
             logDiag({ peer: peerId, type: "error", detail: `auto-attach: ${e.message}` }),
           );
@@ -819,6 +820,17 @@ export function useWebRTCCall({
       }
     }
   }, [status, localStream, logDiag, renegotiate]);
+
+  const refreshAllPeerStats = useCallback(async () => {
+    await Promise.all(Object.keys(pcsRef.current).map((peerId) => refreshPeerStats(peerId)));
+  }, [refreshPeerStats]);
+
+  const logClientAudioEvent = useCallback(
+    (peerId: string, detail: string) => {
+      logDiag({ peer: peerId, type: detail.startsWith("audio play blocked") ? "error" : "info", detail });
+    },
+    [logDiag],
+  );
 
   // Main lifecycle
   useEffect(() => {
@@ -938,6 +950,7 @@ export function useWebRTCCall({
             if (pc) {
               await pc.setRemoteDescription(new RTCSessionDescription(payload.sdp));
               logDiag({ peer: payload.from, type: "info", detail: "remote answer set" });
+              void refreshPeerStats(payload.from);
             }
           })
           .on("broadcast", { event: "ice" }, async ({ payload }) => {
@@ -946,6 +959,9 @@ export function useWebRTCCall({
             if (pc && payload.candidate) {
               try {
                 await pc.addIceCandidate(new RTCIceCandidate(payload.candidate));
+                if (payload.candidate?.type === "relay") {
+                  logDiag({ peer: payload.from, type: "ice", detail: "remote relay candidate received" });
+                }
               } catch (e) {
                 console.warn("addIceCandidate failed", e);
                 logDiag({
@@ -962,6 +978,11 @@ export function useWebRTCCall({
             const pc = pcsRef.current[fromId];
             if (!pc) return;
             try {
+              const stable = await waitForStableSignaling(pc);
+              if (!stable) {
+                logDiag({ peer: fromId, type: "error", detail: `iceRestart blocked: signaling=${pc.signalingState}` });
+                return;
+              }
               const offer = await pc.createOffer({ iceRestart: true });
               await pc.setLocalDescription(offer);
               channel.send({
@@ -1343,5 +1364,7 @@ export function useWebRTCCall({
     audioInputs,
     currentMicId,
     switchMicrophone,
+    refreshAllPeerStats,
+    logClientAudioEvent,
   };
 }
