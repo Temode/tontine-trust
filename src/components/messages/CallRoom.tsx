@@ -37,6 +37,7 @@ interface Props {
   groupId?: string;
   initialPrefs?: PreCallDevicePrefs | null;
   cancelOnCloseBeforeJoin?: boolean;
+  manageLifecycle?: boolean;
 }
 
 interface TokenResponse {
@@ -47,9 +48,11 @@ interface TokenResponse {
   isHost: boolean;
 }
 
-function cancelCallBestEffort(callId: string): void {
+type ManagedCallStatus = "accepted" | "cancelled" | "ended";
+
+function updateCallStatusBestEffort(callId: string, status: ManagedCallStatus): void {
   void supabase
-    .rpc("respond_call_request", { p_id: callId, p_status: "cancelled" })
+    .rpc("respond_call_request", { p_id: callId, p_status: status })
     .then(() => {}, () => {});
 }
 
@@ -60,6 +63,7 @@ export function CallRoom({
   groupName,
   initialPrefs,
   cancelOnCloseBeforeJoin = false,
+  manageLifecycle = false,
 }: Props) {
   const { user } = useAuth();
   const [tokenData, setTokenData] = useState<TokenResponse | null>(null);
@@ -98,7 +102,7 @@ export function CallRoom({
           setTokenData(null);
           // Rollback : évite les appels fantômes côté destinataires si
           // l'accès LiveKit échoue avant qu'aucun participant n'ait rejoint.
-          cancelCallBestEffort(callId);
+          updateCallStatusBestEffort(callId, "cancelled");
         } else {
           setTokenData(data);
         }
@@ -114,14 +118,21 @@ export function CallRoom({
   const startVideo = initialPrefs ? !initialPrefs.camOff : false;
   const startAudio = initialPrefs ? !initialPrefs.micMuted : true;
   const handleOpenChange = (nextOpen: boolean) => {
-    if (!nextOpen && open && callId && cancelOnCloseBeforeJoin && !hasConnectedRef.current) {
-      cancelCallBestEffort(callId);
+    if (!nextOpen && open && callId) {
+      if (manageLifecycle && hasConnectedRef.current) {
+        updateCallStatusBestEffort(callId, "ended");
+      } else if (cancelOnCloseBeforeJoin && !hasConnectedRef.current) {
+        updateCallStatusBestEffort(callId, "cancelled");
+      }
     }
     onOpenChange(nextOpen);
   };
 
   const handleConnected = () => {
     hasConnectedRef.current = true;
+    if (manageLifecycle && callId) {
+      updateCallStatusBestEffort(callId, "accepted");
+    }
   };
 
   return (
