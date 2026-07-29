@@ -243,6 +243,7 @@ export function useIncomingCalls(): {
           .in("group_id", ids)
           .in("status", ["pending", "accepted"])
           .neq("requested_by", userIdRef.current)
+          .gte("created_at", new Date(Date.now() - 120_000).toISOString())
           .order("created_at", { ascending: false })
           .limit(5);
         if (cancelled) return;
