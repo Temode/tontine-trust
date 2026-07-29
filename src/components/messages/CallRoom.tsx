@@ -65,7 +65,6 @@ export function CallRoom({
   const [tokenData, setTokenData] = useState<TokenResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [hasConnected, setHasConnected] = useState(false);
   const hasConnectedRef = useRef(false);
 
   const displayName = useMemo(() => {
@@ -82,7 +81,6 @@ export function CallRoom({
     if (!open || !callId) {
       setTokenData(null);
       setError(null);
-      setHasConnected(false);
       hasConnectedRef.current = false;
       return;
     }
@@ -124,7 +122,6 @@ export function CallRoom({
 
   const handleConnected = () => {
     hasConnectedRef.current = true;
-    setHasConnected(true);
   };
 
   return (
