@@ -169,7 +169,32 @@ export function useWebRTCCall({
       });
 
       const local = localStreamRef.current;
-      if (local) local.getTracks().forEach((t) => pc.addTrack(t, local));
+      let hasLocalAudio = false;
+      if (local) {
+        local.getTracks().forEach((t) => {
+          pc.addTrack(t, local);
+          if (t.kind === "audio") hasLocalAudio = true;
+          logDiag({
+            peer: peerId,
+            type: "info",
+            detail: `local addTrack ${t.kind} enabled=${t.enabled}`,
+          });
+        });
+      }
+      // Garantit qu'un m=audio existe même si le micro n'est pas encore prêt
+      // (le pair recevra "silence" plutôt qu'une négociation sans piste audio).
+      if (!hasLocalAudio) {
+        try {
+          pc.addTransceiver("audio", { direction: "sendrecv" });
+          logDiag({ peer: peerId, type: "info", detail: "addTransceiver(audio) fallback" });
+        } catch (e) {
+          logDiag({
+            peer: peerId,
+            type: "error",
+            detail: `addTransceiver audio: ${(e as Error).message}`,
+          });
+        }
+      }
 
       pc.onicecandidate = (ev) => {
         if (ev.candidate && channelRef.current && myId) {
@@ -185,7 +210,19 @@ export function useWebRTCCall({
       pc.ontrack = (ev) => {
         const [stream] = ev.streams;
         updatePeer(peerId, { stream });
-        logDiag({ peer: peerId, type: "info", detail: `track ${ev.track.kind}` });
+        logDiag({
+          peer: peerId,
+          type: "info",
+          detail: `ontrack ${ev.track.kind} id=${ev.track.id.slice(0, 6)} muted=${ev.track.muted} state=${ev.track.readyState}`,
+        });
+        ev.track.addEventListener("unmute", () => {
+          logDiag({ peer: peerId, type: "info", detail: `track ${ev.track.kind} unmute` });
+          // Force React à recréer la référence pour que le tile réattache srcObject.
+          updatePeer(peerId, { stream: new MediaStream(stream.getTracks()) });
+        });
+        ev.track.addEventListener("mute", () => {
+          logDiag({ peer: peerId, type: "info", detail: `track ${ev.track.kind} mute` });
+        });
         if (audioCtxRef.current && mixedStreamRef.current) {
           try {
             const ctx = audioCtxRef.current;
