@@ -26,6 +26,39 @@ export interface RemotePeer {
   micMuted?: boolean;
   camOff?: boolean;
   screenSharing?: boolean;
+  stats?: WebRTCStatsSnapshot | null;
+}
+
+export interface WebRTCStatsSnapshot {
+  capturedAt: number;
+  connectionState: RTCPeerConnectionState;
+  iceConnectionState: RTCIceConnectionState;
+  signalingState: RTCSignalingState;
+  candidateTypes: {
+    local: string[];
+    remote: string[];
+  };
+  selectedCandidatePair: {
+    state?: string;
+    nominated?: boolean;
+    localCandidateType?: string;
+    remoteCandidateType?: string;
+    localProtocol?: string;
+    remoteProtocol?: string;
+    currentRoundTripTime?: number;
+    availableOutgoingBitrate?: number;
+    bytesSent?: number;
+    bytesReceived?: number;
+  } | null;
+  audio: {
+    senderTracks: number;
+    receiverTracks: number;
+    receiverMuted: boolean;
+    bytesSent: number;
+    bytesReceived: number;
+    packetsSent: number;
+    packetsReceived: number;
+  };
 }
 
 export interface WebRTCDiagEvent {
@@ -61,6 +94,138 @@ interface UseWebRTCCallOpts {
   initialMuted?: boolean;
   initialCamOff?: boolean;
   initialScreenShare?: boolean;
+}
+
+type StatsDict = Record<string, unknown> & { id?: string; type?: string };
+
+function statString(value: unknown): string | undefined {
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+function statNumber(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+function statBoolean(value: unknown): boolean | undefined {
+  return typeof value === "boolean" ? value : undefined;
+}
+
+function isAudioSender(pc: RTCPeerConnection, sender: RTCRtpSender): boolean {
+  if (sender.track?.kind === "audio") return true;
+  const transceiver = pc.getTransceivers().find((t) => t.sender === sender);
+  return transceiver?.receiver.track?.kind === "audio" || transceiver?.sender.track?.kind === "audio";
+}
+
+function waitForStableSignaling(pc: RTCPeerConnection, timeoutMs = 2500): Promise<boolean> {
+  if (pc.signalingState === "stable") return Promise.resolve(true);
+  return new Promise((resolve) => {
+    let done = false;
+    const finish = (ok: boolean) => {
+      if (done) return;
+      done = true;
+      window.clearTimeout(timer);
+      pc.removeEventListener("signalingstatechange", onChange);
+      resolve(ok);
+    };
+    const onChange = () => {
+      if (pc.signalingState === "stable") finish(true);
+    };
+    const timer = window.setTimeout(() => finish(pc.signalingState === "stable"), timeoutMs);
+    pc.addEventListener("signalingstatechange", onChange);
+  });
+}
+
+async function collectPeerStats(pc: RTCPeerConnection): Promise<WebRTCStatsSnapshot> {
+  const report = await pc.getStats();
+  const localCandidates = new Map<string, StatsDict>();
+  const remoteCandidates = new Map<string, StatsDict>();
+  const localTypes = new Set<string>();
+  const remoteTypes = new Set<string>();
+  let selectedCandidatePairId: string | undefined;
+  let selectedCandidatePair: StatsDict | null = null;
+  let bytesSent = 0;
+  let bytesReceived = 0;
+  let packetsSent = 0;
+  let packetsReceived = 0;
+
+  report.forEach((raw) => {
+    const stat = raw as StatsDict;
+    if (stat.type === "transport") {
+      selectedCandidatePairId = statString(stat.selectedCandidatePairId) ?? selectedCandidatePairId;
+    }
+    if (stat.type === "local-candidate") {
+      const id = statString(stat.id);
+      if (id) localCandidates.set(id, stat);
+      const candidateType = statString(stat.candidateType);
+      if (candidateType) localTypes.add(candidateType);
+    }
+    if (stat.type === "remote-candidate") {
+      const id = statString(stat.id);
+      if (id) remoteCandidates.set(id, stat);
+      const candidateType = statString(stat.candidateType);
+      if (candidateType) remoteTypes.add(candidateType);
+    }
+    const kind = statString(stat.kind) ?? statString(stat.mediaType);
+    if (kind === "audio" && stat.type === "outbound-rtp") {
+      bytesSent += statNumber(stat.bytesSent) ?? 0;
+      packetsSent += statNumber(stat.packetsSent) ?? 0;
+    }
+    if (kind === "audio" && stat.type === "inbound-rtp") {
+      bytesReceived += statNumber(stat.bytesReceived) ?? 0;
+      packetsReceived += statNumber(stat.packetsReceived) ?? 0;
+    }
+  });
+
+  report.forEach((raw) => {
+    const stat = raw as StatsDict;
+    if (stat.type !== "candidate-pair") return;
+    const id = statString(stat.id);
+    const state = statString(stat.state);
+    const selected = statBoolean(stat.selected) === true;
+    const nominated = statBoolean(stat.nominated) === true;
+    if (id === selectedCandidatePairId || selected || (nominated && state === "succeeded")) {
+      selectedCandidatePair = stat;
+    }
+  });
+
+  const pair = selectedCandidatePair;
+  const localCandidate = pair ? localCandidates.get(statString(pair.localCandidateId) ?? "") : undefined;
+  const remoteCandidate = pair ? remoteCandidates.get(statString(pair.remoteCandidateId) ?? "") : undefined;
+  const receiverTracks = pc.getReceivers().filter((r) => r.track?.kind === "audio");
+
+  return {
+    capturedAt: Date.now(),
+    connectionState: pc.connectionState,
+    iceConnectionState: pc.iceConnectionState,
+    signalingState: pc.signalingState,
+    candidateTypes: {
+      local: [...localTypes].sort(),
+      remote: [...remoteTypes].sort(),
+    },
+    selectedCandidatePair: pair
+      ? {
+          state: statString(pair.state),
+          nominated: statBoolean(pair.nominated),
+          localCandidateType: statString(localCandidate?.candidateType),
+          remoteCandidateType: statString(remoteCandidate?.candidateType),
+          localProtocol: statString(localCandidate?.protocol),
+          remoteProtocol: statString(remoteCandidate?.protocol),
+          currentRoundTripTime: statNumber(pair.currentRoundTripTime),
+          availableOutgoingBitrate: statNumber(pair.availableOutgoingBitrate),
+          bytesSent: statNumber(pair.bytesSent),
+          bytesReceived: statNumber(pair.bytesReceived),
+        }
+      : null,
+    audio: {
+      senderTracks: pc.getSenders().filter((s) => isAudioSender(pc, s) && s.track).length,
+      receiverTracks: receiverTracks.length,
+      receiverMuted: receiverTracks.some((r) => r.track.muted),
+      bytesSent,
+      bytesReceived,
+      packetsSent,
+      packetsReceived,
+    },
+  };
 }
 
 export function useWebRTCCall({
@@ -108,6 +273,9 @@ export function useWebRTCCall({
   const mixedStreamRef = useRef<MediaStream | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const currentMicIdRef = useRef<string | null>(null);
+  const selectedPairSignatureRef = useRef<Record<string, string>>({});
+  const relaySeenRef = useRef<Record<string, boolean>>({});
+  const negotiationLocksRef = useRef<Record<string, Promise<void>>>({});
 
   const logDiag = useCallback((ev: Omit<WebRTCDiagEvent, "ts">) => {
     setDiagEvents((prev) => {
@@ -158,7 +326,36 @@ export function useWebRTCCall({
       window.clearTimeout(t);
       delete retryTimersRef.current[id];
     }
+    delete selectedPairSignatureRef.current[id];
+    delete relaySeenRef.current[id];
+    delete negotiationLocksRef.current[id];
   }, []);
+
+  const refreshPeerStats = useCallback(
+    async (peerId: string) => {
+      const pc = pcsRef.current[peerId];
+      if (!pc) return;
+      try {
+        const stats = await collectPeerStats(pc);
+        updatePeer(peerId, { stats });
+        if (stats.candidateTypes.local.includes("relay") && !relaySeenRef.current[peerId]) {
+          relaySeenRef.current[peerId] = true;
+          logDiag({ peer: peerId, type: "ice", detail: "relay candidate received" });
+        }
+        const pair = stats.selectedCandidatePair;
+        if (pair) {
+          const signature = `${pair.localCandidateType ?? "?"}->${pair.remoteCandidateType ?? "?"}:${pair.state ?? "?"}`;
+          if (selectedPairSignatureRef.current[peerId] !== signature) {
+            selectedPairSignatureRef.current[peerId] = signature;
+            logDiag({ peer: peerId, type: "info", detail: `selected pair ${signature}` });
+          }
+        }
+      } catch (e) {
+        logDiag({ peer: peerId, type: "error", detail: `getStats: ${(e as Error).message}` });
+      }
+    },
+    [logDiag, updatePeer],
+  );
 
   // Forward decls via refs (mutual recursion: createPeerConnection -> scheduleRetry -> rebuildPeer -> createPeerConnection)
   const scheduleRetryRef = useRef<(peerId: string, reason: string) => void>(() => {});
@@ -206,7 +403,12 @@ export function useWebRTCCall({
             event: "ice",
             payload: { from: myId, to: peerId, candidate: ev.candidate.toJSON() },
           });
-          logDiag({ peer: peerId, type: "ice", detail: ev.candidate.type ?? "candidate" });
+          const candidateType = ev.candidate.type ?? "candidate";
+          logDiag({
+            peer: peerId,
+            type: "ice",
+            detail: candidateType === "relay" ? "relay candidate generated" : candidateType,
+          });
         }
       };
 
@@ -222,9 +424,11 @@ export function useWebRTCCall({
           logDiag({ peer: peerId, type: "info", detail: `track ${ev.track.kind} unmute` });
           // Force React à recréer la référence pour que le tile réattache srcObject.
           updatePeer(peerId, { stream: new MediaStream(stream.getTracks()) });
+          void refreshPeerStats(peerId);
         });
         ev.track.addEventListener("mute", () => {
           logDiag({ peer: peerId, type: "info", detail: `track ${ev.track.kind} mute` });
+          void refreshPeerStats(peerId);
         });
         if (audioCtxRef.current && mixedStreamRef.current) {
           try {
@@ -243,6 +447,7 @@ export function useWebRTCCall({
       pc.oniceconnectionstatechange = () => {
         updatePeer(peerId, { iceConnectionState: pc.iceConnectionState });
         logDiag({ peer: peerId, type: "ice-state", detail: pc.iceConnectionState });
+        void refreshPeerStats(peerId);
         if (pc.iceConnectionState === "failed") {
           scheduleRetryRef.current(peerId, "ice-failed");
         }
@@ -255,6 +460,7 @@ export function useWebRTCCall({
       pc.onconnectionstatechange = () => {
         updatePeer(peerId, { connectionState: pc.connectionState });
         logDiag({ peer: peerId, type: "conn-state", detail: pc.connectionState });
+        void refreshPeerStats(peerId);
         if (pc.connectionState === "failed") {
           scheduleRetryRef.current(peerId, "conn-failed");
         } else if (pc.connectionState === "closed") {
@@ -272,7 +478,7 @@ export function useWebRTCCall({
       });
       return pc;
     },
-    [myId, updatePeer, removePeer, logDiag],
+    [myId, updatePeer, removePeer, logDiag, refreshPeerStats],
   );
 
   const rebuildPeer = useCallback(
