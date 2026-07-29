@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   LiveKitRoom,
   GridLayout,
@@ -66,6 +66,7 @@ export function CallRoom({
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [hasConnected, setHasConnected] = useState(false);
+  const hasConnectedRef = useRef(false);
 
   const displayName = useMemo(() => {
     const meta = (user?.user_metadata ?? {}) as Record<string, unknown>;
@@ -82,6 +83,7 @@ export function CallRoom({
       setTokenData(null);
       setError(null);
       setHasConnected(false);
+      hasConnectedRef.current = false;
       return;
     }
     let cancelled = false;
@@ -114,10 +116,15 @@ export function CallRoom({
   const startVideo = initialPrefs ? !initialPrefs.camOff : false;
   const startAudio = initialPrefs ? !initialPrefs.micMuted : true;
   const handleOpenChange = (nextOpen: boolean) => {
-    if (!nextOpen && open && callId && cancelOnCloseBeforeJoin && !hasConnected) {
+    if (!nextOpen && open && callId && cancelOnCloseBeforeJoin && !hasConnectedRef.current) {
       cancelCallBestEffort(callId);
     }
     onOpenChange(nextOpen);
+  };
+
+  const handleConnected = () => {
+    hasConnectedRef.current = true;
+    setHasConnected(true);
   };
 
   return (
@@ -172,7 +179,7 @@ export function CallRoom({
               connect
               audio={startAudio}
               video={startVideo}
-              onConnected={() => setHasConnected(true)}
+              onConnected={handleConnected}
               onDisconnected={() => handleOpenChange(false)}
               onError={(e) => setError(e.message)}
               className={cn("flex h-full w-full flex-col")}
