@@ -60,6 +60,9 @@ export function CallRoom({ open, onOpenChange, callId, groupName, groupId, initi
     turnAvailable,
     localStream,
     diagEvents,
+    audioInputs,
+    currentMicId,
+    switchMicrophone,
   } = useWebRTCCall({
     callId,
     enabled: open && micGranted,
@@ -403,6 +406,28 @@ export function CallRoom({ open, onOpenChange, callId, groupName, groupId, initi
           >
             {isMuted ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
           </button>
+          {audioInputs.length > 1 && (
+            <select
+              aria-label="Choisir le micro"
+              value={currentMicId ?? ""}
+              disabled={status !== "live"}
+              onChange={(e) => {
+                const id = e.target.value;
+                if (!id) return;
+                void switchMicrophone(id).catch((err: Error) => {
+                  toast.error("Impossible de basculer le micro", { description: err.message });
+                });
+              }}
+              className="col-span-2 h-11 max-w-[10rem] rounded-full border border-hairline bg-background px-3 text-xs font-semibold text-foreground disabled:opacity-50 sm:col-span-1 sm:max-w-[12rem]"
+            >
+              {!currentMicId && <option value="">Micro par défaut</option>}
+              {audioInputs.map((d, i) => (
+                <option key={d.deviceId || `mic-${i}`} value={d.deviceId}>
+                  {d.label || `Micro ${i + 1}`}
+                </option>
+              ))}
+            </select>
+          )}
           <button
             type="button"
             onClick={toggleCam}
