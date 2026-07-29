@@ -1,8 +1,8 @@
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 
-// Returns ICE servers (STUN + optional Twilio TURN) for WebRTC calls.
-// If TWILIO_ACCOUNT_SID + TWILIO_AUTH_TOKEN are set, mints a short-lived
-// Network Traversal Service token. Otherwise returns STUN-only.
+// Returns ICE servers (STUN + optional self-hosted Coturn TURN) for WebRTC.
+// If TURN_HOST + TURN_SHARED_SECRET are set, mints ephemeral REST credentials
+// (HMAC-SHA1) compatible with Coturn `use-auth-secret`. Otherwise STUN-only.
 
 const STUN_ONLY: RTCIceServer[] = [
   { urls: "stun:stun.l.google.com:19302" },
@@ -16,64 +16,93 @@ function json(body: Record<string, unknown>, status = 200) {
   });
 }
 
+function b64(bytes: ArrayBuffer): string {
+  const b = new Uint8Array(bytes);
+  let s = "";
+  for (let i = 0; i < b.length; i++) s += String.fromCharCode(b[i]);
+  return btoa(s);
+}
+
+export async function buildCoturnCredential(
+  secret: string,
+  username: string,
+): Promise<string> {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-1" },
+    false,
+    ["sign"],
+  );
+  const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(username));
+  return b64(sig);
+}
+
+function extractUserLabel(req: Request): string {
+  const auth = req.headers.get("authorization") ?? "";
+  const m = auth.match(/^Bearer\s+(.+)$/i);
+  if (!m) return "anon";
+  try {
+    const parts = m[1].split(".");
+    if (parts.length < 2) return "anon";
+    const payload = JSON.parse(
+      atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")),
+    );
+    return (payload.sub as string) ?? "anon";
+  } catch {
+    return "anon";
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
 
-  const sid = Deno.env.get("TWILIO_ACCOUNT_SID");
-  const token = Deno.env.get("TWILIO_AUTH_TOKEN");
+  const host = Deno.env.get("TURN_HOST");
+  const secret = Deno.env.get("TURN_SHARED_SECRET");
 
-  if (!sid || !token) {
+  if (!host || !secret) {
     console.warn("ice-servers stun_only", {
-      reason: "twilio_not_configured",
-      hasSid: !!sid,
-      hasToken: !!token,
+      reason: "coturn_not_configured",
+      hasHost: !!host,
+      hasSecret: !!secret,
     });
-    return json({
-      iceServers: STUN_ONLY,
-      turn: false,
-      reason: "twilio_not_configured",
-    });
+    return json({ iceServers: STUN_ONLY, turn: false, reason: "coturn_not_configured" });
   }
 
+  const udpTcpPort = Number(Deno.env.get("TURN_UDP_TCP_PORT") ?? "3478");
+  const tlsPort = Number(Deno.env.get("TURN_TLS_PORT") ?? "5349");
+  const rawTtl = Number(Deno.env.get("TURN_TTL_SECONDS") ?? "21600");
+  const ttl = Math.min(Math.max(Number.isFinite(rawTtl) ? rawTtl : 21600, 3600), 86400);
+
   try {
-    console.info("ice-servers turn_configured");
-    const auth = btoa(`${sid}:${token}`);
-    const res = await fetch(
-      `https://api.twilio.com/2010-04-01/Accounts/${sid}/Tokens.json`,
-      {
-        method: "POST",
-        headers: { Authorization: `Basic ${auth}` },
-      },
-    );
-    if (!res.ok) {
-      const body = await res.text();
-      console.error("ice-servers turn_token_failed", { status: res.status, body });
-      return json({
-        iceServers: STUN_ONLY,
-        turn: false,
-        reason: "twilio_error",
-        status: res.status,
-      });
-    }
-    const data = (await res.json()) as { ice_servers?: RTCIceServer[] };
-    const iceServers = data.ice_servers ?? [];
-    const hasRelay = iceServers.some((server) => {
-      const urls = Array.isArray(server.urls) ? server.urls : [server.urls];
-      return urls.some((url) => typeof url === "string" && url.startsWith("turn"));
-    });
-    console.info("ice-servers turn_token_ok", {
-      servers: iceServers.length,
-      hasRelay,
+    const expiry = Math.floor(Date.now() / 1000) + ttl;
+    const userLabel = extractUserLabel(req);
+    const username = `${expiry}:${userLabel}`;
+    const credential = await buildCoturnCredential(secret, username);
+
+    const iceServers: RTCIceServer[] = [
+      { urls: `turn:${host}:${udpTcpPort}?transport=udp`, username, credential },
+      { urls: `turn:${host}:${udpTcpPort}?transport=tcp`, username, credential },
+      { urls: `turns:${host}:${tlsPort}?transport=tcp`, username, credential },
+      ...STUN_ONLY,
+    ];
+
+    console.info("ice-servers coturn_credential_ok", {
+      host,
+      ttl,
+      user: userLabel,
     });
     return json({
-      iceServers: iceServers.length ? iceServers : STUN_ONLY,
-      turn: hasRelay,
-      reason: hasRelay ? "turn_available" : "turn_token_without_relay",
+      iceServers,
+      turn: true,
+      reason: "coturn",
+      ttlSeconds: ttl,
+      username,
     });
   } catch (e) {
-    console.error("ice-servers exception", e);
-    return json({ iceServers: STUN_ONLY, turn: false, reason: "exception" });
+    console.error("ice-servers coturn_credential_failed", (e as Error).message);
+    return json({ iceServers: STUN_ONLY, turn: false, reason: "coturn_credential_failed" });
   }
 });
