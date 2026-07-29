@@ -819,7 +819,7 @@ export function useWebRTCCall({
         }
       }
     }
-  }, [status, localStream, logDiag, renegotiate]);
+  }, [status, localStream, logDiag, refreshPeerStats, renegotiate]);
 
   const refreshAllPeerStats = useCallback(async () => {
     await Promise.all(Object.keys(pcsRef.current).map((peerId) => refreshPeerStats(peerId)));
@@ -831,6 +831,14 @@ export function useWebRTCCall({
     },
     [logDiag],
   );
+
+  useEffect(() => {
+    if (status !== "live") return;
+    const timer = window.setInterval(() => {
+      void refreshAllPeerStats();
+    }, 3000);
+    return () => window.clearInterval(timer);
+  }, [refreshAllPeerStats, status]);
 
   // Main lifecycle
   useEffect(() => {
@@ -915,7 +923,12 @@ export function useWebRTCCall({
             // Send our current media state to the newcomer immediately.
             broadcastMediaState();
             if (myId < fromId) {
-              const pc = createPeerConnection(fromId);
+              const pc = pcsRef.current[fromId] ?? createPeerConnection(fromId);
+              const stable = await waitForStableSignaling(pc);
+              if (!stable) {
+                logDiag({ peer: fromId, type: "error", detail: `initial offer blocked: signaling=${pc.signalingState}` });
+                return;
+              }
               const offer = await pc.createOffer();
               await pc.setLocalDescription(offer);
               channel.send({
@@ -930,6 +943,10 @@ export function useWebRTCCall({
             if (payload.to !== myId) return;
             const fromId: string = payload.from;
             const pc = pcsRef.current[fromId] ?? createPeerConnection(fromId);
+            if (pc.signalingState !== "stable" && !payload.restart) {
+              logDiag({ peer: fromId, type: "info", detail: `offer glare ignored: signaling=${pc.signalingState}` });
+              return;
+            }
             await pc.setRemoteDescription(new RTCSessionDescription(payload.sdp));
             const answer = await pc.createAnswer();
             await pc.setLocalDescription(answer);
@@ -943,6 +960,7 @@ export function useWebRTCCall({
               type: "answer",
               detail: payload.restart ? "iceRestart" : "initial",
             });
+            void refreshPeerStats(fromId);
           })
           .on("broadcast", { event: "answer" }, async ({ payload }) => {
             if (payload.to !== myId) return;
@@ -1035,6 +1053,11 @@ export function useWebRTCCall({
                 if (myId >= peerId || pcsRef.current[peerId]) continue;
                 try {
                   const pc = createPeerConnection(peerId);
+                  const stable = await waitForStableSignaling(pc);
+                  if (!stable) {
+                    logDiag({ peer: peerId, type: "error", detail: `existing-peer offer blocked: signaling=${pc.signalingState}` });
+                    continue;
+                  }
                   const offer = await pc.createOffer();
                   await pc.setLocalDescription(offer);
                   channel.send({
