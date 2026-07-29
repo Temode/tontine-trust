@@ -1,30 +1,21 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useEffect, useMemo, useState } from "react";
 import {
-  Activity,
-  AlertTriangle,
-  Circle,
-  Mic,
-  MicOff,
-  MonitorUp,
-  MonitorX,
-  PhoneOff,
-  ShieldAlert,
-  Square,
-  Video,
-  VideoOff,
-} from "lucide-react";
-import { toast } from "sonner";
+  LiveKitRoom,
+  GridLayout,
+  ParticipantTile,
+  RoomAudioRenderer,
+  ControlBar,
+  useTracks,
+  useParticipants,
+} from "@livekit/components-react";
+import { Track } from "livekit-client";
+import "@livekit/components-styles";
+import { Loader2, PhoneOff, ShieldAlert, Users } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { useWebRTCCall } from "@/hooks/useWebRTCCall";
-import { useCallTimer } from "@/hooks/useCallTimer";
-import { CallParticipantTile } from "./CallParticipantTile";
-import { MicPermissionGate, type PreCallDevicePrefs } from "./MicPermissionGate";
-import { getInitials } from "@/lib/format";
+import type { PreCallDevicePrefs } from "./MicPermissionGate";
 import { cn } from "@/lib/utils";
-import { giveCallRecordingConsent } from "@/lib/api/calls";
 
 interface Props {
   open: boolean;
@@ -35,553 +26,158 @@ interface Props {
   initialPrefs?: PreCallDevicePrefs | null;
 }
 
-export function CallRoom({ open, onOpenChange, callId, groupName, groupId, initialPrefs }: Props) {
+interface TokenResponse {
+  token: string;
+  wsUrl: string;
+  roomName: string;
+  identity: string;
+}
+
+export function CallRoom({ open, onOpenChange, callId, groupName, initialPrefs }: Props) {
   const { user } = useAuth();
-  const [micGranted, setMicGranted] = useState(false);
-  const [preCallPrefs, setPreCallPrefs] = useState<PreCallDevicePrefs>({
-    micMuted: false,
-    camOff: false,
-    screenShare: false,
-  });
-  const [recordingEnabled, setRecordingEnabled] = useState(false);
-  const [showDiag, setShowDiag] = useState(false);
-  const {
-    status,
-    error,
-    participants,
-    peers,
-    isMuted,
-    toggleMute,
-    isCamOff,
-    toggleCam,
-    isScreenSharing,
-    toggleScreenShare,
-    leave,
-    isRecording,
-    turnAvailable,
-    localStream,
-    diagEvents,
-    audioInputs,
-    currentMicId,
-    switchMicrophone,
-    refreshAllPeerStats,
-    logClientAudioEvent,
-  } = useWebRTCCall({
-    callId,
-    enabled: open && micGranted,
-    groupId,
-    recordingEnabled,
-    video: true,
-    initialMuted: preCallPrefs.micMuted,
-    initialCamOff: preCallPrefs.camOff,
-    initialScreenShare: preCallPrefs.screenShare,
-  });
+  const [tokenData, setTokenData] = useState<TokenResponse | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  const { data: call } = useQuery({
-    queryKey: ["call-detail", callId],
-    queryFn: async () => {
-      if (!callId) return null;
-      const { data } = await supabase
-        .from("call_requests")
-        .select("started_at, topic, recording_consent_user_ids")
-        .eq("id", callId)
-        .maybeSingle();
-      return data;
-    },
-    enabled: open && !!callId,
-    refetchInterval: open ? 5000 : false,
-  });
-
-  const duration = useCallTimer(call?.started_at ?? null);
-
-  useEffect(() => {
-    if (!open || !initialPrefs || micGranted) return;
-    setPreCallPrefs(initialPrefs);
-    setMicGranted(true);
-  }, [initialPrefs, micGranted, open]);
-
-  const handleLeave = async () => {
-    await leave();
-    onOpenChange(false);
-    setMicGranted(false);
-    setPreCallPrefs({ micMuted: false, camOff: false, screenShare: false });
-    setRecordingEnabled(false);
-  };
-
-  // Auto-close on errors with no remediation (user dismiss)
-  const [showError, setShowError] = useState(false);
-  useEffect(() => {
-    if (status === "error") setShowError(true);
-  }, [status]);
-
-  const activeParticipants = participants.filter((p) => !p.left_at);
-  const remoteParticipants = activeParticipants.filter((p) => p.user_id !== user?.id);
-  const peersList = Object.values(peers);
-  const networkBlockedPeers = peersList.filter(
-    (p) =>
-      p.lastError?.includes("TURN absent") ||
-      p.connectionState === "failed" ||
-      p.iceConnectionState === "failed" ||
-      (p.iceConnectionState === "disconnected" && !turnAvailable),
-  );
-
-  // Realtime participant events → toast feed
-  const prevRef = useRef<Map<string, { is_muted: boolean; left_at: string | null }>>(new Map());
-  useEffect(() => {
-    if (!open || status !== "live") {
-      prevRef.current = new Map();
-      return;
-    }
-    const next = new Map<string, { is_muted: boolean; left_at: string | null }>();
-    participants.forEach((p) => {
-      next.set(p.user_id, { is_muted: p.is_muted, left_at: p.left_at });
-      const before = prevRef.current.get(p.user_id);
-      const name = p.profile?.full_name ?? "Un membre";
-      if (p.user_id === user?.id) return;
-      if (!before) {
-        if (!p.left_at) toast(`${name} a rejoint l'appel`);
-      } else {
-        if (before.left_at == null && p.left_at != null) toast(`${name} a quitté l'appel`);
-        if (before.left_at != null && p.left_at == null) toast(`${name} a rejoint l'appel`);
-        if (before.is_muted !== p.is_muted) {
-          toast(p.is_muted ? `${name} est en sourdine` : `${name} a réactivé son micro`);
-        }
-      }
-    });
-    prevRef.current = next;
-  }, [participants, open, status, user?.id]);
-
-  // Recording consent
-  const myConsent = useMemo(() => {
-    const ids = (call?.recording_consent_user_ids as string[] | undefined) ?? [];
-    return user?.id ? ids.includes(user.id) : false;
-  }, [call, user?.id]);
-
-  const consentCount = ((call?.recording_consent_user_ids as string[] | undefined) ?? []).length;
-  const totalParticipants = activeParticipants.length || 1;
-  const allConsented = consentCount >= totalParticipants;
-
-  const requestRecording = async () => {
-    if (!callId) return;
-    if (!myConsent) {
-      try {
-        await giveCallRecordingConsent(callId);
-        toast.success("Consentement enregistré", {
-          description: allConsented
-            ? "Tous les participants ont accepté — vous pouvez démarrer l'enregistrement."
-            : "En attente du consentement des autres participants.",
-        });
-      } catch (e) {
-        toast.error("Action impossible", { description: (e as Error).message });
-      }
-      return;
-    }
-    if (!allConsented) {
-      toast.info("En attente des autres consentements", {
-        description: `${consentCount}/${totalParticipants} membres ont accepté.`,
-      });
-      return;
-    }
-    setRecordingEnabled((v) => !v);
-    toast.success(recordingEnabled ? "Enregistrement arrêté" : "Enregistrement démarré", {
-      description: recordingEnabled
-        ? "Le fichier sera disponible dans l'historique."
-        : "Tous les participants sont informés.",
-    });
-  };
-
-  // Mic permission gate
-  if (open && !micGranted) {
+  const displayName = useMemo(() => {
+    const meta = (user?.user_metadata ?? {}) as Record<string, unknown>;
     return (
-      <Dialog
-        open={open}
-        onOpenChange={(v) => {
-          if (!v) onOpenChange(false);
-        }}
-      >
-        <DialogContent className="max-h-[95dvh] overflow-hidden p-0 sm:max-w-md">
-          <DialogTitle className="sr-only">Autorisation micro</DialogTitle>
-          <MicPermissionGate
-            onGranted={(prefs) => {
-              setPreCallPrefs(prefs);
-              setMicGranted(true);
-            }}
-            onCancel={() => {
-              setPreCallPrefs({ micMuted: false, camOff: false, screenShare: false });
-              onOpenChange(false);
-            }}
-          />
-        </DialogContent>
-      </Dialog>
+      (typeof meta.full_name === "string" && meta.full_name) ||
+      (typeof meta.name === "string" && meta.name) ||
+      user?.email ||
+      "Participant"
     );
-  }
+  }, [user]);
+
+  useEffect(() => {
+    if (!open || !callId) {
+      setTokenData(null);
+      setError(null);
+      return;
+    }
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    supabase.functions
+      .invoke<TokenResponse>("livekit-token", {
+        body: { callId, displayName },
+      })
+      .then(({ data, error }) => {
+        if (cancelled) return;
+        if (error || !data?.token) {
+          setError(error?.message ?? "Impossible d'obtenir un accès à la salle.");
+          setTokenData(null);
+        } else {
+          setTokenData(data);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, callId, displayName]);
+
+  const startVideo = initialPrefs ? !initialPrefs.camOff : false;
+  const startAudio = initialPrefs ? !initialPrefs.micMuted : true;
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(v) => {
-        if (!v) void handleLeave();
-        else onOpenChange(v);
-      }}
-    >
-      <DialogContent className="flex h-[100dvh] max-h-[100dvh] w-screen max-w-none flex-col gap-0 border-0 p-0 sm:rounded-none">
-        <DialogTitle className="sr-only">Appel audio en cours</DialogTitle>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="flex h-[90vh] max-w-5xl flex-col gap-0 overflow-hidden p-0 sm:h-[85vh]">
+        <DialogTitle className="sr-only">
+          Appel {groupName ? `— ${groupName}` : ""}
+        </DialogTitle>
 
-        {/* Header */}
-        <header className="flex items-center justify-between gap-3 border-b border-hairline px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))] sm:px-6 sm:py-4">
-          <div className="min-w-0 flex-1">
-            <p className="truncate font-display text-sm font-semibold text-foreground">
-              {groupName ?? "Appel audio"}
-            </p>
-            {call?.topic && (
-              <p className="truncate text-xs text-muted-foreground">{call.topic}</p>
-            )}
+        <header className="flex items-center justify-between border-b border-hairline bg-card px-4 py-3">
+          <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+            <Users className="h-4 w-4 text-primary" />
+            {groupName ?? "Appel de groupe"}
           </div>
-          <div className="flex shrink-0 items-center gap-2">
-            {isRecording && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-destructive/15 px-2 py-0.5 text-[10px] font-bold text-destructive">
-                <Circle className="h-2 w-2 animate-pulse fill-current" />
-                REC
-              </span>
-            )}
-            <span
-              className={cn(
-                "inline-flex h-2 w-2 rounded-full",
-                status === "live" ? "animate-pulse bg-primary" : "bg-muted-foreground/40",
-              )}
-            />
-            <span className="hidden text-xs font-semibold text-foreground sm:inline">
-              {status === "live" ? "En direct" : status === "connecting" ? "Connexion…" : status === "requesting-mic" ? "Micro…" : "—"}
-            </span>
-            <span className="tabular-nums text-sm font-semibold text-foreground">
-              {duration}
-            </span>
-          </div>
+          <button
+            type="button"
+            onClick={() => onOpenChange(false)}
+            className="inline-flex h-9 items-center gap-2 rounded-md border border-hairline px-3 text-xs font-semibold text-foreground hover:bg-secondary"
+          >
+            <PhoneOff className="h-4 w-4" />
+            Quitter
+          </button>
         </header>
 
-        {/* Body */}
-        <div className="flex-1 overflow-y-auto px-4 py-6 sm:px-6 sm:py-8">
-          {showError && error && (
-            <div className="mx-auto mb-6 max-w-md rounded-lg border border-destructive/40 bg-destructive/5 p-4 text-center text-sm text-destructive">
-              {error}
+        <div className="relative flex-1 bg-[#0b0d10]">
+          {loading && (
+            <div className="absolute inset-0 flex items-center justify-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin text-primary" />
+              Connexion à la salle…
             </div>
           )}
-          {!turnAvailable && status === "live" && (
-            <div
-              className={cn(
-                "mx-auto mb-4 flex max-w-xl items-start gap-2 rounded-lg border p-3 text-xs",
-                networkBlockedPeers.length > 0
-                  ? "border-destructive/40 bg-destructive/5 text-destructive"
-                  : "border-hairline bg-secondary/50 text-muted-foreground",
-              )}
+          {error && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-6 text-center">
+              <ShieldAlert className="h-8 w-8 text-destructive" />
+              <p className="max-w-sm text-sm text-foreground">{error}</p>
+              <button
+                type="button"
+                onClick={() => onOpenChange(false)}
+                className="mt-2 inline-flex h-10 items-center rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground"
+              >
+                Fermer
+              </button>
+            </div>
+          )}
+          {tokenData && !error && (
+            <LiveKitRoom
+              token={tokenData.token}
+              serverUrl={tokenData.wsUrl}
+              connect
+              audio={startAudio}
+              video={startVideo}
+              onDisconnected={() => onOpenChange(false)}
+              onError={(e) => setError(e.message)}
+              className={cn("flex h-full w-full flex-col")}
+              data-lk-theme="default"
             >
-              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-              <p>
-                {networkBlockedPeers.length > 0
-                  ? "Connexion audio impossible sans relais réseau. Le diagnostic indique STUN seul : activez TURN pour transporter la voix entre ces réseaux."
-                  : "Mode STUN uniquement — certains réseaux mobiles/Wi‑Fi bloquent la voix sans relais TURN."}
-              </p>
-            </div>
-          )}
-
-          <div className="mx-auto grid max-w-6xl grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
-            <CallParticipantTile
-              name={user?.user_metadata?.full_name ?? "Vous"}
-              initials={getInitials(user?.user_metadata?.full_name ?? "Moi") ?? "··"}
-              stream={localStream}
-              isLocal
-              isMuted={isMuted}
-              isCamOff={isCamOff}
-              isScreenSharing={isScreenSharing}
-              connectionState="connected"
-            />
-            {remoteParticipants.map((p) => {
-              const peer = peers[p.user_id];
-              return (
-                <CallParticipantTile
-                  key={p.user_id}
-                  name={p.profile?.full_name ?? "Membre"}
-                  stream={peer?.stream ?? null}
-                  peerId={p.user_id}
-                  isMuted={peer?.micMuted ?? p.is_muted}
-                  isCamOff={peer?.camOff}
-                  isScreenSharing={peer?.screenSharing}
-                  connectionState={peer?.connectionState ?? "connecting"}
-                  onAudioEvent={logClientAudioEvent}
+              <RoomAudioRenderer />
+              <RoomStage />
+              <div className="border-t border-hairline bg-card/95 px-2 py-2">
+                <ControlBar
+                  controls={{
+                    microphone: true,
+                    camera: true,
+                    screenShare: true,
+                    chat: false,
+                    leave: true,
+                  }}
                 />
-              );
-            })}
-            {remoteParticipants.length === 0 && status === "live" && (
-              <div className="flex h-40 items-center justify-center rounded-xl border border-dashed border-hairline p-6 text-center text-sm text-muted-foreground sm:col-span-2 lg:col-span-3 xl:col-span-4">
-                En attente d'autres participants…
               </div>
-            )}
-          </div>
-
-          {/* WebRTC diagnostic drawer */}
-          {showDiag && (
-            <div className="mx-auto mt-6 max-w-3xl rounded-xl border border-hairline bg-card p-4 text-xs">
-              <div className="mb-3 flex items-center justify-between">
-                <p className="font-display text-sm font-semibold text-foreground">
-                  Diagnostic WebRTC
-                </p>
-                <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                  {diagEvents.length} events
-                </span>
-              </div>
-              {/* Per-peer summary */}
-              <div className="mb-3 grid gap-2 sm:grid-cols-2">
-                {Object.values(peers).map((p) => {
-                  const name =
-                    participants.find((pa) => pa.user_id === p.user_id)?.profile?.full_name ??
-                    p.user_id.slice(0, 8);
-                  return (
-                    <div key={p.user_id} className="rounded-md border border-hairline p-2">
-                      <p className="font-semibold text-foreground">{name}</p>
-                      <p className="text-muted-foreground">
-                        conn:{" "}
-                        <span className="font-mono text-foreground">{p.connectionState}</span> ·
-                        ice:{" "}
-                        <span className="font-mono text-foreground">
-                          {p.iceConnectionState ?? "—"}
-                        </span>
-                      </p>
-                      <p className="text-muted-foreground">
-                        signaling:{" "}
-                        <span className="font-mono text-foreground">
-                          {p.signalingState ?? "—"}
-                        </span>{" "}
-                        · retries:{" "}
-                        <span className="font-mono text-foreground">{p.retries ?? 0}</span>
-                      </p>
-                      {p.lastError && (
-                        <p className="mt-1 text-destructive">{p.lastError}</p>
-                      )}
-                      {p.stats && (
-                        <div className="mt-2 space-y-1 rounded-md bg-muted/40 p-2 font-mono text-[10px] text-muted-foreground">
-                          <p>
-                            candidates: local={p.stats.candidateTypes.local.join(",") || "—"} · remote={p.stats.candidateTypes.remote.join(",") || "—"}
-                          </p>
-                          <p>
-                            pair: {p.stats.selectedCandidatePair
-                              ? `${p.stats.selectedCandidatePair.localCandidateType ?? "?"}→${p.stats.selectedCandidatePair.remoteCandidateType ?? "?"}`
-                              : "aucune paire sélectionnée"}
-                          </p>
-                          <p>
-                            audio: sent={p.stats.audio.bytesSent}B/{p.stats.audio.packetsSent}pkt · recv={p.stats.audio.bytesReceived}B/{p.stats.audio.packetsReceived}pkt · muted={String(p.stats.audio.receiverMuted)}
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-                {Object.keys(peers).length === 0 && (
-                  <p className="text-muted-foreground">Aucun pair connecté.</p>
-                )}
-              </div>
-              {/* Event log */}
-              <div className="max-h-48 overflow-y-auto rounded-md bg-muted/40 p-2 font-mono text-[10px] leading-relaxed">
-                {diagEvents.slice(-60).map((e, i) => (
-                  <div key={i} className="flex gap-2">
-                    <span className="text-muted-foreground">
-                      {new Date(e.ts).toLocaleTimeString()}
-                    </span>
-                    <span className="text-primary">{e.type}</span>
-                    {e.peer && (
-                      <span className="text-muted-foreground">[{e.peer.slice(0, 6)}]</span>
-                    )}
-                    <span className="flex-1 truncate text-foreground">{e.detail ?? ""}</span>
-                  </div>
-                ))}
-                {diagEvents.length === 0 && (
-                  <p className="text-muted-foreground">Aucun événement.</p>
-                )}
-              </div>
-              <button
-                type="button"
-                onClick={() => void refreshAllPeerStats()}
-                className="mt-3 h-8 w-full rounded-md border border-hairline text-[11px] font-semibold text-foreground hover:bg-secondary"
-              >
-                Rafraîchir les stats média
-              </button>
-              <button
-                type="button"
-                onClick={async () => {
-                  const freshStats = await refreshAllPeerStats();
-                  const blob = new Blob(
-                    [
-                      JSON.stringify(
-                        {
-                          callId,
-                          timestamp: new Date().toISOString(),
-                          status,
-                          turnAvailable,
-                          networkBlocked: networkBlockedPeers.length > 0,
-                          peers: Object.fromEntries(
-                            Object.entries(peers).map(([peerId, peer]) => [
-                              peerId,
-                              { ...peer, stats: freshStats[peerId] ?? peer.stats ?? null },
-                            ]),
-                          ),
-                          events: diagEvents,
-                        },
-                        null,
-                        2,
-                      ),
-                    ],
-                    { type: "application/json" },
-                  );
-                  const url = URL.createObjectURL(blob);
-                  const a = document.createElement("a");
-                  a.href = url;
-                  a.download = `webrtc-diag-${callId}-${Date.now()}.json`;
-                  a.click();
-                  URL.revokeObjectURL(url);
-                }}
-                className="mt-3 h-8 w-full rounded-md border border-hairline text-[11px] font-semibold text-foreground hover:bg-secondary"
-              >
-                Exporter le diagnostic (JSON)
-              </button>
-            </div>
+            </LiveKitRoom>
           )}
         </div>
-
-        {/* Footer / controls */}
-        <footer className="grid grid-cols-4 items-center justify-items-center gap-2 border-t border-hairline bg-card px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:flex sm:justify-center sm:gap-3 sm:px-6 sm:py-5">
-          <button
-            type="button"
-            onClick={toggleMute}
-            disabled={status !== "live"}
-            className={cn(
-              "inline-flex h-11 w-11 items-center justify-center rounded-full border border-hairline transition hover:bg-secondary",
-              isMuted && "border-destructive/40 bg-destructive/10 text-destructive",
-            )}
-            aria-label={isMuted ? "Réactiver le micro" : "Couper le micro"}
-          >
-            {isMuted ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
-          </button>
-          {audioInputs.length > 1 && (
-            <select
-              aria-label="Choisir le micro"
-              value={currentMicId ?? ""}
-              disabled={status !== "live"}
-              onChange={(e) => {
-                const id = e.target.value;
-                if (!id) return;
-                void switchMicrophone(id).catch((err: Error) => {
-                  toast.error("Impossible de basculer le micro", { description: err.message });
-                });
-              }}
-              className="col-span-2 h-11 max-w-[10rem] rounded-full border border-hairline bg-background px-3 text-xs font-semibold text-foreground disabled:opacity-50 sm:col-span-1 sm:max-w-[12rem]"
-            >
-              {!currentMicId && <option value="">Micro par défaut</option>}
-              {audioInputs.map((d, i) => (
-                <option key={d.deviceId || `mic-${i}`} value={d.deviceId}>
-                  {d.label || `Micro ${i + 1}`}
-                </option>
-              ))}
-            </select>
-          )}
-          <button
-            type="button"
-            onClick={toggleCam}
-            disabled={status !== "live" || !localStream?.getVideoTracks().length}
-            className={cn(
-              "inline-flex h-11 w-11 items-center justify-center rounded-full border border-hairline transition hover:bg-secondary disabled:opacity-50",
-              isCamOff && "border-destructive/40 bg-destructive/10 text-destructive",
-            )}
-            aria-label={isCamOff ? "Réactiver la caméra" : "Couper la caméra"}
-          >
-            {isCamOff ? <VideoOff className="h-5 w-5" /> : <Video className="h-5 w-5" />}
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              void toggleScreenShare().catch((e: Error) => {
-                toast.error("Partage d'écran impossible", { description: e.message });
-              });
-            }}
-            disabled={status !== "live"}
-            className={cn(
-              "hidden h-11 w-11 items-center justify-center rounded-full border border-hairline transition hover:bg-secondary disabled:opacity-50 sm:inline-flex",
-              isScreenSharing && "border-primary/40 bg-primary/10 text-primary",
-            )}
-            aria-label={isScreenSharing ? "Arrêter le partage d'écran" : "Partager mon écran"}
-            title={isScreenSharing ? "Arrêter le partage" : "Partager mon écran"}
-          >
-            {isScreenSharing ? <MonitorX className="h-5 w-5" /> : <MonitorUp className="h-5 w-5" />}
-          </button>
-          <button
-            type="button"
-            onClick={requestRecording}
-            disabled={status !== "live"}
-            className={cn(
-              "hidden h-11 items-center gap-2 rounded-full border border-hairline px-4 text-xs font-semibold transition hover:bg-secondary sm:inline-flex",
-              isRecording && "border-destructive/40 bg-destructive/10 text-destructive",
-            )}
-            aria-label="Enregistrer l'appel"
-            title={
-              !myConsent
-                ? "Consentir à l'enregistrement"
-                : allConsented
-                  ? isRecording
-                    ? "Arrêter l'enregistrement"
-                    : "Démarrer l'enregistrement"
-                  : `Consentements ${consentCount}/${totalParticipants}`
-            }
-          >
-            {isRecording ? <Square className="h-4 w-4" /> : <Circle className="h-4 w-4" />}
-            {isRecording
-              ? "Arrêter"
-              : !myConsent
-                ? "Consentir à l'enreg."
-                : allConsented
-                  ? "Enregistrer"
-                  : `Consentements ${consentCount}/${totalParticipants}`}
-            {!allConsented && myConsent && <ShieldAlert className="h-3.5 w-3.5" />}
-          </button>
-          {/* Mobile-only: record icon (compact) */}
-          <button
-            type="button"
-            onClick={requestRecording}
-            disabled={status !== "live"}
-            className={cn(
-              "inline-flex h-11 w-11 items-center justify-center rounded-full border border-hairline transition hover:bg-secondary disabled:opacity-50 sm:hidden",
-              isRecording && "border-destructive/40 bg-destructive/10 text-destructive",
-            )}
-            aria-label={
-              isRecording
-                ? "Arrêter l'enregistrement"
-                : !myConsent
-                  ? "Consentir à l'enregistrement"
-                  : "Démarrer l'enregistrement"
-            }
-          >
-            {isRecording ? <Square className="h-4 w-4" /> : <Circle className="h-4 w-4" />}
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowDiag((v) => !v)}
-            className={cn(
-              "hidden h-11 w-11 items-center justify-center rounded-full border border-hairline transition hover:bg-secondary sm:inline-flex",
-              showDiag && "border-primary/40 bg-primary/10 text-primary",
-            )}
-            aria-label="Diagnostic WebRTC"
-            title="Diagnostic WebRTC"
-          >
-            <Activity className="h-5 w-5" />
-          </button>
-          <button
-            type="button"
-            onClick={handleLeave}
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-accent px-4 text-sm font-semibold text-accent-foreground shadow-md transition hover:opacity-90 sm:px-6"
-            aria-label="Quitter l'appel"
-          >
-            <PhoneOff className="h-5 w-5" />
-            <span className="hidden sm:inline">Quitter</span>
-          </button>
-        </footer>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function RoomStage() {
+  const participants = useParticipants();
+  const tracks = useTracks(
+    [
+      { source: Track.Source.Camera, withPlaceholder: true },
+      { source: Track.Source.ScreenShare, withPlaceholder: false },
+    ],
+    { onlySubscribed: false },
+  );
+
+  return (
+    <div className="flex-1 overflow-hidden p-2">
+      {participants.length === 0 ? (
+        <div className="flex h-full items-center justify-center text-sm text-white/70">
+          En attente d'autres participants…
+        </div>
+      ) : (
+        <GridLayout tracks={tracks} className="h-full">
+          <ParticipantTile />
+        </GridLayout>
+      )}
+    </div>
   );
 }

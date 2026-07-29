@@ -5,7 +5,6 @@ import { DesktopSidebar } from "./DesktopSidebar";
 import { useNotificationsRealtime } from "@/hooks/useNotifications";
 import { useChatToasts } from "@/hooks/useChatToasts";
 import { IncomingCallScreen } from "@/components/messages/IncomingCallScreen";
-import { CallDiagnosticPanel } from "@/components/messages/CallDiagnosticPanel";
 import { IncomingCallsProvider } from "@/hooks/IncomingCallsContext";
 import { usePrimeCallChannel } from "@/hooks/usePrimeCallChannel";
 import { useDjomyPaymentReconciler } from "@/hooks/useDjomyPaymentReconciler";
@@ -47,7 +46,6 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
           <BottomNav />
           <IncomingCallScreen />
-          <CallDiagnosticPanel />
         </div>
         </IncomingCallsProvider>
       </QuickActionsProvider>
