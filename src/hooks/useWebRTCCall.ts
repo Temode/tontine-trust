@@ -87,6 +87,8 @@ export function useWebRTCCall({
   const [turnAvailable, setTurnAvailable] = useState(false);
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [diagEvents, setDiagEvents] = useState<WebRTCDiagEvent[]>([]);
+  const [audioInputs, setAudioInputs] = useState<MediaDeviceInfo[]>([]);
+  const [currentMicId, setCurrentMicId] = useState<string | null>(null);
 
   const localStreamRef = useRef<MediaStream | null>(null);
   const cameraTrackRef = useRef<MediaStreamTrack | null>(null);
@@ -105,6 +107,7 @@ export function useWebRTCCall({
   const recordStartRef = useRef<number>(0);
   const mixedStreamRef = useRef<MediaStream | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
+  const currentMicIdRef = useRef<string | null>(null);
 
   const logDiag = useCallback((ev: Omit<WebRTCDiagEvent, "ts">) => {
     setDiagEvents((prev) => {
@@ -372,6 +375,222 @@ export function useWebRTCCall({
       console.error("listCallParticipants", e);
     }
   }, [callId]);
+
+  const refreshAudioInputs = useCallback(async () => {
+    try {
+      if (!navigator.mediaDevices?.enumerateDevices) return;
+      const devs = await navigator.mediaDevices.enumerateDevices();
+      setAudioInputs(devs.filter((d) => d.kind === "audioinput"));
+    } catch (e) {
+      logDiag({ type: "error", detail: `enumerateDevices: ${(e as Error).message}` });
+    }
+  }, [logDiag]);
+
+  /**
+   * Renégocie un peer connection quand la topologie SDP change
+   * (ajout d'une piste audio là où il n'y en avait pas).
+   */
+  const renegotiate = useCallback(
+    async (peerId: string, reason: string) => {
+      const pc = pcsRef.current[peerId];
+      const channel = channelRef.current;
+      if (!pc || !channel || !myId) return;
+      // Convention initiateur : le user_id le plus petit envoie l'offre.
+      if (myId < peerId) {
+        try {
+          const offer = await pc.createOffer();
+          await pc.setLocalDescription(offer);
+          channel.send({
+            type: "broadcast",
+            event: "offer",
+            payload: { from: myId, to: peerId, sdp: offer, reason },
+          });
+          logDiag({ peer: peerId, type: "offer", detail: `renegotiate: ${reason}` });
+        } catch (e) {
+          logDiag({ peer: peerId, type: "error", detail: `renegotiate: ${(e as Error).message}` });
+        }
+      } else {
+        channel.send({
+          type: "broadcast",
+          event: "need-restart",
+          payload: { from: myId, to: peerId, reason },
+        });
+        logDiag({ peer: peerId, type: "info", detail: `need-restart: ${reason}` });
+      }
+    },
+    [myId, logDiag],
+  );
+
+  /**
+   * Attache (ou remplace) la piste audio locale sur chaque peer connection.
+   * - Si un sender audio existe déjà → replaceTrack (aucune renégociation).
+   * - Sinon → addTrack + renégociation (offer/answer).
+   * Utilisé à la fois par l'auto-attach quand le micro devient disponible
+   * et par le sélecteur de périphérique.
+   */
+  const attachLocalAudioTrack = useCallback(
+    async (newTrack: MediaStreamTrack) => {
+      const local = localStreamRef.current;
+      // Met à jour le MediaStream local (retire les anciennes pistes audio).
+      if (local) {
+        local.getAudioTracks().forEach((t) => {
+          if (t !== newTrack) {
+            try {
+              t.stop();
+            } catch {
+              /* ignore */
+            }
+            try {
+              local.removeTrack(t);
+            } catch {
+              /* ignore */
+            }
+          }
+        });
+        if (!local.getAudioTracks().includes(newTrack)) {
+          local.addTrack(newTrack);
+        }
+        newTrack.enabled = !mediaStateRef.current.micMuted;
+        setLocalStream(new MediaStream(local.getTracks()));
+      }
+
+      for (const [peerId, pc] of Object.entries(pcsRef.current)) {
+        const sender = pc.getSenders().find((s) => s.track?.kind === "audio")
+          ?? pc.getSenders().find((s) => {
+            // Sender d'un transceiver audio sans piste
+            const tr = pc.getTransceivers().find((t) => t.sender === s);
+            return tr?.receiver.track?.kind === "audio" || tr?.mid === null
+              ? s.track === null
+              : false;
+          });
+        if (sender) {
+          try {
+            await sender.replaceTrack(newTrack);
+            logDiag({ peer: peerId, type: "info", detail: "audio sender replaceTrack" });
+            continue;
+          } catch (e) {
+            logDiag({
+              peer: peerId,
+              type: "error",
+              detail: `replaceTrack audio: ${(e as Error).message}`,
+            });
+          }
+        }
+        // Pas de sender audio → addTrack et renégociation SDP.
+        try {
+          if (local) pc.addTrack(newTrack, local);
+          else pc.addTransceiver(newTrack, { direction: "sendrecv" });
+          logDiag({ peer: peerId, type: "info", detail: "audio addTrack (post-start)" });
+          await renegotiate(peerId, "audio-attached");
+        } catch (e) {
+          logDiag({
+            peer: peerId,
+            type: "error",
+            detail: `addTrack audio: ${(e as Error).message}`,
+          });
+        }
+      }
+    },
+    [logDiag, renegotiate],
+  );
+
+  /**
+   * Bascule sur un autre micro (deviceId). Ouvre un nouveau flux, remplace
+   * la piste audio courante et renégocie si nécessaire.
+   */
+  const switchMicrophone = useCallback(
+    async (deviceId: string) => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            deviceId: { exact: deviceId },
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+          },
+        });
+        const newTrack = stream.getAudioTracks()[0];
+        if (!newTrack) throw new Error("Aucune piste audio disponible sur ce périphérique.");
+        currentMicIdRef.current = deviceId;
+        setCurrentMicId(deviceId);
+        await attachLocalAudioTrack(newTrack);
+        logDiag({ type: "info", detail: `micro basculé (${newTrack.label || deviceId})` });
+        void refreshAudioInputs();
+      } catch (e) {
+        const err = e as Error;
+        logDiag({ type: "error", detail: `switchMicrophone: ${err.message}` });
+        throw err;
+      }
+    },
+    [attachLocalAudioTrack, logDiag, refreshAudioInputs],
+  );
+
+  // Rafraîchit la liste des micros à chaque hot-plug + après le démarrage.
+  useEffect(() => {
+    if (!enabled) return;
+    void refreshAudioInputs();
+    if (!navigator.mediaDevices?.addEventListener) return;
+    const handler = () => void refreshAudioInputs();
+    navigator.mediaDevices.addEventListener("devicechange", handler);
+    return () => navigator.mediaDevices.removeEventListener("devicechange", handler);
+  }, [enabled, refreshAudioInputs]);
+
+  // Auto-attache toute nouvelle piste micro qui apparaît après le démarrage
+  // (cas : PC créé sans piste audio → transceiver fallback → getUserMedia
+  // réussit plus tard). Se déclenche quand localStream muté par start().
+  useEffect(() => {
+    if (status !== "live") return;
+    const local = localStreamRef.current;
+    if (!local) return;
+    const audioTracks = local.getAudioTracks();
+    if (audioTracks.length === 0) return;
+    // Renseigne currentMicId depuis la piste courante si non fixé.
+    const firstTrack = audioTracks[0];
+    const settings = firstTrack.getSettings?.();
+    if (settings?.deviceId && !currentMicIdRef.current) {
+      currentMicIdRef.current = settings.deviceId;
+      setCurrentMicId(settings.deviceId);
+    }
+    // Vérifie chaque PC : si le sender audio n'a pas de piste, on l'attache.
+    for (const [peerId, pc] of Object.entries(pcsRef.current)) {
+      const audioSender = pc
+        .getSenders()
+        .find((s) => {
+          if (s.track?.kind === "audio") return true;
+          if (s.track) return false;
+          // Sender vide : appartient probablement au transceiver audio fallback
+          const tr = pc.getTransceivers().find((t) => t.sender === s);
+          return !!tr && tr.receiver.track?.kind !== "video";
+        });
+      if (audioSender && !audioSender.track) {
+        void audioSender
+          .replaceTrack(firstTrack)
+          .then(() =>
+            logDiag({
+              peer: peerId,
+              type: "info",
+              detail: "audio auto-attach (replaceTrack post-start)",
+            }),
+          )
+          .catch((e: Error) =>
+            logDiag({ peer: peerId, type: "error", detail: `auto-attach: ${e.message}` }),
+          );
+      } else if (!audioSender) {
+        // Aucun m=audio dans ce PC → addTrack + renégocie.
+        try {
+          pc.addTrack(firstTrack, local);
+          logDiag({ peer: peerId, type: "info", detail: "audio auto-attach (addTrack)" });
+          void renegotiate(peerId, "audio-auto-attach");
+        } catch (e) {
+          logDiag({
+            peer: peerId,
+            type: "error",
+            detail: `auto-attach addTrack: ${(e as Error).message}`,
+          });
+        }
+      }
+    }
+  }, [status, localStream, logDiag, renegotiate]);
 
   // Main lifecycle
   useEffect(() => {
