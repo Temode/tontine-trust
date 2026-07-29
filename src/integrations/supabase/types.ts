@@ -6699,6 +6699,7 @@ export type Database = {
         }[]
       }
       auto_close_turn: { Args: { _turn_id: string }; Returns: boolean }
+      can_join_call: { Args: { p_call_id: string }; Returns: boolean }
       cancel_my_bid: { Args: { _turn_id: string }; Returns: undefined }
       cancel_turn_swap: { Args: { _request_id: string }; Returns: undefined }
       claim_sms_dedupe: { Args: { _key: string }; Returns: boolean }
