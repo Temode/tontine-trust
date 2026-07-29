@@ -218,6 +218,7 @@ export function CallRequestDialog({ open, onOpenChange, groupId, groupName, onDo
       groupName={groupName}
       initialPrefs={activeCallPrefs}
       cancelOnCloseBeforeJoin
+      manageLifecycle
     />
     </>
   );

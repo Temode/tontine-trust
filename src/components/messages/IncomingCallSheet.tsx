@@ -125,6 +125,7 @@ export function IncomingCallSheet() {
         callId={joined?.callId ?? null}
         groupId={joined?.groupId}
         groupName={joined?.groupName}
+        manageLifecycle
       />
     </>
   );

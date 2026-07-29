@@ -220,6 +220,7 @@ export function IncomingCallScreen() {
         callId={joined?.callId ?? null}
         groupId={joined?.groupId}
         groupName={joined?.groupName}
+        manageLifecycle
       />
     </>
   );
