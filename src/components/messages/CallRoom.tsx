@@ -80,6 +80,11 @@ export function CallRoom({ open, onOpenChange, callId, groupName, initialPrefs }
         if (error || !data?.token) {
           setError(error?.message ?? "Impossible d'obtenir un accès à la salle.");
           setTokenData(null);
+          // Rollback : évite les appels fantômes côté destinataires si
+          // l'accès LiveKit échoue avant qu'aucun participant n'ait rejoint.
+          void supabase
+            .rpc("respond_call_request", { p_id: callId, p_status: "cancelled" })
+            .then(() => {}, () => {});
         } else {
           setTokenData(data);
         }
