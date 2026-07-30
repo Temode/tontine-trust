@@ -91,3 +91,17 @@ export async function explainContribution(contributionId: string): Promise<Recor
   if (error) throw error;
   return (data ?? {}) as Record<string, unknown>;
 }
+
+export interface WithdrawalConsistencyRow {
+  user_id: string;
+  full_name: string | null;
+  balances_withdrawn: number;
+  completed_requests: number;
+  delta: number;
+}
+
+export async function listWithdrawalConsistency(): Promise<WithdrawalConsistencyRow[]> {
+  const { data, error } = await supabase.rpc("admin_withdrawal_consistency_check" as never);
+  if (error) throw error;
+  return (data ?? []) as WithdrawalConsistencyRow[];
+}
