@@ -7,6 +7,7 @@ import {
   listCycleOpenTurnChecks,
   listTontineAlerts,
   listTurnAssignmentAudit,
+  listWithdrawalConsistency,
   resolveTontineAlert,
   type TontineAlert,
 } from "@/lib/api/integrity";
@@ -35,6 +36,10 @@ export default function AdminIntegrity() {
   const auditQ = useQuery({
     queryKey: ["integrity", "audit", groupFilter || null],
     queryFn: () => listTurnAssignmentAudit(groupFilter || undefined),
+  });
+  const withdrawalCheckQ = useQuery({
+    queryKey: ["integrity", "withdrawal-consistency"],
+    queryFn: listWithdrawalConsistency,
   });
 
   const resolveMut = useMutation({
