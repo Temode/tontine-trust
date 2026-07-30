@@ -180,11 +180,9 @@ export default function AdminIntegrity() {
                 className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-slate-800 bg-slate-950/50 px-3 py-2 text-xs"
               >
                 <div>
-                  <span className={SEV_STYLES[(f.severity as TontineAlert["severity"]) ?? "warning"] ? "" : ""}>
-                    <strong className={f.severity === "critical" ? "text-red-300" : "text-amber-300"}>
-                      {FINDING_LABEL[f.code] ?? f.code}
-                    </strong>
-                  </span>
+                  <strong className={f.severity === "critical" ? "text-red-300" : "text-amber-300"}>
+                    {FINDING_LABEL[f.code] ?? f.code}
+                  </strong>
                   <span className="text-slate-400">
                     {" "}· {f.full_name ?? f.user_id.slice(0, 8)} · attendu {formatGNF(f.expected_amount)} /
                     constaté {formatGNF(f.actual_amount)} · écart{" "}
