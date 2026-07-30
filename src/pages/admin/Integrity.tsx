@@ -233,6 +233,33 @@ export default function AdminIntegrity() {
             </label>
             <button
               type="button"
+              disabled={(findingsQ.data?.length ?? 0) === 0}
+              onClick={() =>
+                exportCSV(findingsQ.data ?? [], FINDING_EXPORT_COLUMNS, timestampedName("reconciliation", "csv"))
+              }
+              className="rounded-md border border-slate-700 px-2.5 py-1 text-xs text-slate-200 hover:bg-slate-800 disabled:opacity-40"
+            >
+              <Download className="mr-1 inline h-3 w-3" />
+              CSV
+            </button>
+            <button
+              type="button"
+              disabled={(findingsQ.data?.length ?? 0) === 0}
+              onClick={() =>
+                exportPDF(
+                  "Résultats de réconciliation des soldes",
+                  `${findingsQ.data?.length ?? 0} écart(s) — export du ${new Date().toLocaleString("fr-FR")}`,
+                  findingsQ.data ?? [],
+                  FINDING_EXPORT_COLUMNS,
+                )
+              }
+              className="rounded-md border border-slate-700 px-2.5 py-1 text-xs text-slate-200 hover:bg-slate-800 disabled:opacity-40"
+            >
+              <FileText className="mr-1 inline h-3 w-3" />
+              PDF
+            </button>
+            <button
+              type="button"
               onClick={() => runMut.mutate()}
               disabled={runMut.isPending}
               className="rounded-md border border-slate-700 px-2.5 py-1 text-xs text-slate-200 hover:bg-slate-800 disabled:opacity-50"
