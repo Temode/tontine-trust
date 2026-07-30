@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Wallet, AlertCircle } from "lucide-react";
 import {
@@ -17,6 +17,7 @@ import {
   type WithdrawalChannel,
 } from "@/lib/api/wallet";
 import { cn } from "@/lib/utils";
+import { computeWithdrawalFee, fetchWithdrawalFeeConfig } from "@/lib/api/accounting";
 
 interface Props {
   open: boolean;
@@ -49,6 +50,11 @@ export function GlobalWithdrawDialog({ open, onOpenChange, available }: Props) {
 
   const parsed = Number.parseInt(amount, 10);
   const amountValid = Number.isFinite(parsed) && parsed > 0 && parsed <= available;
+
+  const feeCfgQ = useQuery({ queryKey: ["withdrawal-fee-config"], queryFn: fetchWithdrawalFeeConfig });
+  const feeCfg = feeCfgQ.data ?? { percent: 0, min_fee: 0, max_fee: null, is_active: false };
+  const fee = amountValid ? computeWithdrawalFee(parsed, feeCfg) : 0;
+  const net = amountValid ? parsed - fee : 0;
 
   const details = useMemo<Record<string, string>>(() => {
     if (method === "mobile_money_om" || method === "mobile_money_momo") {
@@ -176,6 +182,22 @@ export function GlobalWithdrawDialog({ open, onOpenChange, available }: Props) {
               <p className="mt-1 text-xs text-destructive">
                 Le montant doit être compris entre 1 et {formatGNF(available)} GNF.
               </p>
+            )}
+            {amountValid && feeCfg.is_active && (
+              <div className="mt-2 space-y-1 rounded-lg border border-hairline bg-secondary/30 p-3 text-xs">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Montant demandé</span>
+                  <span className="num font-semibold">{formatGNF(parsed)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Frais de retrait</span>
+                  <span className="num font-semibold text-destructive">− {formatGNF(fee)}</span>
+                </div>
+                <div className="flex justify-between border-t border-hairline pt-1">
+                  <span className="font-semibold">Net reçu</span>
+                  <span className="num font-bold text-foreground">{formatGNF(net, { withCurrency: true })}</span>
+                </div>
+              </div>
             )}
           </div>
 
