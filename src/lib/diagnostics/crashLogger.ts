@@ -73,6 +73,8 @@ function detectLikelyCause(message: string): string | undefined {
   return undefined;
 }
 
+import { reportIncident } from "@/lib/ops/reportIncident";
+
 export function logCrash(input: {
   source: CrashSource;
   error: unknown;
@@ -128,6 +130,22 @@ export function logCrash(input: {
         : "") +
       (report.stack ? `  stack         :\n${report.stack}\n` : "") +
       (report.extra ? `  extra         : ${JSON.stringify(report.extra)}\n` : ""),
+  );
+
+  // Remontée temps réel à l'équipe (email / SMS / webhook), sans bloquer l'UI.
+  void reportIncident(
+    `crash.${report.source}`,
+    report.message,
+    {
+      route: report.route,
+      user: report.user,
+      roles: report.roles,
+      likely_cause: report.likelyCause ?? null,
+      user_agent: report.userAgent,
+      stack: report.stack?.slice(0, 1500) ?? null,
+      extra: report.extra ?? null,
+    },
+    report.source === "ErrorBoundary" ? "critical" : "warning",
   );
 
   return report;
