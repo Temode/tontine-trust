@@ -26,6 +26,7 @@ import {
 import { formatGNF } from "@/lib/format";
 import { downloadCsv } from "@/lib/export/csv";
 import { cn } from "@/lib/utils";
+import { ReconciliationAlert } from "@/components/admin/ReconciliationAlert";
 
 const PAGE_SIZE = 25;
 
@@ -106,6 +107,7 @@ export default function AdminAccounting() {
           Séparation stricte entre l'argent des clients (cotisations) et les revenus propres de Tontine Digitale.
         </p>
       </header>
+      <ReconciliationAlert />
 
       <div className="mb-6 grid gap-4 lg:grid-cols-2">
         <BalanceCard

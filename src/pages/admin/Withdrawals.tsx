@@ -14,6 +14,7 @@ import {
 } from "@/lib/api/wallet";
 import { formatGNF } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { ReconciliationAlert } from "@/components/admin/ReconciliationAlert";
 
 const TABS: { id: UserWithdrawalStatus | "all"; label: string }[] = [
   { id: "pending", label: "En attente" },
@@ -75,6 +76,7 @@ export default function AdminWithdrawals() {
           Traitez les demandes de retrait des utilisateurs. Effectuez le virement en externe, puis marquez la demande comme payée.
         </p>
       </header>
+      <ReconciliationAlert />
 
       <div className="mb-4 flex flex-wrap gap-2">
         {TABS.map((t) => (
