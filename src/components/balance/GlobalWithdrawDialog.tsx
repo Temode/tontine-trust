@@ -116,6 +116,8 @@ export function GlobalWithdrawDialog({ open, onOpenChange, available }: Props) {
     onError: (e: Error) => {
       const msg = e.message.includes("INSUFFICIENT_BALANCE")
         ? "Solde disponible insuffisant."
+        : e.message.includes("WITHDRAWAL_BLOCKED")
+        ? "Vos retraits sont temporairement suspendus : une incohérence a été détectée sur votre solde. Notre équipe vérifie votre dossier et débloquera votre compte rapidement."
         : e.message.includes("PHONE_MISMATCH")
         ? "Les deux numéros de téléphone ne correspondent pas."
         : e.message;
