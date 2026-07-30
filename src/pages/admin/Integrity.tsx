@@ -328,6 +328,164 @@ export default function AdminIntegrity() {
           <CheckCircle2 className="h-4 w-4 text-emerald-400" />
           Cohérence « total retiré » vs retraits traités
         </h2>
+      </section>
+
+      {/* Garde-fou : retraits suspendus */}
+      <section className="rounded-lg border border-slate-800 bg-slate-900/60 p-4">
+        <h2 className="text-sm font-semibold text-slate-200 flex items-center gap-2">
+          <Lock className="h-4 w-4 text-red-400" />
+          Retraits suspendus ({blocksQ.data?.filter((b) => !b.released_at).length ?? 0})
+        </h2>
+        <p className="mt-1 text-xs text-slate-500">
+          Toute incohérence détectée suspend automatiquement la création de retraits pour l'utilisateur
+          concerné, jusqu'à validation admin (ou clôture de l'écart).
+        </p>
+        {blocksQ.isLoading ? (
+          <p className="mt-2 text-xs text-slate-500">Chargement…</p>
+        ) : (blocksQ.data?.length ?? 0) === 0 ? (
+          <p className="mt-2 text-xs text-emerald-400">Aucun compte suspendu.</p>
+        ) : (
+          <ul className="mt-3 space-y-2">
+            {blocksQ.data?.map((b) => (
+              <li
+                key={b.id}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-slate-800 bg-slate-950/50 px-3 py-2 text-xs"
+              >
+                <div>
+                  <strong className={b.released_at ? "text-slate-400" : "text-red-300"}>
+                    {b.full_name ?? b.user_id.slice(0, 8)}
+                  </strong>
+                  <span className="text-slate-400"> · {b.reason}</span>
+                  <span className="text-slate-600"> · {new Date(b.created_at).toLocaleString("fr-FR")}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setJournalUser({ id: b.user_id, name: b.full_name })}
+                    className="rounded border border-slate-700 px-2 py-1 text-slate-300 hover:bg-slate-800"
+                  >
+                    <ScrollText className="mr-1 inline h-3 w-3" /> Journal
+                  </button>
+                  {!b.released_at && (
+                    <button
+                      type="button"
+                      onClick={() => releaseMut.mutate(b.id)}
+                      disabled={releaseMut.isPending}
+                      className="rounded border border-emerald-700 px-2 py-1 text-emerald-300 hover:bg-emerald-900/30 disabled:opacity-50"
+                    >
+                      Débloquer
+                    </button>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      {/* Alertes équipe */}
+      <section className="rounded-lg border border-slate-800 bg-slate-900/60 p-4">
+        <h2 className="text-sm font-semibold text-slate-200 flex items-center gap-2">
+          <BellRing className="h-4 w-4 text-amber-400" />
+          Alertes équipe ({opsAlertsQ.data?.length ?? 0} non acquittées)
+        </h2>
+        <p className="mt-1 text-xs text-slate-500">
+          Chaque anomalie détectée (écart de solde, crash applicatif, erreur technique) déclenche un
+          envoi immédiat aux destinataires configurés.
+        </p>
+
+        <div className="mt-3 flex flex-wrap items-end gap-2">
+          <select
+            value={newChannel}
+            onChange={(e) => setNewChannel(e.target.value as OpsRecipient["channel"])}
+            className="h-8 rounded-md border border-slate-700 bg-slate-950 px-2 text-xs text-slate-200"
+          >
+            <option value="email">Email</option>
+            <option value="sms">SMS (admins)</option>
+            <option value="webhook">Webhook</option>
+          </select>
+          <input
+            value={newTarget}
+            onChange={(e) => setNewTarget(e.target.value)}
+            placeholder={
+              newChannel === "email"
+                ? "ops@tontinedigitale.com"
+                : newChannel === "webhook"
+                  ? "https://hooks.slack.com/…"
+                  : "activer (valeur libre, ex. admins)"
+            }
+            className="h-8 min-w-[240px] flex-1 rounded-md border border-slate-700 bg-slate-950 px-2 text-xs text-slate-200"
+          />
+          <button
+            type="button"
+            disabled={newTarget.trim().length < 3 || addRecipientMut.isPending}
+            onClick={() => addRecipientMut.mutate()}
+            className="h-8 rounded-md border border-slate-700 px-3 text-xs text-slate-200 hover:bg-slate-800 disabled:opacity-40"
+          >
+            Ajouter
+          </button>
+        </div>
+
+        <ul className="mt-2 flex flex-wrap gap-2">
+          {recipientsQ.data?.map((r) => (
+            <li
+              key={r.id}
+              className="flex items-center gap-2 rounded-full border border-slate-700 bg-slate-950/60 px-3 py-1 text-[11px] text-slate-300"
+            >
+              <span className="font-mono uppercase text-amber-300">{r.channel}</span>
+              <span>{r.target}</span>
+              <button
+                type="button"
+                onClick={() => delRecipientMut.mutate(r.id)}
+                className="text-slate-500 hover:text-red-300"
+                aria-label="Supprimer le destinataire"
+              >
+                <Trash2 className="h-3 w-3" />
+              </button>
+            </li>
+          ))}
+          {(recipientsQ.data?.length ?? 0) === 0 && (
+            <li className="text-xs text-amber-300">
+              Aucun destinataire configuré — les alertes sont enregistrées mais non diffusées.
+            </li>
+          )}
+        </ul>
+
+        {(opsAlertsQ.data?.length ?? 0) > 0 && (
+          <ul className="mt-3 space-y-2">
+            {opsAlertsQ.data?.slice(0, 25).map((a) => (
+              <li
+                key={a.id}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-slate-800 bg-slate-950/50 px-3 py-2 text-xs"
+              >
+                <div>
+                  <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase ${SEV_STYLES[(a.severity as TontineAlert["severity"]) ?? "info"] ?? SEV_STYLES.info}`}>
+                    {a.severity}
+                  </span>
+                  <span className="ml-2 font-mono text-amber-300">{a.code}</span>
+                  <span className="text-slate-400"> · {a.message}</span>
+                  <span className="text-slate-600">
+                    {" "}· email {a.email_status} / sms {a.sms_status} / webhook {a.webhook_status}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => ackMut.mutate(a.id)}
+                  className="rounded border border-emerald-700 px-2 py-1 text-emerald-300 hover:bg-emerald-900/30"
+                >
+                  Acquitter
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section className="rounded-lg border border-slate-800 bg-slate-900/60 p-4">
+        <h2 className="text-sm font-semibold text-slate-200 flex items-center gap-2">
+          <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+          Détail des divergences « total retiré »
+        </h2>
         {withdrawalCheckQ.isLoading ? (
           <p className="mt-2 text-xs text-slate-500">Chargement…</p>
         ) : (withdrawalCheckQ.data?.length ?? 0) === 0 ? (
