@@ -164,6 +164,95 @@ export type Database = {
         }
         Relationships: []
       }
+      balance_reconciliation_findings: {
+        Row: {
+          actual_amount: number
+          code: string
+          created_at: string
+          delta: number
+          details: Json
+          expected_amount: number
+          id: string
+          resolved_at: string | null
+          resolved_by: string | null
+          run_id: string
+          severity: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          actual_amount?: number
+          code: string
+          created_at?: string
+          delta?: number
+          details?: Json
+          expected_amount?: number
+          id?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          run_id: string
+          severity?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          actual_amount?: number
+          code?: string
+          created_at?: string
+          delta?: number
+          details?: Json
+          expected_amount?: number
+          id?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          run_id?: string
+          severity?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "balance_reconciliation_findings_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "balance_reconciliation_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      balance_reconciliation_runs: {
+        Row: {
+          created_at: string
+          discrepancies: number
+          finished_at: string | null
+          id: string
+          source: string
+          started_at: string
+          triggered_by: string | null
+          users_checked: number
+        }
+        Insert: {
+          created_at?: string
+          discrepancies?: number
+          finished_at?: string | null
+          id?: string
+          source?: string
+          started_at?: string
+          triggered_by?: string | null
+          users_checked?: number
+        }
+        Update: {
+          created_at?: string
+          discrepancies?: number
+          finished_at?: string | null
+          id?: string
+          source?: string
+          started_at?: string
+          triggered_by?: string | null
+          users_checked?: number
+        }
+        Relationships: []
+      }
       beneficiary_balances: {
         Row: {
           available_amount: number
@@ -6595,6 +6684,23 @@ export type Database = {
           was_late_in_cycle: boolean
         }[]
       }
+      admin_list_reconciliation_findings: {
+        Args: { _limit?: number; _only_open?: boolean }
+        Returns: {
+          actual_amount: number
+          code: string
+          created_at: string
+          delta: number
+          details: Json
+          expected_amount: number
+          full_name: string
+          id: string
+          resolved_at: string
+          run_id: string
+          severity: string
+          user_id: string
+        }[]
+      }
       admin_list_referral_earnings: {
         Args: { _paid?: boolean; _referrer_id?: string }
         Returns: {
@@ -6698,6 +6804,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      admin_reconciliation_summary: { Args: never; Returns: Json }
       admin_refund_member_deposit: {
         Args: { _deposit_id: string; _reason?: string }
         Returns: undefined
@@ -6709,6 +6816,10 @@ export type Database = {
       admin_resend_payout_hold_notice: {
         Args: { _turn_id: string }
         Returns: boolean
+      }
+      admin_resolve_reconciliation_finding: {
+        Args: { _id: string; _note?: string }
+        Returns: undefined
       }
       admin_set_referral_status: {
         Args: {
@@ -6828,6 +6939,18 @@ export type Database = {
           _percent: number
         }
         Returns: undefined
+      }
+      admin_user_balance_journal: {
+        Args: { _limit?: number; _user_id: string }
+        Returns: {
+          amount: number
+          direction: string
+          kind: string
+          label: string
+          metadata: Json
+          occurred_at: string
+          reference: string
+        }[]
       }
       admin_validate_kyc: {
         Args: { _approve: boolean; _document_id: string; _note?: string }
@@ -7494,6 +7617,10 @@ export type Database = {
       revoke_admin_permissions: {
         Args: { _group_id: string; _user_id: string }
         Returns: undefined
+      }
+      run_balance_reconciliation: {
+        Args: { _source?: string }
+        Returns: string
       }
       seed_notification_preferences: {
         Args: { _user_id: string }

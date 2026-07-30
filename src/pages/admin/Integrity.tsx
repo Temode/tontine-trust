@@ -11,6 +11,15 @@ import {
   resolveTontineAlert,
   type TontineAlert,
 } from "@/lib/api/integrity";
+import {
+  FINDING_LABEL,
+  fetchReconciliationSummary,
+  listReconciliationFindings,
+  resolveReconciliationFinding,
+  runReconciliation,
+} from "@/lib/api/reconciliation";
+import { UserBalanceJournalDialog } from "@/components/admin/UserBalanceJournalDialog";
+import { formatGNF } from "@/lib/format";
 
 const SEV_STYLES: Record<TontineAlert["severity"], string> = {
   critical: "bg-red-500/15 text-red-300 border-red-500/30",
@@ -23,6 +32,8 @@ export default function AdminIntegrity() {
   const [includeResolved, setIncludeResolved] = useState(false);
   const [groupFilter, setGroupFilter] = useState("");
   const [explainOpen, setExplainOpen] = useState<Record<string, unknown> | null>(null);
+  const [journalUser, setJournalUser] = useState<{ id: string; name: string | null } | null>(null);
+  const [showResolved, setShowResolved] = useState(false);
 
   const alertsQ = useQuery({
     queryKey: ["integrity", "alerts", includeResolved],
@@ -40,6 +51,33 @@ export default function AdminIntegrity() {
   const withdrawalCheckQ = useQuery({
     queryKey: ["integrity", "withdrawal-consistency"],
     queryFn: listWithdrawalConsistency,
+  });
+  const reconSummaryQ = useQuery({
+    queryKey: ["reconciliation", "summary"],
+    queryFn: fetchReconciliationSummary,
+  });
+  const findingsQ = useQuery({
+    queryKey: ["reconciliation", "findings", showResolved],
+    queryFn: () => listReconciliationFindings(!showResolved),
+  });
+
+  const runMut = useMutation({
+    mutationFn: runReconciliation,
+    onSuccess: () => {
+      toast.success("Réconciliation exécutée");
+      qc.invalidateQueries({ queryKey: ["reconciliation"] });
+      qc.invalidateQueries({ queryKey: ["integrity", "withdrawal-consistency"] });
+    },
+    onError: (e: Error) => toast.error("Échec du contrôle", { description: e.message }),
+  });
+
+  const resolveFindingMut = useMutation({
+    mutationFn: (id: string) => resolveReconciliationFinding(id, "Traité depuis l'admin"),
+    onSuccess: () => {
+      toast.success("Écart clôturé");
+      qc.invalidateQueries({ queryKey: ["reconciliation"] });
+    },
+    onError: (e: Error) => toast.error("Échec", { description: e.message }),
   });
 
   const resolveMut = useMutation({
@@ -97,6 +135,86 @@ export default function AdminIntegrity() {
 
       {/* Alertes */}
       <section className="rounded-lg border border-slate-800 bg-slate-900/60 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-sm font-semibold text-slate-200 flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4 text-amber-400" />
+            Réconciliation périodique soldes calculés vs comptables
+          </h2>
+          <div className="flex items-center gap-3">
+            <label className="flex items-center gap-1.5 text-xs text-slate-400">
+              <input
+                type="checkbox"
+                checked={showResolved}
+                onChange={(e) => setShowResolved(e.target.checked)}
+              />
+              Inclure clôturés
+            </label>
+            <button
+              type="button"
+              onClick={() => runMut.mutate()}
+              disabled={runMut.isPending}
+              className="rounded-md border border-slate-700 px-2.5 py-1 text-xs text-slate-200 hover:bg-slate-800 disabled:opacity-50"
+            >
+              <RefreshCcw className="mr-1 inline h-3 w-3" />
+              Lancer un contrôle
+            </button>
+          </div>
+        </div>
+        <p className="mt-1 text-xs text-slate-500">
+          Contrôle automatique quotidien (03h15) · dernier passage :{" "}
+          {reconSummaryQ.data?.last_run_at
+            ? new Date(reconSummaryQ.data.last_run_at).toLocaleString("fr-FR")
+            : "jamais"}
+        </p>
+        {findingsQ.isLoading ? (
+          <p className="mt-2 text-xs text-slate-500">Chargement…</p>
+        ) : (findingsQ.data?.length ?? 0) === 0 ? (
+          <p className="mt-2 text-xs text-emerald-400">
+            Aucun écart ouvert — soldes calculés et écritures comptables alignés.
+          </p>
+        ) : (
+          <ul className="mt-3 space-y-2">
+            {findingsQ.data?.map((f) => (
+              <li
+                key={f.id}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-slate-800 bg-slate-950/50 px-3 py-2 text-xs"
+              >
+                <div>
+                  <strong className={f.severity === "critical" ? "text-red-300" : "text-amber-300"}>
+                    {FINDING_LABEL[f.code] ?? f.code}
+                  </strong>
+                  <span className="text-slate-400">
+                    {" "}· {f.full_name ?? f.user_id.slice(0, 8)} · attendu {formatGNF(f.expected_amount)} /
+                    constaté {formatGNF(f.actual_amount)} · écart{" "}
+                    <strong className="text-red-300">{formatGNF(f.delta)}</strong>
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setJournalUser({ id: f.user_id, name: f.full_name })}
+                    className="rounded border border-slate-700 px-2 py-1 text-slate-300 hover:bg-slate-800"
+                  >
+                    <ScrollText className="mr-1 inline h-3 w-3" />
+                    Journal
+                  </button>
+                  {!f.resolved_at && (
+                    <button
+                      type="button"
+                      onClick={() => resolveFindingMut.mutate(f.id)}
+                      className="rounded border border-emerald-700 px-2 py-1 text-emerald-300 hover:bg-emerald-900/30"
+                    >
+                      Clôturer
+                    </button>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section className="rounded-lg border border-slate-800 bg-slate-900/60 p-4">
         <h2 className="text-sm font-semibold text-slate-200 flex items-center gap-2">
           <CheckCircle2 className="h-4 w-4 text-emerald-400" />
           Cohérence « total retiré » vs retraits traités
@@ -114,6 +232,14 @@ export default function AdminIntegrity() {
                 {r.full_name ?? r.user_id.slice(0, 8)} : soldes {Intl.NumberFormat("fr-FR").format(r.balances_withdrawn)} GNF
                 {" "}vs demandes traitées {Intl.NumberFormat("fr-FR").format(r.completed_requests)} GNF
                 {" "}(écart <strong>{Intl.NumberFormat("fr-FR").format(r.delta)}</strong>)
+                {" "}
+                <button
+                  type="button"
+                  onClick={() => setJournalUser({ id: r.user_id, name: r.full_name })}
+                  className="underline hover:text-red-200"
+                >
+                  voir le journal
+                </button>
               </li>
             ))}
           </ul>
@@ -271,6 +397,14 @@ export default function AdminIntegrity() {
       </section>
 
       {/* Modal explication */}
+      {journalUser && (
+        <UserBalanceJournalDialog
+          userId={journalUser.id}
+          userName={journalUser.name}
+          onClose={() => setJournalUser(null)}
+        />
+      )}
+
       {explainOpen && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
