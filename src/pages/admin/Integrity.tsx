@@ -99,6 +99,49 @@ export default function AdminIntegrity() {
     queryKey: ["reconciliation", "findings", showResolved],
     queryFn: () => listReconciliationFindings(!showResolved),
   });
+  const blocksQ = useQuery({
+    queryKey: ["withdrawal-blocks", showResolved],
+    queryFn: () => listWithdrawalBlocks(!showResolved),
+  });
+  const opsAlertsQ = useQuery({
+    queryKey: ["ops-alerts"],
+    queryFn: () => listOpsAlerts(true),
+    refetchInterval: 30_000,
+  });
+  const recipientsQ = useQuery({
+    queryKey: ["ops-recipients"],
+    queryFn: listOpsRecipients,
+  });
+  const [newChannel, setNewChannel] = useState<OpsRecipient["channel"]>("email");
+  const [newTarget, setNewTarget] = useState("");
+
+  const releaseMut = useMutation({
+    mutationFn: (id: string) => releaseWithdrawalBlock(id, "Validé depuis l'admin"),
+    onSuccess: () => {
+      toast.success("Retraits réactivés");
+      qc.invalidateQueries({ queryKey: ["withdrawal-blocks"] });
+    },
+    onError: (e: Error) => toast.error("Échec", { description: e.message }),
+  });
+  const ackMut = useMutation({
+    mutationFn: ackOpsAlert,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["ops-alerts"] }),
+    onError: (e: Error) => toast.error("Échec", { description: e.message }),
+  });
+  const addRecipientMut = useMutation({
+    mutationFn: () => upsertOpsRecipient(newChannel, newTarget.trim()),
+    onSuccess: () => {
+      setNewTarget("");
+      toast.success("Destinataire ajouté");
+      qc.invalidateQueries({ queryKey: ["ops-recipients"] });
+    },
+    onError: (e: Error) => toast.error("Échec", { description: e.message }),
+  });
+  const delRecipientMut = useMutation({
+    mutationFn: deleteOpsRecipient,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["ops-recipients"] }),
+    onError: (e: Error) => toast.error("Échec", { description: e.message }),
+  });
 
   const runMut = useMutation({
     mutationFn: runReconciliation,
