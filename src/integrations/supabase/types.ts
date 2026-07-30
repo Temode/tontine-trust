@@ -3156,6 +3156,107 @@ export type Database = {
           },
         ]
       }
+      penalty_distributions: {
+        Row: {
+          amount: number
+          beneficiary_user_id: string
+          contribution_id: string
+          created_at: string
+          group_id: string
+          id: string
+          reverted_at: string | null
+        }
+        Insert: {
+          amount: number
+          beneficiary_user_id: string
+          contribution_id: string
+          created_at?: string
+          group_id: string
+          id?: string
+          reverted_at?: string | null
+        }
+        Update: {
+          amount?: number
+          beneficiary_user_id?: string
+          contribution_id?: string
+          created_at?: string
+          group_id?: string
+          id?: string
+          reverted_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "penalty_distributions_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
+            referencedRelation: "contributions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "penalty_distributions_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
+            referencedRelation: "group_defaulters"
+            referencedColumns: ["contribution_id"]
+          },
+          {
+            foreignKeyName: "penalty_distributions_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
+            referencedRelation: "group_payments_history"
+            referencedColumns: ["contribution_id"]
+          },
+          {
+            foreignKeyName: "penalty_distributions_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
+            referencedRelation: "my_contributions_due"
+            referencedColumns: ["contribution_id"]
+          },
+          {
+            foreignKeyName: "penalty_distributions_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
+            referencedRelation: "my_late_contributions"
+            referencedColumns: ["contribution_id"]
+          },
+          {
+            foreignKeyName: "penalty_distributions_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
+            referencedRelation: "pending_reminders_view"
+            referencedColumns: ["contribution_id"]
+          },
+          {
+            foreignKeyName: "penalty_distributions_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
+            referencedRelation: "turn_assignment_audit"
+            referencedColumns: ["contribution_id"]
+          },
+          {
+            foreignKeyName: "penalty_distributions_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "admin_group_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "penalty_distributions_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "penalty_distributions_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "my_groups_overview"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       phone_otp_challenges: {
         Row: {
           attempts: number
@@ -3186,6 +3287,60 @@ export type Database = {
           id?: string
           phone_e164?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      platform_ledger: {
+        Row: {
+          amount: number
+          category: string
+          compartment: string
+          created_at: string
+          currency: string
+          direction: string
+          group_id: string | null
+          id: string
+          idempotency_key: string
+          memo: string | null
+          payment_id: string | null
+          sms_order_id: string | null
+          subscription_id: string | null
+          user_id: string | null
+          withdrawal_id: string | null
+        }
+        Insert: {
+          amount: number
+          category: string
+          compartment: string
+          created_at?: string
+          currency?: string
+          direction: string
+          group_id?: string | null
+          id?: string
+          idempotency_key: string
+          memo?: string | null
+          payment_id?: string | null
+          sms_order_id?: string | null
+          subscription_id?: string | null
+          user_id?: string | null
+          withdrawal_id?: string | null
+        }
+        Update: {
+          amount?: number
+          category?: string
+          compartment?: string
+          created_at?: string
+          currency?: string
+          direction?: string
+          group_id?: string | null
+          id?: string
+          idempotency_key?: string
+          memo?: string | null
+          payment_id?: string | null
+          sms_order_id?: string | null
+          subscription_id?: string | null
+          user_id?: string | null
+          withdrawal_id?: string | null
         }
         Relationships: []
       }
@@ -4506,7 +4661,9 @@ export type Database = {
         Row: {
           amount: number
           created_at: string
+          fee_amount: number
           id: string
+          net_amount: number | null
           payment_details: Json
           payment_method: Database["public"]["Enums"]["user_withdrawal_channel"]
           processed_at: string | null
@@ -4519,7 +4676,9 @@ export type Database = {
         Insert: {
           amount: number
           created_at?: string
+          fee_amount?: number
           id?: string
+          net_amount?: number | null
           payment_details?: Json
           payment_method: Database["public"]["Enums"]["user_withdrawal_channel"]
           processed_at?: string | null
@@ -4532,7 +4691,9 @@ export type Database = {
         Update: {
           amount?: number
           created_at?: string
+          fee_amount?: number
           id?: string
+          net_amount?: number | null
           payment_details?: Json
           payment_method?: Database["public"]["Enums"]["user_withdrawal_channel"]
           processed_at?: string | null
@@ -4541,6 +4702,36 @@ export type Database = {
           status?: Database["public"]["Enums"]["user_withdrawal_status"]
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      withdrawal_fee_config: {
+        Row: {
+          id: boolean
+          is_active: boolean
+          max_fee: number | null
+          min_fee: number
+          percent: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          id?: boolean
+          is_active?: boolean
+          max_fee?: number | null
+          min_fee?: number
+          percent?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          id?: boolean
+          is_active?: boolean
+          max_fee?: number | null
+          min_fee?: number
+          percent?: number
+          updated_at?: string
+          updated_by?: string | null
         }
         Relationships: []
       }
@@ -6538,6 +6729,42 @@ export type Database = {
         Args: { _reason?: string; _suspend: boolean; _target_user: string }
         Returns: undefined
       }
+      admin_treasury_journal: {
+        Args: {
+          _category?: string
+          _compartment?: string
+          _from?: string
+          _limit?: number
+          _offset?: number
+          _search?: string
+          _to?: string
+        }
+        Returns: {
+          amount: number
+          category: string
+          compartment: string
+          created_at: string
+          direction: string
+          group_id: string
+          group_name: string
+          id: string
+          memo: string
+          total_count: number
+          user_id: string
+          user_name: string
+        }[]
+      }
+      admin_treasury_summary: {
+        Args: never
+        Returns: {
+          category: string
+          compartment: string
+          net: number
+          net_30d: number
+          total_in: number
+          total_out: number
+        }[]
+      }
       admin_update_sms_order: {
         Args: {
           _admin_note: string
@@ -6592,6 +6819,15 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      admin_update_withdrawal_fee_config: {
+        Args: {
+          _is_active: boolean
+          _max_fee: number
+          _min_fee: number
+          _percent: number
+        }
+        Returns: undefined
       }
       admin_validate_kyc: {
         Args: { _approve: boolean; _document_id: string; _note?: string }
@@ -6710,6 +6946,7 @@ export type Database = {
       close_auction: { Args: { _turn_id: string }; Returns: string }
       compute_hold_until: { Args: { _turn_id: string }; Returns: string }
       compute_premium_price: { Args: { _options: Json }; Returns: number }
+      compute_withdrawal_fee: { Args: { _amount: number }; Returns: number }
       confirm_external_payment: {
         Args: { _proof_id: string }
         Returns: undefined
@@ -6755,6 +6992,10 @@ export type Database = {
           _user_id: string
         }
         Returns: Json
+      }
+      distribute_penalty: {
+        Args: { _contribution_id: string; _notify?: boolean }
+        Returns: number
       }
       email_outbox_mark: {
         Args: { _error?: string; _id: string; _status: string }
@@ -7147,6 +7388,23 @@ export type Database = {
         }
         Returns: string
       }
+      record_platform_entry: {
+        Args: {
+          _amount: number
+          _category: string
+          _compartment: string
+          _direction: string
+          _group_id?: string
+          _idempotency_key: string
+          _memo?: string
+          _payment_id?: string
+          _sms_order_id?: string
+          _subscription_id?: string
+          _user_id?: string
+          _withdrawal_id?: string
+        }
+        Returns: undefined
+      }
       register_referral: { Args: { _code: string }; Returns: string }
       reject_external_payment: {
         Args: { _proof_id: string; _reason?: string }
@@ -7219,6 +7477,10 @@ export type Database = {
         Returns: undefined
       }
       resume_cycle: { Args: { _group_id: string }; Returns: number }
+      revert_penalty_distribution: {
+        Args: { _contribution_id: string }
+        Returns: number
+      }
       revoke_admin_permissions: {
         Args: { _group_id: string; _user_id: string }
         Returns: undefined
@@ -7599,6 +7861,7 @@ export type Database = {
         | "sms_order_paid"
         | "sms_order_failed"
         | "sms_order_cancelled"
+        | "penalty_share_received"
       payment_method_external:
         | "cash"
         | "bank_transfer"
@@ -7921,6 +8184,7 @@ export const Constants = {
         "sms_order_paid",
         "sms_order_failed",
         "sms_order_cancelled",
+        "penalty_share_received",
       ],
       payment_method_external: [
         "cash",

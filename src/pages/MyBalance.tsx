@@ -237,6 +237,11 @@ function UserWithdrawalRow({ w }: { w: UserWithdrawal }) {
       <span className="num shrink-0 font-display text-sm font-bold text-foreground">
         {formatGNF(w.amount, { withCurrency: true })}
       </span>
+      {w.fee_amount > 0 && (
+        <span className="num shrink-0 text-[11px] text-muted-foreground">
+          frais {formatGNF(w.fee_amount)} · net {formatGNF(w.net_amount ?? w.amount - w.fee_amount)}
+        </span>
+      )}
     </li>
   );
 }

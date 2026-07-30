@@ -62,6 +62,7 @@ const AdminSmsPricing = lazy(() => import("@/pages/admin/SmsPricing"));
 const AdminSmsOrders = lazy(() => import("@/pages/admin/SmsOrders"));
 const AdminAffiliation = lazy(() => import("@/pages/admin/AffiliationAdmin"));
 const AdminWithdrawals = lazy(() => import("@/pages/admin/Withdrawals"));
+const AdminAccounting = lazy(() => import("@/pages/admin/Accounting"));
 const Subscription = lazy(() => import("@/pages/Subscription"));
 const SubscriptionCheckout = lazy(() => import("@/pages/SubscriptionCheckout"));
 const SubscriptionConfirmation = lazy(() => import("@/pages/SubscriptionConfirmation"));
@@ -208,6 +209,7 @@ const App = () => (
                     <Route path="/admin/utilisateurs" element={<RouteBoundary name="Admin utilisateurs"><AdminUsers /></RouteBoundary>} />
                     <Route path="/admin/groupes" element={<RouteBoundary name="Admin groupes"><AdminGroups /></RouteBoundary>} />
                     <Route path="/admin/paiements" element={<RouteBoundary name="Admin paiements"><AdminPayments /></RouteBoundary>} />
+                    <Route path="/admin/comptabilite" element={<RouteBoundary name="Comptabilité"><AdminAccounting /></RouteBoundary>} />
                     <Route path="/admin/audit" element={<RouteBoundary name="Admin audit"><AdminAudit /></RouteBoundary>} />
                     <Route path="/admin/integrite" element={<RouteBoundary name="Intégrité tontine"><AdminIntegrity /></RouteBoundary>} />
                     <Route path="/admin/djomy" element={<RouteBoundary name="Identifiants Djomy"><AdminDjomySettings /></RouteBoundary>} />
