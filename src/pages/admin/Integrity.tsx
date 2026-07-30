@@ -1,6 +1,17 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, CheckCircle2, RefreshCcw, ScrollText, Search } from "lucide-react";
+import {
+  AlertTriangle,
+  BellRing,
+  CheckCircle2,
+  Download,
+  FileText,
+  Lock,
+  RefreshCcw,
+  ScrollText,
+  Search,
+  Trash2,
+} from "lucide-react";
 import { toast } from "sonner";
 import {
   explainContribution,
@@ -20,6 +31,34 @@ import {
 } from "@/lib/api/reconciliation";
 import { UserBalanceJournalDialog } from "@/components/admin/UserBalanceJournalDialog";
 import { formatGNF } from "@/lib/format";
+import {
+  ackOpsAlert,
+  deleteOpsRecipient,
+  listOpsAlerts,
+  listOpsRecipients,
+  listWithdrawalBlocks,
+  releaseWithdrawalBlock,
+  upsertOpsRecipient,
+  type OpsRecipient,
+} from "@/lib/api/opsAlerts";
+import { exportCSV, exportPDF, timestampedName, type ExportColumn } from "@/lib/export";
+import type { ReconciliationFinding } from "@/lib/api/reconciliation";
+
+const FINDING_EXPORT_COLUMNS: ExportColumn<ReconciliationFinding>[] = [
+  { key: "date", label: "Date", value: (f) => new Date(f.created_at).toLocaleString("fr-FR") },
+  { key: "code", label: "Type d'écart", value: (f) => FINDING_LABEL[f.code] ?? f.code },
+  { key: "sev", label: "Gravité", value: (f) => f.severity },
+  { key: "user", label: "Utilisateur", value: (f) => f.full_name ?? f.user_id },
+  { key: "user_id", label: "ID utilisateur", value: (f) => f.user_id },
+  { key: "expected", label: "Attendu (GNF)", value: (f) => Number(f.expected_amount ?? 0) },
+  { key: "actual", label: "Constaté (GNF)", value: (f) => Number(f.actual_amount ?? 0) },
+  { key: "delta", label: "Écart (GNF)", value: (f) => Number(f.delta ?? 0) },
+  {
+    key: "status",
+    label: "Statut",
+    value: (f) => (f.resolved_at ? `Clôturé le ${new Date(f.resolved_at).toLocaleString("fr-FR")}` : "Ouvert"),
+  },
+];
 
 const SEV_STYLES: Record<TontineAlert["severity"], string> = {
   critical: "bg-red-500/15 text-red-300 border-red-500/30",
