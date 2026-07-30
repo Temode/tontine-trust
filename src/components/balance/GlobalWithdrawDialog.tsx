@@ -160,6 +160,20 @@ export function GlobalWithdrawDialog({ open, onOpenChange, available }: Props) {
         </DialogHeader>
 
         <div className="space-y-4">
+          {blocked && (
+            <div className="flex gap-2 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-xs text-destructive">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+              <div>
+                <p className="font-semibold">Retraits temporairement suspendus</p>
+                <p className="mt-0.5 opacity-90">
+                  {blockQ.data?.reason ??
+                    "Une incohérence a été détectée sur votre solde."}{" "}
+                  Notre équipe vérifie votre dossier ; vous pourrez de nouveau demander un retrait
+                  dès validation.
+                </p>
+              </div>
+            </div>
+          )}
           {/* Montant */}
           <div>
             <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
