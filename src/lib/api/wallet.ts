@@ -19,6 +19,8 @@ export interface UserWithdrawal {
   id: string;
   user_id: string;
   amount: number;
+  fee_amount: number;
+  net_amount: number | null;
   payment_method: WithdrawalChannel;
   payment_details: Record<string, string>;
   status: UserWithdrawalStatus;
