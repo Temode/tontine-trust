@@ -59,8 +59,10 @@ export default function MyBalance() {
   const balances = balancesQ.data ?? [];
   const totalAvailable = walletQ.data?.available_amount ?? balances.reduce((s, b) => s + b.available_amount, 0);
   const totalLocked = walletQ.data?.locked_amount ?? 0;
-  const totalCredited = balances.reduce((s, b) => s + b.total_credited, 0);
-  const totalWithdrawn = balances.reduce((s, b) => s + b.total_withdrawn, 0);
+  const totalCredited =
+    walletQ.data?.total_credited ?? balances.reduce((s, b) => s + b.total_credited, 0);
+  const totalWithdrawn =
+    walletQ.data?.total_withdrawn ?? balances.reduce((s, b) => s + b.total_withdrawn, 0);
   const heldPayouts = heldQ.data ?? [];
   const totalHeld = heldPayouts.reduce((s, h) => s + h.payout_amount, 0);
 
