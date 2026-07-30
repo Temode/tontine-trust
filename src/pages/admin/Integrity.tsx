@@ -397,6 +397,14 @@ export default function AdminIntegrity() {
       </section>
 
       {/* Modal explication */}
+      {journalUser && (
+        <UserBalanceJournalDialog
+          userId={journalUser.id}
+          userName={journalUser.name}
+          onClose={() => setJournalUser(null)}
+        />
+      )}
+
       {explainOpen && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
