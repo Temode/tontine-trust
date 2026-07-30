@@ -9,9 +9,15 @@ vi.mock("sonner", () => ({
 }));
 
 const rpcMock = vi.fn();
+/** Route les RPC hors flux retrait (blocage, config) vers une réponse neutre. */
+function rpcRouter(...args: unknown[]) {
+  const name = args[0] as string;
+  if (name === "my_withdrawal_block") return Promise.resolve({ data: [], error: null });
+  return rpcMock(...args);
+}
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
-    rpc: (...args: unknown[]) => rpcMock(...args),
+    rpc: (...args: unknown[]) => rpcRouter(...args),
     from: () => ({ select: () => ({ order: async () => ({ data: [], error: null }) }) }),
     functions: { invoke: async () => ({ data: null, error: null }) },
   },
@@ -72,5 +78,21 @@ describe("GlobalWithdrawDialog — erreurs 400 backend", () => {
 
     await waitFor(() => expect(toastError).toHaveBeenCalled());
     expect(toastError.mock.calls[0][1].description).toMatch(/insuffisant/i);
+  });
+
+  it("bloque la demande et informe l'utilisateur quand les retraits sont suspendus", async () => {
+    rpcMock.mockResolvedValueOnce({
+      data: null,
+      error: { message: "WITHDRAWAL_BLOCKED" },
+    });
+    renderDialog();
+
+    fireEvent.change(screen.getByPlaceholderText(/50000/i), { target: { value: "5000" } });
+    fireEvent.change(screen.getByPlaceholderText(/\+224/i), { target: { value: "622000111" } });
+    fireEvent.change(screen.getByPlaceholderText(/Retapez/i), { target: { value: "622000111" } });
+    fireEvent.click(screen.getByRole("button", { name: /Valider la demande/i }));
+
+    await waitFor(() => expect(toastError).toHaveBeenCalled());
+    expect(toastError.mock.calls[0][1].description).toMatch(/suspendus/i);
   });
 });
