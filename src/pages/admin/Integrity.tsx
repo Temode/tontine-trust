@@ -7,6 +7,7 @@ import {
   listCycleOpenTurnChecks,
   listTontineAlerts,
   listTurnAssignmentAudit,
+  listWithdrawalConsistency,
   resolveTontineAlert,
   type TontineAlert,
 } from "@/lib/api/integrity";
@@ -35,6 +36,10 @@ export default function AdminIntegrity() {
   const auditQ = useQuery({
     queryKey: ["integrity", "audit", groupFilter || null],
     queryFn: () => listTurnAssignmentAudit(groupFilter || undefined),
+  });
+  const withdrawalCheckQ = useQuery({
+    queryKey: ["integrity", "withdrawal-consistency"],
+    queryFn: listWithdrawalConsistency,
   });
 
   const resolveMut = useMutation({
@@ -91,6 +96,30 @@ export default function AdminIntegrity() {
       </section>
 
       {/* Alertes */}
+      <section className="rounded-lg border border-slate-800 bg-slate-900/60 p-4">
+        <h2 className="text-sm font-semibold text-slate-200 flex items-center gap-2">
+          <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+          Cohérence « total retiré » vs retraits traités
+        </h2>
+        {withdrawalCheckQ.isLoading ? (
+          <p className="mt-2 text-xs text-slate-500">Chargement…</p>
+        ) : (withdrawalCheckQ.data?.length ?? 0) === 0 ? (
+          <p className="mt-2 text-xs text-emerald-400">
+            Aucune divergence — chaque membre a un total retiré égal à ses demandes traitées.
+          </p>
+        ) : (
+          <ul className="mt-2 space-y-1 text-xs text-red-300">
+            {withdrawalCheckQ.data?.map((r) => (
+              <li key={r.user_id}>
+                {r.full_name ?? r.user_id.slice(0, 8)} : soldes {Intl.NumberFormat("fr-FR").format(r.balances_withdrawn)} GNF
+                {" "}vs demandes traitées {Intl.NumberFormat("fr-FR").format(r.completed_requests)} GNF
+                {" "}(écart <strong>{Intl.NumberFormat("fr-FR").format(r.delta)}</strong>)
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
       <section className="rounded-lg border border-slate-800 overflow-hidden">
         <header className="flex items-center justify-between bg-slate-900 px-4 py-3">
           <h2 className="text-sm font-semibold text-slate-200 flex items-center gap-2">

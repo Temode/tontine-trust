@@ -6833,6 +6833,16 @@ export type Database = {
         Args: { _approve: boolean; _document_id: string; _note?: string }
         Returns: undefined
       }
+      admin_withdrawal_consistency_check: {
+        Args: never
+        Returns: {
+          balances_withdrawn: number
+          completed_requests: number
+          delta: number
+          full_name: string
+          user_id: string
+        }[]
+      }
       append_ledger: {
         Args: {
           _amount: number
