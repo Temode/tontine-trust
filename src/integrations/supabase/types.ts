@@ -2805,6 +2805,87 @@ export type Database = {
           },
         ]
       }
+      ops_alert_recipients: {
+        Row: {
+          channel: string
+          created_at: string
+          enabled: boolean
+          id: string
+          min_severity: string
+          target: string
+          updated_at: string
+        }
+        Insert: {
+          channel: string
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          min_severity?: string
+          target: string
+          updated_at?: string
+        }
+        Update: {
+          channel?: string
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          min_severity?: string
+          target?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      ops_alerts: {
+        Row: {
+          acknowledged_at: string | null
+          acknowledged_by: string | null
+          code: string
+          context: Json
+          created_at: string
+          dedupe_key: string
+          email_status: string
+          id: string
+          message: string
+          severity: string
+          sms_status: string
+          webhook_error: string | null
+          webhook_sent_at: string | null
+          webhook_status: string
+        }
+        Insert: {
+          acknowledged_at?: string | null
+          acknowledged_by?: string | null
+          code: string
+          context?: Json
+          created_at?: string
+          dedupe_key: string
+          email_status?: string
+          id?: string
+          message: string
+          severity?: string
+          sms_status?: string
+          webhook_error?: string | null
+          webhook_sent_at?: string | null
+          webhook_status?: string
+        }
+        Update: {
+          acknowledged_at?: string | null
+          acknowledged_by?: string | null
+          code?: string
+          context?: Json
+          created_at?: string
+          dedupe_key?: string
+          email_status?: string
+          id?: string
+          message?: string
+          severity?: string
+          sms_status?: string
+          webhook_error?: string | null
+          webhook_sent_at?: string | null
+          webhook_status?: string
+        }
+        Relationships: []
+      }
       payment_links: {
         Row: {
           amount: number
@@ -4746,6 +4827,39 @@ export type Database = {
         }
         Relationships: []
       }
+      user_withdrawal_blocks: {
+        Row: {
+          created_at: string
+          finding_id: string | null
+          id: string
+          reason: string
+          release_note: string | null
+          released_at: string | null
+          released_by: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          finding_id?: string | null
+          id?: string
+          reason: string
+          release_note?: string | null
+          released_at?: string | null
+          released_by?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          finding_id?: string | null
+          id?: string
+          reason?: string
+          release_note?: string | null
+          released_at?: string | null
+          released_by?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_withdrawal_requests: {
         Row: {
           amount: number
@@ -6615,6 +6729,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      admin_ack_ops_alert: { Args: { _id: string }; Returns: undefined }
       admin_complete_dispute_export: {
         Args: {
           _error?: string
@@ -6631,6 +6746,7 @@ export type Database = {
         Args: { _approve: boolean; _reason?: string; _request_id: string }
         Returns: undefined
       }
+      admin_delete_ops_recipient: { Args: { _id: string }; Returns: undefined }
       admin_force_deposit_status: {
         Args: { _deposit_id: string; _new_status: string; _reason: string }
         Returns: undefined
@@ -6662,6 +6778,49 @@ export type Database = {
           user_id: string
           user_phone: string
         }[]
+      }
+      admin_list_ops_alerts: {
+        Args: { _limit?: number; _only_open?: boolean }
+        Returns: {
+          acknowledged_at: string | null
+          acknowledged_by: string | null
+          code: string
+          context: Json
+          created_at: string
+          dedupe_key: string
+          email_status: string
+          id: string
+          message: string
+          severity: string
+          sms_status: string
+          webhook_error: string | null
+          webhook_sent_at: string | null
+          webhook_status: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "ops_alerts"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      admin_list_ops_recipients: {
+        Args: never
+        Returns: {
+          channel: string
+          created_at: string
+          enabled: boolean
+          id: string
+          min_severity: string
+          target: string
+          updated_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "ops_alert_recipients"
+          isOneToOne: false
+          isSetofReturn: true
+        }
       }
       admin_list_payout_holds: {
         Args: { _only_active?: boolean }
@@ -6732,6 +6891,19 @@ export type Database = {
           referrer_name: string
           status: Database["public"]["Enums"]["referral_status"]
           total_earned: number
+        }[]
+      }
+      admin_list_withdrawal_blocks: {
+        Args: { _only_open?: boolean }
+        Returns: {
+          created_at: string
+          finding_id: string
+          full_name: string
+          id: string
+          reason: string
+          release_note: string
+          released_at: string
+          user_id: string
         }[]
       }
       admin_list_withdrawals: {
@@ -6811,6 +6983,10 @@ export type Database = {
       }
       admin_reject_withdrawal: {
         Args: { _id: string; _reason: string }
+        Returns: undefined
+      }
+      admin_release_withdrawal_block: {
+        Args: { _id: string; _note?: string }
         Returns: undefined
       }
       admin_resend_payout_hold_notice: {
@@ -6939,6 +7115,10 @@ export type Database = {
           _percent: number
         }
         Returns: undefined
+      }
+      admin_upsert_ops_recipient: {
+        Args: { _channel: string; _enabled?: boolean; _target: string }
+        Returns: string
       }
       admin_user_balance_journal: {
         Args: { _limit?: number; _user_id: string }
@@ -7071,6 +7251,10 @@ export type Database = {
         }[]
       }
       auto_close_turn: { Args: { _turn_id: string }; Returns: boolean }
+      block_user_withdrawals: {
+        Args: { _finding_id?: string; _reason: string; _user_id: string }
+        Returns: string
+      }
       can_join_call: { Args: { p_call_id: string }; Returns: boolean }
       can_moderate_call: { Args: { p_call_id: string }; Returns: boolean }
       cancel_my_bid: { Args: { _turn_id: string }; Returns: undefined }
@@ -7313,6 +7497,7 @@ export type Database = {
       }
       is_rpc_context: { Args: never; Returns: boolean }
       is_super_admin: { Args: { _uid: string }; Returns: boolean }
+      is_withdrawal_blocked: { Args: { _uid: string }; Returns: boolean }
       join_call: { Args: { p_call_id: string }; Returns: undefined }
       join_group_with_code: {
         Args: {
@@ -7453,6 +7638,14 @@ export type Database = {
         Args: { _flag: string; _group: string; _user: string }
         Returns: boolean
       }
+      my_withdrawal_block: {
+        Args: never
+        Returns: {
+          created_at: string
+          id: string
+          reason: string
+        }[]
+      }
       notification_kind_is_sms_critical: {
         Args: { _kind: Database["public"]["Enums"]["notification_kind"] }
         Returns: boolean
@@ -7471,6 +7664,21 @@ export type Database = {
         Returns: string
       }
       open_next_turn: { Args: { _cycle_id: string }; Returns: string }
+      ops_alert_webhook_mark: {
+        Args: { _error?: string; _id: string; _status: string }
+        Returns: undefined
+      }
+      ops_alert_webhook_pop: {
+        Args: { _limit?: number }
+        Returns: {
+          code: string
+          context: Json
+          created_at: string
+          id: string
+          message: string
+          severity: string
+        }[]
+      }
       pause_cycle: {
         Args: { _group_id: string; _reason?: string }
         Returns: undefined
@@ -7487,6 +7695,16 @@ export type Database = {
           _contribution_id: string
           _evidence_url?: string
           _reason: string
+        }
+        Returns: string
+      }
+      raise_ops_alert: {
+        Args: {
+          _code: string
+          _context?: Json
+          _dedupe_key?: string
+          _message: string
+          _severity: string
         }
         Returns: string
       }
@@ -7549,6 +7767,15 @@ export type Database = {
         Args: {
           _provider?: Database["public"]["Enums"]["payment_provider"]
           _turn_id: string
+        }
+        Returns: string
+      }
+      report_client_incident: {
+        Args: {
+          _code: string
+          _context?: Json
+          _message: string
+          _severity?: string
         }
         Returns: string
       }

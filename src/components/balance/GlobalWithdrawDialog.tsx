@@ -18,6 +18,7 @@ import {
 } from "@/lib/api/wallet";
 import { cn } from "@/lib/utils";
 import { computeWithdrawalFee, fetchWithdrawalFeeConfig } from "@/lib/api/accounting";
+import { fetchMyWithdrawalBlock } from "@/lib/api/opsAlerts";
 
 interface Props {
   open: boolean;
@@ -34,6 +35,12 @@ const CHANNELS: WithdrawalChannel[] = [
 
 export function GlobalWithdrawDialog({ open, onOpenChange, available }: Props) {
   const qc = useQueryClient();
+  const blockQ = useQuery({
+    queryKey: ["my-withdrawal-block"],
+    queryFn: fetchMyWithdrawalBlock,
+    enabled: open,
+  });
+  const blocked = Boolean(blockQ.data);
   const [amount, setAmount] = useState("");
   const [method, setMethod] = useState<WithdrawalChannel>("mobile_money_om");
   // Mobile money
@@ -116,6 +123,8 @@ export function GlobalWithdrawDialog({ open, onOpenChange, available }: Props) {
     onError: (e: Error) => {
       const msg = e.message.includes("INSUFFICIENT_BALANCE")
         ? "Solde disponible insuffisant."
+        : e.message.includes("WITHDRAWAL_BLOCKED")
+        ? "Vos retraits sont temporairement suspendus : une incohérence a été détectée sur votre solde. Notre équipe vérifie votre dossier et débloquera votre compte rapidement."
         : e.message.includes("PHONE_MISMATCH")
         ? "Les deux numéros de téléphone ne correspondent pas."
         : e.message;
@@ -151,6 +160,20 @@ export function GlobalWithdrawDialog({ open, onOpenChange, available }: Props) {
         </DialogHeader>
 
         <div className="space-y-4">
+          {blocked && (
+            <div className="flex gap-2 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-xs text-destructive">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+              <div>
+                <p className="font-semibold">Retraits temporairement suspendus</p>
+                <p className="mt-0.5 opacity-90">
+                  {blockQ.data?.reason ??
+                    "Une incohérence a été détectée sur votre solde."}{" "}
+                  Notre équipe vérifie votre dossier ; vous pourrez de nouveau demander un retrait
+                  dès validation.
+                </p>
+              </div>
+            </div>
+          )}
           {/* Montant */}
           <div>
             <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -273,7 +296,7 @@ export function GlobalWithdrawDialog({ open, onOpenChange, available }: Props) {
           </button>
           <button
             type="button"
-            disabled={!valid || mut.isPending}
+            disabled={!valid || mut.isPending || blocked}
             onClick={() => mut.mutate()}
             className="inline-flex h-10 items-center gap-2 rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-primary-700 disabled:opacity-60"
           >
