@@ -18,6 +18,7 @@ import {
 } from "@/lib/api/wallet";
 import { cn } from "@/lib/utils";
 import { computeWithdrawalFee, fetchWithdrawalFeeConfig } from "@/lib/api/accounting";
+import { fetchMyWithdrawalBlock } from "@/lib/api/opsAlerts";
 
 interface Props {
   open: boolean;
@@ -34,6 +35,12 @@ const CHANNELS: WithdrawalChannel[] = [
 
 export function GlobalWithdrawDialog({ open, onOpenChange, available }: Props) {
   const qc = useQueryClient();
+  const blockQ = useQuery({
+    queryKey: ["my-withdrawal-block"],
+    queryFn: fetchMyWithdrawalBlock,
+    enabled: open,
+  });
+  const blocked = Boolean(blockQ.data);
   const [amount, setAmount] = useState("");
   const [method, setMethod] = useState<WithdrawalChannel>("mobile_money_om");
   // Mobile money
