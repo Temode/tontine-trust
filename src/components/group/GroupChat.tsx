@@ -1,9 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Check, CheckCheck, Send } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { getInitials } from "@/lib/format";
 import { useAuth } from "@/hooks/useAuth";
 import {
   listGroupMessages,
@@ -12,20 +10,35 @@ import {
   subscribeGroupMessages,
   type DbGroupMessage,
 } from "@/lib/api/chat";
-import { AttachmentPicker } from "@/components/messages/AttachmentPicker";
-import { AttachmentView } from "@/components/messages/AttachmentView";
-import { VoiceRecorder } from "@/components/messages/VoiceRecorder";
 import { TypingIndicator } from "@/components/messages/TypingIndicator";
 import { UnreadSeparator } from "@/components/messages/UnreadSeparator";
+import { DaySeparator } from "@/components/messages/DaySeparator";
+import { MessageBubble } from "@/components/messages/MessageBubble";
+import { Composer } from "@/components/messages/Composer";
 import { useTypingChannel } from "@/hooks/useTypingChannel";
 import { supabase } from "@/integrations/supabase/client";
 import type { UploadedAttachment } from "@/lib/api/chatAttachments";
 
 interface Props {
   groupId: string;
+  /** "page" = surface plein cadre (messagerie), "panel" = carte encastrée (détail groupe). */
+  variant?: "page" | "panel";
+  groupName?: string;
 }
 
-export function GroupChat({ groupId }: Props) {
+const BURST_WINDOW_MS = 5 * 60 * 1000;
+
+function sameDay(a: string, b: string): boolean {
+  const x = new Date(a);
+  const y = new Date(b);
+  return (
+    x.getFullYear() === y.getFullYear() &&
+    x.getMonth() === y.getMonth() &&
+    x.getDate() === y.getDate()
+  );
+}
+
+export function GroupChat({ groupId, variant = "panel", groupName = "" }: Props) {
   const { user } = useAuth();
   const qc = useQueryClient();
   const [body, setBody] = useState("");
@@ -124,164 +137,120 @@ export function GroupChat({ groupId }: Props) {
     onError: (e: Error) => toast.error("Envoi impossible", { description: e.message }),
   });
 
-  const onSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const v = body.trim();
-    if ((!v && !attachment) || sendM.isPending) return;
+  const submit = () => {
+    if ((!body.trim() && !attachment) || sendM.isPending) return;
     sendM.mutate();
   };
 
+  const rows = useMemo(() => {
+    return messages.map((m, idx) => {
+      const prev = messages[idx - 1];
+      const next = messages[idx + 1];
+      const newDay = !prev || !sameDay(prev.created_at, m.created_at);
+      const burstWithPrev =
+        !!prev &&
+        !newDay &&
+        prev.author_user_id === m.author_user_id &&
+        new Date(m.created_at).getTime() - new Date(prev.created_at).getTime() < BURST_WINDOW_MS;
+      const burstWithNext =
+        !!next &&
+        sameDay(next.created_at, m.created_at) &&
+        next.author_user_id === m.author_user_id &&
+        new Date(next.created_at).getTime() - new Date(m.created_at).getTime() < BURST_WINDOW_MS;
+      return { m, newDay, showName: !burstWithPrev, showAvatar: !burstWithNext, isLastOfBurst: !burstWithNext };
+    });
+  }, [messages]);
+
+  const lastMineId = useMemo(() => {
+    for (let i = messages.length - 1; i >= 0; i -= 1) {
+      if (messages[i].author_user_id === user?.id) return messages[i].id;
+    }
+    return null;
+  }, [messages, user?.id]);
+
+  const isPage = variant === "page";
+
   return (
-    <div className="flex h-[60vh] flex-col overflow-hidden rounded-xl border border-hairline bg-card">
-      <div ref={listRef} className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
-        {isLoading && (
-          <div className="space-y-3 px-2">
-            {Array.from({ length: 4 }).map((_, i) => (
+    <div
+      className={cn(
+        "flex flex-col overflow-hidden",
+        isPage ? "h-full" : "h-[60vh] rounded-xl border border-hairline",
+        "chat-wallpaper",
+      )}
+    >
+      <div
+        ref={listRef}
+        className={cn(
+          "scrollbar-thin flex-1 overflow-y-auto px-3 py-4 lg:px-6",
+        )}
+      >
+        <div className="mx-auto w-full max-w-3xl space-y-1">
+          {isLoading &&
+            Array.from({ length: 4 }).map((_, i) => (
               <div key={i} className="flex items-end gap-2">
-                <div className="h-8 w-8 animate-pulse rounded-full bg-secondary" />
+                <div className="h-7 w-7 animate-pulse rounded-full bg-secondary" />
                 <div className="h-12 w-2/3 animate-pulse rounded-2xl bg-secondary" />
               </div>
             ))}
-          </div>
-        )}
-        {!isLoading && messages.length === 0 && (
-          <p className="text-center text-sm text-muted-foreground">
-            Aucun message. Lancez la discussion !
-          </p>
-        )}
-        {messages.map((m, idx) => {
-          const mine = m.author_user_id === user?.id;
-          const name = m.author?.full_name?.trim() || "Membre";
-          const initials = getInitials(name) || "··";
-          const showUnread =
-            initialUnreadRef.current?.firstId === m.id &&
-            initialUnreadRef.current.count > 0;
-          const prev = messages[idx - 1];
-          const sameAuthorAsPrev = prev && prev.author_user_id === m.author_user_id;
-          const isLastFromMe =
-            mine && messages.slice(idx + 1).every((x) => x.author_user_id !== user?.id);
-          const readByOthers =
-            isLastFromMe && false; // serveur ne suit pas par message ; pour v1, on affiche CheckCheck si message ancien
-          // Heuristique : on considère "lu" si message vieux de >2s ET pas le dernier de la list (le récepteur ouvre la conv)
-          return (
-            <div key={m.id}>
-              {showUnread && <UnreadSeparator count={initialUnreadRef.current!.count} />}
-              <div
-                className={cn(
-                  "flex items-end gap-2",
-                  mine && "flex-row-reverse",
-                  sameAuthorAsPrev && "mt-0.5",
-                )}
-              >
-              <div className="flex h-8 w-8 shrink-0 overflow-hidden rounded-full bg-secondary">
-                {m.author?.avatar_url ? (
-                  <img src={m.author.avatar_url} alt={name} className="h-full w-full object-cover" />
-                ) : (
-                  <span className="flex h-full w-full items-center justify-center text-[10px] font-bold text-foreground">
-                    {initials}
-                  </span>
-                )}
-              </div>
-              <div
-                className={cn(
-                  "max-w-[75%] rounded-2xl px-3 py-2 text-sm",
-                  mine
-                    ? "rounded-br-sm bg-primary text-primary-foreground"
-                    : "rounded-bl-sm bg-secondary text-foreground",
-                )}
-              >
-                {!mine && !sameAuthorAsPrev && (
-                  <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                    {name}
-                  </p>
-                )}
-                {m.attachment_url && (
-                  <AttachmentView
-                    path={m.attachment_url}
-                    type={m.attachment_type ?? "application/octet-stream"}
-                    name={m.attachment_name ?? "Pièce jointe"}
-                    size={m.attachment_size}
-                  />
-                )}
-                {m.body && m.body.trim() && (
-                  <p className="whitespace-pre-wrap break-words">{m.body}</p>
-                )}
-                <div
-                  className={cn(
-                    "mt-1 flex items-center gap-1 text-[10px] tabular-nums",
-                    mine ? "justify-end text-primary-100/80" : "text-muted-foreground",
-                  )}
-                >
-                  <span>
-                    {new Date(m.created_at).toLocaleTimeString("fr-FR", {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
-                  </span>
-                  {mine && (
-                    readByOthers ? (
-                      <CheckCheck className="h-3 w-3 text-accent" />
-                    ) : isLastFromMe ? (
-                      <CheckCheck className="h-3 w-3" />
-                    ) : (
-                      <Check className="h-3 w-3" />
-                    )
-                  )}
-                </div>
-              </div>
-              </div>
+
+          {!isLoading && messages.length === 0 && (
+            <div className="flex h-full items-center justify-center py-16">
+              <p className="chat-bubble-shadow rounded-full bg-chat-in px-4 py-2 text-xs text-muted-foreground">
+                Aucun message — lancez la discussion
+              </p>
             </div>
-          );
-        })}
+          )}
+
+          {rows.map(({ m, newDay, showName, showAvatar, isLastOfBurst }) => {
+            const mine = m.author_user_id === user?.id;
+            const showUnread =
+              initialUnreadRef.current?.firstId === m.id && initialUnreadRef.current.count > 0;
+            return (
+              <div key={m.id} className={cn(showName ? "pt-2" : "pt-0.5")}>
+                {newDay && <DaySeparator iso={m.created_at} />}
+                {showUnread && <UnreadSeparator count={initialUnreadRef.current!.count} />}
+                <MessageBubble
+                  message={m}
+                  mine={mine}
+                  groupName={groupName}
+                  showAvatar={showAvatar}
+                  showName={showName}
+                  isLastOfBurst={isLastOfBurst}
+                  delivered={m.id !== lastMineId}
+                />
+              </div>
+            );
+          })}
+        </div>
       </div>
+
       <TypingIndicator typers={typers} />
-      <form onSubmit={onSubmit} className="flex items-center gap-2 border-t border-hairline bg-card px-3 py-2">
-        <AttachmentPicker
-          groupId={groupId}
-          value={attachment}
-          onChange={setAttachment}
-          disabled={sendM.isPending}
-        />
-        <VoiceRecorder
-          groupId={groupId}
-          disabled={sendM.isPending}
-          onRecorded={(a) => {
-            sendGroupMessageV2(groupId, {
-              body: "",
-              attachment: { url: a.url, type: a.type, name: a.name, size: a.size },
+
+      <Composer
+        groupId={groupId}
+        body={body}
+        onBodyChange={(v) => {
+          setBody(v);
+          notifyTyping();
+        }}
+        attachment={attachment}
+        onAttachmentChange={setAttachment}
+        onSubmit={submit}
+        pending={sendM.isPending}
+        onRecorded={(a) => {
+          sendGroupMessageV2(groupId, {
+            body: "",
+            attachment: { url: a.url, type: a.type, name: a.name, size: a.size },
+          })
+            .then((msg) => {
+              qc.setQueryData<DbGroupMessage[]>(["chat", groupId], (prev = []) => {
+                if (prev.some((x) => x.id === msg.id)) return prev;
+                return [...prev, msg];
+              });
             })
-              .then((msg) => {
-                qc.setQueryData<DbGroupMessage[]>(["chat", groupId], (prev = []) => {
-                  if (prev.some((m) => m.id === msg.id)) return prev;
-                  return [...prev, msg];
-                });
-              })
-              .catch((e: Error) =>
-                toast.error("Envoi impossible", { description: e.message }),
-              );
-          }}
-        />
-        <input
-          type="text"
-          value={body}
-          onChange={(e) => {
-            setBody(e.target.value);
-            notifyTyping();
-          }}
-          placeholder="Votre message…"
-          maxLength={2000}
-          className="flex-1 rounded-md border border-hairline bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
-          aria-label="Message"
-        />
-        <button
-          type="submit"
-          disabled={sendM.isPending || (!body.trim() && !attachment)}
-          className="inline-flex h-10 w-10 items-center justify-center rounded-md bg-primary text-primary-foreground transition hover:opacity-90 disabled:opacity-50"
-          aria-label="Envoyer"
-        >
-          <Send className="h-4 w-4" />
-        </button>
-      </form>
+            .catch((e: Error) => toast.error("Envoi impossible", { description: e.message }));
+        }}
+      />
     </div>
   );
 }

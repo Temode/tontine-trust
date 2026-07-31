@@ -64,6 +64,14 @@
     --sidebar-accent-foreground: 187 75% 19%;
     --sidebar-border: 40 14% 90%;
     --sidebar-ring: 187 75% 19%;
+
+    /* Chat surface */
+    --chat-surface: 42 30% 95%;
+    --chat-bubble-in: 0 0% 100%;
+    --chat-bubble-in-foreground: 200 35% 9%;
+    --chat-bubble-out: 183 80% 26%;
+    --chat-bubble-out-foreground: 40 30% 96%;
+    --chat-pattern: 183 25% 35%;
   }
 
   .dark {
@@ -103,6 +111,13 @@
     --border: 200 25% 18%;
     --input: 200 25% 18%;
     --ring: 186 55% 42%;
+
+    --chat-surface: 200 32% 8%;
+    --chat-bubble-in: 200 28% 13%;
+    --chat-bubble-in-foreground: 40 20% 92%;
+    --chat-bubble-out: 187 70% 22%;
+    --chat-bubble-out-foreground: 40 25% 94%;
+    --chat-pattern: 186 40% 70%;
   }
 }
 
@@ -169,5 +184,21 @@
   .call-pulse-ring { animation: call-pulse-ring 1.8s cubic-bezier(0.16, 1, 0.3, 1) infinite; }
   @media (prefers-reduced-motion: reduce) {
     .call-breathe, .call-pulse-ring { animation: none !important; }
+  }
+}
+
+@layer utilities {
+  /* Papier peint de conversation — motif géométrique discret, jamais bruyant. */
+  .chat-wallpaper {
+    background-color: hsl(var(--chat-surface));
+    background-image:
+      radial-gradient(hsl(var(--chat-pattern) / 0.07) 1px, transparent 1.2px),
+      radial-gradient(hsl(var(--chat-pattern) / 0.05) 1px, transparent 1.2px);
+    background-size: 28px 28px, 28px 28px;
+    background-position: 0 0, 14px 14px;
+  }
+
+  .chat-bubble-shadow {
+    box-shadow: 0 1px 1px 0 hsl(200 30% 9% / 0.08), 0 1px 3px -1px hsl(200 30% 9% / 0.06);
   }
 }

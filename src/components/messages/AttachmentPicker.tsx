@@ -13,6 +13,9 @@ interface Props {
   value: UploadedAttachment | null;
   onChange: (a: UploadedAttachment | null) => void;
   disabled?: boolean;
+  /** N'affiche jamais l'aperçu inline : le parent gère l'affichage. */
+  iconOnly?: boolean;
+  className?: string;
 }
 
 function formatBytes(n: number) {
@@ -21,7 +24,14 @@ function formatBytes(n: number) {
   return `${(n / (1024 * 1024)).toFixed(1)} Mo`;
 }
 
-export function AttachmentPicker({ groupId, value, onChange, disabled }: Props) {
+export function AttachmentPicker({
+  groupId,
+  value,
+  onChange,
+  disabled,
+  iconOnly,
+  className,
+}: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
 
@@ -47,7 +57,7 @@ export function AttachmentPicker({ groupId, value, onChange, disabled }: Props) 
     }
   };
 
-  if (value) {
+  if (value && !iconOnly) {
     const isImg = value.type.startsWith("image/");
     return (
       <div className="flex items-center gap-2 rounded-md border border-hairline bg-secondary px-2 py-1.5 text-xs">
@@ -76,7 +86,10 @@ export function AttachmentPicker({ groupId, value, onChange, disabled }: Props) 
         type="button"
         disabled={disabled || busy}
         onClick={() => fileRef.current?.click()}
-        className="inline-flex h-10 w-10 items-center justify-center rounded-md text-muted-foreground transition hover:bg-secondary hover:text-foreground disabled:opacity-50"
+        className={
+          className ??
+          "inline-flex h-10 w-10 items-center justify-center rounded-md text-muted-foreground transition hover:bg-secondary hover:text-foreground disabled:opacity-50"
+        }
         aria-label="Joindre un fichier"
         title="Joindre une image ou un PDF (max 8 Mo)"
       >

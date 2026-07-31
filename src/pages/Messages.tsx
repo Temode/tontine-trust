@@ -75,17 +75,19 @@ export default function Messages() {
         {/* Conversation */}
         <section
           className={cn(
-            "flex-1 flex-col bg-background",
+            "min-w-0 flex-1 flex-col bg-chat-surface",
             groupId ? "flex" : "hidden lg:flex",
           )}
         >
           {activeConv ? (
             <>
               <ConversationHeader group={activeConv.group} />
-              <div className="flex-1 overflow-hidden p-3 lg:p-4">
-                <div className="h-full">
-                  <GroupChat groupId={activeConv.group.id} />
-                </div>
+              <div className="min-h-0 flex-1 overflow-hidden">
+                <GroupChat
+                  groupId={activeConv.group.id}
+                  variant="page"
+                  groupName={activeConv.group.name}
+                />
               </div>
             </>
           ) : (
