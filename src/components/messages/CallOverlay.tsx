@@ -62,20 +62,23 @@ export function usePictureInPicture(getVideo: () => HTMLVideoElement | null) {
     };
   }, []);
 
-  const toggle = useCallback(async () => {
-    if (!supported) return;
+  /** @returns true si le PiP a bien été activé/désactivé, false si indisponible. */
+  const toggle = useCallback(async (): Promise<boolean> => {
+    if (!supported) return false;
     try {
       if (document.pictureInPictureElement) {
         await document.exitPictureInPicture();
         setActive(false);
-        return;
+        return true;
       }
       const video = getVideo();
-      if (!video) return;
+      if (!video) return false;
       await video.requestPictureInPicture();
       setActive(true);
+      return true;
     } catch {
-      /* ignore */
+      setActive(false);
+      return false;
     }
   }, [getVideo, supported]);
 
