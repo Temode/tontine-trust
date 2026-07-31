@@ -8,6 +8,7 @@ import { Track } from "livekit-client";
 import type { LocalParticipant } from "livekit-client";
 import { Maximize2, Mic, MicOff, PhoneOff, PictureInPicture2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { AudioOutputControl } from "@/components/messages/AudioOutputControl";
 
 interface Props {
   groupName?: string;
