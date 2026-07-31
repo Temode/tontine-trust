@@ -1,9 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  LiveKitRoom,
   GridLayout,
   ParticipantTile,
-  RoomAudioRenderer,
   TrackToggle,
   useTracks,
   useParticipants,
@@ -14,8 +12,7 @@ import { Track, RoomEvent } from "livekit-client";
 import type { LocalParticipant, Room } from "livekit-client";
 import "@livekit/components-styles";
 import {
-  ArrowLeft,
-  Loader2,
+  ChevronDown,
   Lock,
   LockOpen,
   Maximize2,
@@ -25,7 +22,7 @@ import {
   MonitorUp,
   MoreVertical,
   PhoneOff,
-  ShieldAlert,
+  PictureInPicture2,
   Speaker,
   UserMinus,
   Users,
@@ -33,7 +30,6 @@ import {
   VideoOff,
 } from "lucide-react";
 import { toast } from "sonner";
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -43,188 +39,67 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/hooks/useAuth";
-import type { PreCallDevicePrefs } from "./MicPermissionGate";
 import { cn } from "@/lib/utils";
 
-interface Props {
-  open: boolean;
-  onOpenChange: (v: boolean) => void;
-  callId: string | null;
-  groupName?: string;
-  groupId?: string;
-  initialPrefs?: PreCallDevicePrefs | null;
-  cancelOnCloseBeforeJoin?: boolean;
-  manageLifecycle?: boolean;
-}
-
-interface TokenResponse {
-  token: string;
-  wsUrl: string;
-  roomName: string;
-  identity: string;
-  isHost: boolean;
-}
-
-type ManagedCallStatus = "accepted" | "cancelled" | "ended";
-
-function updateCallStatusBestEffort(callId: string, status: ManagedCallStatus): void {
-  void supabase
-    .rpc("respond_call_request", { p_id: callId, p_status: status })
-    .then(() => {}, () => {});
-}
-
-export function CallRoom({
-  open,
-  onOpenChange,
-  callId,
-  groupName,
-  initialPrefs,
-  cancelOnCloseBeforeJoin = false,
-  manageLifecycle = false,
-}: Props) {
-  const { user } = useAuth();
-  const [tokenData, setTokenData] = useState<TokenResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const hasConnectedRef = useRef(false);
-
-  const displayName = useMemo(() => {
-    const meta = (user?.user_metadata ?? {}) as Record<string, unknown>;
-    return (
-      (typeof meta.full_name === "string" && meta.full_name) ||
-      (typeof meta.name === "string" && meta.name) ||
-      user?.email ||
-      "Participant"
-    );
-  }, [user]);
+/**
+ * Picture-in-Picture natif : `getVideo` fournit l'élément <video> cible.
+ */
+export function usePictureInPicture(getVideo: () => HTMLVideoElement | null) {
+  const [active, setActive] = useState(false);
+  const supported =
+    typeof document !== "undefined" &&
+    "pictureInPictureEnabled" in document &&
+    document.pictureInPictureEnabled;
 
   useEffect(() => {
-    if (!open || !callId) {
-      setTokenData(null);
-      setError(null);
-      hasConnectedRef.current = false;
-      return;
-    }
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
-    supabase.functions
-      .invoke<TokenResponse>("livekit-token", {
-        body: { callId, displayName },
-      })
-      .then(({ data, error }) => {
-        if (cancelled) return;
-        if (error || !data?.token) {
-          setError(error?.message ?? "Impossible d'obtenir un accès à la salle.");
-          setTokenData(null);
-          updateCallStatusBestEffort(callId, "cancelled");
-        } else {
-          setTokenData(data);
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
+    const onEnter = () => setActive(true);
+    const onLeave = () => setActive(false);
+    document.addEventListener("enterpictureinpicture", onEnter, true);
+    document.addEventListener("leavepictureinpicture", onLeave, true);
     return () => {
-      cancelled = true;
+      document.removeEventListener("enterpictureinpicture", onEnter, true);
+      document.removeEventListener("leavepictureinpicture", onLeave, true);
     };
-  }, [open, callId, displayName]);
+  }, []);
 
-  const startVideo = initialPrefs ? !initialPrefs.camOff : false;
-  const startAudio = initialPrefs ? !initialPrefs.micMuted : true;
-
-  const handleOpenChange = (nextOpen: boolean) => {
-    if (!nextOpen && open && callId) {
-      if (manageLifecycle && hasConnectedRef.current) {
-        updateCallStatusBestEffort(callId, "ended");
-      } else if (cancelOnCloseBeforeJoin && !hasConnectedRef.current) {
-        updateCallStatusBestEffort(callId, "cancelled");
+  const toggle = useCallback(async () => {
+    if (!supported) return;
+    try {
+      if (document.pictureInPictureElement) {
+        await document.exitPictureInPicture();
+        setActive(false);
+        return;
       }
+      const video = getVideo();
+      if (!video) return;
+      await video.requestPictureInPicture();
+      setActive(true);
+    } catch {
+      /* ignore */
     }
-    onOpenChange(nextOpen);
-  };
+  }, [getVideo, supported]);
 
-  const handleConnected = () => {
-    hasConnectedRef.current = true;
-    if (manageLifecycle && callId) {
-      updateCallStatusBestEffort(callId, "accepted");
-    }
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent
-        className={cn(
-          "flex h-[100dvh] w-screen max-w-none flex-col gap-0 overflow-hidden border-0 p-0",
-          "bg-[#0b0d10] sm:h-[90vh] sm:max-w-5xl sm:rounded-xl",
-        )}
-      >
-        <DialogTitle className="sr-only">
-          Appel {groupName ? `— ${groupName}` : ""}
-        </DialogTitle>
-        <DialogDescription className="sr-only">
-          Salle d'appel audio et vidéo de la tontine, avec contrôles de micro, caméra et sortie.
-        </DialogDescription>
-
-        <div className="relative flex-1 overflow-hidden bg-[#0b0d10]">
-          {loading && (
-            <div className="absolute inset-0 z-20 flex items-center justify-center gap-2 text-sm text-white/80">
-              <Loader2 className="h-4 w-4 animate-spin text-primary" />
-              Connexion à la salle…
-            </div>
-          )}
-          {error && (
-            <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 p-6 text-center">
-              <ShieldAlert className="h-8 w-8 text-destructive" />
-              <p className="max-w-sm text-sm text-white">{error}</p>
-              <button
-                type="button"
-                onClick={() => handleOpenChange(false)}
-                className="mt-2 inline-flex h-10 items-center rounded-full bg-primary px-4 text-sm font-semibold text-primary-foreground"
-              >
-                Fermer
-              </button>
-            </div>
-          )}
-          {tokenData && !error && callId && (
-            <LiveKitRoom
-              token={tokenData.token}
-              serverUrl={tokenData.wsUrl}
-              connect
-              audio={startAudio}
-              video={startVideo}
-              onConnected={handleConnected}
-              onDisconnected={() => handleOpenChange(false)}
-              onError={(e) => setError(e.message)}
-              className="flex h-full w-full flex-col"
-              data-lk-theme="default"
-            >
-              <RoomAudioRenderer />
-              <RoomShell
-                callId={callId}
-                isHost={tokenData.isHost}
-                groupName={groupName}
-                onClose={() => handleOpenChange(false)}
-              />
-            </LiveKitRoom>
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
+  return { supported, active, toggle };
 }
 
-function RoomShell({
+export function CallStage({
   callId,
   isHost,
   groupName,
-  onClose,
+  onMinimize,
+  onHangup,
+  onTogglePip,
+  pipSupported,
+  pipActive,
 }: {
   callId: string;
   isHost: boolean;
   groupName?: string;
-  onClose: () => void;
+  onMinimize: () => void;
+  onHangup: () => void;
+  onTogglePip: () => void;
+  pipSupported: boolean;
+  pipActive: boolean;
 }) {
   const room = useRoomContext();
   const participants = useParticipants();
@@ -300,7 +175,10 @@ function RoomShell({
       <CallHeader
         groupName={groupName}
         participantsCount={participants.length}
-        onClose={onClose}
+        onMinimize={onMinimize}
+        onTogglePip={onTogglePip}
+        pipSupported={pipSupported}
+        pipActive={pipActive}
         room={room}
         isHost={isHost}
         locked={locked}
@@ -393,7 +271,7 @@ function RoomShell({
       </div>
 
       {/* Dock flottant */}
-      <ControlDock onLeave={onClose} />
+      <ControlDock onLeave={onHangup} onMinimize={onMinimize} />
     </div>
   );
 }
@@ -401,7 +279,10 @@ function RoomShell({
 function CallHeader({
   groupName,
   participantsCount,
-  onClose,
+  onMinimize,
+  onTogglePip,
+  pipSupported,
+  pipActive,
   room,
   isHost,
   locked,
@@ -412,7 +293,10 @@ function CallHeader({
 }: {
   groupName?: string;
   participantsCount: number;
-  onClose: () => void;
+  onMinimize: () => void;
+  onTogglePip: () => void;
+  pipSupported: boolean;
+  pipActive: boolean;
   room: Room;
   isHost: boolean;
   locked: boolean;
@@ -425,11 +309,11 @@ function CallHeader({
     <header className="absolute inset-x-0 top-0 z-10 flex items-center justify-between gap-2 border-b border-white/10 bg-black/40 px-3 py-2 backdrop-blur">
       <button
         type="button"
-        onClick={onClose}
+        onClick={onMinimize}
         className="inline-flex h-9 w-9 items-center justify-center rounded-full text-white hover:bg-white/10"
-        aria-label="Retour"
+        aria-label="Réduire l'appel"
       >
-        <ArrowLeft className="h-4 w-4" />
+        <ChevronDown className="h-4 w-4" />
       </button>
 
       <div className="flex min-w-0 flex-1 items-center justify-center gap-2">
@@ -443,6 +327,19 @@ function CallHeader({
       </div>
 
       <div className="flex items-center gap-1">
+        {pipSupported && (
+          <button
+            type="button"
+            onClick={onTogglePip}
+            className={cn(
+              "inline-flex h-9 w-9 items-center justify-center rounded-full text-white hover:bg-white/10",
+              pipActive && "bg-primary/80",
+            )}
+            aria-label="Picture-in-Picture"
+          >
+            <PictureInPicture2 className="h-4 w-4" />
+          </button>
+        )}
         <AudioOutputMenu room={room} />
         {isHost && (
           <DropdownMenu>
@@ -640,7 +537,13 @@ function FocusStage({
   );
 }
 
-function ControlDock({ onLeave }: { onLeave: () => void }) {
+function ControlDock({
+  onLeave,
+  onMinimize,
+}: {
+  onLeave: () => void;
+  onMinimize: () => void;
+}) {
   const room = useRoomContext();
   const { localParticipant } = useLocalParticipant();
 
@@ -687,6 +590,14 @@ function ControlDock({ onLeave }: { onLeave: () => void }) {
         >
           <MonitorUp className="h-4 w-4" />
         </TrackToggle>
+        <button
+          type="button"
+          onClick={onMinimize}
+          className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20"
+          aria-label="Réduire l'appel"
+        >
+          <ChevronDown className="h-4 w-4" />
+        </button>
         <button
           type="button"
           onClick={handleLeave}
