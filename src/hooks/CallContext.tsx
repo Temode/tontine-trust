@@ -9,14 +9,20 @@ import {
   useState,
 } from "react";
 import { createPortal } from "react-dom";
-import { LiveKitRoom, RoomAudioRenderer } from "@livekit/components-react";
-import { Loader2, PhoneCall, ShieldAlert } from "lucide-react";
+import {
+  LiveKitRoom,
+  RoomAudioRenderer,
+  useConnectionState,
+} from "@livekit/components-react";
+import { ConnectionState } from "livekit-client";
+import { Loader2, PhoneCall, ShieldAlert, WifiOff } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useCallTimer } from "@/hooks/useCallTimer";
 import { CallStage, usePictureInPicture } from "@/components/messages/CallOverlay";
 import { CallMiniPlayer } from "@/components/messages/CallMiniPlayer";
+import { AudioOutputControl } from "@/components/messages/AudioOutputControl";
 import type { PreCallDevicePrefs } from "@/components/messages/MicPermissionGate";
 
 export interface StartCallArgs {
@@ -30,6 +36,12 @@ export interface StartCallArgs {
 
 type CallMode = "full" | "mini" | "pip";
 type CallStatus = "idle" | "connecting" | "connected" | "error";
+type NetState = "online" | "reconnecting" | "lost";
+
+const MAX_RECONNECT_ATTEMPTS = 3;
+
+/** Mode bouchon utilisé uniquement par les tests E2E (aucun réseau LiveKit). */
+const isStubCall = (callId: string) => callId.startsWith("e2e-stub");
 
 interface CallContextValue {
   callId: string | null;
@@ -37,6 +49,7 @@ interface CallContextValue {
   groupName?: string;
   mode: CallMode;
   status: CallStatus;
+  netState: NetState;
   startCall: (args: StartCallArgs) => void;
   minimize: () => void;
   expand: () => void;
