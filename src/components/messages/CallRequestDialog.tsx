@@ -15,8 +15,8 @@ import {
   listCallParticipants,
   subscribeCallParticipants,
 } from "@/lib/api/calls";
-import { CallRoom } from "./CallRoom";
 import { MicPermissionGate, type PreCallDevicePrefs } from "./MicPermissionGate";
+import { useCall } from "@/hooks/CallContext";
 
 interface Props {
   open: boolean;
@@ -27,6 +27,7 @@ interface Props {
 }
 
 export function CallRequestDialog({ open, onOpenChange, groupId, groupName, onDone }: Props) {
+  const { startCall } = useCall();
   const [topic, setTopic] = useState("");
   const [mode, setMode] = useState<"now" | "schedule">("now");
   const [datetime, setDatetime] = useState("");
@@ -85,10 +86,18 @@ export function CallRequestDialog({ open, onOpenChange, groupId, groupName, onDo
       onOpenChange(false);
       onDone?.();
       if (mode === "now") {
-        setActiveCallPrefs(
-          pendingPrefsRef.current ?? { micMuted: false, camOff: false, screenShare: false },
-        );
+        const prefs =
+          pendingPrefsRef.current ?? { micMuted: false, camOff: false, screenShare: false };
+        setActiveCallPrefs(prefs);
         setActiveCall(callId);
+        startCall({
+          callId,
+          groupId,
+          groupName,
+          prefs,
+          manageLifecycle: true,
+          cancelOnCloseBeforeJoin: true,
+        });
       }
     },
     onError: (e: Error) =>
@@ -210,16 +219,6 @@ export function CallRequestDialog({ open, onOpenChange, groupId, groupName, onDo
         )}
       </DialogContent>
     </Dialog>
-    <CallRoom
-      open={!!activeCall}
-      onOpenChange={(v) => !v && setActiveCall(null)}
-      callId={activeCall}
-      groupId={groupId}
-      groupName={groupName}
-      initialPrefs={activeCallPrefs}
-      cancelOnCloseBeforeJoin
-      manageLifecycle
-    />
     </>
   );
 }
