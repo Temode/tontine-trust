@@ -133,6 +133,7 @@ export function CallLauncherPopover({
   const noSelection = selectedMembers.length === 0;
 
   return (
+    <>
     <Popover
       open={open}
       modal={false}
