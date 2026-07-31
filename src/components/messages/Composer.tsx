@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { FileText, Image as ImageIcon, Plus, Send, X } from "lucide-react";
+import { FileText, Image as ImageIcon, Send, X } from "lucide-react";
 import { AttachmentPicker } from "./AttachmentPicker";
 import { VoiceRecorder } from "./VoiceRecorder";
 import type { UploadedAttachment } from "@/lib/api/chatAttachments";
@@ -117,5 +117,3 @@ export function Composer({
     </div>
   );
 }
-
-export const ComposerPlusIcon = Plus;
