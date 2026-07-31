@@ -105,6 +105,25 @@ export function CallProvider({ children }: { children: ReactNode }) {
     () => containerRef.current?.querySelector("video") ?? null,
   );
 
+  /**
+   * Bascule PiP avec repli automatique : si le navigateur ne supporte pas le
+   * Picture-in-Picture (ou le refuse), on passe en mini-player sans jamais
+   * démonter la salle LiveKit — la continuité de l'appel est préservée.
+   */
+  const togglePipWithFallback = useCallback(
+    async (silent = false) => {
+      const ok = await pip.toggle();
+      if (ok) return;
+      setMode("mini");
+      if (!silent) {
+        toast("Mode PiP indisponible", {
+          description: "L'appel continue dans le mini-lecteur.",
+        });
+      }
+    },
+    [pip],
+  );
+
   const teardown = useCallback(
     (reason: "hangup" | "error") => {
       const s = session;
@@ -275,16 +294,17 @@ export function CallProvider({ children }: { children: ReactNode }) {
   }, [session]);
 
   // Auto Picture-in-Picture quand l'onglet passe en arrière-plan
+  // (repli silencieux sur le mini-player si le PiP n'est pas disponible).
   useEffect(() => {
-    if (!session || !pip.supported) return;
+    if (!session) return;
     const onVisibility = () => {
       if (document.visibilityState === "hidden" && !document.pictureInPictureElement) {
-        void pip.toggle();
+        void togglePipWithFallback(true);
       }
     };
     document.addEventListener("visibilitychange", onVisibility);
     return () => document.removeEventListener("visibilitychange", onVisibility);
-  }, [session, pip]);
+  }, [session, togglePipWithFallback]);
 
   const handleConnected = () => {
     hasConnectedRef.current = true;
@@ -404,7 +424,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
                       groupName={session.groupName}
                       onMinimize={() => setMode("mini")}
                       onHangup={hangup}
-                      onTogglePip={() => void pip.toggle()}
+                      onTogglePip={() => void togglePipWithFallback()}
                       pipSupported={pip.supported}
                       pipActive={pip.active}
                     />
@@ -421,7 +441,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
                       connectedAt={connectedAt}
                       onExpand={() => setMode("full")}
                       onHangup={hangup}
-                      onTogglePip={() => void pip.toggle()}
+                      onTogglePip={() => void togglePipWithFallback()}
                       pipSupported={pip.supported}
                     />
                   </>
