@@ -306,14 +306,29 @@ export function CallProvider({ children }: { children: ReactNode }) {
         : hasConnectedRef.current
           ? "connected"
           : "connecting",
+    netState,
     startCall,
     minimize: () => setMode("mini"),
     expand: () => setMode("full"),
-    hangup: () => teardown("hangup"),
+    hangup,
   };
 
   const startVideo = session?.prefs ? !session.prefs.camOff : false;
   const startAudio = session?.prefs ? !session.prefs.micMuted : true;
+  const stub = !!session && isStubCall(session.callId);
+
+  // Pilotage des tests E2E (dev uniquement)
+  useEffect(() => {
+    if (!import.meta.env.DEV || typeof window === "undefined") return;
+    (window as unknown as Record<string, unknown>).__lovableCall = {
+      startCall,
+      minimize: () => setMode("mini"),
+      expand: () => setMode("full"),
+      hangup,
+      mode: pip.active ? "pip" : mode,
+      netState,
+    };
+  }, [startCall, hangup, mode, netState, pip.active]);
 
   return (
     <Ctx.Provider value={value}>
@@ -349,15 +364,38 @@ export function CallProvider({ children }: { children: ReactNode }) {
               <LiveKitRoom
                 token={tokenData.token}
                 serverUrl={tokenData.wsUrl}
-                connect
+                connect={!stub}
                 audio={startAudio}
                 video={startVideo}
                 onConnected={handleConnected}
-                onDisconnected={() => teardown("hangup")}
-                onError={(e) => setError(e.message)}
+                onDisconnected={handleDisconnected}
+                onError={(e) => {
+                  if (stub) return;
+                  if (hasConnectedRef.current) {
+                    handleDisconnected();
+                  } else {
+                    setError(e.message);
+                  }
+                }}
                 data-lk-theme="default"
               >
                 <RoomAudioRenderer />
+                <RoomMountProbe />
+                <ConnectionWatcher
+                  onReconnecting={() => setNetState("reconnecting")}
+                  onRestored={() => {
+                    setNetState("online");
+                    setReconnectAttempt(0);
+                  }}
+                />
+                {netState !== "online" && (
+                  <ReconnectBanner
+                    netState={netState}
+                    attempt={reconnectAttempt}
+                    onRetry={scheduleReconnect}
+                    onHangup={hangup}
+                  />
+                )}
                 {mode === "full" ? (
                   <div className="fixed inset-0 z-[80] bg-[#0b0d10]">
                     <CallStage
@@ -365,7 +403,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
                       isHost={tokenData.isHost}
                       groupName={session.groupName}
                       onMinimize={() => setMode("mini")}
-                      onHangup={() => teardown("hangup")}
+                      onHangup={hangup}
                       onTogglePip={() => void pip.toggle()}
                       pipSupported={pip.supported}
                       pipActive={pip.active}
@@ -382,7 +420,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
                       groupName={session.groupName}
                       connectedAt={connectedAt}
                       onExpand={() => setMode("full")}
-                      onHangup={() => teardown("hangup")}
+                      onHangup={hangup}
                       onTogglePip={() => void pip.toggle()}
                       pipSupported={pip.supported}
                     />
@@ -394,6 +432,83 @@ export function CallProvider({ children }: { children: ReactNode }) {
           document.body,
         )}
     </Ctx.Provider>
+  );
+}
+
+/**
+ * Sonde de cycle de vie : compte les montages du sous-arbre <LiveKitRoom>.
+ * Sert aux tests E2E à prouver que la salle n'est jamais démontée.
+ */
+function RoomMountProbe() {
+  useEffect(() => {
+    const w = window as unknown as Record<string, number>;
+    w.__livekitRoomMounts = (w.__livekitRoomMounts ?? 0) + 1;
+    return () => {
+      w.__livekitRoomUnmounts = (w.__livekitRoomUnmounts ?? 0) + 1;
+    };
+  }, []);
+  return <span data-testid="livekit-room-probe" className="hidden" aria-hidden />;
+}
+
+function ConnectionWatcher({
+  onReconnecting,
+  onRestored,
+}: {
+  onReconnecting: () => void;
+  onRestored: () => void;
+}) {
+  const state = useConnectionState();
+  useEffect(() => {
+    if (state === ConnectionState.Reconnecting) onReconnecting();
+    if (state === ConnectionState.Connected) onRestored();
+  }, [state, onReconnecting, onRestored]);
+  return null;
+}
+
+function ReconnectBanner({
+  netState,
+  attempt,
+  onRetry,
+  onHangup,
+}: {
+  netState: NetState;
+  attempt: number;
+  onRetry: () => void;
+  onHangup: () => void;
+}) {
+  return (
+    <div
+      data-testid="call-reconnect-banner"
+      className="fixed inset-x-0 top-0 z-[90] flex flex-wrap items-center justify-center gap-2 bg-destructive px-3 py-2 pt-[max(0.5rem,env(safe-area-inset-top))] text-[11px] font-semibold text-destructive-foreground sm:text-xs"
+    >
+      {netState === "reconnecting" ? (
+        <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
+      ) : (
+        <WifiOff className="h-3.5 w-3.5 shrink-0" />
+      )}
+      <span className="truncate">
+        {netState === "reconnecting"
+          ? "Reconnexion en cours…"
+          : `Connexion perdue — reprise (${Math.min(attempt, MAX_RECONNECT_ATTEMPTS)}/${MAX_RECONNECT_ATTEMPTS})`}
+      </span>
+      <div className="flex items-center gap-1">
+        <AudioOutputControl variant="banner" />
+        <button
+          type="button"
+          onClick={onRetry}
+          className="rounded-full bg-black/20 px-2 py-1 text-[11px] font-semibold"
+        >
+          Réessayer
+        </button>
+        <button
+          type="button"
+          onClick={onHangup}
+          className="rounded-full bg-black/30 px-2 py-1 text-[11px] font-semibold"
+        >
+          Quitter
+        </button>
+      </div>
+    </div>
   );
 }
 
