@@ -34,6 +34,8 @@ export function CallLauncherPopover({
   const [topic, setTopic] = useState("");
   const [datetime, setDatetime] = useState("");
 
+  const [excluded, setExcluded] = useState<Set<string>>(new Set());
+
   const { data: members = [], isLoading } = useQuery({
     queryKey: ["group-members", groupId],
     queryFn: () => listGroupMembers(groupId),
@@ -41,14 +43,26 @@ export function CallLauncherPopover({
     staleTime: 60_000,
   });
   const activeMembers = members.filter((m) => m.status === "active");
+  const selectedMembers = activeMembers.filter((m) => !excluded.has(m.id));
+
+  const toggleMember = (id: string) =>
+    setExcluded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
 
   const launch = useMutation({
     mutationFn: async (video: boolean) => {
       const callId = await requestGroupCall(groupId, "", null);
       return { callId, video };
     },
-    onSuccess: ({ callId, video }) => {
+    onMutate: () => {
+      // Fermeture immédiate : sensation WhatsApp, la vue d'appel prend le relais.
       onOpenChange(false);
+    },
+    onSuccess: ({ callId, video }) => {
       startCall({
         callId,
         groupId,
@@ -68,8 +82,10 @@ export function CallLauncherPopover({
       const url = `${window.location.origin}/appel/${callId}`;
       await sendGroupMessage(groupId, `Lien d'appel : ${url}`);
     },
-    onSuccess: () => {
+    onMutate: () => {
       onOpenChange(false);
+    },
+    onSuccess: () => {
       toast.success("Lien d'appel envoyé dans la discussion");
     },
     onError: (e: Error) =>
@@ -93,6 +109,9 @@ export function CallLauncherPopover({
   });
 
   const busy = launch.isPending || sendLink.isPending;
+  const pendingVideo = launch.isPending && launch.variables === true;
+  const pendingAudio = launch.isPending && launch.variables === false;
+  const noSelection = selectedMembers.length === 0;
 
   return (
     <Popover
