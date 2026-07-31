@@ -12,7 +12,9 @@ function firstNames(list: TypingUser[]): string[] {
 function phrase(names: string[], singular: string, plural: string): string {
   if (names.length === 1) return `${names[0]} ${singular}`;
   if (names.length === 2) return `${names[0]} et ${names[1]} ${plural}`;
-  return `${names.length} personnes ${plural}`;
+  if (names.length === 3) return `${names[0]}, ${names[1]} et ${names[2]} ${plural}`;
+  const shown = names.slice(0, 2).join(", ");
+  return `${shown} et ${names.length - 2} autres ${plural}`;
 }
 
 export function TypingIndicator({ typers }: Props) {
