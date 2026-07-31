@@ -102,7 +102,10 @@ test.describe("@calls persistance du LiveKitRoom", () => {
     // Réduction puis navigation SPA sur plusieurs routes
     await page.evaluate(() => window.__lovableCall!.minimize());
     for (const route of ["/groupes", "/discussions", "/profil", "/dashboard"]) {
-      await page.evaluate((r) => window.history.pushState({}, "", r), route);
+      await page.evaluate((r) => {
+        window.history.pushState({}, "", r);
+        window.dispatchEvent(new PopStateEvent("popstate"));
+      }, route);
       await page.waitForTimeout(300);
       await expect(page.getByTestId("livekit-room-probe")).toBeAttached();
     }
