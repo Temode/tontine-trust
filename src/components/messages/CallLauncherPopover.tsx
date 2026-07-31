@@ -319,5 +319,21 @@ export function CallLauncherPopover({
         )}
       </PopoverContent>
     </Popover>
+    <MediaPermissionPrompt
+      open={!!permIssue}
+      onOpenChange={(v) => {
+        if (!v) setPermIssue(null);
+      }}
+      reason={permIssue?.reason ?? null}
+      message={permIssue?.message ?? ""}
+      withVideo={!!permIssue?.withVideo}
+      retrying={launch.isPending}
+      onRetry={() => {
+        const video = !!permIssue?.withVideo;
+        setPermIssue(null);
+        launch.mutate(video);
+      }}
+    />
+    </>
   );
 }
