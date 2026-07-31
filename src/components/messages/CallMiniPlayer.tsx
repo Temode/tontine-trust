@@ -8,6 +8,7 @@ import { Track } from "livekit-client";
 import type { LocalParticipant } from "livekit-client";
 import { Maximize2, Mic, MicOff, PhoneOff, PictureInPicture2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { AudioOutputControl } from "@/components/messages/AudioOutputControl";
 
 interface Props {
   groupName?: string;
@@ -186,6 +187,7 @@ export function CallMiniPlayer({
         >
           {micOn ? <Mic className="h-3.5 w-3.5" /> : <MicOff className="h-3.5 w-3.5" />}
         </button>
+        <AudioOutputControl variant="mini" />
         {pipSupported && (
           <button
             type="button"

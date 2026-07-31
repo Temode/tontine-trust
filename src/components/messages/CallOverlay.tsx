@@ -9,7 +9,7 @@ import {
   useLocalParticipant,
 } from "@livekit/components-react";
 import { Track, RoomEvent } from "livekit-client";
-import type { LocalParticipant, Room } from "livekit-client";
+import type { LocalParticipant } from "livekit-client";
 import "@livekit/components-styles";
 import {
   ChevronDown,
@@ -23,7 +23,6 @@ import {
   MoreVertical,
   PhoneOff,
   PictureInPicture2,
-  Speaker,
   UserMinus,
   Users,
   Video,
@@ -40,6 +39,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
+import { AudioOutputControl } from "@/components/messages/AudioOutputControl";
 
 /**
  * Picture-in-Picture natif : `getVideo` fournit l'élément <video> cible.
@@ -179,7 +179,6 @@ export function CallStage({
         onTogglePip={onTogglePip}
         pipSupported={pipSupported}
         pipActive={pipActive}
-        room={room}
         isHost={isHost}
         locked={locked}
         onToggleLock={() => moderate(locked ? "unlock" : "lock")}
@@ -283,7 +282,6 @@ function CallHeader({
   onTogglePip,
   pipSupported,
   pipActive,
-  room,
   isHost,
   locked,
   onToggleLock,
@@ -297,7 +295,6 @@ function CallHeader({
   onTogglePip: () => void;
   pipSupported: boolean;
   pipActive: boolean;
-  room: Room;
   isHost: boolean;
   locked: boolean;
   onToggleLock: () => void;
@@ -340,7 +337,7 @@ function CallHeader({
             <PictureInPicture2 className="h-4 w-4" />
           </button>
         )}
-        <AudioOutputMenu room={room} />
+        <AudioOutputControl variant="full" />
         {isHost && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -380,68 +377,6 @@ function CallHeader({
         )}
       </div>
     </header>
-  );
-}
-
-function AudioOutputMenu({ room }: { room: Room }) {
-  const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
-  const [current, setCurrent] = useState<string | null>(null);
-
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const list = await navigator.mediaDevices.enumerateDevices();
-        setDevices(list.filter((d) => d.kind === "audiooutput"));
-      } catch {
-        /* ignore */
-      }
-    };
-    void load();
-    navigator.mediaDevices?.addEventListener?.("devicechange", load);
-    return () => navigator.mediaDevices?.removeEventListener?.("devicechange", load);
-  }, []);
-
-  const supported =
-    typeof HTMLMediaElement !== "undefined" &&
-    typeof (HTMLMediaElement.prototype as unknown as { setSinkId?: unknown }).setSinkId === "function";
-
-  if (!supported || devices.length === 0) return null;
-
-  const pick = async (deviceId: string) => {
-    try {
-      await room.switchActiveDevice("audiooutput", deviceId);
-      setCurrent(deviceId);
-      toast.success("Sortie audio changée");
-    } catch (e) {
-      toast.error("Impossible de changer la sortie", {
-        description: e instanceof Error ? e.message : String(e),
-      });
-    }
-  };
-
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button
-          type="button"
-          className="inline-flex h-9 w-9 items-center justify-center rounded-full text-white hover:bg-white/10"
-          aria-label="Sortie audio"
-        >
-          <Speaker className="h-4 w-4" />
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-64">
-        <DropdownMenuLabel>Sortie audio</DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        {devices.map((d) => (
-          <DropdownMenuItem key={d.deviceId} onClick={() => pick(d.deviceId)}>
-            <span className={cn("truncate", current === d.deviceId && "font-semibold text-primary")}>
-              {d.label || "Périphérique audio"}
-            </span>
-          </DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
   );
 }
 
