@@ -28,7 +28,7 @@ export interface StartCallArgs {
   cancelOnCloseBeforeJoin?: boolean;
 }
 
-type CallMode = "full" | "mini";
+type CallMode = "full" | "mini" | "pip";
 type CallStatus = "idle" | "connecting" | "connected" | "error";
 
 interface CallContextValue {
@@ -118,8 +118,18 @@ export function CallProvider({ children }: { children: ReactNode }) {
   const startCall = useCallback(
     (args: StartCallArgs) => {
       if (session && session.callId !== args.callId) {
-        toast.error("Un appel est déjà en cours", {
-          description: "Raccrochez l'appel actuel avant d'en rejoindre un autre.",
+        toast("Un appel est déjà en cours", {
+          description: "Voulez-vous basculer vers ce nouvel appel ?",
+          action: {
+            label: "Basculer",
+            onClick: () => {
+              teardown("hangup");
+              hasConnectedRef.current = false;
+              setError(null);
+              setMode("full");
+              setSession(args);
+            },
+          },
         });
         return;
       }
@@ -132,7 +142,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
       setMode("full");
       setSession(args);
     },
-    [session],
+    [session, teardown],
   );
 
   // Récupération du token LiveKit
@@ -211,7 +221,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
     callId: session?.callId ?? null,
     groupId: session?.groupId,
     groupName: session?.groupName,
-    mode,
+    mode: pip.active ? "pip" : mode,
     status: error
       ? "error"
       : !session
