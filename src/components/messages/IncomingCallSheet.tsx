@@ -5,17 +5,22 @@ import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/compone
 import { toast } from "sonner";
 import { useIncomingCallsContext } from "@/hooks/IncomingCallsContext";
 import { respondCallRequest } from "@/lib/api/calls";
-import { CallRoom } from "./CallRoom";
+import { useCall } from "@/hooks/CallContext";
 import { useRingtone } from "@/hooks/useRingtone";
 
 export function IncomingCallSheet() {
   const { current, dismiss } = useIncomingCallsContext();
-  const [joined, setJoined] = useState<{ callId: string; groupName: string; groupId: string } | null>(null);
+  const { startCall, callId: activeCallId } = useCall();
+  const [joined, setJoined] = useState(false);
   const notifiedRef = useRef<string | null>(null);
   const toastIdRef = useRef<string | number | null>(null);
 
   // Sonnerie active tant qu'un appel entrant est en attente
-  useRingtone(!!current && !joined);
+  useRingtone(!!current && !joined && !activeCallId);
+
+  useEffect(() => {
+    if (!activeCallId) setJoined(false);
+  }, [activeCallId]);
 
   const decline = useMutation({
     mutationFn: (id: string) => respondCallRequest(id, "declined"),
@@ -43,10 +48,12 @@ export function IncomingCallSheet() {
       action: {
         label: "Rejoindre",
         onClick: () => {
-          setJoined({
+          setJoined(true);
+          startCall({
             callId: current.id,
             groupName: current.group_name,
             groupId: current.group_id,
+            manageLifecycle: true,
           });
           dismiss();
         },
@@ -107,7 +114,13 @@ export function IncomingCallSheet() {
               type="button"
               onClick={() => {
                 if (!current) return;
-                setJoined({ callId: current.id, groupName: current.group_name, groupId: current.group_id });
+                setJoined(true);
+                startCall({
+                  callId: current.id,
+                  groupName: current.group_name,
+                  groupId: current.group_id,
+                  manageLifecycle: true,
+                });
                 dismiss();
               }}
               className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-md bg-primary text-sm font-semibold text-primary-foreground shadow-primary hover:bg-primary-700"
@@ -118,15 +131,6 @@ export function IncomingCallSheet() {
           </div>
         </DialogContent>
       </Dialog>
-
-      <CallRoom
-        open={!!joined}
-        onOpenChange={(v) => !v && setJoined(null)}
-        callId={joined?.callId ?? null}
-        groupId={joined?.groupId}
-        groupName={joined?.groupName}
-        manageLifecycle
-      />
     </>
   );
 }

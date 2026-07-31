@@ -7,7 +7,7 @@ import { useIncomingCallsContext } from "@/hooks/IncomingCallsContext";
 import { respondCallRequest } from "@/lib/api/calls";
 import { useRingtone } from "@/hooks/useRingtone";
 import { useDocumentTitleFlash } from "@/hooks/useDocumentTitleFlash";
-import { CallRoom } from "./CallRoom";
+import { useCall } from "@/hooks/CallContext";
 
 function initials(name: string): string {
   return name
@@ -36,9 +36,14 @@ function useElapsed(startIso: string | undefined): string {
 
 export function IncomingCallScreen() {
   const { current, dismiss } = useIncomingCallsContext();
-  const [joined, setJoined] = useState<{ callId: string; groupName: string; groupId: string } | null>(null);
+  const { startCall, callId: activeCallId } = useCall();
+  const [joined, setJoined] = useState(false);
 
-  const ringing = !!current && !joined;
+  const ringing = !!current && !joined && !activeCallId;
+
+  useEffect(() => {
+    if (!activeCallId) setJoined(false);
+  }, [activeCallId]);
   useRingtone(ringing);
   useDocumentTitleFlash(
     ringing,
@@ -182,10 +187,12 @@ export function IncomingCallScreen() {
                 <button
                   type="button"
                   onClick={() => {
-                    setJoined({
+                    setJoined(true);
+                    startCall({
                       callId: current.id,
                       groupName: current.group_name,
                       groupId: current.group_id,
+                      manageLifecycle: true,
                     });
                     dismiss();
                   }}
@@ -213,15 +220,6 @@ export function IncomingCallScreen() {
             document.body,
           )
         : null}
-
-      <CallRoom
-        open={!!joined}
-        onOpenChange={(v) => !v && setJoined(null)}
-        callId={joined?.callId ?? null}
-        groupId={joined?.groupId}
-        groupName={joined?.groupName}
-        manageLifecycle
-      />
     </>
   );
 }

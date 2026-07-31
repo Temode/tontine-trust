@@ -6,6 +6,7 @@ import { useNotificationsRealtime } from "@/hooks/useNotifications";
 import { useChatToasts } from "@/hooks/useChatToasts";
 import { IncomingCallScreen } from "@/components/messages/IncomingCallScreen";
 import { IncomingCallsProvider } from "@/hooks/IncomingCallsContext";
+import { CallProvider } from "@/hooks/CallContext";
 import { usePrimeCallChannel } from "@/hooks/usePrimeCallChannel";
 import { useDjomyPaymentReconciler } from "@/hooks/useDjomyPaymentReconciler";
 import { useTontineRealtime } from "@/hooks/useTontineRealtime";
@@ -32,6 +33,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     <GuidedTourProvider>
       <QuickActionsProvider>
         <IncomingCallsProvider>
+        <CallProvider>
         <div className="min-h-screen bg-background">
           <DesktopSidebar />
           <div className="lg:pl-72">
@@ -47,6 +49,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <BottomNav />
           <IncomingCallScreen />
         </div>
+        </CallProvider>
         </IncomingCallsProvider>
       </QuickActionsProvider>
     </GuidedTourProvider>
