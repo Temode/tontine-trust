@@ -72,6 +72,7 @@
     --chat-bubble-out: 183 80% 26%;
     --chat-bubble-out-foreground: 40 30% 96%;
     --chat-pattern: 183 25% 35%;
+    --chat-receipt: 199 89% 55%;
   }
 
   .dark {
@@ -118,6 +119,7 @@
     --chat-bubble-out: 187 70% 22%;
     --chat-bubble-out-foreground: 40 25% 94%;
     --chat-pattern: 186 40% 70%;
+    --chat-receipt: 199 89% 62%;
   }
 }
 

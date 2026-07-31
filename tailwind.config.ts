@@ -82,6 +82,7 @@ export default {
           "in-foreground": "hsl(var(--chat-bubble-in-foreground))",
           out: "hsl(var(--chat-bubble-out))",
           "out-foreground": "hsl(var(--chat-bubble-out-foreground))",
+          receipt: "hsl(var(--chat-receipt))",
         },
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",

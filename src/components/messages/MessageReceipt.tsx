@@ -27,7 +27,7 @@ export function MessageReceipt({ status, seenBy, audience, pending, className }:
       {status === "sent" ? (
         <Check className="h-3.5 w-3.5" />
       ) : (
-        <CheckCheck className={cn("h-3.5 w-3.5", status === "read" && "text-sky-400")} />
+        <CheckCheck className={cn("h-3.5 w-3.5", status === "read" && "text-chat-receipt")} />
       )}
     </span>
   );
