@@ -560,6 +560,7 @@ function CallActiveBanner({
       <span className="truncate">
         Appel en cours{groupName ? ` — ${groupName}` : ""} · {elapsed}
       </span>
+      <AudioOutputControl variant="banner" />
       <span className="shrink-0 underline underline-offset-2">Revenir</span>
     </button>
   );
@@ -572,6 +573,7 @@ export function useCall(): CallContextValue {
       callId: null,
       mode: "full",
       status: "idle",
+      netState: "online",
       startCall: () => {},
       minimize: () => {},
       expand: () => {},
