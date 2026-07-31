@@ -362,13 +362,13 @@ function CallActiveBanner({
     <button
       type="button"
       onClick={onExpand}
-      className="fixed inset-x-0 top-0 z-[84] flex h-8 w-full items-center justify-center gap-2 bg-primary px-3 text-xs font-semibold text-primary-foreground shadow-primary"
+      className="fixed inset-x-0 top-0 z-[84] flex min-h-8 w-full items-center justify-center gap-2 bg-primary px-3 pt-[env(safe-area-inset-top)] text-[11px] font-semibold text-primary-foreground shadow-primary sm:text-xs"
     >
-      <PhoneCall className="h-3.5 w-3.5" />
+      <PhoneCall className="h-3.5 w-3.5 shrink-0" />
       <span className="truncate">
         Appel en cours{groupName ? ` — ${groupName}` : ""} · {elapsed}
       </span>
-      <span className="underline underline-offset-2">Revenir</span>
+      <span className="shrink-0 underline underline-offset-2">Revenir</span>
     </button>
   );
 }
