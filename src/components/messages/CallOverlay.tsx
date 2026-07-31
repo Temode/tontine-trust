@@ -219,7 +219,7 @@ export function CallStage({
 
         {/* Panneau modération */}
         {isHost && modOpen && (
-          <div className="absolute right-3 top-16 z-20 w-72 max-h-[60vh] overflow-y-auto rounded-xl border border-white/10 bg-[#141618]/95 p-2 shadow-elegant backdrop-blur">
+          <div className="absolute right-3 top-16 z-20 w-[min(18rem,calc(100vw-1.5rem))] max-h-[60vh] overflow-y-auto rounded-xl border border-white/10 bg-[#141618]/95 p-2 shadow-elegant backdrop-blur">
             <div className="mb-2 px-2 pt-1 text-xs font-semibold uppercase tracking-wide text-white/60">
               Participants — {groupName ?? "Salle"}
             </div>
