@@ -87,6 +87,9 @@ export function CallProvider({ children }: { children: ReactNode }) {
   const [connectedAt, setConnectedAt] = useState<string | null>(null);
   const hasConnectedRef = useRef(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const intentionalRef = useRef(false);
+  const [netState, setNetState] = useState<NetState>("online");
+  const [reconnectAttempt, setReconnectAttempt] = useState(0);
 
   const displayName = useMemo(() => {
     const meta = (user?.user_metadata ?? {}) as Record<string, unknown>;
@@ -121,6 +124,9 @@ export function CallProvider({ children }: { children: ReactNode }) {
       setError(null);
       setConnectedAt(null);
       setMode("full");
+      setNetState("online");
+      setReconnectAttempt(0);
+      intentionalRef.current = false;
       if (typeof document !== "undefined" && document.pictureInPictureElement) {
         void document.exitPictureInPicture().catch(() => {});
       }
@@ -162,6 +168,17 @@ export function CallProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!session) return;
     let cancelled = false;
+    if (isStubCall(session.callId)) {
+      setTokenData({
+        token: "stub",
+        wsUrl: "wss://stub.invalid",
+        roomName: session.callId,
+        identity: "stub",
+        isHost: true,
+      });
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError(null);
     supabase.functions
@@ -171,9 +188,16 @@ export function CallProvider({ children }: { children: ReactNode }) {
       .then(({ data, error: err }) => {
         if (cancelled) return;
         if (err || !data?.token) {
-          setError(err?.message ?? "Impossible d'obtenir un accès à la salle.");
           setTokenData(null);
-          updateCallStatusBestEffort(session.callId, "cancelled");
+          if (hasConnectedRef.current && reconnectAttempt < MAX_RECONNECT_ATTEMPTS) {
+            // Échec pendant une reprise : on retentera via le backoff
+            setNetState("lost");
+          } else {
+            setError(err?.message ?? "Impossible d'obtenir un accès à la salle.");
+            if (!hasConnectedRef.current) {
+              updateCallStatusBestEffort(session.callId, "cancelled");
+            }
+          }
         } else {
           setTokenData(data);
         }
@@ -184,7 +208,47 @@ export function CallProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [session, displayName]);
+    // reconnectAttempt force une nouvelle demande de token à chaque tentative
+  }, [session, displayName, reconnectAttempt]);
+
+  /** Reprise automatique : nouveau token + reconnexion, avec backoff. */
+  const scheduleReconnect = useCallback(() => {
+    setNetState("lost");
+    setTokenData(null);
+    setReconnectAttempt((a) => a + 1);
+  }, []);
+
+  useEffect(() => {
+    if (!session || netState !== "lost") return;
+    if (reconnectAttempt > MAX_RECONNECT_ATTEMPTS) return;
+    const delay = Math.min(8000, 1000 * 2 ** Math.max(0, reconnectAttempt - 1));
+    const t = window.setTimeout(() => {
+      setReconnectAttempt((a) => a + 1);
+    }, delay);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [netState, session]);
+
+  const handleDisconnected = useCallback(() => {
+    if (intentionalRef.current || !hasConnectedRef.current) {
+      teardown("hangup");
+      return;
+    }
+    if (reconnectAttempt >= MAX_RECONNECT_ATTEMPTS) {
+      toast.error("Appel interrompu", {
+        description: "La connexion n'a pas pu être rétablie.",
+      });
+      teardown("hangup");
+      return;
+    }
+    toast("Connexion perdue", { description: "Reprise de l'appel en cours…" });
+    scheduleReconnect();
+  }, [reconnectAttempt, scheduleReconnect, teardown]);
+
+  const hangup = useCallback(() => {
+    intentionalRef.current = true;
+    teardown("hangup");
+  }, [teardown]);
 
   // Échap réduit l'appel, ne raccroche jamais
   useEffect(() => {
