@@ -27,6 +27,7 @@ const MyContributions = lazy(() => import("@/pages/MyContributions"));
 const Receipts = lazy(() => import("@/pages/Receipts"));
 const Notifications = lazy(() => import("@/pages/Notifications"));
 const Messages = lazy(() => import("@/pages/Messages"));
+const CallJoin = lazy(() => import("@/pages/CallJoin"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
 const Profile = lazy(() => import("@/pages/Profile"));
 const GroupSettings = lazy(() => import("@/pages/GroupSettings"));
@@ -176,6 +177,7 @@ const App = () => (
                     <Route path="/notifications" element={<RouteBoundary name="Notifications"><Notifications /></RouteBoundary>} />
                     <Route path="/discussions" element={<RouteBoundary name="Discussions"><Messages /></RouteBoundary>} />
                     <Route path="/discussions/:groupId" element={<RouteBoundary name="Discussion"><Messages /></RouteBoundary>} />
+                    <Route path="/appel/:callId" element={<RouteBoundary name="Rejoindre l'appel"><CallJoin /></RouteBoundary>} />
                     <Route path="/nouveau" element={<RouteBoundary name="Créer un groupe"><CreateGroup /></RouteBoundary>} />
                     <Route path="/abonnement" element={<RouteBoundary name="Abonnement"><Subscription /></RouteBoundary>} />
                     <Route path="/abonnement/checkout" element={<RouteBoundary name="Récapitulatif abonnement"><SubscriptionCheckout /></RouteBoundary>} />

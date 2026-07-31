@@ -7,8 +7,11 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import type { DbGroupOverview } from "@/lib/api/types";
 import { getGroupPresence, subscribePresence, type PresenceStatus } from "@/lib/api/presence";
 import { listCallRequests, subscribeCallRequests } from "@/lib/api/calls";
-import { CallRequestDialog } from "./CallRequestDialog";
 import { CallHistoryDrawer } from "./CallHistoryDrawer";
+import { CallLauncherPopover } from "./CallLauncherPopover";
+import { useCall } from "@/hooks/CallContext";
+import { requestGroupCall } from "@/lib/api/calls";
+import { toast } from "sonner";
 import { PresenceDot } from "./PresenceDot";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -27,6 +30,30 @@ export function ConversationHeader({ group }: Props) {
   const qc = useQueryClient();
   const [callOpen, setCallOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const { startCall } = useCall();
+  const [videoBusy, setVideoBusy] = useState(false);
+
+  const startVideoCall = async () => {
+    if (videoBusy) return;
+    setVideoBusy(true);
+    try {
+      const callId = await requestGroupCall(group.id, "", null);
+      startCall({
+        callId,
+        groupId: group.id,
+        groupName: group.name,
+        prefs: { micMuted: false, camOff: false, screenShare: false },
+        manageLifecycle: true,
+        cancelOnCloseBeforeJoin: true,
+      });
+    } catch (e) {
+      toast.error("Appel impossible", {
+        description: e instanceof Error ? e.message : String(e),
+      });
+    } finally {
+      setVideoBusy(false);
+    }
+  };
 
   const { data: presence = [] } = useQuery({
     queryKey: ["group-presence", group.id],
@@ -97,19 +124,20 @@ export function ConversationHeader({ group }: Props) {
         </p>
       </div>
       <div className="flex items-center gap-3">
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              type="button"
-              onClick={() => setCallOpen(true)}
-              className="inline-flex h-9 w-9 items-center justify-center rounded-md text-foreground transition hover:bg-secondary"
-              aria-label="Demander un appel"
-            >
-              <Phone className="h-4 w-4" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent>Demander un appel</TooltipContent>
-        </Tooltip>
+        <CallLauncherPopover
+          groupId={group.id}
+          groupName={group.name}
+          open={callOpen}
+          onOpenChange={setCallOpen}
+        >
+          <button
+            type="button"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-md text-foreground transition hover:bg-secondary"
+            aria-label="Démarrer un appel"
+          >
+            <Phone className="h-4 w-4" />
+          </button>
+        </CallLauncherPopover>
         <Tooltip>
           <TooltipTrigger asChild>
             <button
@@ -132,7 +160,8 @@ export function ConversationHeader({ group }: Props) {
           <TooltipTrigger asChild>
             <button
               type="button"
-              onClick={() => setCallOpen(true)}
+              onClick={() => void startVideoCall()}
+              disabled={videoBusy}
               className="inline-flex h-9 w-9 items-center justify-center rounded-md text-foreground transition hover:bg-secondary"
               aria-label="Lancer un appel vidéo"
             >
@@ -150,12 +179,6 @@ export function ConversationHeader({ group }: Props) {
         </Link>
       </div>
     </header>
-    <CallRequestDialog
-      open={callOpen}
-      onOpenChange={setCallOpen}
-      groupId={group.id}
-      groupName={group.name}
-    />
     <CallHistoryDrawer open={historyOpen} onOpenChange={setHistoryOpen} groupId={group.id} />
     </>
   );
