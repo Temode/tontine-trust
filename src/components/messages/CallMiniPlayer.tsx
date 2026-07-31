@@ -187,6 +187,7 @@ export function CallMiniPlayer({
         >
           {micOn ? <Mic className="h-3.5 w-3.5" /> : <MicOff className="h-3.5 w-3.5" />}
         </button>
+        <AudioOutputControl variant="mini" />
         {pipSupported && (
           <button
             type="button"
