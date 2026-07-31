@@ -105,6 +105,38 @@ export async function listGroupMessages(groupId: string, limit = 100): Promise<D
   return (data ?? []) as DbGroupMessage[];
 }
 
+export interface MessagePage {
+  /** Messages triés du plus ancien au plus récent. */
+  items: DbGroupMessage[];
+  /** true s'il reste des messages plus anciens à charger. */
+  hasMore: boolean;
+}
+
+/**
+ * Charge une page de messages en remontant dans le temps.
+ * `before` = created_at du plus ancien message déjà chargé (exclu).
+ */
+export async function listGroupMessagesPage(
+  groupId: string,
+  before?: string | null,
+  limit = 30,
+): Promise<MessagePage> {
+  let q = supabase
+    .from("group_messages")
+    .select("*, author:profiles!group_messages_author_user_id_fkey(full_name, avatar_url)")
+    .eq("group_id", groupId)
+    .is("deleted_at", null)
+    .order("created_at", { ascending: false })
+    .limit(limit + 1);
+  if (before) q = q.lt("created_at", before);
+  const { data, error } = await q;
+  if (error) throw error;
+  const rows = (data ?? []) as DbGroupMessage[];
+  const hasMore = rows.length > limit;
+  const page = hasMore ? rows.slice(0, limit) : rows;
+  return { items: page.reverse(), hasMore };
+}
+
 export async function sendGroupMessage(groupId: string, body: string): Promise<DbGroupMessage> {
   const { data: u } = await supabase.auth.getUser();
   const uid = u.user?.id;

@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import {
-  listGroupMessages,
+  listGroupMessagesPage,
   sendGroupMessageV2,
   markGroupRead,
   subscribeGroupMessages,
@@ -28,6 +28,13 @@ interface Props {
 }
 
 const BURST_WINDOW_MS = 5 * 60 * 1000;
+const PAGE_SIZE = 30;
+/** Distance (px) sous laquelle on considère l'utilisateur "collé" au bas de la liste. */
+const BOTTOM_THRESHOLD = 120;
+
+function scrollKey(groupId: string) {
+  return `chat-scroll:${groupId}`;
+}
 
 function sameDay(a: string, b: string): boolean {
   const x = new Date(a);
@@ -45,14 +52,31 @@ export function GroupChat({ groupId, variant = "panel", groupName = "" }: Props)
   const [body, setBody] = useState("");
   const [attachment, setAttachment] = useState<UploadedAttachment | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const topSentinelRef = useRef<HTMLDivElement>(null);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [atBottom, setAtBottom] = useState(true);
+  const restoredRef = useRef(false);
   const initialUnreadRef = useRef<{ count: number; firstId: string | null } | null>(null);
   const myName =
     (user?.user_metadata?.full_name as string | undefined) ?? user?.email ?? "Membre";
 
   const { data: messages = [], isLoading } = useQuery({
     queryKey: ["chat", groupId],
-    queryFn: () => listGroupMessages(groupId),
+    queryFn: async () => {
+      const page = await listGroupMessagesPage(groupId, null, PAGE_SIZE);
+      setHasMore(page.hasMore);
+      return page.items;
+    },
   });
+
+  // Réinitialise l'état de pagination quand on change de conversation.
+  useEffect(() => {
+    setHasMore(true);
+    restoredRef.current = false;
+    setAtBottom(true);
+    initialUnreadRef.current = null;
+  }, [groupId]);
 
   // Charger last_read_at pour calculer le séparateur "non lus"
   const { data: lastReadAt } = useQuery({
@@ -102,17 +126,85 @@ export function GroupChat({ groupId, variant = "panel", groupName = "" }: Props)
 
   // Auto-scroll & mark as read
   useEffect(() => {
-    listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
-    // mark as read peu après que le user ait vu le scroll
+    const el = listRef.current;
+    if (!el || messages.length === 0) return;
+
+    // Première peinture : on restaure la position de lecture mémorisée.
+    if (!restoredRef.current) {
+      restoredRef.current = true;
+      const saved = Number(sessionStorage.getItem(scrollKey(groupId)) ?? "NaN");
+      if (Number.isFinite(saved) && saved > 0 && saved < el.scrollHeight) {
+        el.scrollTop = saved;
+        setAtBottom(el.scrollHeight - saved - el.clientHeight < BOTTOM_THRESHOLD);
+      } else {
+        el.scrollTop = el.scrollHeight;
+      }
+    } else if (atBottom) {
+      el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+    }
+
+    // On ne marque comme lu que si l'utilisateur voit réellement le bas.
+    if (!atBottom) return;
     const t = window.setTimeout(() => {
       markGroupRead(groupId).catch(() => {});
       qc.invalidateQueries({ queryKey: ["conversations"] });
     }, 800);
     return () => window.clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [messages.length]);
+  }, [messages.length, groupId, atBottom]);
 
-  const { typers, notifyTyping, notifyRecording } = useTypingChannel(
+  // Mémorise la position de lecture (par conversation) et l'état "bas de liste".
+  const handleScroll = () => {
+    const el = listRef.current;
+    if (!el) return;
+    sessionStorage.setItem(scrollKey(groupId), String(el.scrollTop));
+    setAtBottom(el.scrollHeight - el.scrollTop - el.clientHeight < BOTTOM_THRESHOLD);
+  };
+
+  // Chargement infini vers le haut, en conservant la position visuelle.
+  const loadOlder = async () => {
+    const el = listRef.current;
+    const oldest = messages[0];
+    if (!el || !oldest || loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    const prevHeight = el.scrollHeight;
+    const prevTop = el.scrollTop;
+    try {
+      const page = await listGroupMessagesPage(groupId, oldest.created_at, PAGE_SIZE);
+      setHasMore(page.hasMore);
+      if (page.items.length > 0) {
+        qc.setQueryData<DbGroupMessage[]>(["chat", groupId], (prev = []) => {
+          const known = new Set(prev.map((m) => m.id));
+          return [...page.items.filter((m) => !known.has(m.id)), ...prev];
+        });
+        requestAnimationFrame(() => {
+          if (!listRef.current) return;
+          listRef.current.scrollTop = listRef.current.scrollHeight - prevHeight + prevTop;
+        });
+      }
+    } catch {
+      /* silencieux : on réessaiera au prochain scroll */
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
+  useEffect(() => {
+    const sentinel = topSentinelRef.current;
+    const root = listRef.current;
+    if (!sentinel || !root || !hasMore) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) void loadOlder();
+      },
+      { root, rootMargin: "200px 0px 0px 0px" },
+    );
+    io.observe(sentinel);
+    return () => io.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasMore, loadingMore, messages.length, groupId]);
+
+  const { typers, notifyTyping, notifyRecording, stopActivity } = useTypingChannel(
     groupId,
     user?.id ?? null,
     myName,
@@ -135,6 +227,8 @@ export function GroupChat({ groupId, variant = "panel", groupName = "" }: Props)
     onSuccess: (msg) => {
       setBody("");
       setAttachment(null);
+      stopActivity();
+      setAtBottom(true);
       qc.setQueryData<DbGroupMessage[]>(["chat", groupId], (prev = []) => {
         if (prev.some((m) => m.id === msg.id)) return prev;
         return [...prev, msg];
@@ -179,11 +273,18 @@ export function GroupChat({ groupId, variant = "panel", groupName = "" }: Props)
     >
       <div
         ref={listRef}
+        onScroll={handleScroll}
         className={cn(
           "scrollbar-thin flex-1 overflow-y-auto px-3 py-4 lg:px-6",
         )}
       >
         <div className="mx-auto w-full max-w-3xl space-y-1">
+          <div ref={topSentinelRef} aria-hidden className="h-px w-full" />
+          {hasMore && !isLoading && (
+            <div className="flex justify-center py-2 text-xs text-muted-foreground">
+              {loadingMore ? "Chargement des messages…" : "Faites défiler pour voir l'historique"}
+            </div>
+          )}
           {isLoading &&
             Array.from({ length: 4 }).map((_, i) => (
               <div key={i} className="flex items-end gap-2">

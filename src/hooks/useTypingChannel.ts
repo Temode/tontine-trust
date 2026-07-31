@@ -10,13 +10,17 @@ export interface TypingUser {
   at: number;
 }
 
-const TYPING_TTL_MS = 4000;
+/** Un pair est considéré inactif au-delà de ce délai sans nouveau signal. */
+const TYPING_TTL_MS = 5000;
+/** Délai local sans frappe avant d'émettre l'arrêt d'activité. */
+const IDLE_STOP_MS = 3000;
 
 export function useTypingChannel(groupId: string, myUserId: string | null, myName: string) {
   const [typers, setTypers] = useState<TypingUser[]>([]);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const lastSentRef = useRef(0);
   const lastKindRef = useRef<ActivityKind | null>(null);
+  const idleTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!groupId) return;
@@ -39,21 +43,48 @@ export function useTypingChannel(groupId: string, myUserId: string | null, myNam
         ];
       });
     });
+    ch.on("broadcast", { event: "typing_stop" }, (payload) => {
+      const p = payload.payload as { user_id?: string };
+      if (!p?.user_id) return;
+      setTypers((prev) => prev.filter((u) => u.user_id !== p.user_id));
+    });
     ch.subscribe();
     channelRef.current = ch;
     const interval = window.setInterval(() => {
-      setTypers((prev) => prev.filter((u) => Date.now() - u.at < TYPING_TTL_MS));
-    }, 1500);
+      setTypers((prev) => {
+        const next = prev.filter((u) => Date.now() - u.at < TYPING_TTL_MS);
+        return next.length === prev.length ? prev : next;
+      });
+    }, 1000);
     return () => {
       window.clearInterval(interval);
+      if (idleTimerRef.current) window.clearTimeout(idleTimerRef.current);
       ch.unsubscribe();
       channelRef.current = null;
     };
   }, [groupId, myUserId]);
 
+  const stopActivity = () => {
+    if (idleTimerRef.current) {
+      window.clearTimeout(idleTimerRef.current);
+      idleTimerRef.current = null;
+    }
+    if (!myUserId || lastKindRef.current === null) return;
+    lastKindRef.current = null;
+    lastSentRef.current = 0;
+    channelRef.current?.send({
+      type: "broadcast",
+      event: "typing_stop",
+      payload: { user_id: myUserId },
+    });
+  };
+
   const notifyActivity = (kind: ActivityKind = "typing") => {
     if (!myUserId) return;
     const now = Date.now();
+    // Toute nouvelle activité repousse l'expiration automatique.
+    if (idleTimerRef.current) window.clearTimeout(idleTimerRef.current);
+    idleTimerRef.current = window.setTimeout(stopActivity, IDLE_STOP_MS);
     // On laisse toujours passer un changement de nature d'activité (saisie ↔ vocal).
     if (kind === lastKindRef.current && now - lastSentRef.current < 1500) return;
     lastSentRef.current = now;
@@ -68,6 +99,7 @@ export function useTypingChannel(groupId: string, myUserId: string | null, myNam
   return {
     typers,
     notifyActivity,
+    stopActivity,
     notifyTyping: () => notifyActivity("typing"),
     notifyRecording: () => notifyActivity("recording"),
   };
