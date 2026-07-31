@@ -40,6 +40,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
+import { AudioOutputControl } from "@/components/messages/AudioOutputControl";
 
 /**
  * Picture-in-Picture natif : `getVideo` fournit l'élément <video> cible.
@@ -340,7 +341,7 @@ function CallHeader({
             <PictureInPicture2 className="h-4 w-4" />
           </button>
         )}
-        <AudioOutputMenu room={room} />
+        <AudioOutputControl variant="full" />
         {isHost && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
