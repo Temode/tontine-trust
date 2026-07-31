@@ -34,6 +34,8 @@ export function CallLauncherPopover({
   const [topic, setTopic] = useState("");
   const [datetime, setDatetime] = useState("");
 
+  const [excluded, setExcluded] = useState<Set<string>>(new Set());
+
   const { data: members = [], isLoading } = useQuery({
     queryKey: ["group-members", groupId],
     queryFn: () => listGroupMembers(groupId),
@@ -41,14 +43,26 @@ export function CallLauncherPopover({
     staleTime: 60_000,
   });
   const activeMembers = members.filter((m) => m.status === "active");
+  const selectedMembers = activeMembers.filter((m) => !excluded.has(m.id));
+
+  const toggleMember = (id: string) =>
+    setExcluded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
 
   const launch = useMutation({
     mutationFn: async (video: boolean) => {
       const callId = await requestGroupCall(groupId, "", null);
       return { callId, video };
     },
-    onSuccess: ({ callId, video }) => {
+    onMutate: () => {
+      // Fermeture immédiate : sensation WhatsApp, la vue d'appel prend le relais.
       onOpenChange(false);
+    },
+    onSuccess: ({ callId, video }) => {
       startCall({
         callId,
         groupId,
@@ -68,8 +82,10 @@ export function CallLauncherPopover({
       const url = `${window.location.origin}/appel/${callId}`;
       await sendGroupMessage(groupId, `Lien d'appel : ${url}`);
     },
-    onSuccess: () => {
+    onMutate: () => {
       onOpenChange(false);
+    },
+    onSuccess: () => {
       toast.success("Lien d'appel envoyé dans la discussion");
     },
     onError: (e: Error) =>
@@ -93,6 +109,9 @@ export function CallLauncherPopover({
   });
 
   const busy = launch.isPending || sendLink.isPending;
+  const pendingVideo = launch.isPending && launch.variables === true;
+  const pendingAudio = launch.isPending && launch.variables === false;
+  const noSelection = selectedMembers.length === 0;
 
   return (
     <Popover
@@ -187,9 +206,17 @@ export function CallLauncherPopover({
                   Aucun membre actif à appeler.
                 </p>
               ) : (
-                <ul className="space-y-1">
+                <ul className="space-y-1" data-testid="call-member-list">
                   {activeMembers.map((m) => (
                     <li key={m.id} className="flex items-center gap-2 py-1">
+                      <input
+                        type="checkbox"
+                        checked={!excluded.has(m.id)}
+                        onChange={() => toggleMember(m.id)}
+                        aria-label={m.profile?.full_name ?? "Membre"}
+                        data-testid={`call-member-${m.id}`}
+                        className="h-4 w-4 shrink-0 accent-primary"
+                      />
                       <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-secondary text-[10px] font-bold text-foreground">
                         {getInitials(m.profile?.full_name ?? "") || "··"}
                       </div>
@@ -208,31 +235,38 @@ export function CallLauncherPopover({
             </div>
 
             <div className="border-t border-hairline p-3">
-              <p className="mb-2 text-[10px] text-muted-foreground">
-                {activeMembers.length} membre{activeMembers.length > 1 ? "s" : ""} seront notifiés.
+              <p className="mb-2 text-[10px] text-muted-foreground" data-testid="call-selection-count">
+                {selectedMembers.length} membre{selectedMembers.length > 1 ? "s" : ""} sélectionné
+                {selectedMembers.length > 1 ? "s" : ""} sur {activeMembers.length}.
               </p>
               <div className="flex gap-2">
                 <button
                   type="button"
-                  disabled={busy}
+                  disabled={busy || noSelection}
+                  data-testid="call-start-audio"
                   onClick={() => launch.mutate(false)}
                   className="inline-flex h-10 flex-1 items-center justify-center gap-1.5 rounded-full bg-primary text-xs font-semibold text-primary-foreground transition hover:bg-primary-700 disabled:opacity-50"
                 >
-                  {launch.isPending ? (
+                  {pendingAudio ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
                     <Phone className="h-4 w-4" />
                   )}
-                  Appel vocal
+                  {pendingAudio ? "Connexion…" : "Appel vocal"}
                 </button>
                 <button
                   type="button"
-                  disabled={busy}
+                  disabled={busy || noSelection}
+                  data-testid="call-start-video"
                   onClick={() => launch.mutate(true)}
                   className="inline-flex h-10 flex-1 items-center justify-center gap-1.5 rounded-full bg-primary text-xs font-semibold text-primary-foreground transition hover:bg-primary-700 disabled:opacity-50"
                 >
-                  <Video className="h-4 w-4" />
-                  Appel vidéo
+                  {pendingVideo ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Video className="h-4 w-4" />
+                  )}
+                  {pendingVideo ? "Connexion…" : "Appel vidéo"}
                 </button>
               </div>
 
@@ -240,11 +274,16 @@ export function CallLauncherPopover({
                 <button
                   type="button"
                   disabled={busy}
+                  data-testid="call-send-link"
                   onClick={() => sendLink.mutate()}
                   className="inline-flex h-9 w-full items-center gap-2 rounded-md px-2 text-xs text-foreground transition hover:bg-secondary disabled:opacity-50"
                 >
-                  <Link2 className="h-4 w-4 text-muted-foreground" />
-                  Envoyer un lien d'appel dans le groupe
+                  {sendLink.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                  ) : (
+                    <Link2 className="h-4 w-4 text-muted-foreground" />
+                  )}
+                  {sendLink.isPending ? "Envoi du lien…" : "Envoyer un lien d'appel dans le groupe"}
                 </button>
                 <button
                   type="button"
