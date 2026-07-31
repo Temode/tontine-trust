@@ -175,7 +175,10 @@ export function CallStage({
       <CallHeader
         groupName={groupName}
         participantsCount={participants.length}
-        onClose={onClose}
+        onMinimize={onMinimize}
+        onTogglePip={onTogglePip}
+        pipSupported={pipSupported}
+        pipActive={pipActive}
         room={room}
         isHost={isHost}
         locked={locked}
@@ -268,7 +271,7 @@ export function CallStage({
       </div>
 
       {/* Dock flottant */}
-      <ControlDock onLeave={onClose} />
+      <ControlDock onLeave={onHangup} onMinimize={onMinimize} />
     </div>
   );
 }
@@ -276,7 +279,10 @@ export function CallStage({
 function CallHeader({
   groupName,
   participantsCount,
-  onClose,
+  onMinimize,
+  onTogglePip,
+  pipSupported,
+  pipActive,
   room,
   isHost,
   locked,
@@ -287,7 +293,10 @@ function CallHeader({
 }: {
   groupName?: string;
   participantsCount: number;
-  onClose: () => void;
+  onMinimize: () => void;
+  onTogglePip: () => void;
+  pipSupported: boolean;
+  pipActive: boolean;
   room: Room;
   isHost: boolean;
   locked: boolean;
@@ -300,11 +309,11 @@ function CallHeader({
     <header className="absolute inset-x-0 top-0 z-10 flex items-center justify-between gap-2 border-b border-white/10 bg-black/40 px-3 py-2 backdrop-blur">
       <button
         type="button"
-        onClick={onClose}
+        onClick={onMinimize}
         className="inline-flex h-9 w-9 items-center justify-center rounded-full text-white hover:bg-white/10"
-        aria-label="Retour"
+        aria-label="Réduire l'appel"
       >
-        <ArrowLeft className="h-4 w-4" />
+        <ChevronDown className="h-4 w-4" />
       </button>
 
       <div className="flex min-w-0 flex-1 items-center justify-center gap-2">
@@ -318,6 +327,19 @@ function CallHeader({
       </div>
 
       <div className="flex items-center gap-1">
+        {pipSupported && (
+          <button
+            type="button"
+            onClick={onTogglePip}
+            className={cn(
+              "inline-flex h-9 w-9 items-center justify-center rounded-full text-white hover:bg-white/10",
+              pipActive && "bg-primary/80",
+            )}
+            aria-label="Picture-in-Picture"
+          >
+            <PictureInPicture2 className="h-4 w-4" />
+          </button>
+        )}
         <AudioOutputMenu room={room} />
         {isHost && (
           <DropdownMenu>
