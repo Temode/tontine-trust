@@ -537,7 +537,13 @@ function FocusStage({
   );
 }
 
-function ControlDock({ onLeave }: { onLeave: () => void }) {
+function ControlDock({
+  onLeave,
+  onMinimize,
+}: {
+  onLeave: () => void;
+  onMinimize: () => void;
+}) {
   const room = useRoomContext();
   const { localParticipant } = useLocalParticipant();
 
@@ -584,6 +590,14 @@ function ControlDock({ onLeave }: { onLeave: () => void }) {
         >
           <MonitorUp className="h-4 w-4" />
         </TrackToggle>
+        <button
+          type="button"
+          onClick={onMinimize}
+          className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20"
+          aria-label="Réduire l'appel"
+        >
+          <ChevronDown className="h-4 w-4" />
+        </button>
         <button
           type="button"
           onClick={handleLeave}
