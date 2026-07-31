@@ -9,7 +9,7 @@ import {
   useLocalParticipant,
 } from "@livekit/components-react";
 import { Track, RoomEvent } from "livekit-client";
-import type { LocalParticipant, Room } from "livekit-client";
+import type { LocalParticipant } from "livekit-client";
 import "@livekit/components-styles";
 import {
   ChevronDown,
