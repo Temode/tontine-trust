@@ -16,6 +16,7 @@ import { DaySeparator } from "@/components/messages/DaySeparator";
 import { MessageBubble } from "@/components/messages/MessageBubble";
 import { Composer } from "@/components/messages/Composer";
 import { useTypingChannel } from "@/hooks/useTypingChannel";
+import { useMessageReceipts } from "@/hooks/useMessageReceipts";
 import { supabase } from "@/integrations/supabase/client";
 import type { UploadedAttachment } from "@/lib/api/chatAttachments";
 
@@ -111,7 +112,12 @@ export function GroupChat({ groupId, variant = "panel", groupName = "" }: Props)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [messages.length]);
 
-  const { typers, notifyTyping } = useTypingChannel(groupId, user?.id ?? null, myName);
+  const { typers, notifyTyping, notifyRecording } = useTypingChannel(
+    groupId,
+    user?.id ?? null,
+    myName,
+  );
+  const { statusOf } = useMessageReceipts(groupId, user?.id ?? null);
 
   const sendM = useMutation({
     mutationFn: () =>
@@ -161,13 +167,6 @@ export function GroupChat({ groupId, variant = "panel", groupName = "" }: Props)
     });
   }, [messages]);
 
-  const lastMineId = useMemo(() => {
-    for (let i = messages.length - 1; i >= 0; i -= 1) {
-      if (messages[i].author_user_id === user?.id) return messages[i].id;
-    }
-    return null;
-  }, [messages, user?.id]);
-
   const isPage = variant === "page";
 
   return (
@@ -216,7 +215,7 @@ export function GroupChat({ groupId, variant = "panel", groupName = "" }: Props)
                   showAvatar={showAvatar}
                   showName={showName}
                   isLastOfBurst={isLastOfBurst}
-                  delivered={m.id !== lastMineId}
+                  receipt={mine ? statusOf(m.created_at) : undefined}
                 />
               </div>
             );
@@ -237,6 +236,7 @@ export function GroupChat({ groupId, variant = "panel", groupName = "" }: Props)
         onAttachmentChange={setAttachment}
         onSubmit={submit}
         pending={sendM.isPending}
+        onRecordingActivity={notifyRecording}
         onRecorded={(a) => {
           sendGroupMessageV2(groupId, {
             body: "",
