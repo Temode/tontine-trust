@@ -546,6 +546,8 @@ function ControlDock({
 }) {
   const room = useRoomContext();
   const { localParticipant } = useLocalParticipant();
+  const participants = useParticipants();
+  const [confirming, setConfirming] = useState(false);
 
   const handleLeave = async () => {
     try {
@@ -556,14 +558,38 @@ function ControlDock({
     onLeave();
   };
 
+  const others = participants.filter(
+    (p) => p.identity !== localParticipant?.identity,
+  ).length;
+
+  // La confirmation retombe d'elle-même après 4 s
+  useEffect(() => {
+    if (!confirming) return;
+    const t = window.setTimeout(() => setConfirming(false), 4000);
+    return () => window.clearTimeout(t);
+  }, [confirming]);
+
+  const onHangupClick = () => {
+    if (others > 0 && !confirming) {
+      setConfirming(true);
+      return;
+    }
+    void handleLeave();
+  };
+
   return (
     <div
       className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex justify-center pb-[max(1rem,env(safe-area-inset-bottom))] pt-2"
     >
-      <div className="pointer-events-auto flex items-center gap-2 rounded-full border border-white/10 bg-black/70 px-3 py-2 shadow-elegant backdrop-blur-lg">
+      <div className="pointer-events-auto relative mx-2 flex max-w-[calc(100vw-1rem)] flex-wrap items-center justify-center gap-1.5 rounded-3xl border border-white/10 bg-black/70 px-2 py-2 shadow-elegant backdrop-blur-lg sm:gap-2 sm:rounded-full sm:px-3">
+        {confirming && (
+          <div className="absolute -top-11 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full border border-white/10 bg-black/85 px-3 py-1.5 text-xs font-medium text-white shadow-elegant">
+            Quitter l'appel ? Touchez à nouveau
+          </div>
+        )}
         <TrackToggle
           source={Track.Source.Microphone}
-          className="!inline-flex !h-11 !w-11 !items-center !justify-center !gap-0 !rounded-full !bg-white/10 !px-0 !text-white hover:!bg-white/20 data-[lk-enabled=false]:!bg-destructive/80"
+          className="!inline-flex !h-10 !w-10 !items-center !justify-center !gap-0 !rounded-full !bg-white/10 !px-0 !text-white hover:!bg-white/20 data-[lk-enabled=false]:!bg-destructive/80 sm:!h-11 sm:!w-11"
           showIcon={false}
         >
           {(localParticipant as LocalParticipant | undefined)?.isMicrophoneEnabled ? (
@@ -574,7 +600,7 @@ function ControlDock({
         </TrackToggle>
         <TrackToggle
           source={Track.Source.Camera}
-          className="!inline-flex !h-11 !w-11 !items-center !justify-center !gap-0 !rounded-full !bg-white/10 !px-0 !text-white hover:!bg-white/20 data-[lk-enabled=false]:!bg-destructive/80"
+          className="!inline-flex !h-10 !w-10 !items-center !justify-center !gap-0 !rounded-full !bg-white/10 !px-0 !text-white hover:!bg-white/20 data-[lk-enabled=false]:!bg-destructive/80 sm:!h-11 sm:!w-11"
           showIcon={false}
         >
           {(localParticipant as LocalParticipant | undefined)?.isCameraEnabled ? (
@@ -585,7 +611,7 @@ function ControlDock({
         </TrackToggle>
         <TrackToggle
           source={Track.Source.ScreenShare}
-          className="!hidden !h-11 !w-11 !items-center !justify-center !gap-0 !rounded-full !bg-white/10 !px-0 !text-white hover:!bg-white/20 data-[lk-enabled=true]:!bg-primary/80 sm:!inline-flex"
+          className="!hidden !h-10 !w-10 !items-center !justify-center !gap-0 !rounded-full !bg-white/10 !px-0 !text-white hover:!bg-white/20 data-[lk-enabled=true]:!bg-primary/80 sm:!inline-flex sm:!h-11 sm:!w-11"
           showIcon={false}
         >
           <MonitorUp className="h-4 w-4" />
@@ -593,18 +619,22 @@ function ControlDock({
         <button
           type="button"
           onClick={onMinimize}
-          className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20"
+          className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 sm:h-11 sm:w-11"
           aria-label="Réduire l'appel"
         >
           <ChevronDown className="h-4 w-4" />
         </button>
         <button
           type="button"
-          onClick={handleLeave}
-          className="ml-1 inline-flex h-11 w-11 items-center justify-center rounded-full bg-destructive text-destructive-foreground shadow-lg transition hover:opacity-90"
-          aria-label="Raccrocher"
+          onClick={onHangupClick}
+          className={cn(
+            "inline-flex h-10 items-center justify-center gap-1.5 rounded-full bg-destructive px-0 text-destructive-foreground shadow-lg transition hover:opacity-90 sm:ml-1 sm:h-11",
+            confirming ? "w-auto px-4 text-xs font-semibold" : "w-10 sm:w-11",
+          )}
+          aria-label={confirming ? "Confirmer et raccrocher" : "Raccrocher"}
         >
           <PhoneOff className="h-4 w-4" />
+          {confirming && <span>Confirmer</span>}
         </button>
       </div>
     </div>
