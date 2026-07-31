@@ -1,9 +1,10 @@
-import { Check, CheckCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getInitials } from "@/lib/format";
 import { AttachmentView } from "./AttachmentView";
 import { MessageText } from "./MessageText";
 import { CallEventCard, extractCallId } from "./CallEventCard";
+import { MessageReceipt } from "./MessageReceipt";
+import type { ReceiptStatus } from "@/hooks/useMessageReceipts";
 import type { DbGroupMessage } from "@/lib/api/chat";
 
 interface Props {
@@ -13,7 +14,7 @@ interface Props {
   showAvatar: boolean;
   showName: boolean;
   isLastOfBurst: boolean;
-  delivered: boolean;
+  receipt?: { status: ReceiptStatus; seenBy: number; audience: number };
 }
 
 export function MessageBubble({
@@ -23,7 +24,7 @@ export function MessageBubble({
   showAvatar,
   showName,
   isLastOfBurst,
-  delivered,
+  receipt,
 }: Props) {
   const name = m.author?.full_name?.trim() || "Membre";
   const initials = getInitials(name) || "··";
@@ -89,12 +90,13 @@ export function MessageBubble({
             )}
           >
             {time}
-            {mine &&
-              (delivered ? (
-                <CheckCheck className="h-3.5 w-3.5" />
-              ) : (
-                <Check className="h-3.5 w-3.5" />
-              ))}
+            {mine && receipt && (
+              <MessageReceipt
+                status={receipt.status}
+                seenBy={receipt.seenBy}
+                audience={receipt.audience}
+              />
+            )}
           </span>
           <span className="clear-both block" />
         </div>

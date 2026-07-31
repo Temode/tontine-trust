@@ -12,6 +12,7 @@ interface Props {
   onAttachmentChange: (a: UploadedAttachment | null) => void;
   onSubmit: () => void;
   onRecorded: (a: UploadedAttachment) => void;
+  onRecordingActivity?: () => void;
   pending: boolean;
 }
 
@@ -29,6 +30,7 @@ export function Composer({
   onAttachmentChange,
   onSubmit,
   onRecorded,
+  onRecordingActivity,
   pending,
 }: Props) {
   const taRef = useRef<HTMLTextAreaElement>(null);
@@ -110,7 +112,12 @@ export function Composer({
           </button>
         ) : (
           <div className="flex h-11 shrink-0 items-center">
-            <VoiceRecorder groupId={groupId} disabled={pending} onRecorded={onRecorded} />
+            <VoiceRecorder
+              groupId={groupId}
+              disabled={pending}
+              onRecorded={onRecorded}
+              onActivity={onRecordingActivity}
+            />
           </div>
         )}
       </form>

@@ -7,6 +7,8 @@ interface Props {
   groupId: string;
   disabled?: boolean;
   onRecorded: (a: UploadedAttachment) => void;
+  /** Signale au groupe que l'utilisateur est en train d'enregistrer un vocal. */
+  onActivity?: () => void;
 }
 
 function pickMime(): string | null {
@@ -23,7 +25,7 @@ function fmt(s: number) {
 
 const MAX_SECONDS = 180;
 
-export function VoiceRecorder({ groupId, disabled, onRecorded }: Props) {
+export function VoiceRecorder({ groupId, disabled, onRecorded, onActivity }: Props) {
   const [state, setState] = useState<"idle" | "recording" | "uploading">("idle");
   const [elapsed, setElapsed] = useState(0);
   const recRef = useRef<MediaRecorder | null>(null);
@@ -95,7 +97,9 @@ export function VoiceRecorder({ groupId, disabled, onRecorded }: Props) {
       recRef.current = rec;
       setState("recording");
       setElapsed(0);
+      onActivity?.();
       timerRef.current = window.setInterval(() => {
+        onActivity?.();
         setElapsed((s) => {
           const next = s + 1;
           if (next >= MAX_SECONDS) {
