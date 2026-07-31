@@ -12,6 +12,8 @@ import { sendGroupMessage } from "@/lib/api/chat";
 import { requestGroupCall } from "@/lib/api/calls";
 import { getInitials } from "@/lib/format";
 import { useCall } from "@/hooks/CallContext";
+import { ensureMediaPermissions, type MediaPermissionFailure } from "@/lib/media/permissions";
+import { MediaPermissionPrompt } from "./MediaPermissionPrompt";
 
 interface Props {
   groupId: string;
@@ -35,6 +37,11 @@ export function CallLauncherPopover({
   const [datetime, setDatetime] = useState("");
 
   const [excluded, setExcluded] = useState<Set<string>>(new Set());
+  const [permIssue, setPermIssue] = useState<{
+    reason: MediaPermissionFailure;
+    message: string;
+    withVideo: boolean;
+  } | null>(null);
 
   const { data: members = [], isLoading } = useQuery({
     queryKey: ["group-members", groupId],
@@ -55,14 +62,26 @@ export function CallLauncherPopover({
 
   const launch = useMutation({
     mutationFn: async (video: boolean) => {
+      const perm = await ensureMediaPermissions(video);
+      if (!perm.ok) {
+        setPermIssue({ reason: perm.reason, message: perm.message, withVideo: video });
+        return null;
+      }
       const callId = await requestGroupCall(groupId, "", null);
-      return { callId, video };
+      return { callId, video: video && perm.hasVideo, degraded: video && !perm.hasVideo };
     },
     onMutate: () => {
       // Fermeture immédiate : sensation WhatsApp, la vue d'appel prend le relais.
       onOpenChange(false);
     },
-    onSuccess: ({ callId, video }) => {
+    onSuccess: (res) => {
+      if (!res) return;
+      const { callId, video, degraded } = res;
+      if (degraded) {
+        toast.info("Caméra indisponible", {
+          description: "L'appel démarre en mode vocal.",
+        });
+      }
       startCall({
         callId,
         groupId,
