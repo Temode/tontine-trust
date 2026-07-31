@@ -1,9 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Check, CheckCheck, Send } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { getInitials } from "@/lib/format";
 import { useAuth } from "@/hooks/useAuth";
 import {
   listGroupMessages,
@@ -12,20 +10,35 @@ import {
   subscribeGroupMessages,
   type DbGroupMessage,
 } from "@/lib/api/chat";
-import { AttachmentPicker } from "@/components/messages/AttachmentPicker";
-import { AttachmentView } from "@/components/messages/AttachmentView";
-import { VoiceRecorder } from "@/components/messages/VoiceRecorder";
 import { TypingIndicator } from "@/components/messages/TypingIndicator";
 import { UnreadSeparator } from "@/components/messages/UnreadSeparator";
+import { DaySeparator } from "@/components/messages/DaySeparator";
+import { MessageBubble } from "@/components/messages/MessageBubble";
+import { Composer } from "@/components/messages/Composer";
 import { useTypingChannel } from "@/hooks/useTypingChannel";
 import { supabase } from "@/integrations/supabase/client";
 import type { UploadedAttachment } from "@/lib/api/chatAttachments";
 
 interface Props {
   groupId: string;
+  /** "page" = surface plein cadre (messagerie), "panel" = carte encastrée (détail groupe). */
+  variant?: "page" | "panel";
+  groupName?: string;
 }
 
-export function GroupChat({ groupId }: Props) {
+const BURST_WINDOW_MS = 5 * 60 * 1000;
+
+function sameDay(a: string, b: string): boolean {
+  const x = new Date(a);
+  const y = new Date(b);
+  return (
+    x.getFullYear() === y.getFullYear() &&
+    x.getMonth() === y.getMonth() &&
+    x.getDate() === y.getDate()
+  );
+}
+
+export function GroupChat({ groupId, variant = "panel", groupName = "" }: Props) {
   const { user } = useAuth();
   const qc = useQueryClient();
   const [body, setBody] = useState("");
