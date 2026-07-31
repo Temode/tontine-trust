@@ -1,6 +1,7 @@
 import { cn } from "@/lib/utils";
 
 const URL_RE = /(https?:\/\/[^\s]+)/g;
+const IS_URL = /^https?:\/\//;
 
 function pretty(url: string): string {
   try {
@@ -17,7 +18,7 @@ export function MessageText({ body, mine }: { body: string; mine: boolean }) {
   return (
     <p className="whitespace-pre-wrap break-words text-[15px] leading-[1.45]">
       {parts.map((part, i) =>
-        URL_RE.test(part) && /^https?:\/\//.test(part) ? (
+        IS_URL.test(part) ? (
           <a
             key={i}
             href={part}
