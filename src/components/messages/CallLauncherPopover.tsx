@@ -63,7 +63,7 @@ export function CallLauncherPopover({
   const launch = useMutation({
     mutationFn: async (video: boolean) => {
       const perm = await ensureMediaPermissions(video);
-      if (!perm.ok) {
+      if (perm.ok === false) {
         setPermIssue({ reason: perm.reason, message: perm.message, withVideo: video });
         return null;
       }
