@@ -115,14 +115,14 @@ function SoloCard({ g }: { g: Awaited<ReturnType<typeof listMySoloGroups>>[numbe
   const pct = target > 0 ? Math.min(100, Math.round((g.total_saved / target) * 100)) : null;
 
   return (
-    <Link to={`/groupes/${g.id}`} className="block">
+    <Link to={`/solo/${g.id}`} className="block">
       <div className="rounded-lg border border-hairline bg-card p-4 transition hover:border-primary/40 hover:shadow-sm">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
             <p className="truncate text-base font-semibold text-foreground">{g.name}</p>
             <p className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
               {isProject ? <Target className="h-3.5 w-3.5" /> : <Wallet2 className="h-3.5 w-3.5" />}
-              {isProject ? "Épargne Projet" : "Fonds de roulement"} · {g.frequency}
+              {isProject ? "Épargne Projet" : "Fonds de roulement"} · Épargne libre
             </p>
           </div>
           {isLocked ? (
@@ -139,7 +139,7 @@ function SoloCard({ g }: { g: Awaited<ReturnType<typeof listMySoloGroups>>[numbe
           <span className="text-muted-foreground">Total épargné</span>
           <span className="font-display text-sm font-semibold text-foreground num">{formatGNF(g.total_saved)} GNF</span>
         </div>
-        {isProject && target > 0 && (
+        {target > 0 && (
           <>
             <div className="mt-1 flex items-center justify-between text-xs text-muted-foreground">
               <span>Objectif</span>
@@ -149,7 +149,10 @@ function SoloCard({ g }: { g: Awaited<ReturnType<typeof listMySoloGroups>>[numbe
               <div className="h-full bg-primary transition-all" style={{ width: `${pct ?? 0}%` }} />
             </div>
             <p className="mt-1 text-[11px] text-muted-foreground">
-              {pct}% · échéance {new Date(g.solo_lock_until!).toLocaleDateString("fr-FR")}
+              {pct}%
+              {g.solo_lock_until
+                ? ` · échéance ${new Date(g.solo_lock_until).toLocaleDateString("fr-FR")}`
+                : ""}
             </p>
           </>
         )}
@@ -165,7 +168,7 @@ function CreateSoloDialog({
   onOpenChange: (v: boolean) => void;
   onSubmit: (input: {
     name: string; description?: string; category?: string;
-    mode: SoloMode; contribution: number; frequency: SoloFrequency; lockUntil?: string;
+    mode: SoloMode; targetAmount?: number | null; lockUntil?: string;
   }) => void;
   submitting: boolean;
   canCreate: boolean;
@@ -175,8 +178,7 @@ function CreateSoloDialog({
   const [name, setName] = useState("");
   const [desc, setDesc] = useState("");
   const [mode, setMode] = useState<SoloMode>("project");
-  const [contribution, setContribution] = useState<string>("");
-  const [frequency, setFrequency] = useState<SoloFrequency>("mensuelle");
+  const [targetAmount, setTargetAmount] = useState<string>("");
   const [lockUntil, setLockUntil] = useState<string>("");
 
   const minDate = useMemo(() => {
@@ -184,7 +186,7 @@ function CreateSoloDialog({
     return d.toISOString().slice(0, 10);
   }, []);
 
-  const amount = Number(contribution);
+  const amount = Number(targetAmount);
 
   /** Alertes temps réel évaluées à chaque frappe, avant toute soumission. */
   const alerts = useMemo(() => {
