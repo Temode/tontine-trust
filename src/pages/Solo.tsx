@@ -203,11 +203,11 @@ function CreateSoloDialog({
     if (name.trim().length > 0 && name.trim().length < 3) {
       list.push({ level: "error", text: "Le nom doit contenir au moins 3 caractères." });
     }
-    if (contribution !== "" && !(amount > 0)) {
-      list.push({ level: "error", text: "La cotisation doit être supérieure à zéro." });
+    if (targetAmount !== "" && !(amount > 0)) {
+      list.push({ level: "error", text: "L'objectif d'épargne doit être supérieur à zéro." });
     }
     if (amount > 0 && amount % 1000 !== 0) {
-      list.push({ level: "warn", text: "Cotisation inhabituelle : un multiple de 1 000 GNF est conseillé." });
+      list.push({ level: "warn", text: "Objectif inhabituel : un multiple de 1 000 GNF est conseillé." });
     }
     if (mode === "project") {
       if (!lockUntil) {
@@ -217,35 +217,27 @@ function CreateSoloDialog({
       }
     }
     return list;
-  }, [canCreate, maxSolo, used, name, contribution, amount, mode, lockUntil]);
+  }, [canCreate, maxSolo, used, name, targetAmount, amount, mode, lockUntil]);
 
   const blocking = alerts.some((a) => a.level === "error");
 
   /** Prévisualisation du groupe qui sera créé. */
   const preview = useMemo(() => {
-    const perYear: Record<SoloFrequency, number> = {
-      quotidienne: 365, hebdomadaire: 52, quinzaine: 26, mensuelle: 12,
-    };
-    const echeances =
+    const days =
       mode === "project" && lockUntil
-        ? Math.max(
-            0,
-            Math.round(
-              ((new Date(lockUntil).getTime() - Date.now()) / (1000 * 60 * 60 * 24 * 365)) *
-                perYear[frequency],
-            ),
-          )
-        : perYear[frequency];
+        ? Math.max(0, Math.ceil((new Date(lockUntil).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+        : null;
     return {
       members: 1,
       international: false,
       targetStatus: "Active" as const,
-      echeances,
-      projected: (amount > 0 ? amount : 0) * echeances,
+      days,
+      target: amount > 0 ? amount : null,
+      perMonth: amount > 0 && days && days > 0 ? Math.round(amount / Math.max(1, days / 30)) : null,
     };
-  }, [mode, lockUntil, frequency, amount]);
+  }, [mode, lockUntil, amount]);
 
-  const canSubmit = !blocking && name.trim().length >= 3 && amount > 0 &&
+  const canSubmit = !blocking && name.trim().length >= 3 &&
     (mode === "working_capital" || lockUntil.length > 0);
 
   const submit = () => {
@@ -254,8 +246,7 @@ function CreateSoloDialog({
       name: name.trim(),
       description: desc.trim() || undefined,
       mode,
-      contribution: Number(contribution),
-      frequency,
+      targetAmount: targetAmount === "" ? null : Number(targetAmount),
       lockUntil: mode === "project" ? new Date(lockUntil).toISOString() : undefined,
     });
   };
