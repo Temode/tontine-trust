@@ -70,11 +70,11 @@ export default function International() {
   const applyBlocked = applyAlerts.some((a) => a.level === "error");
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-6 space-y-6">
+    <div className="mx-auto w-full max-w-5xl space-y-6 px-4 py-5 sm:py-6 lg:px-6">
       <header className="space-y-1">
         <div className="flex items-center gap-2">
-          <Globe2 className="h-6 w-6 text-primary" />
-          <h1 className="font-display text-2xl font-bold">Tontines internationales</h1>
+          <Globe2 className="h-5 w-5 shrink-0 text-primary sm:h-6 sm:w-6" />
+          <h1 className="font-display text-xl font-bold sm:text-2xl">Tontines internationales</h1>
         </div>
         <p className="text-sm text-muted-foreground">
           Annuaire public de tontines ouvertes aux membres du monde entier.
@@ -93,13 +93,13 @@ export default function International() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-2">
           {groups.map((g) => (
             <Card key={g.group_id} className="hover:shadow-md transition-shadow">
               <CardHeader className="space-y-2">
                 <div className="flex items-start justify-between gap-2">
-                  <CardTitle className="text-lg">{g.name}</CardTitle>
-                  <Badge variant={g.seats_left > 0 ? "default" : "secondary"}>
+                  <CardTitle className="min-w-0 break-words text-base sm:text-lg">{g.name}</CardTitle>
+                  <Badge variant={g.seats_left > 0 ? "default" : "secondary"} className="shrink-0 whitespace-nowrap">
                     {g.seats_left > 0 ? `${g.seats_left} place(s)` : "Complet"}
                   </Badge>
                 </div>
@@ -108,19 +108,19 @@ export default function International() {
                 )}
               </CardHeader>
               <CardContent className="space-y-3">
-                <div className="grid grid-cols-2 gap-2 text-sm">
-                  <div>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div className="min-w-0">
                     <p className="text-xs text-muted-foreground">Cotisation</p>
-                    <p className="font-semibold">{formatXof(g.contribution_amount)}</p>
+                    <p className="break-words font-semibold">{formatXof(g.contribution_amount)}</p>
                     <p className="text-xs text-muted-foreground">{g.frequency}</p>
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <p className="text-xs text-muted-foreground">Membres</p>
-                    <p className="font-semibold flex items-center gap-1">
-                      <Users className="h-3 w-3" /> {g.current_members} / {g.max_members}
+                    <p className="flex items-center gap-1 font-semibold">
+                      <Users className="h-3 w-3 shrink-0" /> {g.current_members} / {g.max_members}
                     </p>
-                    <p className="text-xs text-muted-foreground flex items-center gap-1">
-                      <TrendingUp className="h-3 w-3" /> Score {Math.round(g.avg_reliability)}
+                    <p className="flex items-center gap-1 text-xs text-muted-foreground">
+                      <TrendingUp className="h-3 w-3 shrink-0" /> Score {Math.round(g.avg_reliability)}
                     </p>
                   </div>
                 </div>
@@ -138,15 +138,15 @@ export default function International() {
       )}
 
       <Dialog open={!!selected} onOpenChange={(o) => !o && setSelected(null)}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>{selected?.name}</DialogTitle>
+        <DialogContent className="flex max-h-[90dvh] w-[calc(100%-2rem)] max-w-lg flex-col gap-4 overflow-hidden p-4 sm:p-6">
+          <DialogHeader className="shrink-0">
+            <DialogTitle className="break-words">{selected?.name}</DialogTitle>
             <DialogDescription>
               Membres anonymisés. Votre identité ne sera révélée qu'après acceptation de votre candidature.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-3">
+          <div className="-mx-1 min-h-0 flex-1 space-y-3 overflow-y-auto px-1">
             <div>
               <p className="text-xs font-semibold uppercase text-muted-foreground mb-2">Composition actuelle</p>
               <div className="space-y-1 max-h-40 overflow-y-auto rounded-lg border p-2">
@@ -181,19 +181,19 @@ export default function International() {
                 <p className="flex items-center gap-1.5 text-xs font-semibold uppercase text-muted-foreground">
                   <Info className="h-3.5 w-3.5" /> Prévisualisation de votre adhésion
                 </p>
-                <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
+                <dl className="mt-2 grid grid-cols-1 gap-x-4 gap-y-2 text-sm sm:grid-cols-2 sm:gap-y-1.5">
                   <dt className="text-muted-foreground">Membres après validation</dt>
-                  <dd className="text-right font-medium">
+                  <dd className="break-words font-medium sm:text-right">
                     {Math.min(selected.current_members + 1, selected.max_members)} / {selected.max_members}
                   </dd>
                   <dt className="text-muted-foreground">Type</dt>
-                  <dd className="text-right font-medium">Collective · Internationale</dd>
+                  <dd className="break-words font-medium sm:text-right">Collective · Internationale</dd>
                   <dt className="text-muted-foreground">Statut du groupe</dt>
-                  <dd className="text-right font-medium">{selected.status}</dd>
+                  <dd className="break-words font-medium sm:text-right">{selected.status}</dd>
                   <dt className="text-muted-foreground">Statut cible</dt>
-                  <dd className="text-right font-medium">En attente de validation</dd>
+                  <dd className="break-words font-medium sm:text-right">En attente de validation</dd>
                   <dt className="text-muted-foreground">Cotisation</dt>
-                  <dd className="text-right font-medium">{formatXof(selected.contribution_amount)} · {selected.frequency}</dd>
+                  <dd className="break-words font-medium sm:text-right">{formatXof(selected.contribution_amount)} · {selected.frequency}</dd>
                 </dl>
               </div>
             )}
@@ -215,9 +215,9 @@ export default function International() {
             )}
           </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setSelected(null)}>Annuler</Button>
-            <Button onClick={() => applyMut.mutate()} disabled={applyMut.isPending || applyBlocked}>
+          <DialogFooter className="shrink-0 gap-2 sm:gap-2">
+            <Button variant="outline" className="w-full sm:w-auto" onClick={() => setSelected(null)}>Annuler</Button>
+            <Button className="w-full sm:w-auto" onClick={() => applyMut.mutate()} disabled={applyMut.isPending || applyBlocked}>
               {applyMut.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Envoyer ma candidature
             </Button>
