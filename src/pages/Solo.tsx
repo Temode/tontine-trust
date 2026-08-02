@@ -159,7 +159,7 @@ function SoloCard({ g }: { g: Awaited<ReturnType<typeof listMySoloGroups>>[numbe
 }
 
 function CreateSoloDialog({
-  open, onOpenChange, onSubmit, submitting,
+  open, onOpenChange, onSubmit, submitting, canCreate, used, maxSolo,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
@@ -168,6 +168,9 @@ function CreateSoloDialog({
     mode: SoloMode; contribution: number; frequency: SoloFrequency; lockUntil?: string;
   }) => void;
   submitting: boolean;
+  canCreate: boolean;
+  used: number;
+  maxSolo: number;
 }) {
   const [name, setName] = useState("");
   const [desc, setDesc] = useState("");
@@ -181,7 +184,66 @@ function CreateSoloDialog({
     return d.toISOString().slice(0, 10);
   }, []);
 
-  const canSubmit = name.trim().length > 0 && Number(contribution) > 0 &&
+  const amount = Number(contribution);
+
+  /** Alertes temps réel évaluées à chaque frappe, avant toute soumission. */
+  const alerts = useMemo(() => {
+    const list: { level: "error" | "warn"; text: string }[] = [];
+    if (!canCreate) {
+      list.push({
+        level: "error",
+        text:
+          maxSolo === 0
+            ? "Votre plan actuel n'inclut pas la tontine Solo."
+            : `Quota Solo atteint (${used}/${maxSolo}) pour votre plan.`,
+      });
+    }
+    if (name.trim().length > 0 && name.trim().length < 3) {
+      list.push({ level: "error", text: "Le nom doit contenir au moins 3 caractères." });
+    }
+    if (contribution !== "" && !(amount > 0)) {
+      list.push({ level: "error", text: "La cotisation doit être supérieure à zéro." });
+    }
+    if (amount > 0 && amount % 1000 !== 0) {
+      list.push({ level: "warn", text: "Cotisation inhabituelle : un multiple de 1 000 GNF est conseillé." });
+    }
+    if (mode === "project") {
+      if (!lockUntil) {
+        list.push({ level: "error", text: "Choisissez une date d'échéance pour l'épargne Projet." });
+      } else if (new Date(lockUntil).getTime() <= Date.now()) {
+        list.push({ level: "error", text: "La date d'échéance doit être dans le futur." });
+      }
+    }
+    return list;
+  }, [canCreate, maxSolo, used, name, contribution, amount, mode, lockUntil]);
+
+  const blocking = alerts.some((a) => a.level === "error");
+
+  /** Prévisualisation du groupe qui sera créé. */
+  const preview = useMemo(() => {
+    const perYear: Record<SoloFrequency, number> = {
+      quotidienne: 365, hebdomadaire: 52, quinzaine: 26, mensuelle: 12,
+    };
+    const echeances =
+      mode === "project" && lockUntil
+        ? Math.max(
+            0,
+            Math.round(
+              ((new Date(lockUntil).getTime() - Date.now()) / (1000 * 60 * 60 * 24 * 365)) *
+                perYear[frequency],
+            ),
+          )
+        : perYear[frequency];
+    return {
+      members: 1,
+      international: false,
+      targetStatus: "Active" as const,
+      echeances,
+      projected: (amount > 0 ? amount : 0) * echeances,
+    };
+  }, [mode, lockUntil, frequency, amount]);
+
+  const canSubmit = !blocking && name.trim().length >= 3 && amount > 0 &&
     (mode === "working_capital" || lockUntil.length > 0);
 
   const submit = () => {
@@ -270,6 +332,51 @@ function CreateSoloDialog({
                 Aucun retrait ne sera possible avant cette date.
               </p>
             </div>
+          )}
+
+          <div className="rounded-md border border-hairline bg-secondary/40 p-3">
+            <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              <Info className="h-3.5 w-3.5" /> Prévisualisation
+            </p>
+            <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
+              <dt className="text-muted-foreground">Membres</dt>
+              <dd className="text-right font-medium">{preview.members} (organisateur unique)</dd>
+              <dt className="text-muted-foreground">Type</dt>
+              <dd className="text-right font-medium">
+                Solo · {mode === "project" ? "Projet" : "Fonds de roulement"} ·{" "}
+                {preview.international ? "International" : "Privé"}
+              </dd>
+              <dt className="text-muted-foreground">Statut cible</dt>
+              <dd className="text-right font-medium">{preview.targetStatus}</dd>
+              <dt className="text-muted-foreground">Échéances estimées</dt>
+              <dd className="text-right font-medium num">{preview.echeances}</dd>
+              <dt className="text-muted-foreground">Épargne projetée</dt>
+              <dd className="text-right font-medium num">{formatGNF(preview.projected)} GNF</dd>
+            </dl>
+          </div>
+
+          {alerts.length > 0 && (
+            <ul className="space-y-1.5" data-testid="solo-alerts">
+              {alerts.map((a, i) => (
+                <li
+                  key={i}
+                  className={`flex items-start gap-2 rounded-md px-3 py-2 text-xs ${
+                    a.level === "error"
+                      ? "bg-destructive/10 text-destructive"
+                      : "bg-warning/10 text-warning-foreground"
+                  }`}
+                >
+                  <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                  <span>{a.text}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {!canCreate && (
+            <Button asChild variant="outline" className="w-full gap-2">
+              <Link to="/abonnement"><Crown className="h-4 w-4" /> Voir les plans Premium & Business</Link>
+            </Button>
           )}
         </div>
         <DialogFooter>
