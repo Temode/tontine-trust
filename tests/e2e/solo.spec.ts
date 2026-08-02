@@ -75,3 +75,14 @@ test.describe("M6 — Tontine Solo", () => {
     await admin.auth.admin.deleteUser(uid);
   });
 });
+test.describe("Solo — dépôt libre (initialisation Djomy)", () => {
+  test("la fonction d'initialisation du dépôt est déployée et joignable", async ({ request }) => {
+    const res = await request.post(
+      `${process.env.VITE_SUPABASE_URL ?? "https://oljyzmannzejtsbfpzxp.supabase.co"}/functions/v1/djomy-init-solo-deposit`,
+      { data: {}, headers: { "Content-Type": "application/json" } },
+    );
+    // Non déployée ⇒ 404 : c'est la régression que l'on veut détecter.
+    expect(res.status()).not.toBe(404);
+    expect([400, 401]).toContain(res.status());
+  });
+});

@@ -110,6 +110,21 @@ export async function createSoloGroup(input: {
   return { groupId: r.group_id };
 }
 
+async function readFunctionError(error: unknown): Promise<string> {
+  const err = error as { message?: string; name?: string; context?: Response };
+  try {
+    const ctx = err?.context;
+    if (ctx && typeof ctx.json === "function") {
+      if (ctx.status === 404) return "SERVICE_UNAVAILABLE";
+      const body = await ctx.clone().json();
+      const parts = [body?.error, body?.message, body?.hint].filter(Boolean);
+      if (parts.length) return parts.join(" — ");
+    }
+  } catch { /* ignore */ }
+  if (err?.name === "FunctionsFetchError") return "SERVICE_UNAVAILABLE";
+  return err?.message ?? "DJOMY_INIT_FAILED";
+}
+
 /** Démarre un dépôt libre puis renvoie l'URL de paiement Djomy. */
 export async function startSoloDeposit(groupId: string, amount: number): Promise<{ redirectUrl: string; depositId: string }> {
   const base =
@@ -128,8 +143,9 @@ export async function startSoloDeposit(groupId: string, amount: number): Promise
       cancelUrl: `${base}/solo/${groupId}`,
     },
   });
-  if (error) throw buildSoloError(error.message ?? "DJOMY_INIT_FAILED");
+  if (error) throw buildSoloError(await readFunctionError(error));
   if (!data || "error" in data) throw buildSoloError((data as { error?: string })?.error ?? "DJOMY_INIT_FAILED");
+  if (!(data as { redirectUrl?: string }).redirectUrl) throw buildSoloError("DJOMY_NO_REDIRECT");
   return data;
 }
 
@@ -178,6 +194,9 @@ export function translateSoloError(msg: string): string {
   if (msg.includes("SOLO_ARCHIVED")) return "Cette épargne Solo est archivée.";
   if (msg.includes("SOLO_LOCKED_UNTIL")) return "L'échéance d'une épargne Projet ne peut pas être retirée avant son terme.";
   if (msg.includes("RETURN_URL_NOT_HTTPS")) return "Le paiement nécessite une URL sécurisée (https). Ouvrez l'application publiée.";
+  if (msg.includes("SERVICE_UNAVAILABLE")) return "Service de paiement momentanément indisponible. Réessayez dans un instant.";
+  if (msg.includes("DJOMY_NO_REDIRECT")) return "Le prestataire de paiement n'a pas renvoyé de lien. Réessayez.";
+  if (msg.includes("DJOMY_INIT_FAILED")) return "Impossible de démarrer le paiement. Réessayez dans un instant.";
   if (msg.includes("membres doit être compris")) return msg;
   if (msg.includes("NAME_REQUIRED")) return "Le nom est requis.";
   if (msg.includes("AUTH_REQUIRED")) return "Vous devez être connecté.";
