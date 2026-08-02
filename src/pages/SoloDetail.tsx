@@ -229,6 +229,10 @@ function DepositDialog({
   const deposit = useMutation({
     mutationFn: () => startSoloDeposit(groupId, value),
     onSuccess: (r) => {
+      if (!r?.redirectUrl) {
+        toast.error("Dépôt impossible", { description: "Lien de paiement indisponible. Réessayez." });
+        return;
+      }
       onDone();
       window.location.assign(r.redirectUrl);
     },
