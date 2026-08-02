@@ -28,8 +28,8 @@ DECLARE
   v_src text;
   v_ok boolean;
 BEGIN
-  SELECT id INTO v_uid FROM auth.users ORDER BY created_at LIMIT 1;
-  SELECT id INTO v_uid2 FROM auth.users WHERE id <> v_uid ORDER BY created_at LIMIT 1;
+  SELECT id INTO v_uid FROM public.profiles ORDER BY created_at LIMIT 1;
+  SELECT id INTO v_uid2 FROM public.profiles WHERE id <> v_uid ORDER BY created_at LIMIT 1;
   IF v_uid IS NULL THEN
     RAISE NOTICE 'SKIP: aucun utilisateur disponible pour les tests Solo.';
   ELSE
