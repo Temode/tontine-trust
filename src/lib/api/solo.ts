@@ -49,9 +49,14 @@ export async function createSoloGroup(input: {
 }
 
 function translateSoloError(msg: string): string {
-  if (msg.includes("QUOTA_SOLO_EXCEEDED")) return "Vous avez atteint le quota de tontines Solo de votre plan.";
+  if (msg.includes("QUOTA_SOLO_EXCEEDED")) {
+    return "Votre plan actuel n'inclut pas de tontine Solo (ou le quota est atteint). Passez à un plan supérieur pour en créer une.";
+  }
+  if (msg.includes("QUOTA_MEMBERS_EXCEEDED")) return "Quota de membres atteint pour votre plan.";
+  if (msg.includes("QUOTA_GROUPS_EXCEEDED")) return "Vous avez atteint le nombre maximum de tontines de votre plan.";
   if (msg.includes("INVALID_SOLO_LOCK_UNTIL")) return "Choisissez une date d'échéance future.";
   if (msg.includes("INVALID_CONTRIBUTION")) return "La cotisation doit être supérieure à zéro.";
+  if (msg.includes("membres doit être compris")) return msg;
   if (msg.includes("NAME_REQUIRED")) return "Le nom est requis.";
   if (msg.includes("AUTH_REQUIRED")) return "Vous devez être connecté.";
   return msg;
