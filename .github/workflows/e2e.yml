@@ -51,6 +51,15 @@ jobs:
       - name: Run edge-function unit tests (SMS templates + provider simulé)
         run: deno test --no-check supabase/functions/_shared/__tests__/
 
+      - name: Tests unitaires (règles Solo & Internationale)
+        run: bunx vitest run
+
+      - name: Tests de non-régression SQL (Solo & Internationale)
+        if: ${{ env.E2E_DATABASE_URL != '' }}
+        env:
+          E2E_DATABASE_URL: ${{ secrets.E2E_DATABASE_URL }}
+        run: psql "$E2E_DATABASE_URL" -v ON_ERROR_STOP=1 -f db/tests/solo_and_international_rules.test.sql
+
       - name: Seed deterministic fixtures (Famille Alice)
         run: bun run tests/e2e/fixtures/famille-alice.ts
 

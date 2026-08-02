@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Globe2, Users, TrendingUp, Loader2 } from "lucide-react";
+import { Globe2, Users, TrendingUp, Loader2, Info, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -46,6 +46,28 @@ export default function International() {
     },
     onError: (e: Error) => toast.error(e.message),
   });
+
+  const applyAlerts: { level: "error" | "warn"; text: string }[] = [];
+  if (selected) {
+    if (selected.seats_left <= 0) {
+      applyAlerts.push({ level: "error", text: "Ce groupe est complet : aucune place restante." });
+    } else if (selected.seats_left === 1) {
+      applyAlerts.push({ level: "warn", text: "Dernière place disponible : votre candidature peut être devancée." });
+    }
+    if (!["draft", "open"].includes(selected.status)) {
+      applyAlerts.push({
+        level: "warn",
+        text: `Cycle déjà ${selected.status === "active" ? "démarré" : selected.status} : votre tour sera positionné en fin de rotation.`,
+      });
+    }
+    if (selected.avg_reliability > 0 && selected.avg_reliability < 50) {
+      applyAlerts.push({ level: "warn", text: "Score de fiabilité moyen faible sur ce groupe." });
+    }
+    if (message.trim().length > 500) {
+      applyAlerts.push({ level: "error", text: "Le message ne peut pas dépasser 500 caractères." });
+    }
+  }
+  const applyBlocked = applyAlerts.some((a) => a.level === "error");
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-6 space-y-6">
@@ -151,12 +173,51 @@ export default function International() {
                 className="mt-1"
                 rows={3}
               />
+              <p className="mt-1 text-right text-[11px] text-muted-foreground">{message.trim().length}/500</p>
             </div>
+
+            {selected && (
+              <div className="rounded-lg border bg-muted/40 p-3" data-testid="intl-preview">
+                <p className="flex items-center gap-1.5 text-xs font-semibold uppercase text-muted-foreground">
+                  <Info className="h-3.5 w-3.5" /> Prévisualisation de votre adhésion
+                </p>
+                <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
+                  <dt className="text-muted-foreground">Membres après validation</dt>
+                  <dd className="text-right font-medium">
+                    {Math.min(selected.current_members + 1, selected.max_members)} / {selected.max_members}
+                  </dd>
+                  <dt className="text-muted-foreground">Type</dt>
+                  <dd className="text-right font-medium">Collective · Internationale</dd>
+                  <dt className="text-muted-foreground">Statut du groupe</dt>
+                  <dd className="text-right font-medium">{selected.status}</dd>
+                  <dt className="text-muted-foreground">Statut cible</dt>
+                  <dd className="text-right font-medium">En attente de validation</dd>
+                  <dt className="text-muted-foreground">Cotisation</dt>
+                  <dd className="text-right font-medium">{formatXof(selected.contribution_amount)} · {selected.frequency}</dd>
+                </dl>
+              </div>
+            )}
+
+            {applyAlerts.length > 0 && (
+              <ul className="space-y-1.5" data-testid="intl-alerts">
+                {applyAlerts.map((a, i) => (
+                  <li
+                    key={i}
+                    className={`flex items-start gap-2 rounded-md px-3 py-2 text-xs ${
+                      a.level === "error" ? "bg-destructive/10 text-destructive" : "bg-warning/10 text-warning-foreground"
+                    }`}
+                  >
+                    <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                    <span>{a.text}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setSelected(null)}>Annuler</Button>
-            <Button onClick={() => applyMut.mutate()} disabled={applyMut.isPending}>
+            <Button onClick={() => applyMut.mutate()} disabled={applyMut.isPending || applyBlocked}>
               {applyMut.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Envoyer ma candidature
             </Button>
