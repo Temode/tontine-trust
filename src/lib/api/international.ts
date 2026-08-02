@@ -70,7 +70,12 @@ function translateApplyError(msg: string): string {
   if (msg.includes("already_applied_or_member")) return "Vous avez déjà postulé ou êtes déjà membre.";
   if (msg.includes("group_full")) return "Ce groupe est complet.";
   if (msg.includes("group_not_open")) return "Ce groupe n'accepte plus de candidatures.";
-  if (msg.includes("group_not_found_or_not_international")) return "Groupe introuvable.";
+  if (msg.includes("group_not_found_or_not_international")) {
+    return "Cette tontine n'est plus ouverte aux candidatures publiques.";
+  }
+  if (msg.includes("QUOTA_MEMBERS_EXCEEDED")) {
+    return "Cette tontine a atteint le nombre de membres autorisé par le plan de son organisateur.";
+  }
   if (msg.includes("not_authenticated")) return "Vous devez être connecté.";
   return msg;
 }

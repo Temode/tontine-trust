@@ -52,7 +52,13 @@ export default function Solo() {
           </Button>
         </div>
 
-        {!canCreate && (
+        {!canCreate && maxSolo === 0 && (
+          <div className="rounded-md border border-hairline bg-warning/10 px-4 py-3 text-sm text-warning-foreground">
+            Votre plan actuel n'inclut pas la tontine Solo.{" "}
+            <Link to="/abonnement" className="underline">Passez au plan Premium ou Business</Link> pour créer une épargne Solo.
+          </div>
+        )}
+        {!canCreate && maxSolo > 0 && (
           <div className="rounded-md border border-hairline bg-warning/10 px-4 py-3 text-sm text-warning-foreground">
             Vous avez atteint le quota Solo de votre plan ({used}/{maxSolo}).{" "}
             <Link to="/abonnement" className="underline">Passez à un plan supérieur</Link> pour continuer.
