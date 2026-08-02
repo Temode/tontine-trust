@@ -157,6 +157,13 @@ export default function GroupDetail() {
     queryFn: () => getGroup(id as string),
     enabled: !!id,
   });
+
+  // Une tontine Solo n'a ni membres, ni invitations, ni cycle : interface dédiée.
+  const isSolo = (groupQ.data as { kind?: string } | undefined)?.kind === "solo";
+  useEffect(() => {
+    if (isSolo && id) navigate(`/solo/${id}`, { replace: true });
+  }, [isSolo, id, navigate]);
+
   const membersQ = useQuery({
     queryKey: ["group", id, "members"],
     queryFn: () => listGroupMembers(id as string),

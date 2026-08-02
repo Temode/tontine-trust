@@ -68,6 +68,7 @@ const Subscription = lazy(() => import("@/pages/Subscription"));
 const SubscriptionCheckout = lazy(() => import("@/pages/SubscriptionCheckout"));
 const SubscriptionConfirmation = lazy(() => import("@/pages/SubscriptionConfirmation"));
 const Solo = lazy(() => import("@/pages/Solo"));
+const SoloDetail = lazy(() => import("@/pages/SoloDetail"));
 const International = lazy(() => import("@/pages/International"));
 const Affiliation = lazy(() => import("@/pages/Affiliation"));
 const CoordinatorCommissions = lazy(() => import("@/pages/CoordinatorCommissions"));
@@ -183,6 +184,7 @@ const App = () => (
                     <Route path="/abonnement/checkout" element={<RouteBoundary name="Récapitulatif abonnement"><SubscriptionCheckout /></RouteBoundary>} />
                     <Route path="/abonnement/confirmation" element={<RouteBoundary name="Confirmation abonnement"><SubscriptionConfirmation /></RouteBoundary>} />
                     <Route path="/solo" element={<RouteBoundary name="Épargne Solo"><Solo /></RouteBoundary>} />
+                    <Route path="/solo/:id" element={<RouteBoundary name="Mon épargne Solo"><SoloDetail /></RouteBoundary>} />
                     <Route path="/international" element={<RouteBoundary name="Tontines internationales"><International /></RouteBoundary>} />
                     <Route path="/affiliation" element={<RouteBoundary name="Affiliation"><Affiliation /></RouteBoundary>} />
                     <Route path="/coordinateur/commissions" element={<RouteBoundary name="Commissions coordinateur"><CoordinatorCommissions /></RouteBoundary>} />

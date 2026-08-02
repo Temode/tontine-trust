@@ -1928,6 +1928,7 @@ export type Database = {
           solo_mode: Database["public"]["Enums"]["solo_mode"] | null
           status: Database["public"]["Enums"]["group_status"]
           swap_policy: Database["public"]["Enums"]["swap_policy"]
+          target_amount: number | null
           total_paused_days: number
           updated_at: string
           visibility: Database["public"]["Enums"]["group_visibility"]
@@ -1966,6 +1967,7 @@ export type Database = {
           solo_mode?: Database["public"]["Enums"]["solo_mode"] | null
           status?: Database["public"]["Enums"]["group_status"]
           swap_policy?: Database["public"]["Enums"]["swap_policy"]
+          target_amount?: number | null
           total_paused_days?: number
           updated_at?: string
           visibility?: Database["public"]["Enums"]["group_visibility"]
@@ -2004,6 +2006,7 @@ export type Database = {
           solo_mode?: Database["public"]["Enums"]["solo_mode"] | null
           status?: Database["public"]["Enums"]["group_status"]
           swap_policy?: Database["public"]["Enums"]["swap_policy"]
+          target_amount?: number | null
           total_paused_days?: number
           updated_at?: string
           visibility?: Database["public"]["Enums"]["group_visibility"]
@@ -4183,6 +4186,73 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      solo_deposits: {
+        Row: {
+          amount: number
+          confirmed_at: string | null
+          created_at: string
+          djomy_transaction_id: string | null
+          group_id: string
+          id: string
+          note: string | null
+          payment_method: string | null
+          provider: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          confirmed_at?: string | null
+          created_at?: string
+          djomy_transaction_id?: string | null
+          group_id: string
+          id?: string
+          note?: string | null
+          payment_method?: string | null
+          provider?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          confirmed_at?: string | null
+          created_at?: string
+          djomy_transaction_id?: string | null
+          group_id?: string
+          id?: string
+          note?: string | null
+          payment_method?: string | null
+          provider?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "solo_deposits_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "admin_group_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "solo_deposits_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "solo_deposits_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "my_groups_overview"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       subscription_plan_history: {
         Row: {
@@ -7194,6 +7264,15 @@ export type Database = {
         Args: { _djomy_ref: string; _new_status: string; _order_id: string }
         Returns: undefined
       }
+      apply_solo_deposit_webhook: {
+        Args: {
+          _deposit_id: string
+          _new_status: string
+          _payment_method?: string
+          _provider_ref?: string
+        }
+        Returns: undefined
+      }
       apply_subscription_webhook: {
         Args: {
           _djomy_ref: string
@@ -7281,18 +7360,32 @@ export type Database = {
         Returns: string
       }
       create_group_with_invitation: { Args: { _payload: Json }; Returns: Json }
-      create_solo_group: {
-        Args: {
-          _category: string
-          _contribution: number
-          _description: string
-          _frequency: Database["public"]["Enums"]["group_frequency"]
-          _lock_until: string
-          _mode: Database["public"]["Enums"]["solo_mode"]
-          _name: string
-        }
-        Returns: Json
-      }
+      create_solo_group:
+        | {
+            Args: {
+              _category?: string
+              _contribution?: number
+              _description?: string
+              _frequency?: Database["public"]["Enums"]["group_frequency"]
+              _lock_until?: string
+              _mode?: Database["public"]["Enums"]["solo_mode"]
+              _name: string
+              _target_amount?: number
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              _category: string
+              _contribution: number
+              _description: string
+              _frequency: Database["public"]["Enums"]["group_frequency"]
+              _lock_until: string
+              _mode: Database["public"]["Enums"]["solo_mode"]
+              _name: string
+            }
+            Returns: Json
+          }
       decide_payment_pause_request: {
         Args: { _approve: boolean; _reason?: string; _request_id: string }
         Returns: undefined
@@ -7429,6 +7522,23 @@ export type Database = {
       }
       get_my_affiliate_summary: { Args: never; Returns: Json }
       get_my_entitlements: { Args: never; Returns: Json }
+      get_my_solo_group: {
+        Args: { _group_id: string }
+        Returns: {
+          category: string
+          created_at: string
+          deposits_count: number
+          description: string
+          id: string
+          name: string
+          pending_amount: number
+          solo_lock_until: string
+          solo_mode: Database["public"]["Enums"]["solo_mode"]
+          status: string
+          target_amount: number
+          total_saved: number
+        }[]
+      }
       get_my_wallet: {
         Args: never
         Returns: {
@@ -7612,6 +7722,18 @@ export type Database = {
           full_name: string
           user_id: string
           voted_at: string
+        }[]
+      }
+      list_solo_deposits: {
+        Args: { _group_id: string; _limit?: number }
+        Returns: {
+          amount: number
+          confirmed_at: string
+          created_at: string
+          djomy_transaction_id: string
+          id: string
+          payment_method: string
+          status: string
         }[]
       }
       log_audit: {
@@ -7985,6 +8107,10 @@ export type Database = {
           unit_price: number
         }[]
       }
+      start_solo_deposit: {
+        Args: { _amount: number; _group_id: string }
+        Returns: Json
+      }
       start_subscription_checkout: {
         Args: {
           _plan_code: Database["public"]["Enums"]["subscription_plan_code"]
@@ -8069,6 +8195,18 @@ export type Database = {
           }
       update_group_settings: {
         Args: { _group_id: string; _payload: Json }
+        Returns: undefined
+      }
+      update_my_solo_group: {
+        Args: {
+          _clear_lock?: boolean
+          _clear_target?: boolean
+          _description?: string
+          _group_id: string
+          _lock_until?: string
+          _name?: string
+          _target_amount?: number
+        }
         Returns: undefined
       }
       update_notification_preferences: {

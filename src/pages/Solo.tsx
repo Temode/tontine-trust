@@ -9,13 +9,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { formatGNF } from "@/lib/format";
 import {
   createSoloGroup,
   listMySoloGroups,
-  type SoloFrequency,
   type SoloMode,
   type SoloQuotaError,
 } from "@/lib/api/solo";
@@ -115,14 +113,14 @@ function SoloCard({ g }: { g: Awaited<ReturnType<typeof listMySoloGroups>>[numbe
   const pct = target > 0 ? Math.min(100, Math.round((g.total_saved / target) * 100)) : null;
 
   return (
-    <Link to={`/groupes/${g.id}`} className="block">
+    <Link to={`/solo/${g.id}`} className="block">
       <div className="rounded-lg border border-hairline bg-card p-4 transition hover:border-primary/40 hover:shadow-sm">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
             <p className="truncate text-base font-semibold text-foreground">{g.name}</p>
             <p className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
               {isProject ? <Target className="h-3.5 w-3.5" /> : <Wallet2 className="h-3.5 w-3.5" />}
-              {isProject ? "Épargne Projet" : "Fonds de roulement"} · {g.frequency}
+              {isProject ? "Épargne Projet" : "Fonds de roulement"} · Épargne libre
             </p>
           </div>
           {isLocked ? (
@@ -139,7 +137,7 @@ function SoloCard({ g }: { g: Awaited<ReturnType<typeof listMySoloGroups>>[numbe
           <span className="text-muted-foreground">Total épargné</span>
           <span className="font-display text-sm font-semibold text-foreground num">{formatGNF(g.total_saved)} GNF</span>
         </div>
-        {isProject && target > 0 && (
+        {target > 0 && (
           <>
             <div className="mt-1 flex items-center justify-between text-xs text-muted-foreground">
               <span>Objectif</span>
@@ -149,7 +147,10 @@ function SoloCard({ g }: { g: Awaited<ReturnType<typeof listMySoloGroups>>[numbe
               <div className="h-full bg-primary transition-all" style={{ width: `${pct ?? 0}%` }} />
             </div>
             <p className="mt-1 text-[11px] text-muted-foreground">
-              {pct}% · échéance {new Date(g.solo_lock_until!).toLocaleDateString("fr-FR")}
+              {pct}%
+              {g.solo_lock_until
+                ? ` · échéance ${new Date(g.solo_lock_until).toLocaleDateString("fr-FR")}`
+                : ""}
             </p>
           </>
         )}
@@ -165,7 +166,7 @@ function CreateSoloDialog({
   onOpenChange: (v: boolean) => void;
   onSubmit: (input: {
     name: string; description?: string; category?: string;
-    mode: SoloMode; contribution: number; frequency: SoloFrequency; lockUntil?: string;
+    mode: SoloMode; targetAmount?: number | null; lockUntil?: string;
   }) => void;
   submitting: boolean;
   canCreate: boolean;
@@ -175,8 +176,7 @@ function CreateSoloDialog({
   const [name, setName] = useState("");
   const [desc, setDesc] = useState("");
   const [mode, setMode] = useState<SoloMode>("project");
-  const [contribution, setContribution] = useState<string>("");
-  const [frequency, setFrequency] = useState<SoloFrequency>("mensuelle");
+  const [targetAmount, setTargetAmount] = useState<string>("");
   const [lockUntil, setLockUntil] = useState<string>("");
 
   const minDate = useMemo(() => {
@@ -184,7 +184,7 @@ function CreateSoloDialog({
     return d.toISOString().slice(0, 10);
   }, []);
 
-  const amount = Number(contribution);
+  const amount = Number(targetAmount);
 
   /** Alertes temps réel évaluées à chaque frappe, avant toute soumission. */
   const alerts = useMemo(() => {
@@ -201,11 +201,11 @@ function CreateSoloDialog({
     if (name.trim().length > 0 && name.trim().length < 3) {
       list.push({ level: "error", text: "Le nom doit contenir au moins 3 caractères." });
     }
-    if (contribution !== "" && !(amount > 0)) {
-      list.push({ level: "error", text: "La cotisation doit être supérieure à zéro." });
+    if (targetAmount !== "" && !(amount > 0)) {
+      list.push({ level: "error", text: "L'objectif d'épargne doit être supérieur à zéro." });
     }
     if (amount > 0 && amount % 1000 !== 0) {
-      list.push({ level: "warn", text: "Cotisation inhabituelle : un multiple de 1 000 GNF est conseillé." });
+      list.push({ level: "warn", text: "Objectif inhabituel : un multiple de 1 000 GNF est conseillé." });
     }
     if (mode === "project") {
       if (!lockUntil) {
@@ -215,35 +215,27 @@ function CreateSoloDialog({
       }
     }
     return list;
-  }, [canCreate, maxSolo, used, name, contribution, amount, mode, lockUntil]);
+  }, [canCreate, maxSolo, used, name, targetAmount, amount, mode, lockUntil]);
 
   const blocking = alerts.some((a) => a.level === "error");
 
   /** Prévisualisation du groupe qui sera créé. */
   const preview = useMemo(() => {
-    const perYear: Record<SoloFrequency, number> = {
-      quotidienne: 365, hebdomadaire: 52, quinzaine: 26, mensuelle: 12,
-    };
-    const echeances =
+    const days =
       mode === "project" && lockUntil
-        ? Math.max(
-            0,
-            Math.round(
-              ((new Date(lockUntil).getTime() - Date.now()) / (1000 * 60 * 60 * 24 * 365)) *
-                perYear[frequency],
-            ),
-          )
-        : perYear[frequency];
+        ? Math.max(0, Math.ceil((new Date(lockUntil).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+        : null;
     return {
       members: 1,
       international: false,
       targetStatus: "Active" as const,
-      echeances,
-      projected: (amount > 0 ? amount : 0) * echeances,
+      days,
+      target: amount > 0 ? amount : null,
+      perMonth: amount > 0 && days && days > 0 ? Math.round(amount / Math.max(1, days / 30)) : null,
     };
-  }, [mode, lockUntil, frequency, amount]);
+  }, [mode, lockUntil, amount]);
 
-  const canSubmit = !blocking && name.trim().length >= 3 && amount > 0 &&
+  const canSubmit = !blocking && name.trim().length >= 3 &&
     (mode === "working_capital" || lockUntil.length > 0);
 
   const submit = () => {
@@ -252,8 +244,7 @@ function CreateSoloDialog({
       name: name.trim(),
       description: desc.trim() || undefined,
       mode,
-      contribution: Number(contribution),
-      frequency,
+      targetAmount: targetAmount === "" ? null : Number(targetAmount),
       lockUntil: mode === "project" ? new Date(lockUntil).toISOString() : undefined,
     });
   };
@@ -300,26 +291,16 @@ function CreateSoloDialog({
             <Textarea id="solo-desc" value={desc} onChange={(e) => setDesc(e.target.value)} rows={2} />
           </div>
 
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div>
-              <Label htmlFor="solo-contrib">Cotisation (GNF)</Label>
-              <Input
-                id="solo-contrib" type="number" inputMode="numeric" min={1}
-                value={contribution} onChange={(e) => setContribution(e.target.value)}
-              />
-            </div>
-            <div>
-              <Label>Fréquence</Label>
-              <Select value={frequency} onValueChange={(v) => setFrequency(v as SoloFrequency)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="quotidienne">Quotidienne</SelectItem>
-                  <SelectItem value="hebdomadaire">Hebdomadaire</SelectItem>
-                  <SelectItem value="quinzaine">Quinzaine</SelectItem>
-                  <SelectItem value="mensuelle">Mensuelle</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+          <div>
+            <Label htmlFor="solo-target">Objectif d'épargne (GNF, optionnel)</Label>
+            <Input
+              id="solo-target" type="number" inputMode="numeric" min={1}
+              value={targetAmount} onChange={(e) => setTargetAmount(e.target.value)}
+              placeholder="Ex : 5000000 — laissez vide si vous n'avez pas d'objectif"
+            />
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              Aucune cotisation fixe : vous déposez le montant que vous voulez, quand vous voulez.
+            </p>
           </div>
 
           {mode === "project" && (
@@ -349,10 +330,24 @@ function CreateSoloDialog({
               </dd>
               <dt className="text-muted-foreground">Statut cible</dt>
               <dd className="break-words font-medium sm:text-right">{preview.targetStatus}</dd>
-              <dt className="text-muted-foreground">Échéances estimées</dt>
-              <dd className="break-words font-medium num sm:text-right">{preview.echeances}</dd>
-              <dt className="text-muted-foreground">Épargne projetée</dt>
-              <dd className="break-words font-medium num sm:text-right">{formatGNF(preview.projected)} GNF</dd>
+              <dt className="text-muted-foreground">Rythme</dt>
+              <dd className="break-words font-medium sm:text-right">Dépôts libres</dd>
+              <dt className="text-muted-foreground">Objectif</dt>
+              <dd className="break-words font-medium num sm:text-right">
+                {preview.target ? `${formatGNF(preview.target)} GNF` : "Aucun"}
+              </dd>
+              {preview.days !== null && (
+                <>
+                  <dt className="text-muted-foreground">Durée avant échéance</dt>
+                  <dd className="break-words font-medium num sm:text-right">{preview.days} jours</dd>
+                </>
+              )}
+              {preview.perMonth ? (
+                <>
+                  <dt className="text-muted-foreground">Effort mensuel indicatif</dt>
+                  <dd className="break-words font-medium num sm:text-right">{formatGNF(preview.perMonth)} GNF</dd>
+                </>
+              ) : null}
             </dl>
           </div>
 

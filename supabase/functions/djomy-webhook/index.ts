@@ -153,6 +153,31 @@ Deno.serve(async (req) => {
   }
 
   // Routage cautions : si purpose=deposit ou si le ref correspond à un member_deposit
+  // Routage épargne Solo : purpose=solo_deposit ou ref = solo_deposits.id
+  let soloDepositId: string | null = null;
+  if (purpose === "solo_deposit" && merchantRef) {
+    soloDepositId = merchantRef;
+  } else if (merchantRef) {
+    const { data: sd } = await admin
+      .from("solo_deposits").select("id")
+      .eq("id", merchantRef).maybeSingle();
+    if (sd) soloDepositId = sd.id;
+  }
+  if (soloDepositId) {
+    if (!newStatus) return json({ ok: true, ignored: "unhandled_event" }, 200);
+    const { error: sdErr } = await admin.rpc("apply_solo_deposit_webhook", {
+      _deposit_id: soloDepositId,
+      _new_status: newStatus,
+      _provider_ref: transactionId,
+      _payment_method: (data.paymentMethod as string) ?? null,
+    });
+    if (sdErr) {
+      console.error("[djomy-webhook] solo deposit rpc error", sdErr);
+      return json({ ok: false, error: sdErr.message }, 500);
+    }
+    return json({ ok: true, soloDepositId, status: newStatus });
+  }
+
   let depositId: string | null = null;
   if (purpose === "deposit" && merchantRef) {
     depositId = merchantRef;
