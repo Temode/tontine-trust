@@ -54,15 +54,15 @@ export default function Solo() {
   return (
     <div className="min-h-screen bg-background">
       <TopBar title="Tontines Solo" />
-      <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-4 py-6 lg:px-6">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <h1 className="font-display text-2xl font-semibold text-foreground">Épargne Solo</h1>
+      <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-4 py-5 sm:py-6 lg:px-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
+            <h1 className="font-display text-xl font-semibold text-foreground sm:text-2xl">Épargne Solo</h1>
             <p className="text-sm text-muted-foreground">
               Épargne personnelle : Épargne Projet (bloquée jusqu'à une date) ou Fonds de roulement (libre).
             </p>
           </div>
-          <Button onClick={() => setOpen(true)} disabled={!canCreate} className="gap-2">
+          <Button onClick={() => setOpen(true)} disabled={!canCreate} className="w-full gap-2 sm:w-auto sm:shrink-0">
             <Plus className="h-4 w-4" /> Nouvelle
           </Button>
         </div>
@@ -89,7 +89,7 @@ export default function Solo() {
             </p>
           </SectionCard>
         ) : (
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-2">
             {(listQ.data ?? []).map((g) => <SoloCard key={g.id} g={g} />)}
           </div>
         )}
@@ -260,14 +260,15 @@ function CreateSoloDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
+      <DialogContent className="flex max-h-[90dvh] w-[calc(100%-2rem)] max-w-lg flex-col gap-4 overflow-hidden p-4 sm:p-6">
+        <DialogHeader className="shrink-0">
           <DialogTitle className="flex items-center gap-2">
-            <PiggyBank className="h-5 w-5 text-primary" /> Nouvelle tontine Solo
+            <PiggyBank className="h-5 w-5 shrink-0 text-primary" />
+            <span className="min-w-0 truncate">Nouvelle tontine Solo</span>
           </DialogTitle>
         </DialogHeader>
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-2">
+        <div className="-mx-1 min-h-0 flex-1 space-y-4 overflow-y-auto px-1">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             <button
               type="button"
               onClick={() => setMode("project")}
