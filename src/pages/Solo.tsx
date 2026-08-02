@@ -293,26 +293,16 @@ function CreateSoloDialog({
             <Textarea id="solo-desc" value={desc} onChange={(e) => setDesc(e.target.value)} rows={2} />
           </div>
 
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div>
-              <Label htmlFor="solo-contrib">Cotisation (GNF)</Label>
-              <Input
-                id="solo-contrib" type="number" inputMode="numeric" min={1}
-                value={contribution} onChange={(e) => setContribution(e.target.value)}
-              />
-            </div>
-            <div>
-              <Label>Fréquence</Label>
-              <Select value={frequency} onValueChange={(v) => setFrequency(v as SoloFrequency)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="quotidienne">Quotidienne</SelectItem>
-                  <SelectItem value="hebdomadaire">Hebdomadaire</SelectItem>
-                  <SelectItem value="quinzaine">Quinzaine</SelectItem>
-                  <SelectItem value="mensuelle">Mensuelle</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+          <div>
+            <Label htmlFor="solo-target">Objectif d'épargne (GNF, optionnel)</Label>
+            <Input
+              id="solo-target" type="number" inputMode="numeric" min={1}
+              value={targetAmount} onChange={(e) => setTargetAmount(e.target.value)}
+              placeholder="Ex : 5000000 — laissez vide si vous n'avez pas d'objectif"
+            />
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              Aucune cotisation fixe : vous déposez le montant que vous voulez, quand vous voulez.
+            </p>
           </div>
 
           {mode === "project" && (
@@ -342,10 +332,24 @@ function CreateSoloDialog({
               </dd>
               <dt className="text-muted-foreground">Statut cible</dt>
               <dd className="break-words font-medium sm:text-right">{preview.targetStatus}</dd>
-              <dt className="text-muted-foreground">Échéances estimées</dt>
-              <dd className="break-words font-medium num sm:text-right">{preview.echeances}</dd>
-              <dt className="text-muted-foreground">Épargne projetée</dt>
-              <dd className="break-words font-medium num sm:text-right">{formatGNF(preview.projected)} GNF</dd>
+              <dt className="text-muted-foreground">Rythme</dt>
+              <dd className="break-words font-medium sm:text-right">Dépôts libres</dd>
+              <dt className="text-muted-foreground">Objectif</dt>
+              <dd className="break-words font-medium num sm:text-right">
+                {preview.target ? `${formatGNF(preview.target)} GNF` : "Aucun"}
+              </dd>
+              {preview.days !== null && (
+                <>
+                  <dt className="text-muted-foreground">Durée avant échéance</dt>
+                  <dd className="break-words font-medium num sm:text-right">{preview.days} jours</dd>
+                </>
+              )}
+              {preview.perMonth ? (
+                <>
+                  <dt className="text-muted-foreground">Effort mensuel indicatif</dt>
+                  <dd className="break-words font-medium num sm:text-right">{formatGNF(preview.perMonth)} GNF</dd>
+                </>
+              ) : null}
             </dl>
           </div>
 
