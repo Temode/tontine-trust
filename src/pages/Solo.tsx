@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, PiggyBank, Plus, Target, Wallet2, Lock, CheckCircle2 } from "lucide-react";
+import { Loader2, PiggyBank, Plus, Target, Wallet2, Lock, CheckCircle2, AlertTriangle, Info, Crown } from "lucide-react";
 import { toast } from "sonner";
 import { TopBar } from "@/components/layout/TopBar";
 import { SectionCard } from "@/components/dashboard/SectionCard";
@@ -12,7 +12,13 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { formatGNF } from "@/lib/format";
-import { createSoloGroup, listMySoloGroups, type SoloFrequency, type SoloMode } from "@/lib/api/solo";
+import {
+  createSoloGroup,
+  listMySoloGroups,
+  type SoloFrequency,
+  type SoloMode,
+  type SoloQuotaError,
+} from "@/lib/api/solo";
 import { useEntitlements } from "@/hooks/useEntitlements";
 
 export default function Solo() {
@@ -28,12 +34,21 @@ export default function Solo() {
   const create = useMutation({
     mutationFn: createSoloGroup,
     onSuccess: () => {
-      toast.success("Tontine Solo créée");
+      toast.success("Tontine Solo créée", {
+        description: "Confirmation envoyée par e-mail et SMS.",
+      });
       qc.invalidateQueries({ queryKey: ["solo", "mine"] });
       qc.invalidateQueries({ queryKey: ["entitlements"] });
       setOpen(false);
     },
-    onError: (e: Error) => toast.error("Création impossible", { description: e.message }),
+    onError: (e: SoloQuotaError) =>
+      toast.error("Création impossible", {
+        description: e.message,
+        action:
+          e.code === "QUOTA_SOLO_EXCEEDED"
+            ? { label: "Voir les plans", onClick: () => { window.location.href = "/abonnement"; } }
+            : undefined,
+      }),
   });
 
   return (
@@ -85,6 +100,9 @@ export default function Solo() {
         onOpenChange={setOpen}
         onSubmit={(input) => create.mutate(input)}
         submitting={create.isPending}
+        canCreate={canCreate}
+        used={used}
+        maxSolo={maxSolo}
       />
     </div>
   );
