@@ -50,6 +50,7 @@ const AdminIntegrity = lazy(() => import("@/pages/admin/Integrity"));
 const AdminDjomySettings = lazy(() => import("@/pages/admin/DjomySettings"));
 const AdminSmsTest = lazy(() => import("@/pages/admin/SmsTest"));
 const AdminSmsLogs = lazy(() => import("@/pages/admin/SmsLogs"));
+const AdminEmailOutbox = lazy(() => import("@/pages/admin/EmailOutbox"));
 const AdminCronPreview = lazy(() => import("@/pages/admin/CronPreview"));
 const AdminDefaulters = lazy(() => import("@/pages/admin/Defaulters"));
 const AdminKycReview = lazy(() => import("@/pages/admin/KycReview"));
@@ -219,6 +220,7 @@ const App = () => (
                     <Route path="/admin/djomy" element={<RouteBoundary name="Identifiants Djomy"><AdminDjomySettings /></RouteBoundary>} />
                     <Route path="/admin/sms-test" element={<RouteBoundary name="Test SMS"><AdminSmsTest /></RouteBoundary>} />
                     <Route path="/admin/sms-logs" element={<RouteBoundary name="Journal SMS"><AdminSmsLogs /></RouteBoundary>} />
+                    <Route path="/admin/emails" element={<RouteBoundary name="File d'envoi emails"><AdminEmailOutbox /></RouteBoundary>} />
                     <Route path="/admin/cron-preview" element={<RouteBoundary name="Aperçu cron rappels"><AdminCronPreview /></RouteBoundary>} />
                     <Route path="/admin/defaillants" element={<RouteBoundary name="Défaillants"><AdminDefaulters /></RouteBoundary>} />
                     <Route path="/admin/kyc" element={<RouteBoundary name="Vérifications KYC"><AdminKycReview /></RouteBoundary>} />
