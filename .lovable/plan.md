@@ -19,11 +19,8 @@ Au 2e essai, la vérification d'inscription regarde uniquement `email_confirmed_
 
 ## Correctifs prévus
 
-### A. Rétablir l'envoi des emails
-Deux voies possibles ; à trancher avec vous :
-
-- **Voie recommandée — Emails Lovable** : configurer le domaine d'envoi `notify.tontinedigitale.com` via la configuration email intégrée (délégation DNS automatique), puis brancher l'envoi des codes OTP dessus. Plus de dépendance à un compte Resend externe, file d'envoi + journal de livraison inclus.
-- **Voie rapide — Resend** : vous re-vérifiez `tontinedigitale.com` dans votre compte Resend (ajout des enregistrements DNS demandés). Aucun changement de code, l'envoi repart dès la vérification.
+### A. Vérifier l'envoi (domaine Resend re-vérifié)
+Le domaine ayant été re-vérifié côté Resend, on commence par un contrôle réel : inscription de test puis lecture des logs d'envoi pour confirmer un statut 200 à la place du 403. Aucun changement du chemin d'envoi si le contrôle passe.
 
 ### B. Débloquer les comptes coincés et empêcher la récidive
 Dans la fonction d'inscription (`auth-otp`) :
@@ -39,5 +36,5 @@ Recensement des comptes créés récemment avec `otp_verified` absent/faux et sa
 
 - `supabase/functions/auth-otp/index.ts` → `startSignup()` : condition `existing?.email_confirmed_at` remplacée par un test sur `user_metadata.otp_verified === true` ; rollback (`auth.admin.deleteUser`) si `issueOtp` échoue pour un utilisateur nouvellement créé.
 - `src/hooks/useAuth.tsx` / `src/lib/authOtp.ts` : libellés d'erreur `email_send_failed` / `email_not_configured` affinés.
-- Envoi : soit conservation du chemin gateway Resend (voie rapide), soit bascule vers l'infrastructure email Lovable (`enqueue_email` + file d'envoi) pour les OTP.
+- Envoi : chemin gateway Resend conservé (`RESEND_GATEWAY_URL`, expéditeur `noreply@tontinedigitale.com`), contrôlé via les logs de `auth-otp`.
 - Déploiement de `auth-otp` après modification.
