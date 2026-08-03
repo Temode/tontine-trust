@@ -146,7 +146,33 @@ function generateNumericCode(): string {
   return (buf[0] % 1_000_000).toString().padStart(6, "0");
 }
 
-type MinimalUser = { id: string; email?: string; email_confirmed_at?: string | null };
+type MinimalUser = {
+  id: string;
+  email?: string;
+  email_confirmed_at?: string | null;
+  user_metadata?: Record<string, unknown> | null;
+};
+
+function isOtpVerified(user: MinimalUser | null): boolean {
+  return user?.user_metadata?.otp_verified === true;
+}
+
+// Alerte Ops : on veut être prévenu avant les utilisateurs si l'envoi casse.
+async function raiseEmailOpsAlert(
+  admin: ReturnType<typeof createClient>,
+  args: { purpose: Purpose; status: number; body: string; emailHash: string },
+) {
+  try {
+    await admin.rpc("raise_ops_alert", {
+      p_kind: "auth_otp_email_failed",
+      p_severity: "critical",
+      p_message: `Envoi OTP ${args.purpose} en échec (HTTP ${args.status})`,
+      p_payload: { status: args.status, body: args.body.slice(0, 500), email_hash: args.emailHash },
+    });
+  } catch (e) {
+    console.error("[auth-otp] ops alert failed", e);
+  }
+}
 
 async function findExistingUser(admin: ReturnType<typeof createClient>, email: string): Promise<MinimalUser | null> {
   const adminAuth = admin.auth.admin as unknown as {
@@ -323,9 +349,11 @@ async function startSignup(admin: ReturnType<typeof createClient>, body: Record<
   if (await checkRateLimit(admin, emailHash, "signup")) return json({ error: "rate_limited" }, 429);
 
   const existing = await findExistingUser(admin, email);
-  if (existing?.email_confirmed_at) {
+  // Un compte n'est "déjà existant" que s'il a réellement validé son code.
+  if (isOtpVerified(existing)) {
     return json({ error: "email_exists" }, 400);
   }
+  let createdUserId: string | null = null;
   if (existing) {
     const { error: updErr } = await admin.auth.admin.updateUserById(existing.id, {
       password,
@@ -336,7 +364,7 @@ async function startSignup(admin: ReturnType<typeof createClient>, body: Record<
       return json({ error: mapAuthError(updErr.message) }, updErr.status ?? 400);
     }
   } else {
-    const { error: createErr } = await admin.auth.admin.createUser({
+    const { data: created, error: createErr } = await admin.auth.admin.createUser({
       email,
       password,
       email_confirm: true,
@@ -347,11 +375,18 @@ async function startSignup(admin: ReturnType<typeof createClient>, body: Record<
       if (mapped === "server_error") console.error("[auth-otp] createUser failed", createErr.message);
       return json({ error: mapped }, createErr.status ?? 400);
     }
+    createdUserId = created?.user?.id ?? null;
   }
 
   const sent = await issueOtp(admin, { email, emailHash, purpose: "signup", triggerSource: "signup_start" });
   if (!sent.ok) {
     console.error("[auth-otp] resend failed (signup)", { status: sent.status, body: sent.body });
+    // Pas de compte fantôme : on supprime l'utilisateur créé à l'instant.
+    if (createdUserId) {
+      const { error: delErr } = await admin.auth.admin.deleteUser(createdUserId);
+      if (delErr) console.error("[auth-otp] rollback deleteUser failed", delErr.message);
+    }
+    await raiseEmailOpsAlert(admin, { purpose: "signup", status: sent.status, body: sent.body, emailHash });
     return json({ error: sent.status === 500 ? "email_not_configured" : "email_send_failed" }, 502);
   }
   return json({ success: true, expiresAt: sent.expiresAt });
