@@ -19,11 +19,8 @@ Au 2e essai, la vérification d'inscription regarde uniquement `email_confirmed_
 
 ## Correctifs prévus
 
-### A. Rétablir l'envoi des emails
-Deux voies possibles ; à trancher avec vous :
-
-- **Voie recommandée — Emails Lovable** : configurer le domaine d'envoi `notify.tontinedigitale.com` via la configuration email intégrée (délégation DNS automatique), puis brancher l'envoi des codes OTP dessus. Plus de dépendance à un compte Resend externe, file d'envoi + journal de livraison inclus.
-- **Voie rapide — Resend** : vous re-vérifiez `tontinedigitale.com` dans votre compte Resend (ajout des enregistrements DNS demandés). Aucun changement de code, l'envoi repart dès la vérification.
+### A. Vérifier l'envoi (domaine Resend re-vérifié)
+Le domaine ayant été re-vérifié côté Resend, on commence par un contrôle réel : inscription de test puis lecture des logs d'envoi pour confirmer un statut 200 à la place du 403. Aucun changement du chemin d'envoi si le contrôle passe.
 
 ### B. Débloquer les comptes coincés et empêcher la récidive
 Dans la fonction d'inscription (`auth-otp`) :
