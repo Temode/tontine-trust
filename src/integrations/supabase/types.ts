@@ -956,6 +956,8 @@ export type Database = {
           id: string
           kind: string
           last_error: string | null
+          locked_at: string | null
+          next_attempt_at: string
           payload: Json
           processed_at: string | null
           status: string
@@ -967,6 +969,8 @@ export type Database = {
           id?: string
           kind: string
           last_error?: string | null
+          locked_at?: string | null
+          next_attempt_at?: string
           payload?: Json
           processed_at?: string | null
           status?: string
@@ -978,6 +982,8 @@ export type Database = {
           id?: string
           kind?: string
           last_error?: string | null
+          locked_at?: string | null
+          next_attempt_at?: string
           payload?: Json
           processed_at?: string | null
           status?: string
@@ -6817,6 +6823,8 @@ export type Database = {
         Returns: undefined
       }
       admin_delete_ops_recipient: { Args: { _id: string }; Returns: undefined }
+      admin_email_outbox_retry: { Args: { _id?: string }; Returns: number }
+      admin_email_outbox_stats: { Args: { _hours?: number }; Returns: Json }
       admin_force_deposit_status: {
         Args: { _deposit_id: string; _new_status: string; _reason: string }
         Returns: undefined
@@ -7338,6 +7346,7 @@ export type Database = {
       can_moderate_call: { Args: { p_call_id: string }; Returns: boolean }
       cancel_my_bid: { Args: { _turn_id: string }; Returns: undefined }
       cancel_turn_swap: { Args: { _request_id: string }; Returns: undefined }
+      check_email_outbox_health: { Args: never; Returns: Json }
       claim_sms_dedupe: { Args: { _key: string }; Returns: boolean }
       close_auction: { Args: { _turn_id: string }; Returns: string }
       compute_hold_until: { Args: { _turn_id: string }; Returns: string }
@@ -7407,6 +7416,7 @@ export type Database = {
         Args: { _contribution_id: string; _notify?: boolean }
         Returns: number
       }
+      email_error_is_retryable: { Args: { _err: string }; Returns: boolean }
       email_outbox_mark: {
         Args: { _error?: string; _id: string; _status: string }
         Returns: undefined
@@ -7420,6 +7430,8 @@ export type Database = {
           id: string
           kind: string
           last_error: string | null
+          locked_at: string | null
+          next_attempt_at: string
           payload: Json
           processed_at: string | null
           status: string
