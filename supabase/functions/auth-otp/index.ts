@@ -360,7 +360,15 @@ async function startSignup(admin: ReturnType<typeof createClient>, body: Record<
       password,
       user_metadata: { full_name: fullName, phone_number: phoneNumber, otp_verified: false },
     });
-    if (updErr) {
+    // Réutiliser le même mot de passe lors d'une reprise d'inscription est légitime :
+    // on ignore l'erreur "same password" et on continue l'envoi du code.
+    const samePassword = /should be different|same as the old|same password/i.test(updErr?.message ?? "");
+    if (updErr && samePassword) {
+      const { error: metaErr } = await admin.auth.admin.updateUserById(existing.id, {
+        user_metadata: { full_name: fullName, phone_number: phoneNumber, otp_verified: false },
+      });
+      if (metaErr) console.error("[auth-otp] metadata refresh failed", metaErr.message);
+    } else if (updErr) {
       console.error("[auth-otp] refresh unverified user failed", updErr.message);
       return json({ error: mapAuthError(updErr.message) }, updErr.status ?? 400);
     }
