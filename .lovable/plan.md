@@ -36,5 +36,5 @@ Recensement des comptes créés récemment avec `otp_verified` absent/faux et sa
 
 - `supabase/functions/auth-otp/index.ts` → `startSignup()` : condition `existing?.email_confirmed_at` remplacée par un test sur `user_metadata.otp_verified === true` ; rollback (`auth.admin.deleteUser`) si `issueOtp` échoue pour un utilisateur nouvellement créé.
 - `src/hooks/useAuth.tsx` / `src/lib/authOtp.ts` : libellés d'erreur `email_send_failed` / `email_not_configured` affinés.
-- Envoi : soit conservation du chemin gateway Resend (voie rapide), soit bascule vers l'infrastructure email Lovable (`enqueue_email` + file d'envoi) pour les OTP.
+- Envoi : chemin gateway Resend conservé (`RESEND_GATEWAY_URL`, expéditeur `noreply@tontinedigitale.com`), contrôlé via les logs de `auth-otp`.
 - Déploiement de `auth-otp` après modification.
