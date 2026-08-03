@@ -7,8 +7,10 @@ const ERROR_MESSAGES: Record<string, string> = {
   weak_password: "Mot de passe trop faible (au moins 8 caractères).",
   email_exists: "Cet email est déjà utilisé. Connecte-toi.",
   rate_limited: "Trop d'emails envoyés. Patiente quelques minutes.",
-  email_send_failed: "Impossible d'envoyer l'email pour le moment.",
-  email_not_configured: "Le service email n'est pas encore configuré.",
+  email_send_failed:
+    "Envoi d'email momentanément indisponible. Réessayez dans quelques minutes — aucun compte n'a été créé.",
+  email_not_configured:
+    "Le service d'envoi d'emails est momentanément indisponible. Réessayez plus tard ou contactez le support.",
   invalid_code: "Code invalide ou expiré. Vérifiez vos 6 chiffres.",
   code_expired: "Ce code a expiré. Cliquez sur « Renvoyer le code » pour en recevoir un nouveau.",
   code_already_used: "Ce code a déjà été utilisé. Demandez un nouveau code pour continuer.",
