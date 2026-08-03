@@ -71,6 +71,7 @@ Deno.serve(async (req) => {
             }),
           });
           const body = await resp.text();
+          const retryable = resp.status === 429 || resp.status === 403 || resp.status === 408 || resp.status >= 500;
           if (resp.ok) {
             await admin.rpc("email_outbox_mark", { _id: row.id, _status: "sent", _error: null });
             summary.sent++;
@@ -78,7 +79,7 @@ Deno.serve(async (req) => {
             console.error(`gateway ${resp.status}: ${body}`);
             await admin.rpc("email_outbox_mark", {
               _id: row.id,
-              _status: row.attempts >= 3 ? "failed" : "queued",
+              _status: retryable && row.attempts < 8 ? "queued" : "failed",
               _error: `${resp.status}:${body.slice(0, 300)}`,
             });
             summary.failed++;
@@ -88,7 +89,7 @@ Deno.serve(async (req) => {
           console.error("send error:", msg);
           await admin.rpc("email_outbox_mark", {
             _id: row.id,
-            _status: row.attempts >= 3 ? "failed" : "queued",
+            _status: row.attempts >= 8 ? "failed" : "queued",
             _error: msg.slice(0, 300),
           });
           summary.failed++;
