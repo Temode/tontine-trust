@@ -153,6 +153,7 @@ export default function GroupDetail() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [section, setSection] = useState<Section>("overview");
+  const [termsOpen, setTermsOpen] = useState(false);
 
   useTontineRealtime(id);
 
@@ -361,7 +362,7 @@ export default function GroupDetail() {
   const cycleFinished = grp.status === "completed" || !!grp.archived_at || allTurnsDone;
   // Aucun cycle en cours : soit rien n'a démarré, soit le précédent est terminé.
   const noCycleRunning = !hasTurns || allTurnsDone;
-  const contractSigned = pageContractQ.data ? !!pageSigQ.data : null;
+  const termsAccepted = pageTermsQ.data ? pageTermsQ.data.accepted : null;
   const canStart = !hasTurns && !isArchived && grp.status !== "paused";
 
   const tabs: Array<{ id: Section; label: string }> = [
@@ -499,6 +500,9 @@ export default function GroupDetail() {
             </div>
           </div>
         </article>
+
+        {/* Relance du cycle : action principale, immédiatement visible. */}
+        <RenewalPanel groupId={grp.id} isOrganizer={isOrganizer} cycleFinished={cycleFinished} />
 
         {/* Action primaire unique + actions secondaires regroupées */}
         <div className="mt-4 flex flex-wrap items-center gap-3 rounded-2xl border border-hairline bg-card/80 p-2 shadow-[0_6px_20px_-12px_hsl(var(--primary)/0.25)] backdrop-blur">
