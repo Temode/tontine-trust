@@ -809,6 +809,13 @@ export default function GroupDetail() {
           {section === "audit" && isOrganizer && <AuditLog groupId={grp.id} />}
         </div>
       </div>
+
+      <TermsAcceptDialog
+        open={termsOpen}
+        onOpenChange={setTermsOpen}
+        groupId={grp.id}
+        ctaLabel="J'accepte les conditions"
+      />
     </div>
   );
 }
