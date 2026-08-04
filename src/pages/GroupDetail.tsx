@@ -59,9 +59,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { CurrentTurnBanner } from "@/components/group/CurrentTurnBanner";
 import { RenewalPanel } from "@/components/group/RenewalPanel";
 import { CycleLaunchCard } from "@/components/group/CycleLaunchCard";
-import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { useTontineRealtime } from "@/hooks/useTontineRealtime";
 import { DepositCallout } from "@/components/group/DepositCallout";
 import { PositionBadge } from "@/components/group/PositionBadge";
@@ -458,65 +455,55 @@ export default function GroupDetail() {
         {/* Relance du cycle : action principale, immédiatement visible. */}
         <RenewalPanel groupId={grp.id} isOrganizer={isOrganizer} cycleFinished={cycleFinished} />
 
-        {/* Action primaire unique + actions secondaires regroupées */}
-        <div className="mt-4 flex flex-wrap items-center gap-3 rounded-2xl border border-hairline bg-card/80 p-2 shadow-[0_6px_20px_-12px_hsl(var(--primary)/0.25)] backdrop-blur">
-          {myDueForGroup && !paymentsBlocked ? (
+        {/* Barre d'actions : boutons visibles (version d'origine) */}
+        <div className="mt-4 flex flex-wrap items-center gap-2 rounded-2xl border border-hairline bg-card/80 p-2 shadow-[0_6px_20px_-12px_hsl(var(--primary)/0.25)] backdrop-blur">
+          <Link
+            to={`/groupes/${grp.id}/membres`}
+            className="inline-flex h-10 items-center gap-1.5 whitespace-nowrap rounded-xl bg-primary px-4 text-xs font-semibold text-primary-foreground shadow-sm transition hover:bg-primary-700"
+          >
+            <Users className="h-4 w-4" />
+            Voir membres
+          </Link>
+          <button
+            type="button"
+            onClick={() => {
+              if (myDueForGroup && !paymentsBlocked)
+                void launchDjomyCheckout(myDueForGroup.contribution_id);
+            }}
+            disabled={!myDueForGroup || paymentsBlocked}
+            className="inline-flex h-10 items-center gap-1.5 whitespace-nowrap rounded-xl border border-hairline bg-card px-4 text-xs font-semibold text-foreground transition hover:bg-secondary disabled:opacity-50"
+          >
+            <HandCoins className="h-4 w-4" />
+            {myDueForGroup && !paymentsBlocked ? "Payer ma cotisation" : "Gérer contributions"}
+          </button>
+          {isOrganizer && (
             <button
               type="button"
-              onClick={() => void launchDjomyCheckout(myDueForGroup.contribution_id)}
-              className="inline-flex h-10 items-center gap-1.5 whitespace-nowrap rounded-xl bg-primary px-4 text-xs font-semibold text-primary-foreground shadow-sm transition hover:bg-primary-700"
+              onClick={() => {
+                const el = document.getElementById(INVITE_PANEL_ID);
+                el?.scrollIntoView({ behavior: "smooth", block: "start" });
+              }}
+              className="inline-flex h-10 items-center gap-1.5 whitespace-nowrap rounded-xl border border-hairline bg-card px-4 text-xs font-semibold text-foreground transition hover:bg-secondary"
             >
-              <HandCoins className="h-4 w-4" />
-              Payer ma cotisation
+              <UserPlus className="h-4 w-4" />
+              Inviter
             </button>
-          ) : (
-            <Link
-              to={`/groupes/${grp.id}/membres`}
-              className="inline-flex h-10 items-center gap-1.5 whitespace-nowrap rounded-xl bg-primary px-4 text-xs font-semibold text-primary-foreground shadow-sm transition hover:bg-primary-700"
-            >
-              <Users className="h-4 w-4" />
-              Voir membres
-            </Link>
           )}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                type="button"
-                className="ml-auto inline-flex h-10 items-center gap-1.5 rounded-xl border border-hairline bg-card px-4 text-xs font-medium text-muted-foreground transition hover:text-foreground"
-              >
-                Actions
-                <ChevronRight className="h-4 w-4" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuItem asChild>
-                <Link to={`/groupes/${grp.id}/membres`}>
-                  <Users className="mr-2 h-4 w-4" />
-                  Voir les membres
-                </Link>
-              </DropdownMenuItem>
-              {isOrganizer && (
-                <DropdownMenuItem
-                  onSelect={() => {
-                    const el = document.getElementById(INVITE_PANEL_ID);
-                    el?.scrollIntoView({ behavior: "smooth", block: "start" });
-                  }}
-                >
-                  <UserPlus className="mr-2 h-4 w-4" />
-                  Inviter des membres
-                </DropdownMenuItem>
-              )}
-              <DropdownMenuItem asChild>
-                <Link to={`/groupes/${grp.id}/parametres`}>Paramètres du groupe</Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <Link to="/parametres/notifications">
-                  <Bell className="mr-2 h-4 w-4" />
-                  Rappels & notifications
-                </Link>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <Link
+            to={`/groupes/${grp.id}/parametres`}
+            className="ml-auto inline-flex h-10 items-center gap-1.5 whitespace-nowrap rounded-xl border border-hairline bg-card px-4 text-xs font-medium text-muted-foreground transition hover:text-foreground"
+          >
+            <ChevronRight className="h-4 w-4" />
+            Paramètres
+          </Link>
+          <Link
+            to="/parametres/notifications"
+            className="inline-flex h-10 items-center gap-1.5 whitespace-nowrap rounded-xl border border-hairline bg-card px-4 text-xs font-medium text-muted-foreground transition hover:text-foreground"
+            title="Régler vos rappels (prochain tour, cotisations dues) — in-app et email"
+          >
+            <Bell className="h-4 w-4" />
+            Rappels
+          </Link>
         </div>
 
         {canStart && (
