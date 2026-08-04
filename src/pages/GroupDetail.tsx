@@ -184,15 +184,10 @@ export default function GroupDetail() {
     queryFn: () => listGroupTurns(id as string),
     enabled: !!id,
   });
-  const pageContractQ = useQuery({
-    queryKey: ["active-contract", id],
-    queryFn: () => getActiveContract(id as string),
+  const pageTermsQ = useQuery({
+    queryKey: ["group-terms", id],
+    queryFn: () => getGroupTerms(id as string),
     enabled: !!id,
-  });
-  const pageSigQ = useQuery({
-    queryKey: ["my-contract-sig", pageContractQ.data?.contract_id],
-    queryFn: () => getMyContractSignature(pageContractQ.data!.contract_id),
-    enabled: !!pageContractQ.data?.contract_id,
   });
 
   const invalidate = () => {
