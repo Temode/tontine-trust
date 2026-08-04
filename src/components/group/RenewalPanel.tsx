@@ -423,18 +423,13 @@ export function RenewalPanel({ groupId, isOrganizer, cycleFinished }: Props) {
         </AlertDialogContent>
       </AlertDialog>
 
-      <TermsAcceptDialog
-        open={termsOpen}
-        onOpenChange={(v) => {
-          setTermsOpen(v);
-          if (!v) setPendingVote(null);
-        }}
+      <RenewalVoteDialog
+        open={voteOpen}
+        onOpenChange={setVoteOpen}
         groupId={groupId}
-        ctaLabel="J'accepte et je participe"
-        onAccepted={() => {
-          if (pendingVote !== null) voteM.mutate(pendingVote);
-          setPendingVote(null);
-        }}
+        status={st}
+        isPending={voteM.isPending}
+        onConfirm={() => voteM.mutate(true)}
       />
     </>
   );
