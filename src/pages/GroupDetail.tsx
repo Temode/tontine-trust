@@ -65,49 +65,8 @@ import {
 import { useTontineRealtime } from "@/hooks/useTontineRealtime";
 import { DepositCallout } from "@/components/group/DepositCallout";
 import { PositionBadge } from "@/components/group/PositionBadge";
-import { ContractSignDialog } from "@/components/contract/ContractSignDialog";
-import { getActiveContract, getMyContractSignature } from "@/lib/api/contracts";
-import { useQuery as useQueryContract } from "@tanstack/react-query";
-
-function ContractSignSection({ groupId }: { groupId: string }) {
-  const [open, setOpen] = useState(false);
-  const contractQ = useQueryContract({
-    queryKey: ["active-contract", groupId],
-    queryFn: () => getActiveContract(groupId),
-    enabled: !!groupId,
-  });
-  const sigQ = useQueryContract({
-    queryKey: ["my-contract-sig", contractQ.data?.contract_id],
-    queryFn: () => getMyContractSignature(contractQ.data!.contract_id),
-    enabled: !!contractQ.data?.contract_id,
-  });
-  if (!contractQ.data) return null;
-  if (sigQ.data) return null;
-  return (
-    <>
-      <section className="mt-5 rounded-xl border-2 border-amber-400 bg-amber-50 p-4">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-700">
-          Signature requise
-        </p>
-        <h3 className="mt-0.5 font-display text-base font-bold text-amber-950">
-          Signez le contrat numérique pour activer le cycle
-        </h3>
-        <p className="mt-1.5 text-sm text-amber-900/90">
-          Le démarrage du cycle est bloqué tant que tous les membres n'ont pas signé.
-          Signature électronique via code SMS — 1 minute.
-        </p>
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          className="mt-3 inline-flex h-10 items-center gap-2 rounded-md bg-amber-600 px-4 text-sm font-semibold text-white hover:bg-amber-700"
-        >
-          Signer le contrat
-        </button>
-      </section>
-      <ContractSignDialog open={open} onOpenChange={setOpen} groupId={groupId} />
-    </>
-  );
-}
+import { getGroupTerms } from "@/lib/api/terms";
+import { TermsAcceptDialog } from "@/components/legal/TermsAcceptDialog";
 
 type Section =
   | "overview"
@@ -153,6 +112,7 @@ export default function GroupDetail() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [section, setSection] = useState<Section>("overview");
+  const [termsOpen, setTermsOpen] = useState(false);
 
   useTontineRealtime(id);
 
@@ -183,15 +143,10 @@ export default function GroupDetail() {
     queryFn: () => listGroupTurns(id as string),
     enabled: !!id,
   });
-  const pageContractQ = useQuery({
-    queryKey: ["active-contract", id],
-    queryFn: () => getActiveContract(id as string),
+  const pageTermsQ = useQuery({
+    queryKey: ["group-terms", id],
+    queryFn: () => getGroupTerms(id as string),
     enabled: !!id,
-  });
-  const pageSigQ = useQuery({
-    queryKey: ["my-contract-sig", pageContractQ.data?.contract_id],
-    queryFn: () => getMyContractSignature(pageContractQ.data!.contract_id),
-    enabled: !!pageContractQ.data?.contract_id,
   });
 
   const invalidate = () => {
@@ -361,7 +316,7 @@ export default function GroupDetail() {
   const cycleFinished = grp.status === "completed" || !!grp.archived_at || allTurnsDone;
   // Aucun cycle en cours : soit rien n'a démarré, soit le précédent est terminé.
   const noCycleRunning = !hasTurns || allTurnsDone;
-  const contractSigned = pageContractQ.data ? !!pageSigQ.data : null;
+  const termsAccepted = pageTermsQ.data ? pageTermsQ.data.accepted : null;
   const canStart = !hasTurns && !isArchived && grp.status !== "paused";
 
   const tabs: Array<{ id: Section; label: string }> = [
@@ -500,6 +455,9 @@ export default function GroupDetail() {
           </div>
         </article>
 
+        {/* Relance du cycle : action principale, immédiatement visible. */}
+        <RenewalPanel groupId={grp.id} isOrganizer={isOrganizer} cycleFinished={cycleFinished} />
+
         {/* Action primaire unique + actions secondaires regroupées */}
         <div className="mt-4 flex flex-wrap items-center gap-3 rounded-2xl border border-hairline bg-card/80 p-2 shadow-[0_6px_20px_-12px_hsl(var(--primary)/0.25)] backdrop-blur">
           {myDueForGroup && !paymentsBlocked ? (
@@ -561,24 +519,16 @@ export default function GroupDetail() {
           </DropdownMenu>
         </div>
 
-        {/* Le contrat est l'étape 1 du démarrage : il reste au-dessus de la ligne de flottaison. */}
-        {noCycleRunning && <ContractSignSection groupId={grp.id} />}
-
         {canStart && (
           <CycleLaunchCard
             activeMembers={activeMembers.length}
-            contractSigned={contractSigned}
+            termsAccepted={termsAccepted}
             isOrganizer={isOrganizer}
             isPending={startCycleM.isPending}
             onStart={() => startCycleM.mutate()}
+            onAcceptTerms={() => setTermsOpen(true)}
           />
         )}
-
-        <RenewalPanel
-          groupId={grp.id}
-          isOrganizer={isOrganizer}
-          cycleFinished={cycleFinished}
-        />
 
         {paymentsBlocked && (
           <PausedPaymentsBanner
@@ -676,7 +626,16 @@ export default function GroupDetail() {
                 memberDepositStatus={(me as { deposit_status?: string | null }).deposit_status ?? null}
               />
               {user?.id && <PositionBadge groupId={grp.id} userId={user.id} />}
-              {!noCycleRunning && <ContractSignSection groupId={grp.id} />}
+              {!noCycleRunning && termsAccepted === false && (
+                <button
+                  type="button"
+                  onClick={() => setTermsOpen(true)}
+                  className="w-full rounded-xl border border-hairline bg-secondary/40 p-3 text-left text-sm text-muted-foreground transition hover:bg-secondary"
+                >
+                  Vous n'avez pas encore accepté les conditions générales de ce groupe —{" "}
+                  <span className="font-semibold text-primary">les accepter</span>
+                </button>
+              )}
               {(() => {
                 const myPaidTurn = turns.find(
                   (t) =>
@@ -850,6 +809,13 @@ export default function GroupDetail() {
           {section === "audit" && isOrganizer && <AuditLog groupId={grp.id} />}
         </div>
       </div>
+
+      <TermsAcceptDialog
+        open={termsOpen}
+        onOpenChange={setTermsOpen}
+        groupId={grp.id}
+        ctaLabel="J'accepte les conditions"
+      />
     </div>
   );
 }

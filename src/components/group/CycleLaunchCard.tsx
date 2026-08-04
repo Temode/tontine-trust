@@ -2,10 +2,12 @@ import { Play, CheckCircle2, Circle } from "lucide-react";
 
 interface Props {
   activeMembers: number;
-  contractSigned: boolean | null;
+  /** Conditions générales acceptées par l'utilisateur courant (null = inconnu). */
+  termsAccepted: boolean | null;
   isOrganizer: boolean;
   isPending: boolean;
   onStart: () => void;
+  onAcceptTerms: () => void;
 }
 
 /**
@@ -13,11 +15,11 @@ interface Props {
  * Affiche la checklist des prérequis et une seule action primaire.
  */
 export function CycleLaunchCard({
-  activeMembers, contractSigned, isOrganizer, isPending, onStart,
+  activeMembers, termsAccepted, isOrganizer, isPending, onStart, onAcceptTerms,
 }: Props) {
   const membersOk = activeMembers >= 2;
-  const contractOk = contractSigned !== false;
-  const ready = membersOk && contractOk;
+  const termsOk = termsAccepted !== false;
+  const ready = membersOk && termsOk;
 
   const steps = [
     {
@@ -27,8 +29,10 @@ export function CycleLaunchCard({
         : `Au moins 2 membres actifs (actuellement ${activeMembers})`,
     },
     {
-      ok: contractOk,
-      label: contractOk ? "Contrat numérique signé" : "Contrat numérique à signer",
+      ok: termsOk,
+      label: termsOk
+        ? "Conditions générales acceptées"
+        : "Conditions générales et protection des données à accepter",
     },
   ];
 
@@ -63,6 +67,15 @@ export function CycleLaunchCard({
           </div>
         </div>
         {isOrganizer ? (
+          !termsOk ? (
+            <button
+              type="button"
+              onClick={onAcceptTerms}
+              className="inline-flex h-11 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-accent-600 px-5 text-sm font-semibold text-accent-foreground transition hover:bg-accent-700"
+            >
+              Accepter les conditions
+            </button>
+          ) : (
           <button
             type="button"
             disabled={!ready || isPending}
@@ -72,6 +85,7 @@ export function CycleLaunchCard({
           >
             {isPending ? "Démarrage…" : "Démarrer le cycle"}
           </button>
+          )
         ) : (
           <p className="shrink-0 text-xs text-muted-foreground">
             L'organisateur démarrera le cycle.
