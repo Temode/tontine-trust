@@ -13,6 +13,7 @@ const TITLES: Record<string, { title: string; subtitle: string }> = {
   "/admin/subscriptions": { title: "Plans d'abonnement", subtitle: "Prix, limites et paliers modulables" },
   "/admin/sms-pricing": { title: "Tarification SMS", subtitle: "Prix unitaire et packs, versionnés" },
   "/admin/sms-orders": { title: "Commandes SMS", subtitle: "Achats de packs par les utilisateurs" },
+  "/admin/campagnes": { title: "Campagnes SMS & Email", subtitle: "Contenus, plafonds, budgets et conversions" },
 };
 
 export function AdminTopBar() {
