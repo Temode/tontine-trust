@@ -37,6 +37,7 @@ export function RenewalPanel({ groupId, isOrganizer, cycleFinished }: Props) {
   const [tick, setTick] = useState(0);
   const [openLaunch, setOpenLaunch] = useState(false);
   const [confirmStart, setConfirmStart] = useState(false);
+  const [confirmCancel, setConfirmCancel] = useState(false);
 
   const statusQ = useQuery({
     queryKey: ["group", groupId, "renewal"],
@@ -113,6 +114,7 @@ export function RenewalPanel({ groupId, isOrganizer, cycleFinished }: Props) {
     mutationFn: () => cancelRenewal(st?.cycle_id ?? ""),
     onSuccess: () => {
       toast.success("Relance annulée");
+      setConfirmCancel(false);
       invalidateAll();
     },
     onError: (e: Error) => toast.error("Annulation impossible", { description: e.message }),
@@ -327,7 +329,11 @@ export function RenewalPanel({ groupId, isOrganizer, cycleFinished }: Props) {
                 <Button variant="outline" onClick={() => extendM.mutate()} disabled={extendM.isPending}>
                   Prolonger de 7 jours
                 </Button>
-                <Button variant="ghost" onClick={() => cancelM.mutate()} disabled={cancelM.isPending}>
+                <Button
+                  variant="ghost"
+                  onClick={() => setConfirmCancel(true)}
+                  disabled={cancelM.isPending}
+                >
                   Annuler la relance
                 </Button>
               </div>
