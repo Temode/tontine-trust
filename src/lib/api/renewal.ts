@@ -35,6 +35,8 @@ const ERRORS: Record<string, string> = {
   MIN_MEMBERS_NOT_REACHED: "Le seuil de participants n'est pas encore atteint.",
   DEADLINE_IN_PAST: "La date limite doit être dans le futur.",
   QUORUM_NOT_REACHED: "Il faut au moins 2 participants confirmés.",
+  TERMS_NOT_ACCEPTED:
+    "Vous devez accepter les conditions de Tontine Digitale avant de confirmer votre participation.",
   CONTRACT_NOT_SIGNED: "Tous les participants doivent avoir signé le contrat du groupe.",
 };
 
