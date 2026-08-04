@@ -9,7 +9,6 @@ import {
   HandCoins,
   FileCheck2,
   MoreVertical,
-  Play,
   Star,
   UserPlus,
   ShieldCheck,
