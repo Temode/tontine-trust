@@ -1,0 +1,2 @@
+ALTER TABLE public.auth_otp_requests ADD COLUMN IF NOT EXISTS trigger_source text;
+CREATE INDEX IF NOT EXISTS idx_auth_otp_requests_trigger_source ON public.auth_otp_requests (trigger_source, created_at DESC);

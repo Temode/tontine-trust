@@ -1,4 +1,4 @@
-import { ArrowRight, Calendar, Sparkles, Users } from "lucide-react";
+import { ArrowRight, Calendar, Crown, Sparkles, Users } from "lucide-react";
 import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { formatGNF, formatRelativeDays } from "@/lib/format";
@@ -41,9 +41,14 @@ function GroupGridCard({ group }: { group: TontineGroup }) {
           <div className="flex items-center gap-2">
             <h3 className="truncate font-display text-base font-bold text-foreground">{group.name}</h3>
           </div>
-          <div className="mt-1 flex items-center gap-2">
+          <div className="mt-1.5 flex items-center gap-2">
             <StatusBadge status={group.status} />
-            <span className="rounded bg-secondary px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+            <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+              {group.role === "organizer" ? (
+                <Crown className="h-3 w-3" />
+              ) : (
+                <Users className="h-3 w-3" />
+              )}
               {group.role === "organizer" ? "Organisateur" : "Participant"}
             </span>
           </div>

@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { ArrowLeft, ArrowRight } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface StepWrapperProps {
@@ -8,7 +8,7 @@ interface StepWrapperProps {
   title: string;
   description: string;
   canContinue: boolean;
-  /** Label of the forward CTA. Defaults to "Continuer". */
+  /** Label of the forward CTA. Defaults to "Étape suivante". */
   continueLabel?: string;
   onBack?: () => void;
   onContinue?: () => void;
@@ -17,41 +17,39 @@ interface StepWrapperProps {
   children: ReactNode;
 }
 
+/**
+ * Carte d'étape "Registre souverain" — pas d'ombre, bordures slate fines,
+ * titre en serif Playfair, footer minimaliste sans bandeau secondaire.
+ */
 export function StepWrapper({
-  index,
-  total,
   title,
   description,
   canContinue,
-  continueLabel = "Continuer",
+  continueLabel = "Étape suivante",
   onBack,
   onContinue,
   customActions,
   children,
 }: StepWrapperProps) {
   return (
-    <article className="rounded-xl border border-hairline bg-card">
-      <header className="border-b border-hairline px-5 py-5 lg:px-7 lg:py-6">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-primary">
-          Étape {index} <span className="text-muted-foreground">/ {total}</span>
-        </p>
-        <h2 className="mt-1 font-display text-xl font-bold text-foreground lg:text-2xl">{title}</h2>
-        <p className="mt-1.5 max-w-prose text-sm text-muted-foreground">{description}</p>
+    <article className="rounded-xl border border-border bg-card p-6 lg:p-10">
+      <header className="mb-8 lg:mb-10">
+        <h2 className="font-serif text-2xl font-bold text-foreground lg:text-3xl">{title}</h2>
+        <p className="mt-2 max-w-prose text-sm leading-relaxed text-muted-foreground">{description}</p>
       </header>
 
-      <div className="px-5 py-6 lg:px-7 lg:py-7">{children}</div>
+      <div>{children}</div>
 
-      <footer className="flex items-center justify-between gap-3 border-t border-hairline bg-secondary/30 px-5 py-4 lg:px-7">
+      <footer className="mt-10 flex items-center justify-between gap-3 border-t border-border pt-6 lg:pt-8">
         <button
           type="button"
           onClick={onBack}
           disabled={!onBack}
           className={cn(
-            "inline-flex h-10 items-center gap-1.5 rounded-md border border-hairline px-4 text-sm font-medium transition",
-            onBack ? "text-foreground hover:bg-secondary" : "text-muted-foreground/50",
+            "px-4 py-2 text-sm font-bold transition-colors",
+            onBack ? "text-muted-foreground hover:text-foreground" : "cursor-not-allowed text-muted-foreground/40",
           )}
         >
-          <ArrowLeft className="h-4 w-4" />
           Retour
         </button>
 
@@ -63,7 +61,7 @@ export function StepWrapper({
             onClick={onContinue}
             disabled={!canContinue}
             className={cn(
-              "inline-flex h-10 items-center gap-1.5 rounded-md px-4 text-sm font-semibold transition",
+              "inline-flex items-center gap-2 rounded-md px-8 py-3 text-sm font-bold transition-all",
               canContinue
                 ? "bg-primary text-primary-foreground hover:bg-primary-700"
                 : "cursor-not-allowed bg-muted text-muted-foreground",

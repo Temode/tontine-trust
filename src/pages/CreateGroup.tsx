@@ -1,8 +1,14 @@
-import { useMemo, useState } from "react";
-import { ArrowRight, CheckCircle2, Copy, ShieldCheck } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ArrowRight, CheckCircle2, ShieldCheck, Sparkles } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
+import { createGroup } from "@/lib/api/groups";
+import { useEntitlements } from "@/hooks/useEntitlements";
 import { TopBar } from "@/components/layout/TopBar";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { ShareSheet } from "@/components/invite/ShareSheet";
+import { formatGNF } from "@/lib/format";
+import { validateGroupDraft } from "@/lib/validation/group";
 import { StepIdentity } from "@/components/create-group/StepIdentity";
 import { StepFinancials } from "@/components/create-group/StepFinancials";
 import { StepRules } from "@/components/create-group/StepRules";
@@ -21,10 +27,21 @@ type WizardState = "drafting" | "submitting" | "issued";
 
 export default function CreateGroup() {
   const [draft, setDraft] = useState<GroupDraft>(DEFAULT_DRAFT);
+  const { entitlements, canCreateGroup } = useEntitlements();
+  const quota = canCreateGroup();
+  const memberLimit = entitlements.limits.max_members_per_group;
   const [step, setStep] = useState(1);
   const [completed, setCompleted] = useState<number[]>([]);
   const [consent, setConsent] = useState(false);
   const [state, setState] = useState<WizardState>("drafting");
+  const [createdGroupId, setCreatedGroupId] = useState<string | null>(null);
+  const [issuedCode, setIssuedCode] = useState<string | null>(null);
+  const stepTitleRef = useRef<HTMLDivElement | null>(null);
+
+  // Focus la zone d'étape à chaque changement pour les lecteurs d'écran.
+  useEffect(() => {
+    stepTitleRef.current?.focus();
+  }, [step]);
 
   const totalSteps = STEPS.length;
   const derived = useMemo(() => deriveFromDraft(draft), [draft]);
@@ -41,21 +58,51 @@ export default function CreateGroup() {
     if (target <= step || completed.includes(target)) setStep(target);
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (state !== "drafting") return;
+    if (!quota.ok) {
+      toast.error(
+        quota.reason === "READ_ONLY"
+          ? "Abonnement expiré"
+          : "Quota de groupes atteint",
+        { description: "Passez à Premium ou Business pour créer un nouveau groupe." },
+      );
+      return;
+    }
+    if (memberLimit !== -1 && draft.members > memberLimit) {
+      toast.error("Trop de membres pour votre plan", {
+        description: `Votre plan ${entitlements.plan_label} autorise ${memberLimit} membres par groupe.`,
+      });
+      return;
+    }
+    const validation = validateGroupDraft(draft);
+    if (!validation.ok) {
+      toast.error("Émission impossible", {
+        description: validation.errors[0] ?? "Vérifiez les informations saisies.",
+      });
+      if (validation.firstErrorStep) setStep(validation.firstErrorStep);
+      return;
+    }
     setState("submitting");
     setCompleted((prev) => Array.from(new Set([...prev, ...STEPS.map((s) => s.id)])));
-    window.setTimeout(() => {
+    try {
+      const { group, inviteCode } = await createGroup(draft);
+      setCreatedGroupId(group.id);
+      setIssuedCode(inviteCode);
       setState("issued");
       toast.success("Groupe émis", {
         description: `${draft.name} a été créé. Le code d'invitation est actif.`,
       });
-    }, 1400);
-  };
-
-  const handleCopyCode = () => {
-    navigator.clipboard?.writeText(draft.inviteCode).catch(() => undefined);
-    toast.success("Code copié", { description: draft.inviteCode });
+    } catch (e) {
+      setState("drafting");
+      const raw = e instanceof Error ? e.message : String(e);
+      const msg = raw.includes("QUOTA_GROUPS_EXCEEDED")
+        ? "Quota de groupes atteint pour votre plan. Passez à Premium ou Business."
+        : raw.includes("QUOTA_MEMBERS_EXCEEDED")
+          ? "Nombre de membres au-delà de la limite de votre plan."
+          : raw;
+      toast.error("Création impossible", { description: msg });
+    }
   };
 
   return (
@@ -65,13 +112,40 @@ export default function CreateGroup() {
         subtitle="Émettez une nouvelle tontine en cinq étapes structurées."
       />
 
-      <div className="space-y-6 px-5 py-6 lg:px-8 lg:py-8">
+      <div className="mx-auto max-w-6xl space-y-8 px-5 py-6 lg:px-8 lg:py-10">
+        <ErrorBoundary fallbackTitle="L'assistant de création a rencontré une erreur">
+        {!quota.ok && (
+          <div className="rounded-md border border-primary/40 bg-primary/5 p-4 text-sm flex items-start gap-3">
+            <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+            <div className="flex-1">
+              <p className="font-semibold text-foreground">
+                {quota.reason === "READ_ONLY"
+                  ? "Votre abonnement est expiré"
+                  : `Vous avez atteint la limite de ${quota.max} groupes du plan ${entitlements.plan_label}`}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Passez à Premium (modulable) ou Business pour créer davantage de tontines.
+              </p>
+            </div>
+            <Link
+              to="/abonnement"
+              className="inline-flex h-9 items-center gap-1 rounded-md bg-primary px-3 text-xs font-semibold text-primary-foreground hover:bg-primary-700"
+            >
+              Voir les plans
+            </Link>
+          </div>
+        )}
         <Stepper current={step} onJump={handleJump} completed={completed} />
 
-        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_360px]">
-          <div>
+        <div className="grid grid-cols-1 gap-8 xl:grid-cols-12">
+          <div className="xl:col-span-7" ref={stepTitleRef} tabIndex={-1} aria-live="polite">
             {state === "issued" ? (
-              <IssuedConfirmation draft={draft} cagnotte={derived.cagnotte} onCopyCode={handleCopyCode} />
+              <IssuedConfirmation
+                draft={draft}
+                cagnotte={derived.cagnotte}
+                groupId={createdGroupId}
+                inviteCode={issuedCode ?? draft.inviteCode}
+              />
             ) : (
               <>
                 {step === 1 && (
@@ -130,14 +204,17 @@ export default function CreateGroup() {
             )}
           </div>
 
-          <aside className="xl:sticky xl:top-20 xl:self-start">
-            <TermSheet draft={draft} issued={state === "issued"} />
+          <aside className="xl:col-span-5 xl:sticky xl:top-20 xl:self-start">
+            <ErrorBoundary fallbackTitle="Aperçu indisponible">
+              <TermSheet draft={draft} issued={state === "issued"} />
+            </ErrorBoundary>
           </aside>
         </div>
+        </ErrorBoundary>
 
         <p className="text-[11px] text-muted-foreground">
-          Tontine Digital horodate chaque émission sur un registre immuable. La modification des termes
-          devient restreinte une fois le premier cycle démarré.
+          Chaque émission est horodatée dans Tontine Digital. La modification des termes devient
+          restreinte une fois le premier cycle démarré.
         </p>
       </div>
     </div>
@@ -147,10 +224,11 @@ export default function CreateGroup() {
 interface IssuedConfirmationProps {
   draft: GroupDraft;
   cagnotte: number;
-  onCopyCode: () => void;
+  groupId: string | null;
+  inviteCode: string;
 }
 
-function IssuedConfirmation({ draft, cagnotte, onCopyCode }: IssuedConfirmationProps) {
+function IssuedConfirmation({ draft, cagnotte, groupId, inviteCode }: IssuedConfirmationProps) {
   return (
     <article className="rounded-xl border border-hairline bg-card">
       <header className="flex items-start gap-4 border-b border-hairline bg-success/5 px-5 py-6 lg:px-7">
@@ -163,30 +241,24 @@ function IssuedConfirmation({ draft, cagnotte, onCopyCode }: IssuedConfirmationP
             {draft.name}
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            {draft.members} membres · cotisation {new Intl.NumberFormat("fr-FR").format(draft.contribution)} GNF · cagnotte {new Intl.NumberFormat("fr-FR").format(cagnotte)} GNF par tour.
+            {draft.members} membres · cotisation {formatGNF(draft.contribution)} GNF · cagnotte {formatGNF(cagnotte)} GNF par tour.
           </p>
         </div>
       </header>
 
       <div className="space-y-5 px-5 py-6 lg:px-7">
         <section className="rounded-lg border border-hairline bg-secondary/30 p-4">
-          <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Code d'invitation actif</p>
-          <div className="mt-2 flex items-center gap-3">
-            <p className="flex-1 truncate font-mono text-2xl font-bold tracking-[0.18em] text-foreground num">
-              {draft.inviteCode}
-            </p>
-            <button
-              type="button"
-              onClick={onCopyCode}
-              className="inline-flex h-9 items-center gap-1.5 rounded-md border border-hairline bg-card px-3 text-xs font-medium text-foreground transition hover:bg-secondary"
-            >
-              <Copy className="h-3.5 w-3.5" />
-              Copier
-            </button>
-          </div>
-          <p className="mt-2 text-[11px] text-muted-foreground">
-            Communiquez ce code à vos futurs membres. Ils pourront rejoindre le groupe depuis l'application.
+          <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
+            Invitation prête à partager
           </p>
+          <div className="mt-3">
+            <ShareSheet
+              code={inviteCode}
+              groupName={draft.name}
+              contribution={draft.contribution}
+              frequency={draft.frequency}
+            />
+          </div>
         </section>
 
         <ol className="space-y-3 text-sm">
@@ -198,17 +270,17 @@ function IssuedConfirmation({ draft, cagnotte, onCopyCode }: IssuedConfirmationP
         <p className="inline-flex items-start gap-2 text-[11px] text-muted-foreground">
           <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-success" />
           <span>
-            Émission notarisée le jour même · signature cryptographique vérifiable depuis le registre du groupe.
+            Émission horodatée · les termes du groupe sont consultables à tout moment dans le registre.
           </span>
         </p>
       </div>
 
       <footer className="flex flex-wrap items-center justify-end gap-2 border-t border-hairline bg-secondary/30 px-5 py-4 lg:px-7">
         <Link
-          to="/groupes"
+          to={groupId ? `/groupes/${groupId}` : "/groupes"}
           className="inline-flex h-10 items-center gap-1.5 rounded-md border border-hairline px-4 text-sm font-medium text-foreground transition hover:bg-secondary"
         >
-          Voir mes groupes
+          Voir le groupe
         </Link>
         <Link
           to="/inviter"

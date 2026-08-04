@@ -63,7 +63,7 @@ export function JoinKpiStrip({ stats }: { stats: Stats }) {
         icon={Inbox}
         label="Vos candidatures"
         primary={`${stats.pendingApplications} en attente`}
-        secondary="Réponse de l'organisateur sous 72h"
+        secondary="En attente de validation par l'organisateur"
       />
     </div>
   );

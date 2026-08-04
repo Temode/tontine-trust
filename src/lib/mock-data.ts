@@ -571,6 +571,7 @@ export function getUpcomingContributions(): UpcomingContribution[] {
  * Cycle length per frequency (in days). Approximations are fine for visualisation.
  */
 const FREQUENCY_DAYS: Record<TontineGroup["frequency"], number> = {
+  Quotidienne: 1,
   Hebdomadaire: 7,
   Quinzaine: 14,
   Mensuelle: 30,

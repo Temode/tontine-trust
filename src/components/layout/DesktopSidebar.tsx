@@ -1,77 +1,30 @@
-import {
-  Bell,
-  Calendar,
-  ChevronDown,
-  HelpCircle,
-  History,
-  LayoutDashboard,
-  type LucideIcon,
-  PlusCircle,
-  Repeat,
-  Send,
-  Settings,
-  User,
-  UserPlus,
-  Users,
-  Wallet,
-} from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { Logo } from "@/components/brand/Logo";
-import { currentUser } from "@/lib/mock-data";
+import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
-
-interface NavEntry {
-  to: string;
-  label: string;
-  icon: LucideIcon;
-  badge?: string | number;
-  dot?: boolean;
-}
-
-interface NavSection {
-  label: string;
-  items: NavEntry[];
-}
-
-const sections: NavSection[] = [
-  {
-    label: "Menu principal",
-    items: [
-      { to: "/dashboard", label: "Tableau de bord", icon: LayoutDashboard },
-      { to: "/groupes", label: "Mes groupes", icon: Users, badge: 3 },
-      { to: "/cotisations", label: "Cotisations", icon: Wallet },
-      { to: "/rotations", label: "Rotations & Tours", icon: Repeat },
-      { to: "/historique", label: "Historique", icon: History },
-      { to: "/calendrier", label: "Calendrier", icon: Calendar },
-    ],
-  },
-  {
-    label: "Actions rapides",
-    items: [
-      { to: "/nouveau", label: "Créer un groupe", icon: PlusCircle },
-      { to: "/rejoindre", label: "Rejoindre un groupe", icon: UserPlus },
-      { to: "/inviter", label: "Inviter des membres", icon: Send },
-    ],
-  },
-  {
-    label: "Compte",
-    items: [
-      { to: "/profil", label: "Mon profil", icon: User },
-      { to: "/parametres", label: "Paramètres", icon: Settings },
-      { to: "/notifications", label: "Notifications", icon: Bell, dot: true },
-      { to: "/aide", label: "Aide & Support", icon: HelpCircle },
-    ],
-  },
-];
+import { PresencePicker } from "@/components/messages/PresencePicker";
+import { navSections as sections } from "./navSections";
 
 export function DesktopSidebar() {
   const { pathname } = useLocation();
+  const { user } = useAuth();
+  const fullName =
+    (user?.user_metadata?.full_name as string | undefined) ?? user?.email ?? "Utilisateur";
+  const phone = (user?.user_metadata?.phone_number as string | undefined) ?? user?.email ?? "";
+  const initials = fullName
+    .split(" ")
+    .map((s) => s[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
 
   return (
     <aside className="fixed inset-y-0 left-0 z-40 hidden w-72 flex-col border-r border-hairline bg-sidebar lg:flex">
       {/* Brand */}
       <div className="border-b border-hairline px-6 py-5">
-        <Link to="/dashboard" className="flex items-center gap-3">
+        <Link to="/dashboard" className="flex items-center gap-3" data-tour="brand">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-primary">
             <Logo size={22} className="text-primary-foreground" />
           </div>
@@ -102,6 +55,7 @@ export function DesktopSidebar() {
                     <Link
                       to={item.to}
                       aria-current={active ? "page" : undefined}
+                      data-tour={item.tourId}
                       className={cn(
                         "group relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
                         active
@@ -131,16 +85,22 @@ export function DesktopSidebar() {
 
       {/* User card */}
       <div className="border-t border-hairline p-3">
+        <div className="mb-2 flex items-center justify-between px-1">
+          <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+            Disponibilité
+          </span>
+          <PresencePicker />
+        </div>
         <button
           type="button"
           className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-secondary"
         >
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-xs font-bold text-primary-foreground">
-            {currentUser.initials}
+            {initials || "?"}
           </div>
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-semibold text-foreground">{currentUser.name}</p>
-            <p className="truncate text-xs text-muted-foreground">{currentUser.phone}</p>
+            <p className="truncate text-sm font-semibold text-foreground">{fullName}</p>
+            <p className="truncate text-xs text-muted-foreground">{phone}</p>
           </div>
           <ChevronDown className="h-4 w-4 text-muted-foreground" />
         </button>

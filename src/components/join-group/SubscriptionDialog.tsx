@@ -284,8 +284,8 @@ function FormStep({
             J'accepte les termes du contrat et m'engage à honorer chaque cotisation
           </p>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            La candidature est notarisée. Aucun débit n'est exécuté tant que l'organisateur n'a pas confirmé
-            votre adhésion.
+            Votre candidature est horodatée et tracée dans le registre du groupe. Aucun débit n'est
+            exécuté tant que l'organisateur n'a pas confirmé votre adhésion.
           </p>
         </div>
       </label>
@@ -307,7 +307,7 @@ function FormStep({
 
       <p className="mt-3 inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
         <ShieldCheck className="h-3.5 w-3.5 text-success" />
-        Candidature chiffrée · réponse de l'organisateur sous 72h
+        Candidature horodatée · réponse selon l'organisateur
       </p>
     </>
   );
@@ -319,9 +319,9 @@ function SubmittingStep() {
       <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-full border border-primary-100 bg-primary-50">
         <Loader2 className="h-6 w-6 animate-spin text-primary" />
       </div>
-      <h3 className="font-display text-base font-bold text-foreground">Notarisation en cours</h3>
+      <h3 className="font-display text-base font-bold text-foreground">Transmission en cours</h3>
       <p className="mt-1 text-sm text-muted-foreground">
-        Signature de la candidature et notification de l'organisateur…
+        Enregistrement de la candidature et notification de l'organisateur…
       </p>
     </div>
   );
@@ -335,7 +335,7 @@ function SubmittedStep({ group }: { group: DirectoryGroup }) {
       </div>
       <h3 className="font-display text-base font-bold text-foreground">Candidature transmise</h3>
       <p className="mt-1 text-sm text-muted-foreground">
-        {group.organizerName} a été notifié(e). Vous serez prévenu de la décision sous 72h.
+        {group.organizerName} a été notifié(e). Vous serez prévenu(e) dès qu'une décision est prise.
       </p>
     </div>
   );

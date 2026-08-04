@@ -1,16 +1,22 @@
-import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { Plus } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { AlertTriangle, Plus } from "lucide-react";
 import { TopBar } from "@/components/layout/TopBar";
 import { EmptyState } from "@/components/groups/EmptyState";
 import { GroupsGrid } from "@/components/groups/GroupsGrid";
-import { GroupsKpiStrip } from "@/components/groups/GroupsKpiStrip";
+import { GroupsHero } from "@/components/groups/GroupsHero";
 import { GroupsTable } from "@/components/groups/GroupsTable";
 import { GroupsToolbar } from "@/components/groups/GroupsToolbar";
+import { Pagination } from "@/components/groups/Pagination";
 import type { GroupsFilter, SortDir, SortKey, ViewMode } from "@/components/groups/types";
-import { getPortfolioStats, groups as allGroups } from "@/lib/mock-data";
+import { listMyGroups } from "@/lib/api/groups";
+import { listMyApplications, cancelMyApplication } from "@/lib/api/groups";
+import { overviewToTontine } from "@/lib/api/types";
+import { ApplicationsList } from "@/components/join-group/ApplicationsList";
+import { useQueryClient } from "@tanstack/react-query";
 import type { TontineGroup } from "@/lib/types";
 import { toast } from "sonner";
+import { useQuickActions } from "@/components/quick-actions/QuickActionsProvider";
 
 const STATUS_DEFAULT_DIRS: Record<SortKey, SortDir> = {
   name: "asc",
@@ -82,14 +88,63 @@ function toCsv(groups: TontineGroup[]): string {
 }
 
 export default function MyGroups() {
-  const navigate = useNavigate();
-  const portfolio = getPortfolioStats();
+  const { openCreate } = useQuickActions();
 
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<GroupsFilter>("all");
   const [sort, setSort] = useState<SortKey>("deadline");
   const [sortDir, setSortDir] = useState<SortDir>(STATUS_DEFAULT_DIRS.deadline);
-  const [view, setView] = useState<ViewMode>("table");
+  const [view, setView] = useState<ViewMode>("grid");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState<number>(12);
+
+  const { data: rows = [], isLoading, isError, error, refetch } = useQuery({
+    queryKey: ["groups", "mine"],
+    queryFn: listMyGroups,
+  });
+
+  const queryClient = useQueryClient();
+  const { data: applications = [] } = useQuery({
+    queryKey: ["applications", "mine"],
+    queryFn: listMyApplications,
+  });
+
+  const handleCancelApplication = async (groupId: string) => {
+    try {
+      await cancelMyApplication(groupId);
+      toast.success("Candidature retirée");
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["applications", "mine"] }),
+        queryClient.invalidateQueries({ queryKey: ["groups", "mine"] }),
+      ]);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Erreur inconnue";
+      toast.error("Impossible de retirer la candidature", { description: msg });
+    }
+  };
+
+  const allGroups = useMemo<TontineGroup[]>(() => {
+    try {
+      return rows.map(overviewToTontine);
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.error("[MyGroups] overviewToTontine mapping failed", e);
+      return [];
+    }
+  }, [rows]);
+
+  const portfolio = useMemo(() => {
+    try {
+      return computePortfolio(allGroups);
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.error("[MyGroups] computePortfolio failed", e);
+      return {
+        total: 0, active: 0, yourTurn: 0, completed: 0, pending: 0,
+        capitalCommitted: 0, cagnotteCumulee: 0, avgScore: 0, upcomingTurn: null as null | { amount: number; days: number; groupName: string },
+      };
+    }
+  }, [allGroups]);
 
   const counts = useMemo<Record<GroupsFilter, number>>(() => {
     const base: Record<GroupsFilter, number> = {
@@ -101,7 +156,7 @@ export default function MyGroups() {
     };
     for (const g of allGroups) base[g.status]++;
     return base;
-  }, []);
+  }, [allGroups]);
 
   const filteredGroups = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -115,7 +170,25 @@ export default function MyGroups() {
       );
     });
     return [...result].sort((a, b) => compareGroups(a, b, sort, sortDir));
-  }, [query, filter, sort, sortDir]);
+  }, [allGroups, query, filter, sort, sortDir]);
+
+  // Reset page on filter / search / sort / view changes
+  useEffect(() => {
+    setPage(1);
+  }, [query, filter, sort, sortDir, view]);
+
+  // Adjust default page size when switching view
+  useEffect(() => {
+    setPageSize(view === "table" ? 20 : 12);
+  }, [view]);
+
+  const totalItems = filteredGroups.length;
+  const pageCount = Math.max(1, Math.ceil(totalItems / pageSize));
+  const safePage = Math.min(page, pageCount);
+  const pagedGroups = useMemo(
+    () => filteredGroups.slice((safePage - 1) * pageSize, safePage * pageSize),
+    [filteredGroups, safePage, pageSize],
+  );
 
   const handleSortChange = (key: SortKey) => {
     if (key === sort) {
@@ -149,13 +222,17 @@ export default function MyGroups() {
         subtitle="Suivi consolidé de votre portefeuille de tontines."
         primaryAction={{
           label: "Créer un groupe",
-          onClick: () => navigate("/nouveau"),
+          onClick: openCreate,
           icon: <Plus className="h-4 w-4" />,
         }}
       />
 
       <div className="space-y-6 px-5 py-6 lg:px-8 lg:py-8">
-        <GroupsKpiStrip stats={portfolio} />
+        <GroupsHero stats={portfolio} />
+
+        {applications.length > 0 && (
+          <ApplicationsList applications={applications} onCancel={handleCancelApplication} />
+        )}
 
         <GroupsToolbar
           query={query}
@@ -173,7 +250,28 @@ export default function MyGroups() {
           onExport={handleExport}
         />
 
-        {filteredGroups.length === 0 ? (
+        {isLoading ? (
+          <LoadingSkeleton view={view} />
+        ) : isError ? (
+          <div className="flex flex-col items-start gap-4 rounded-2xl border border-destructive/30 bg-destructive/[0.04] p-6 sm:flex-row sm:items-center">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-destructive/10 text-destructive">
+              <AlertTriangle className="h-5 w-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="font-display text-base font-bold text-foreground">Impossible de charger vos groupes</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {error instanceof Error ? error.message : "Erreur réseau inattendue."}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => refetch()}
+              className="inline-flex h-9 shrink-0 items-center rounded-lg border border-hairline bg-card px-4 text-xs font-medium text-foreground transition hover:bg-secondary"
+            >
+              Réessayer
+            </button>
+          </div>
+        ) : filteredGroups.length === 0 ? (
           <EmptyState
             filtered={isFiltered}
             onClearFilters={() => {
@@ -181,17 +279,122 @@ export default function MyGroups() {
               setQuery("");
             }}
           />
-        ) : view === "table" ? (
-          <GroupsTable groups={filteredGroups} sort={sort} sortDir={sortDir} onSortChange={handleSortChange} />
         ) : (
-          <GroupsGrid groups={filteredGroups} />
+          <>
+            {view === "table" ? (
+              <GroupsTable groups={pagedGroups} sort={sort} sortDir={sortDir} onSortChange={handleSortChange} />
+            ) : (
+              <GroupsGrid groups={pagedGroups} />
+            )}
+            {pageCount > 1 && (
+              <Pagination
+                page={safePage}
+                pageCount={pageCount}
+                pageSize={pageSize}
+                totalItems={totalItems}
+                onPageChange={setPage}
+                onPageSizeChange={setPageSize}
+                pageSizeOptions={view === "table" ? [10, 20, 50] : [6, 12, 24]}
+              />
+            )}
+          </>
         )}
 
-        <p className="text-[11px] text-muted-foreground">
-          {filteredGroups.length} {filteredGroups.length > 1 ? "groupes" : "groupe"} affichés ·
-          Données mises à jour en temps réel via les webhooks Mobile Money
-        </p>
+        <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-muted-foreground">
+          <span>
+            <span className="num">{totalItems}</span>{" "}
+            {totalItems > 1 ? "groupes filtrés" : "groupe filtré"}
+            {totalItems > 0 && (
+              <>
+                {" "}· <span className="num">{pagedGroups.length}</span> sur cette page
+              </>
+            )}
+          </span>
+          <span>Données en direct · Tontine Digitale</span>
+        </div>
       </div>
     </div>
   );
+}
+
+function LoadingSkeleton({ view }: { view: ViewMode }) {
+  if (view === "table") {
+    return (
+      <div className="space-y-4" aria-busy="true" aria-live="polite">
+        <div className="h-12 animate-pulse rounded-2xl bg-secondary/60" />
+        <div className="overflow-hidden rounded-xl border border-hairline bg-card">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div
+              key={i}
+              className="flex items-center gap-3 border-b border-hairline px-5 py-3 last:border-b-0"
+            >
+              <div className="h-9 w-9 animate-pulse rounded-md bg-secondary/70" />
+              <div className="flex-1 space-y-2">
+                <div className="h-3 w-1/3 animate-pulse rounded bg-secondary/70" />
+                <div className="h-2.5 w-1/4 animate-pulse rounded bg-secondary/50" />
+              </div>
+              <div className="hidden h-3 w-16 animate-pulse rounded bg-secondary/60 sm:block" />
+              <div className="h-7 w-20 animate-pulse rounded-md bg-secondary/70" />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="space-y-4" aria-busy="true" aria-live="polite">
+      <div className="h-12 animate-pulse rounded-2xl bg-secondary/60" />
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="h-56 animate-pulse rounded-xl bg-secondary/60" />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** Dérive les KPIs portefeuille depuis la liste réelle de groupes. */
+function computePortfolio(groups: TontineGroup[]) {
+  const total = groups.length;
+  const active = groups.filter((g) => g.status === "active").length;
+  const yourTurn = groups.filter((g) => g.status === "your-turn").length;
+  const completed = groups.filter((g) => g.status === "completed").length;
+  const pending = groups.filter((g) => g.status === "pending").length;
+
+  const capitalCommitted = groups
+    .filter((g) => g.status === "active" || g.status === "your-turn")
+    .reduce((sum, g) => {
+      const remaining = Math.max(0, g.members - Math.round((g.progress / 100) * g.members));
+      return sum + g.contribution * remaining;
+    }, 0);
+
+  const cagnotteCumulee = groups
+    .filter((g) => g.status === "active" || g.status === "your-turn")
+    .reduce((sum, g) => sum + g.contribution * g.members, 0);
+
+  const scored = groups.filter((g) => g.averageScore > 0);
+  const avgScore = scored.length > 0
+    ? Math.round(scored.reduce((sum, g) => sum + g.averageScore, 0) / scored.length)
+    : 0;
+
+  const upcomingTurn = groups
+    .filter((g) => g.status === "your-turn" && typeof g.daysToDeadline === "number")
+    .reduce<{ amount: number; days: number; groupName: string } | null>((best, g) => {
+      const amount = g.contribution * g.members;
+      const days = g.daysToDeadline ?? 9999;
+      if (!best || days < best.days) return { amount, days, groupName: g.name };
+      return best;
+    }, null);
+
+  return {
+    total,
+    active,
+    yourTurn,
+    completed,
+    pending,
+    capitalCommitted,
+    cagnotteCumulee,
+    avgScore,
+    upcomingTurn,
+  };
 }
