@@ -9,7 +9,6 @@ import {
   HandCoins,
   FileCheck2,
   MoreVertical,
-  Play,
   Star,
   UserPlus,
   ShieldCheck,
@@ -59,6 +58,10 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { CurrentTurnBanner } from "@/components/group/CurrentTurnBanner";
 import { RenewalPanel } from "@/components/group/RenewalPanel";
+import { CycleLaunchCard } from "@/components/group/CycleLaunchCard";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useTontineRealtime } from "@/hooks/useTontineRealtime";
 import { DepositCallout } from "@/components/group/DepositCallout";
 import { PositionBadge } from "@/components/group/PositionBadge";
@@ -179,6 +182,16 @@ export default function GroupDetail() {
     queryKey: ["group", id, "turns"],
     queryFn: () => listGroupTurns(id as string),
     enabled: !!id,
+  });
+  const pageContractQ = useQuery({
+    queryKey: ["active-contract", id],
+    queryFn: () => getActiveContract(id as string),
+    enabled: !!id,
+  });
+  const pageSigQ = useQuery({
+    queryKey: ["my-contract-sig", pageContractQ.data?.contract_id],
+    queryFn: () => getMyContractSignature(pageContractQ.data!.contract_id),
+    enabled: !!pageContractQ.data?.contract_id,
   });
 
   const invalidate = () => {
@@ -333,15 +346,23 @@ export default function GroupDetail() {
   const myDueForGroup = (duesQ.data ?? [])
     .filter((d) => d.group_id === grp.id && d.status !== "submitted")
     .sort((a, b) => a.turn_number - b.turn_number)[0];
-  const canStart =
-    isOrganizer && (grp.status === "draft" || grp.status === "open") && activeMembers.length >= 2;
   const nextTurn =
     turns.find((t) => t.status === "collecting") ?? turns.find((t) => t.status === "upcoming") ?? null;
   const completedTurns = turns.filter((t) => t.status === "paid").length;
   const isPaused = grp.status === "paused";
   const isArchived = !!grp.archived_at || grp.status === "completed" || grp.status === "cancelled";
   const paymentsBlocked = isPaused || isArchived;
-  const progress = turns.length > 0 ? Math.round((completedTurns / turns.length) * 100) : 0;
+  const hasTurns = turns.length > 0;
+  const progress = hasTurns ? Math.round((completedTurns / turns.length) * 100) : 0;
+  // Un cycle est terminé quand tous ses tours sont réglés (ou sautés), même si le
+  // statut du groupe est resté « actif » en base.
+  const allTurnsDone =
+    hasTurns && turns.every((t) => t.status === "paid" || t.status === "skipped");
+  const cycleFinished = grp.status === "completed" || !!grp.archived_at || allTurnsDone;
+  // Aucun cycle en cours : soit rien n'a démarré, soit le précédent est terminé.
+  const noCycleRunning = !hasTurns || allTurnsDone;
+  const contractSigned = pageContractQ.data ? !!pageSigQ.data : null;
+  const canStart = !hasTurns && !isArchived && grp.status !== "paused";
 
   const tabs: Array<{ id: Section; label: string }> = [
     { id: "overview", label: "Aperçu" },
@@ -467,94 +488,97 @@ export default function GroupDetail() {
             <div className="mt-6">
               <div className="mb-1.5 flex items-center justify-between text-[11px] uppercase tracking-wider text-primary-foreground/70">
                 <span>Progression du cycle</span>
-                <span className="num">{progress}%</span>
+                <span className="num">{hasTurns ? `${progress}%` : "—"}</span>
               </div>
               <div className="h-1.5 overflow-hidden rounded-full bg-primary-foreground/15">
-                <div className="h-full rounded-full bg-accent" style={{ width: `${progress}%` }} />
+                <div
+                  className="h-full rounded-full bg-accent"
+                  style={{ width: `${hasTurns ? progress : 0}%` }}
+                />
               </div>
             </div>
           </div>
         </article>
 
-        {/* Barre d'actions billion-dollar */}
-        <div className="mt-4 flex flex-wrap items-center gap-2 rounded-2xl border border-hairline bg-card/80 p-2 shadow-[0_6px_20px_-12px_hsl(var(--primary)/0.25)] backdrop-blur">
-          <Link
-            to={`/groupes/${grp.id}/membres`}
-            className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-primary px-4 text-xs font-semibold text-primary-foreground shadow-sm transition hover:bg-primary-700"
-          >
-            <Users className="h-4 w-4" />
-            Voir membres
-          </Link>
-          <button
-            type="button"
-            onClick={() => {
-              if (myDueForGroup && !paymentsBlocked) void launchDjomyCheckout(myDueForGroup.contribution_id);
-            }}
-            disabled={!myDueForGroup || paymentsBlocked}
-            className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-hairline bg-card px-4 text-xs font-semibold text-foreground transition hover:bg-secondary disabled:opacity-50"
-          >
-            <HandCoins className="h-4 w-4" />
-            Gérer contributions
-          </button>
-          {isOrganizer && (
+        {/* Action primaire unique + actions secondaires regroupées */}
+        <div className="mt-4 flex flex-wrap items-center gap-3 rounded-2xl border border-hairline bg-card/80 p-2 shadow-[0_6px_20px_-12px_hsl(var(--primary)/0.25)] backdrop-blur">
+          {myDueForGroup && !paymentsBlocked ? (
             <button
               type="button"
-              onClick={() => {
-                const el = document.getElementById(INVITE_PANEL_ID);
-                el?.scrollIntoView({ behavior: "smooth", block: "start" });
-              }}
-              className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-hairline bg-card px-4 text-xs font-semibold text-foreground transition hover:bg-secondary"
+              onClick={() => void launchDjomyCheckout(myDueForGroup.contribution_id)}
+              className="inline-flex h-10 items-center gap-1.5 whitespace-nowrap rounded-xl bg-primary px-4 text-xs font-semibold text-primary-foreground shadow-sm transition hover:bg-primary-700"
             >
-              <UserPlus className="h-4 w-4" />
-              Inviter
+              <HandCoins className="h-4 w-4" />
+              Payer ma cotisation
             </button>
+          ) : (
+            <Link
+              to={`/groupes/${grp.id}/membres`}
+              className="inline-flex h-10 items-center gap-1.5 whitespace-nowrap rounded-xl bg-primary px-4 text-xs font-semibold text-primary-foreground shadow-sm transition hover:bg-primary-700"
+            >
+              <Users className="h-4 w-4" />
+              Voir membres
+            </Link>
           )}
-          <Link
-            to={`/groupes/${grp.id}/parametres`}
-            className="ml-auto inline-flex h-10 items-center gap-1.5 rounded-xl border border-hairline bg-card px-4 text-xs font-medium text-muted-foreground transition hover:text-foreground"
-          >
-            <ChevronRight className="h-4 w-4" />
-            Paramètres
-          </Link>
-          <Link
-            to="/parametres/notifications"
-            className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-hairline bg-card px-4 text-xs font-medium text-muted-foreground transition hover:text-foreground"
-            title="Régler vos rappels (prochain tour, cotisations dues) — in-app et email"
-          >
-            <Bell className="h-4 w-4" />
-            Rappels
-          </Link>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="ml-auto inline-flex h-10 items-center gap-1.5 rounded-xl border border-hairline bg-card px-4 text-xs font-medium text-muted-foreground transition hover:text-foreground"
+              >
+                Actions
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuItem asChild>
+                <Link to={`/groupes/${grp.id}/membres`}>
+                  <Users className="mr-2 h-4 w-4" />
+                  Voir les membres
+                </Link>
+              </DropdownMenuItem>
+              {isOrganizer && (
+                <DropdownMenuItem
+                  onSelect={() => {
+                    const el = document.getElementById(INVITE_PANEL_ID);
+                    el?.scrollIntoView({ behavior: "smooth", block: "start" });
+                  }}
+                >
+                  <UserPlus className="mr-2 h-4 w-4" />
+                  Inviter des membres
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuItem asChild>
+                <Link to={`/groupes/${grp.id}/parametres`}>Paramètres du groupe</Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link to="/parametres/notifications">
+                  <Bell className="mr-2 h-4 w-4" />
+                  Rappels & notifications
+                </Link>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
+
+        {/* Le contrat est l'étape 1 du démarrage : il reste au-dessus de la ligne de flottaison. */}
+        {noCycleRunning && <ContractSignSection groupId={grp.id} />}
+
+        {canStart && (
+          <CycleLaunchCard
+            activeMembers={activeMembers.length}
+            contractSigned={contractSigned}
+            isOrganizer={isOrganizer}
+            isPending={startCycleM.isPending}
+            onStart={() => startCycleM.mutate()}
+          />
+        )}
 
         <RenewalPanel
           groupId={grp.id}
           isOrganizer={isOrganizer}
-          cycleFinished={grp.status === "completed"}
+          cycleFinished={cycleFinished}
         />
-
-        {canStart && (
-          <div className="mt-5 flex flex-col gap-3 rounded-xl border border-accent-200 bg-accent-50/60 p-4 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex items-start gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-accent-600 text-accent-foreground">
-                <Play className="h-4 w-4" />
-              </div>
-              <div>
-                <p className="font-display text-sm font-bold text-foreground">Prêt à démarrer le cycle</p>
-                <p className="text-xs text-muted-foreground">
-                  {activeMembers.length} membres actifs · l'ordre de rotation sera tiré et les {activeMembers.length} tours planifiés.
-                </p>
-              </div>
-            </div>
-            <button
-              type="button"
-              disabled={startCycleM.isPending}
-              onClick={() => startCycleM.mutate()}
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-accent-600 px-4 text-sm font-semibold text-accent-foreground transition hover:bg-accent-700 disabled:opacity-60"
-            >
-              {startCycleM.isPending ? "Démarrage…" : "Démarrer le cycle"}
-            </button>
-          </div>
-        )}
 
         {paymentsBlocked && (
           <PausedPaymentsBanner
@@ -652,7 +676,7 @@ export default function GroupDetail() {
                 memberDepositStatus={(me as { deposit_status?: string | null }).deposit_status ?? null}
               />
               {user?.id && <PositionBadge groupId={grp.id} userId={user.id} />}
-              <ContractSignSection groupId={grp.id} />
+              {!noCycleRunning && <ContractSignSection groupId={grp.id} />}
               {(() => {
                 const myPaidTurn = turns.find(
                   (t) =>
