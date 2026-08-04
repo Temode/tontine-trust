@@ -7716,6 +7716,15 @@ export type Database = {
         }
         Returns: Json
       }
+      dispatch_notification_marketing_fallback: {
+        Args: {
+          _group_name: string
+          _kind: Database["public"]["Enums"]["notification_kind"]
+          _skipped: string
+          _user_id: string
+        }
+        Returns: undefined
+      }
       dispatch_renewal_notification: {
         Args: {
           _body: string
