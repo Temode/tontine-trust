@@ -6865,6 +6865,7 @@ export type Database = {
     Functions: {
       _audit_confirm_test_user: { Args: { _email: string }; Returns: undefined }
       _generate_invite_code: { Args: never; Returns: string }
+      accept_group_terms: { Args: { _group_id: string }; Returns: string }
       accrue_referral_earning: {
         Args: { _period: string; _subscription_id: string }
         Returns: string
@@ -7468,6 +7469,14 @@ export type Database = {
             }
             Returns: Json
           }
+      current_terms_version: {
+        Args: never
+        Returns: {
+          content: string
+          published_at: string
+          version: string
+        }[]
+      }
       decide_payment_pause_request: {
         Args: { _approve: boolean; _reason?: string; _request_id: string }
         Returns: undefined
@@ -7595,6 +7604,7 @@ export type Database = {
           metadata: Json
         }[]
       }
+      get_group_terms: { Args: { _group_id: string }; Returns: Json }
       get_international_group_members: {
         Args: { _group_id: string }
         Returns: {
