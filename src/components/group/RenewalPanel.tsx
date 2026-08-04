@@ -375,6 +375,31 @@ export function RenewalPanel({ groupId, isOrganizer, cycleFinished }: Props) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <AlertDialog open={confirmCancel} onOpenChange={setConfirmCancel}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Annuler la demande de relance ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Le nouveau cycle ne démarrera pas et toutes les réponses déjà enregistrées seront
+              abandonnées. Tous les membres du groupe en seront informés (application, email, et SMS
+              s'ils disposent d'un forfait actif). Vous pourrez relancer une nouvelle demande plus
+              tard.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Revenir</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                cancelM.mutate();
+              }}
+            >
+              {cancelM.isPending ? "Annulation…" : "Confirmer l'annulation"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
