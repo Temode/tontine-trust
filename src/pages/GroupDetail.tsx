@@ -677,7 +677,7 @@ export default function GroupDetail() {
                 memberDepositStatus={(me as { deposit_status?: string | null }).deposit_status ?? null}
               />
               {user?.id && <PositionBadge groupId={grp.id} userId={user.id} />}
-              <ContractSignSection groupId={grp.id} />
+              {!noCycleRunning && <ContractSignSection groupId={grp.id} />}
               {(() => {
                 const myPaidTurn = turns.find(
                   (t) =>
