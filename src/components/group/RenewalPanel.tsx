@@ -13,8 +13,7 @@ import {
   cancelRenewal, extendRenewal, getRenewalStatus, startRenewedCycle, voteRenewal,
 } from "@/lib/api/renewal";
 import { RenewalLaunchDialog } from "./RenewalLaunchDialog";
-import { TermsAcceptDialog } from "@/components/legal/TermsAcceptDialog";
-import { getGroupTerms } from "@/lib/api/terms";
+import { RenewalVoteDialog } from "./RenewalVoteDialog";
 
 interface Props {
   groupId: string;
@@ -40,18 +39,11 @@ export function RenewalPanel({ groupId, isOrganizer, cycleFinished }: Props) {
   const [openLaunch, setOpenLaunch] = useState(false);
   const [confirmStart, setConfirmStart] = useState(false);
   const [confirmCancel, setConfirmCancel] = useState(false);
-  const [termsOpen, setTermsOpen] = useState(false);
-  const [pendingVote, setPendingVote] = useState<boolean | null>(null);
+  const [voteOpen, setVoteOpen] = useState(false);
 
   const statusQ = useQuery({
     queryKey: ["group", groupId, "renewal"],
     queryFn: () => getRenewalStatus(groupId),
-    enabled: !!groupId,
-  });
-
-  const termsQ = useQuery({
-    queryKey: ["group-terms", groupId],
-    queryFn: () => getGroupTerms(groupId),
     enabled: !!groupId,
   });
 
@@ -92,6 +84,7 @@ export function RenewalPanel({ groupId, isOrganizer, cycleFinished }: Props) {
     mutationFn: (agreed: boolean) => voteRenewal(st?.cycle_id ?? "", agreed),
     onSuccess: (_d, agreed) => {
       toast.success(agreed ? "Participation confirmée" : "Réponse enregistrée");
+      setVoteOpen(false);
       invalidateAll();
     },
     onError: (e: Error) => toast.error("Réponse impossible", { description: e.message }),
@@ -132,14 +125,13 @@ export function RenewalPanel({ groupId, isOrganizer, cycleFinished }: Props) {
 
   const cd = useMemo(() => countdown(st?.deadline), [st?.deadline, tick]);
 
-  // « Je participe » exige l'acceptation des conditions : on la propose avant d'enregistrer le vote.
+  // « Je participe » passe par la modale détail du cycle + acceptation des conditions.
   const submitVote = (agreed: boolean) => {
-    if (agreed && termsQ.data && !termsQ.data.accepted) {
-      setPendingVote(true);
-      setTermsOpen(true);
+    if (agreed) {
+      setVoteOpen(true);
       return;
     }
-    voteM.mutate(agreed);
+    voteM.mutate(false);
   };
 
   // Rien à afficher tant que le cycle n'est pas terminé et qu'aucune relance n'est ouverte.
@@ -432,18 +424,13 @@ export function RenewalPanel({ groupId, isOrganizer, cycleFinished }: Props) {
         </AlertDialogContent>
       </AlertDialog>
 
-      <TermsAcceptDialog
-        open={termsOpen}
-        onOpenChange={(v) => {
-          setTermsOpen(v);
-          if (!v) setPendingVote(null);
-        }}
+      <RenewalVoteDialog
+        open={voteOpen}
+        onOpenChange={setVoteOpen}
         groupId={groupId}
-        ctaLabel="J'accepte et je participe"
-        onAccepted={() => {
-          if (pendingVote !== null) voteM.mutate(pendingVote);
-          setPendingVote(null);
-        }}
+        status={st}
+        isPending={voteM.isPending}
+        onConfirm={() => voteM.mutate(true)}
       />
     </>
   );
