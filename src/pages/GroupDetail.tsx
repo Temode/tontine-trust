@@ -343,15 +343,24 @@ export default function GroupDetail() {
   const myDueForGroup = (duesQ.data ?? [])
     .filter((d) => d.group_id === grp.id && d.status !== "submitted")
     .sort((a, b) => a.turn_number - b.turn_number)[0];
-  const canStart =
-    isOrganizer && (grp.status === "draft" || grp.status === "open") && activeMembers.length >= 2;
   const nextTurn =
     turns.find((t) => t.status === "collecting") ?? turns.find((t) => t.status === "upcoming") ?? null;
   const completedTurns = turns.filter((t) => t.status === "paid").length;
   const isPaused = grp.status === "paused";
   const isArchived = !!grp.archived_at || grp.status === "completed" || grp.status === "cancelled";
   const paymentsBlocked = isPaused || isArchived;
-  const progress = turns.length > 0 ? Math.round((completedTurns / turns.length) * 100) : 0;
+  const hasTurns = turns.length > 0;
+  const progress = hasTurns ? Math.round((completedTurns / turns.length) * 100) : 0;
+  // Un cycle est terminé quand tous ses tours sont réglés (ou sautés), même si le
+  // statut du groupe est resté « actif » en base.
+  const allTurnsDone =
+    hasTurns && turns.every((t) => t.status === "paid" || t.status === "skipped");
+  const cycleFinished = grp.status === "completed" || !!grp.archived_at || allTurnsDone;
+  // Aucun cycle en cours : soit rien n'a démarré, soit le précédent est terminé.
+  const noCycleRunning = !hasTurns || allTurnsDone;
+  const contractSigned = pageContractQ.data ? !!pageSigQ.data : null;
+  const canStart =
+    !hasTurns && !isArchived && grp.status !== "paused" && grp.kind !== "solo";
 
   const tabs: Array<{ id: Section; label: string }> = [
     { id: "overview", label: "Aperçu" },
