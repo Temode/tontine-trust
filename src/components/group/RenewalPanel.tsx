@@ -13,6 +13,8 @@ import {
   cancelRenewal, extendRenewal, getRenewalStatus, startRenewedCycle, voteRenewal,
 } from "@/lib/api/renewal";
 import { RenewalLaunchDialog } from "./RenewalLaunchDialog";
+import { TermsAcceptDialog } from "@/components/legal/TermsAcceptDialog";
+import { getGroupTerms } from "@/lib/api/terms";
 
 interface Props {
   groupId: string;
@@ -38,10 +40,18 @@ export function RenewalPanel({ groupId, isOrganizer, cycleFinished }: Props) {
   const [openLaunch, setOpenLaunch] = useState(false);
   const [confirmStart, setConfirmStart] = useState(false);
   const [confirmCancel, setConfirmCancel] = useState(false);
+  const [termsOpen, setTermsOpen] = useState(false);
+  const [pendingVote, setPendingVote] = useState<boolean | null>(null);
 
   const statusQ = useQuery({
     queryKey: ["group", groupId, "renewal"],
     queryFn: () => getRenewalStatus(groupId),
+    enabled: !!groupId,
+  });
+
+  const termsQ = useQuery({
+    queryKey: ["group-terms", groupId],
+    queryFn: () => getGroupTerms(groupId),
     enabled: !!groupId,
   });
 
@@ -122,6 +132,16 @@ export function RenewalPanel({ groupId, isOrganizer, cycleFinished }: Props) {
 
   const cd = useMemo(() => countdown(st?.deadline), [st?.deadline, tick]);
 
+  // « Je participe » exige l'acceptation des conditions : on la propose avant d'enregistrer le vote.
+  const submitVote = (agreed: boolean) => {
+    if (agreed && termsQ.data && !termsQ.data.accepted) {
+      setPendingVote(true);
+      setTermsOpen(true);
+      return;
+    }
+    voteM.mutate(agreed);
+  };
+
   // Rien à afficher tant que le cycle n'est pas terminé et qu'aucune relance n'est ouverte.
   if (!st) return null;
   if (!st.open && !(cycleFinished && isOrganizer)) return null;
@@ -130,23 +150,34 @@ export function RenewalPanel({ groupId, isOrganizer, cycleFinished }: Props) {
   if (!st.open) {
     return (
       <>
-        <section className="mt-5 rounded-xl border border-hairline bg-card p-4">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <section className="mt-4 rounded-2xl border-2 border-accent-300 bg-accent-50/70 p-5 shadow-[0_10px_30px_-18px_hsl(var(--primary)/0.45)] lg:p-6">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-start gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                <RefreshCw className="h-4 w-4" />
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-accent-600 text-accent-foreground">
+                <RefreshCw className="h-5 w-5" />
               </div>
               <div>
-                <p className="font-display text-sm font-bold text-foreground">
-                  Relancer une nouvelle tontine
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-accent-700">
+                  Cycle terminé
                 </p>
-                <p className="text-xs text-muted-foreground">
-                  Le cycle {st.cycle_number} est terminé. Chaque membre devra confirmer sa
-                  participation : aucun engagement n'est reconduit automatiquement.
+                <p className="font-display text-lg font-bold text-foreground">
+                  Le cycle {st.cycle_number} est terminé — relancer une nouvelle tontine
+                </p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Chaque membre devra confirmer sa participation : aucun engagement n'est reconduit
+                  automatiquement.
                 </p>
               </div>
             </div>
-            <Button onClick={() => setOpenLaunch(true)}>Lancer une demande de relance</Button>
+            {isOrganizer ? (
+              <Button size="lg" className="shrink-0" onClick={() => setOpenLaunch(true)}>
+                Préparer la relance
+              </Button>
+            ) : (
+              <p className="shrink-0 text-xs text-muted-foreground">
+                L'organisateur peut relancer un nouveau cycle.
+              </p>
+            )}
           </div>
         </section>
         <RenewalLaunchDialog
@@ -260,7 +291,7 @@ export function RenewalPanel({ groupId, isOrganizer, cycleFinished }: Props) {
           {!st.is_organizer && !cd.over && (
             <div className="flex flex-wrap items-center gap-2">
               <Button
-                onClick={() => voteM.mutate(true)}
+                onClick={() => submitVote(true)}
                 disabled={voteM.isPending}
                 variant={st.my_vote === true ? "default" : "outline"}
               >
@@ -268,7 +299,7 @@ export function RenewalPanel({ groupId, isOrganizer, cycleFinished }: Props) {
                 Je participe
               </Button>
               <Button
-                onClick={() => voteM.mutate(false)}
+                onClick={() => submitVote(false)}
                 disabled={voteM.isPending}
                 variant={st.my_vote === false ? "destructive" : "outline"}
               >
