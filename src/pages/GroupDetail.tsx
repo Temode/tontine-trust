@@ -561,24 +561,16 @@ export default function GroupDetail() {
           </DropdownMenu>
         </div>
 
-        {/* Le contrat est l'étape 1 du démarrage : il reste au-dessus de la ligne de flottaison. */}
-        {noCycleRunning && <ContractSignSection groupId={grp.id} />}
-
         {canStart && (
           <CycleLaunchCard
             activeMembers={activeMembers.length}
-            contractSigned={contractSigned}
+            termsAccepted={termsAccepted}
             isOrganizer={isOrganizer}
             isPending={startCycleM.isPending}
             onStart={() => startCycleM.mutate()}
+            onAcceptTerms={() => setTermsOpen(true)}
           />
         )}
-
-        <RenewalPanel
-          groupId={grp.id}
-          isOrganizer={isOrganizer}
-          cycleFinished={cycleFinished}
-        />
 
         {paymentsBlocked && (
           <PausedPaymentsBanner
