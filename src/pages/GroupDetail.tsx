@@ -359,8 +359,7 @@ export default function GroupDetail() {
   // Aucun cycle en cours : soit rien n'a démarré, soit le précédent est terminé.
   const noCycleRunning = !hasTurns || allTurnsDone;
   const contractSigned = pageContractQ.data ? !!pageSigQ.data : null;
-  const canStart =
-    !hasTurns && !isArchived && grp.status !== "paused" && grp.kind !== "solo";
+  const canStart = !hasTurns && !isArchived && grp.status !== "paused";
 
   const tabs: Array<{ id: Section; label: string }> = [
     { id: "overview", label: "Aperçu" },
