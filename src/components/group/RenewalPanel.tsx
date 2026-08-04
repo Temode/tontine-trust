@@ -75,6 +75,8 @@ export function RenewalPanel({ groupId, isOrganizer, cycleFinished }: Props) {
     void qc.invalidateQueries({ queryKey: ["group", groupId, "members"] });
   };
 
+  const st = statusQ.data;
+
   const voteM = useMutation({
     mutationFn: (agreed: boolean) => voteRenewal(st?.cycle_id ?? "", agreed),
     onSuccess: (_d, agreed) => {
@@ -116,7 +118,6 @@ export function RenewalPanel({ groupId, isOrganizer, cycleFinished }: Props) {
     onError: (e: Error) => toast.error("Annulation impossible", { description: e.message }),
   });
 
-  const st = statusQ.data;
   const cd = useMemo(() => countdown(st?.deadline), [st?.deadline, tick]);
 
   // Rien à afficher tant que le cycle n'est pas terminé et qu'aucune relance n'est ouverte.
