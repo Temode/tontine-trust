@@ -58,6 +58,7 @@ import {
 } from "@/lib/api/pauseRequests";
 import { supabase } from "@/integrations/supabase/client";
 import { CurrentTurnBanner } from "@/components/group/CurrentTurnBanner";
+import { RenewalPanel } from "@/components/group/RenewalPanel";
 import { useTontineRealtime } from "@/hooks/useTontineRealtime";
 import { DepositCallout } from "@/components/group/DepositCallout";
 import { PositionBadge } from "@/components/group/PositionBadge";
@@ -524,6 +525,12 @@ export default function GroupDetail() {
             Rappels
           </Link>
         </div>
+
+        <RenewalPanel
+          groupId={grp.id}
+          isOrganizer={isOrganizer}
+          cycleFinished={grp.status === "completed"}
+        />
 
         {canStart && (
           <div className="mt-5 flex flex-col gap-3 rounded-xl border border-accent-200 bg-accent-50/60 p-4 lg:flex-row lg:items-center lg:justify-between">
