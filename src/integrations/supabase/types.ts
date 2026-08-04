@@ -809,6 +809,12 @@ export type Database = {
           ended_at: string | null
           group_id: string
           id: string
+          renewal_closed_at: string | null
+          renewal_deadline: string | null
+          renewal_expiry_notified_at: string | null
+          renewal_min_members: number | null
+          renewal_opened_at: string | null
+          renewal_threshold_notified_at: string | null
           started_at: string
         }
         Insert: {
@@ -817,6 +823,12 @@ export type Database = {
           ended_at?: string | null
           group_id: string
           id?: string
+          renewal_closed_at?: string | null
+          renewal_deadline?: string | null
+          renewal_expiry_notified_at?: string | null
+          renewal_min_members?: number | null
+          renewal_opened_at?: string | null
+          renewal_threshold_notified_at?: string | null
           started_at?: string
         }
         Update: {
@@ -825,6 +837,12 @@ export type Database = {
           ended_at?: string | null
           group_id?: string
           id?: string
+          renewal_closed_at?: string | null
+          renewal_deadline?: string | null
+          renewal_expiry_notified_at?: string | null
+          renewal_min_members?: number | null
+          renewal_opened_at?: string | null
+          renewal_threshold_notified_at?: string | null
           started_at?: string
         }
         Relationships: [
@@ -7344,6 +7362,7 @@ export type Database = {
       }
       can_join_call: { Args: { p_call_id: string }; Returns: boolean }
       can_moderate_call: { Args: { p_call_id: string }; Returns: boolean }
+      cancel_cycle_renewal: { Args: { _cycle_id: string }; Returns: undefined }
       cancel_my_bid: { Args: { _turn_id: string }; Returns: undefined }
       cancel_turn_swap: { Args: { _request_id: string }; Returns: undefined }
       check_email_outbox_health: { Args: never; Returns: Json }
@@ -7469,6 +7488,10 @@ export type Database = {
       explain_contribution: {
         Args: { _contribution_id: string }
         Returns: Json
+      }
+      extend_cycle_renewal: {
+        Args: { _cycle_id: string; _deadline: string; _min_members?: number }
+        Returns: undefined
       }
       finalize_deletion_votes: { Args: never; Returns: number }
       fmt_gnf: { Args: { _n: number }; Returns: string }
@@ -7797,6 +7820,11 @@ export type Database = {
         }
         Returns: string
       }
+      notify_expired_renewals: { Args: never; Returns: number }
+      open_cycle_renewal: {
+        Args: { _deadline: string; _group_id: string; _min_members: number }
+        Returns: string
+      }
       open_next_turn: { Args: { _cycle_id: string }; Returns: string }
       ops_alert_webhook_mark: {
         Args: { _error?: string; _id: string; _status: string }
@@ -7904,6 +7932,7 @@ export type Database = {
         }
         Returns: string
       }
+      renewal_status: { Args: { _group_id: string }; Returns: Json }
       report_client_incident: {
         Args: {
           _code: string
@@ -8109,6 +8138,7 @@ export type Database = {
         Args: { _group_id: string; _payer_phone?: string }
         Returns: Json
       }
+      start_renewed_cycle: { Args: { _group_id: string }; Returns: string }
       start_sms_order_checkout: {
         Args: { _group_id?: string; _pack_id: string }
         Returns: {
