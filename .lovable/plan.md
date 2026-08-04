@@ -26,6 +26,12 @@ Carte dédiée en haut de la page du groupe pour chaque ancien membre :
 - Au démarrage : seuls les membres ayant accepté sont repris, les autres passent en « sorti », les positions et compteurs de retard sont réinitialisés, un nouveau cycle est créé avec de nouveaux tours.
 - Si le délai expire sous le seuil : l'organisateur peut prolonger le délai, abaisser le seuil, ou clôturer définitivement le groupe.
 
+### 4. Recalcul du pot et de la rotation (point de vigilance)
+- **Pot réajusté en temps réel** : la cagnotte d'un tour vaut cotisation × nombre de participants confirmés. Si le groupe passe de 10 à 7, le pot baisse automatiquement. Un encart de simulation affiche en direct, avant le clic sur « Démarrer le cycle » : nouveau montant du pot par tour, nombre de tours, durée totale estimée, date du dernier tour, et l'écart par rapport au cycle précédent (« pot 12 000 000 → 8 400 000 GNF »).
+- **Confirmation explicite** : si le pot diminue de plus de 20 % par rapport au cycle précédent, une confirmation supplémentaire est demandée à l'organisateur, et l'information figure dans la notification de démarrage envoyée aux membres (réassurance et absence de mauvaise surprise).
+- **Rotation régénérée** : les rangs sont entièrement recalculés sur les seuls membres confirmés — nouveau tirage au sort si l'ordre est aléatoire, réattribution séquentielle sans trous sinon. Aucun rang du cycle précédent n'est conservé, aucun membre sorti ne peut rester dans le calendrier.
+- **Vérification serveur** : le montant du pot et les rangs sont recalculés côté base au moment du démarrage (jamais depuis une valeur envoyée par le client) ; la simulation affichée provient de la même fonction de calcul afin qu'aperçu et résultat soient toujours identiques.
+
 ## Analyse UX / psychologie de l'engagement
 - **Preuve sociale** : afficher « 7 membres sur 10 ont déjà confirmé » avec avatars des confirmés — l'adhésion visible des pairs est le premier levier de décision dans une tontine.
 - **Engagement progressif** : la décision est décomposée (voir le bilan du cycle précédent → consulter les conditions → confirmer), plutôt qu'un bouton isolé.
