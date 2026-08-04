@@ -7489,6 +7489,15 @@ export type Database = {
         Args: { _payload: Json }
         Returns: string
       }
+      admin_upsert_marketing_content: {
+        Args: {
+          _body: string
+          _channel: string
+          _code: string
+          _subject: string
+        }
+        Returns: undefined
+      }
       admin_upsert_ops_recipient: {
         Args: { _channel: string; _enabled?: boolean; _target: string }
         Returns: string
