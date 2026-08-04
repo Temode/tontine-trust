@@ -2716,6 +2716,60 @@ export type Database = {
           },
         ]
       }
+      notification_deliveries: {
+        Row: {
+          acknowledged_at: string | null
+          attempts: number
+          channel: string
+          created_at: string
+          id: string
+          last_error: string | null
+          notification_id: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          acknowledged_at?: string | null
+          attempts?: number
+          channel: string
+          created_at?: string
+          id?: string
+          last_error?: string | null
+          notification_id: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          acknowledged_at?: string | null
+          attempts?: number
+          channel?: string
+          created_at?: string
+          id?: string
+          last_error?: string | null
+          notification_id?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_deliveries_notification_id_fkey"
+            columns: ["notification_id"]
+            isOneToOne: false
+            referencedRelation: "my_notifications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notification_deliveries_notification_id_fkey"
+            columns: ["notification_id"]
+            isOneToOne: false
+            referencedRelation: "notifications"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notification_preferences: {
         Row: {
           channel: Database["public"]["Enums"]["notification_channel"]
@@ -7431,6 +7485,17 @@ export type Database = {
         }
         Returns: Json
       }
+      dispatch_renewal_notification: {
+        Args: {
+          _body: string
+          _cycle_id: string
+          _group_id: string
+          _reason: string
+          _title: string
+          _user_id: string
+        }
+        Returns: string
+      }
       distribute_penalty: {
         Args: { _contribution_id: string; _notify?: boolean }
         Returns: number
@@ -7901,6 +7966,16 @@ export type Database = {
         }
         Returns: string
       }
+      record_notification_delivery: {
+        Args: {
+          _channel: string
+          _error?: string
+          _notification_id: string
+          _status: string
+          _user_id: string
+        }
+        Returns: undefined
+      }
       record_platform_entry: {
         Args: {
           _amount: number
@@ -8214,6 +8289,16 @@ export type Database = {
       transfer_ownership: {
         Args: { _group_id: string; _new_owner_user_id: string }
         Returns: undefined
+      }
+      try_send_notification_sms: {
+        Args: {
+          _body: string
+          _group_id: string
+          _notification_id: string
+          _title: string
+          _user_id: string
+        }
+        Returns: boolean
       }
       update_defaulter_report:
         | {
