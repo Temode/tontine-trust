@@ -134,6 +134,23 @@ export function RenewalPanel({ groupId, isOrganizer, cycleFinished }: Props) {
     voteM.mutate(false);
   };
 
+  // En cas d'échec de l'appel serveur : ne pas disparaître silencieusement.
+  if (statusQ.isError && cycleFinished) {
+    return (
+      <section className="mt-4 rounded-2xl border border-destructive/30 bg-destructive/5 p-4">
+        <p className="text-sm font-semibold text-foreground">
+          Impossible de charger l'état de relance du cycle
+        </p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          {(statusQ.error as Error)?.message}
+        </p>
+        <Button size="sm" variant="outline" className="mt-3" onClick={() => void statusQ.refetch()}>
+          Réessayer
+        </Button>
+      </section>
+    );
+  }
+
   // Rien à afficher tant que le cycle n'est pas terminé et qu'aucune relance n'est ouverte.
   if (!st) return null;
   if (!st.open && !(cycleFinished && isOrganizer)) return null;
