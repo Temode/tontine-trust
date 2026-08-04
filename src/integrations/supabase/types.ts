@@ -2443,6 +2443,197 @@ export type Database = {
           },
         ]
       }
+      marketing_campaign_contents: {
+        Row: {
+          body: string
+          campaign_id: string
+          channel: string
+          id: string
+          subject: string | null
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          body: string
+          campaign_id: string
+          channel: string
+          id?: string
+          subject?: string | null
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          body?: string
+          campaign_id?: string
+          channel?: string
+          id?: string
+          subject?: string | null
+          updated_at?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketing_campaign_contents_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "marketing_campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marketing_campaigns: {
+        Row: {
+          cap_period_days: number
+          code: string
+          created_at: string
+          description: string | null
+          email_enabled: boolean
+          id: string
+          is_active: boolean
+          label: string
+          per_user_cap: number
+          priority: number
+          repeat_days: number
+          segment: string
+          sms_enabled: boolean
+          trigger_delay_days: number
+          updated_at: string
+        }
+        Insert: {
+          cap_period_days?: number
+          code: string
+          created_at?: string
+          description?: string | null
+          email_enabled?: boolean
+          id?: string
+          is_active?: boolean
+          label: string
+          per_user_cap?: number
+          priority?: number
+          repeat_days?: number
+          segment: string
+          sms_enabled?: boolean
+          trigger_delay_days?: number
+          updated_at?: string
+        }
+        Update: {
+          cap_period_days?: number
+          code?: string
+          created_at?: string
+          description?: string | null
+          email_enabled?: boolean
+          id?: string
+          is_active?: boolean
+          label?: string
+          per_user_cap?: number
+          priority?: number
+          repeat_days?: number
+          segment?: string
+          sms_enabled?: boolean
+          trigger_delay_days?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      marketing_optouts: {
+        Row: {
+          channel: string
+          created_at: string
+          user_id: string
+        }
+        Insert: {
+          channel: string
+          created_at?: string
+          user_id: string
+        }
+        Update: {
+          channel?: string
+          created_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      marketing_sends: {
+        Row: {
+          campaign_code: string
+          channel: string
+          clicked_at: string | null
+          conversion_type: string | null
+          converted_at: string | null
+          cost_gnf: number
+          created_at: string
+          dedupe_key: string
+          id: string
+          rendered_body: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          campaign_code: string
+          channel: string
+          clicked_at?: string | null
+          conversion_type?: string | null
+          converted_at?: string | null
+          cost_gnf?: number
+          created_at?: string
+          dedupe_key: string
+          id?: string
+          rendered_body?: string | null
+          status?: string
+          user_id: string
+        }
+        Update: {
+          campaign_code?: string
+          channel?: string
+          clicked_at?: string | null
+          conversion_type?: string | null
+          converted_at?: string | null
+          cost_gnf?: number
+          created_at?: string
+          dedupe_key?: string
+          id?: string
+          rendered_body?: string | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      marketing_settings: {
+        Row: {
+          daily_budget_gnf: number
+          global_enabled: boolean
+          id: boolean
+          max_sms_per_user_30d: number
+          monthly_budget_gnf: number
+          quiet_end_hour: number
+          quiet_start_hour: number
+          sms_unit_cost_gnf: number
+          updated_at: string
+        }
+        Insert: {
+          daily_budget_gnf?: number
+          global_enabled?: boolean
+          id?: boolean
+          max_sms_per_user_30d?: number
+          monthly_budget_gnf?: number
+          quiet_end_hour?: number
+          quiet_start_hour?: number
+          sms_unit_cost_gnf?: number
+          updated_at?: string
+        }
+        Update: {
+          daily_budget_gnf?: number
+          global_enabled?: boolean
+          id?: boolean
+          max_sms_per_user_30d?: number
+          monthly_budget_gnf?: number
+          quiet_end_hour?: number
+          quiet_start_hour?: number
+          sms_unit_cost_gnf?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       member_default_reports: {
         Row: {
           contribution_id: string | null
@@ -6930,6 +7121,11 @@ export type Database = {
           user_phone: string
         }[]
       }
+      admin_list_marketing_campaigns: { Args: never; Returns: Json }
+      admin_list_marketing_sends: {
+        Args: { _campaign?: string; _channel?: string; _limit?: number }
+        Returns: Json
+      }
       admin_list_ops_alerts: {
         Args: { _limit?: number; _only_open?: boolean }
         Returns: {
@@ -7105,6 +7301,7 @@ export type Database = {
         Returns: undefined
       }
       admin_mark_withdrawal_paid: { Args: { _id: string }; Returns: undefined }
+      admin_marketing_settings: { Args: never; Returns: Json }
       admin_publish_contract_template: {
         Args: { _body_md: string; _version: string }
         Returns: string
@@ -7148,6 +7345,10 @@ export type Database = {
         Args: { _id: string; _note?: string }
         Returns: undefined
       }
+      admin_send_campaign_test: {
+        Args: { _channel: string; _code: string }
+        Returns: string
+      }
       admin_set_referral_status: {
         Args: {
           _id: string
@@ -7165,6 +7366,10 @@ export type Database = {
       }
       admin_suspend_user: {
         Args: { _reason?: string; _suspend: boolean; _target_user: string }
+        Returns: undefined
+      }
+      admin_toggle_campaign: {
+        Args: { _active: boolean; _code: string }
         Returns: undefined
       }
       admin_treasury_journal: {
@@ -7202,6 +7407,10 @@ export type Database = {
           total_in: number
           total_out: number
         }[]
+      }
+      admin_update_marketing_settings: {
+        Args: { _payload: Json }
+        Returns: undefined
       }
       admin_update_sms_order: {
         Args: {
@@ -7264,6 +7473,28 @@ export type Database = {
           _max_fee: number
           _min_fee: number
           _percent: number
+        }
+        Returns: undefined
+      }
+      admin_upsert_campaign_content: {
+        Args: {
+          _body: string
+          _channel: string
+          _code: string
+          _subject: string
+        }
+        Returns: string
+      }
+      admin_upsert_marketing_campaign: {
+        Args: { _payload: Json }
+        Returns: string
+      }
+      admin_upsert_marketing_content: {
+        Args: {
+          _body: string
+          _channel: string
+          _code: string
+          _subject: string
         }
         Returns: undefined
       }
@@ -7494,6 +7725,15 @@ export type Database = {
         }
         Returns: Json
       }
+      dispatch_notification_marketing_fallback: {
+        Args: {
+          _group_name: string
+          _kind: Database["public"]["Enums"]["notification_kind"]
+          _skipped: string
+          _user_id: string
+        }
+        Returns: undefined
+      }
       dispatch_renewal_notification: {
         Args: {
           _body: string
@@ -7553,6 +7793,17 @@ export type Database = {
         Returns: undefined
       }
       enqueue_late_payment_alerts: { Args: never; Returns: number }
+      enqueue_lifecycle_campaigns: { Args: never; Returns: number }
+      enqueue_marketing_message: {
+        Args: {
+          _channel: string
+          _code: string
+          _dedupe_suffix?: string
+          _user_id: string
+          _vars?: Json
+        }
+        Returns: string
+      }
       enqueue_payment_reminders: { Args: never; Returns: number }
       enqueue_tontine_sms: {
         Args: { _kind: string; _payload: Json }
@@ -8017,6 +8268,10 @@ export type Database = {
         }
         Returns: string
       }
+      render_marketing_template: {
+        Args: { _tpl: string; _vars: Json }
+        Returns: string
+      }
       renewal_status: { Args: { _group_id: string }; Returns: Json }
       report_client_incident: {
         Args: {
@@ -8296,6 +8551,7 @@ export type Database = {
         Args: { _member_id: string; _reason?: string }
         Returns: undefined
       }
+      track_marketing_click: { Args: { _send_id: string }; Returns: undefined }
       transfer_ownership: {
         Args: { _group_id: string; _new_owner_user_id: string }
         Returns: undefined
