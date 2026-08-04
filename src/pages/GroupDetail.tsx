@@ -626,7 +626,16 @@ export default function GroupDetail() {
                 memberDepositStatus={(me as { deposit_status?: string | null }).deposit_status ?? null}
               />
               {user?.id && <PositionBadge groupId={grp.id} userId={user.id} />}
-              {!noCycleRunning && <ContractSignSection groupId={grp.id} />}
+              {!noCycleRunning && termsAccepted === false && (
+                <button
+                  type="button"
+                  onClick={() => setTermsOpen(true)}
+                  className="w-full rounded-xl border border-hairline bg-secondary/40 p-3 text-left text-sm text-muted-foreground transition hover:bg-secondary"
+                >
+                  Vous n'avez pas encore accepté les conditions générales de ce groupe —{" "}
+                  <span className="font-semibold text-primary">les accepter</span>
+                </button>
+              )}
               {(() => {
                 const myPaidTurn = turns.find(
                   (t) =>
