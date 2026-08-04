@@ -124,14 +124,13 @@ export function RenewalPanel({ groupId, isOrganizer, cycleFinished }: Props) {
 
   const cd = useMemo(() => countdown(st?.deadline), [st?.deadline, tick]);
 
-  // « Je participe » exige l'acceptation des conditions : on la propose avant d'enregistrer le vote.
+  // « Je participe » passe par la modale détail du cycle + acceptation des conditions.
   const submitVote = (agreed: boolean) => {
-    if (agreed && termsQ.data && !termsQ.data.accepted) {
-      setPendingVote(true);
-      setTermsOpen(true);
+    if (agreed) {
+      setVoteOpen(true);
       return;
     }
-    voteM.mutate(agreed);
+    voteM.mutate(false);
   };
 
   // Rien à afficher tant que le cycle n'est pas terminé et qu'aucune relance n'est ouverte.
