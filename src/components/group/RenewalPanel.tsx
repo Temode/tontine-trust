@@ -13,8 +13,7 @@ import {
   cancelRenewal, extendRenewal, getRenewalStatus, startRenewedCycle, voteRenewal,
 } from "@/lib/api/renewal";
 import { RenewalLaunchDialog } from "./RenewalLaunchDialog";
-import { TermsAcceptDialog } from "@/components/legal/TermsAcceptDialog";
-import { getGroupTerms } from "@/lib/api/terms";
+import { RenewalVoteDialog } from "./RenewalVoteDialog";
 
 interface Props {
   groupId: string;
@@ -40,18 +39,11 @@ export function RenewalPanel({ groupId, isOrganizer, cycleFinished }: Props) {
   const [openLaunch, setOpenLaunch] = useState(false);
   const [confirmStart, setConfirmStart] = useState(false);
   const [confirmCancel, setConfirmCancel] = useState(false);
-  const [termsOpen, setTermsOpen] = useState(false);
-  const [pendingVote, setPendingVote] = useState<boolean | null>(null);
+  const [voteOpen, setVoteOpen] = useState(false);
 
   const statusQ = useQuery({
     queryKey: ["group", groupId, "renewal"],
     queryFn: () => getRenewalStatus(groupId),
-    enabled: !!groupId,
-  });
-
-  const termsQ = useQuery({
-    queryKey: ["group-terms", groupId],
-    queryFn: () => getGroupTerms(groupId),
     enabled: !!groupId,
   });
 
