@@ -59,9 +59,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { CurrentTurnBanner } from "@/components/group/CurrentTurnBanner";
 import { RenewalPanel } from "@/components/group/RenewalPanel";
 import { CycleLaunchCard } from "@/components/group/CycleLaunchCard";
-import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { useTontineRealtime } from "@/hooks/useTontineRealtime";
 import { DepositCallout } from "@/components/group/DepositCallout";
 import { PositionBadge } from "@/components/group/PositionBadge";
