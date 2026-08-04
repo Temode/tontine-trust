@@ -63,6 +63,7 @@ const AdminSubscriptions = lazy(() => import("@/pages/admin/Subscriptions"));
 const AdminSmsPricing = lazy(() => import("@/pages/admin/SmsPricing"));
 const AdminSmsOrders = lazy(() => import("@/pages/admin/SmsOrders"));
 const AdminAffiliation = lazy(() => import("@/pages/admin/AffiliationAdmin"));
+const AdminCampaigns = lazy(() => import("@/pages/admin/Campaigns"));
 const AdminWithdrawals = lazy(() => import("@/pages/admin/Withdrawals"));
 const AdminAccounting = lazy(() => import("@/pages/admin/Accounting"));
 const Subscription = lazy(() => import("@/pages/Subscription"));
@@ -231,6 +232,7 @@ const App = () => (
                     <Route path="/admin/sms-pricing" element={<RouteBoundary name="Tarification SMS"><AdminSmsPricing /></RouteBoundary>} />
                     <Route path="/admin/sms-orders" element={<RouteBoundary name="Commandes SMS"><AdminSmsOrders /></RouteBoundary>} />
                     <Route path="/admin/affiliation" element={<RouteBoundary name="Affiliation admin"><AdminAffiliation /></RouteBoundary>} />
+                    <Route path="/admin/campagnes" element={<RouteBoundary name="Campagnes"><AdminCampaigns /></RouteBoundary>} />
                     <Route path="/admin/retraits" element={<RouteBoundary name="Gestion des retraits"><AdminWithdrawals /></RouteBoundary>} />
                   </Route>
                 </Route>
