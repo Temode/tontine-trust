@@ -40,19 +40,33 @@ Un catalogue figé de messages promotionnels, chacun avec sa cible, son délai e
 - **Séparation stricte** : les SMS marketing ne consomment jamais le forfait de l'utilisateur, et ne passent jamais devant un SMS transactionnel dans la file.
 - **Mesure** : chaque envoi porte une campagne + un lien tracké, avec attribution des achats de packs et abonnements dans les 7 jours.
 
-### d) Back-office
-Nouvelle page « Campagnes SMS » : liste des scénarios avec activation/désactivation, plafonds, budget consommé, envoyés / clics / conversions / coût par conversion, et journal des envois.
+### d) Back-office « Campagnes » (SMS + Email)
+Chaque campagne existe en deux canaux : SMS (payant, plafonné par le budget) et Email (gratuit, envoyé par défaut). Une page d'administration unique permet de tout piloter sans redéploiement.
+
+- **Liste des campagnes** : code, libellé, segment ciblé, canaux actifs (SMS / Email indépendamment), état activé/désactivé.
+- **Édition d'une campagne** : segment et déclencheur (délai en jours, récurrence), plafond par utilisateur et par période, heures d'envoi autorisées, priorité.
+- **Éditeur de contenu** : texte SMS (compteur de caractères et de segments, aperçu, variables `{prenom}`, `{groupe}`, `{lien}`) et contenu email (objet + corps, même jeu de variables), avec aperçu et envoi de test vers un numéro / une adresse.
+- **Budget** : plafonds SMS quotidien et mensuel en GNF, consommation en temps réel, arrêt automatique au plafond.
+- **Statistiques** : envoyés, échecs, clics, conversions (achat de pack ou d'abonnement sous 7 jours), coût par conversion, par campagne et par canal.
+- **Journal des envois** : filtres par campagne, canal, statut, utilisateur, période ; désabonnements visibles.
+- **Actions** : activer/désactiver une campagne, mettre tout le marketing en pause (interrupteur global), rejouer un envoi échoué.
 
 ## 3. Détails techniques
 
-- Migration SQL : `marketing_campaigns` (catalogue + état activé + plafonds), `marketing_sends` (une ligne par envoi, avec `campaign_code`, `user_id`, `dedupe_key`, coût, clic, conversion), `marketing_optouts`, `marketing_budget` (1 ligne de config).
-- Fonction `public.enqueue_marketing_sms(campaign_code, user_id, vars)` : vérifie opt-out, plafond utilisateur, heures calmes, budget, puis insère dans `sms_outbox` avec `kind = 'marketing_<code>'` — conforme à la doctrine Paxefy (catalogue figé + outbox, jamais de `net.http_post` dans un trigger).
-- Fonction `public.enqueue_lifecycle_campaigns()` planifiée en cron quotidien (09:00 Conakry) : évalue les segments et appelle `enqueue_marketing_sms`.
-- Le SMS « premier contact » se branche dans `dispatch_notification` : quand `sms_skipped` vaut `plan_free` ou `wallet_empty` sur un `kind` critique, appel de `enqueue_marketing_sms('sms_missed_event', ...)`.
-- Textes ajoutés à `supabase/functions/_shared/smsTemplates.ts` (sans accents, < 160 caractères, avec référence courte).
+- Migration SQL :
+  - `marketing_campaigns` : `code`, libellé, segment, déclencheur (délai/récurrence), `sms_enabled`, `email_enabled`, plafonds, priorité, `is_active`.
+  - `marketing_campaign_contents` : une ligne par campagne et par canal (`sms` | `email`), avec objet, corps, version, contenu éditable depuis le back-office.
+  - `marketing_sends` : un envoi = une ligne (`campaign_code`, `channel`, `user_id`, `dedupe_key`, statut, coût, clic, conversion).
+  - `marketing_optouts`, `marketing_settings` (budget quotidien/mensuel, heures calmes, interrupteur global).
+  - RLS : lecture/écriture réservées aux `super_admin` via `has_role`, plus `service_role` pour les workers.
+- RPC admin : `admin_list_marketing_campaigns`, `admin_upsert_marketing_campaign`, `admin_upsert_campaign_content`, `admin_toggle_campaign`, `admin_marketing_stats`, `admin_list_marketing_sends`, `admin_update_marketing_settings`, `admin_send_campaign_test`.
+- Fonction `public.enqueue_marketing_message(campaign_code, channel, user_id, vars)` : vérifie opt-out, plafond utilisateur, heures calmes, budget et interrupteur global, rend le contenu depuis `marketing_campaign_contents`, puis insère dans `sms_outbox` (`kind = 'marketing_<code>'`) ou `email_outbox` — conforme à la doctrine Paxefy (catalogue en base + outbox, jamais de `net.http_post` dans un trigger).
+- Fonction `public.enqueue_lifecycle_campaigns()` planifiée en cron quotidien (09:00 Conakry) : évalue les segments et déclenche les canaux actifs de chaque campagne.
+- Le message « premier contact » se branche dans `dispatch_notification` : quand `sms_skipped` vaut `plan_free` ou `wallet_empty` sur un `kind` critique, appel de `enqueue_marketing_message('sms_missed_event', ...)`.
+- Gabarits de secours (fallback si aucun contenu en base) dans `supabase/functions/_shared/smsTemplates.ts` et `emailTemplates.ts` — SMS sans accents, < 160 caractères.
 - Redirection de tracking : route `/r/:code` qui enregistre le clic dans `marketing_sends` puis redirige vers `/abonnement` ou la recharge SMS.
-- Front : page `src/pages/admin/SmsCampaigns.tsx` + entrée de menu, et bascule « offres et conseils par SMS » dans les préférences de notification.
-- Tests : SQL sur opt-out / plafond / heures calmes / budget, unitaires sur les gabarits, E2E sur la page back-office.
+- Front : page `src/pages/admin/Campaigns.tsx` (onglets Campagnes / Contenus / Statistiques / Journal / Réglages) + entrée de menu back-office, et bascule « offres et conseils » (SMS et email) dans les préférences de notification.
+- Tests : SQL sur opt-out / plafond / heures calmes / budget / interrupteur global, unitaires sur le rendu des variables, E2E sur l'édition et l'activation d'une campagne dans le back-office.
 
 ## 4. Conformité
 Les SMS promotionnels sont du marketing direct : consentement présumé pour les clients actifs, désabonnement systématique, aucune donnée financière dans le corps du message.
