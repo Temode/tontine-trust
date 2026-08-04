@@ -84,6 +84,7 @@ export function RenewalPanel({ groupId, isOrganizer, cycleFinished }: Props) {
     mutationFn: (agreed: boolean) => voteRenewal(st?.cycle_id ?? "", agreed),
     onSuccess: (_d, agreed) => {
       toast.success(agreed ? "Participation confirmée" : "Réponse enregistrée");
+      setVoteOpen(false);
       invalidateAll();
     },
     onError: (e: Error) => toast.error("Réponse impossible", { description: e.message }),
