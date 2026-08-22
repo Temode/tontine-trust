@@ -171,6 +171,12 @@ export default function Subscription() {
               <p className="text-xs text-muted-foreground">
                 {entitlements.usage.groups}/{entitlements.limits.max_groups === -1 ? "∞" : entitlements.limits.max_groups} groupes actifs · {entitlements.sms_included} SMS/mois inclus
               </p>
+              {wallet && (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Solde SMS : <strong className="text-foreground num">{wallet.balance_remaining}</strong>{" "}
+                  ({wallet.included_remaining} inclus · {purchasedRemaining(wallet)} achetés)
+                </p>
+              )}
             </div>
             <div className="text-right text-xs text-muted-foreground">
               {entitlements.current_period_end
