@@ -19,10 +19,10 @@ Conséquence en chaîne : le routage SMS (`try_send_notification_sms`) voit un a
 Dans la fonction d'activation d'abonnement, lorsqu'une ligne passe à `active` : créditer `sms_included` du plan via `sms_wallet_credit` avec la raison `plan_grant`, en une seule fois par période de facturation (clé d'idempotence = abonnement + date de début de période), afin qu'un webhook rejoué ne double pas le crédit.
 
 ### 2. Recréditer à chaque renouvellement
-Au renouvellement (nouvelle période), un nouveau lot de SMS inclus est accordé. Règle à trancher ci-dessous : soit le reliquat non consommé est reporté, soit il est remis à la valeur du plan.
+Au renouvellement, le solde des SMS **inclus** est remis à la valeur du plan (100 Premium, 200 Business) : pas de report du reliquat non consommé. Les SMS **achetés** ne sont jamais touchés et restent cumulés — le portefeuille distingue donc les deux origines.
 
 ### 3. Rattrapage des abonnés déjà payants
-Créditer rétroactivement les comptes ayant un abonnement `premium`/`business` actif et jamais crédités : Kankou et votre compte, plus tout autre cas identique. Chaque crédit passe par le grand livre SMS (`sms_ledger`), donc traçable en back-office.
+Créditer rétroactivement **un lot par mois facturé depuis le début de l'abonnement** pour tout compte `premium`/`business` jamais crédité : Kankou (abonnée depuis le 12/07) et votre compte, plus tout autre cas identique. Chaque lot est inscrit dans le grand livre SMS (`sms_ledger`) avec sa période, donc traçable en back-office.
 
 ### 4. Changement de plan / options
 Si l'utilisateur change de plan en cours de période, ne créditer que le différentiel positif, jamais de débit rétroactif.
