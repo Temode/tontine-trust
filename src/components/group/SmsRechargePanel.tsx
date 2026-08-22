@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import {
-  getActiveSmsPricing, getMySmsWallet, initSmsOrderCheckout,
+  getActiveSmsPricing, getMySmsWallet, initSmsOrderCheckout, purchasedRemaining,
 } from "@/lib/api/smsWallet";
 
 function fmtGnf(n: number) { return new Intl.NumberFormat("fr-FR").format(n) + " GNF"; }
