@@ -3,7 +3,9 @@ import { supabase } from "@/integrations/supabase/client";
 export interface SmsWallet {
   user_id: string;
   balance_remaining: number;
+  included_remaining: number;
   total_purchased: number;
+  total_granted: number;
   total_consumed: number;
 }
 
