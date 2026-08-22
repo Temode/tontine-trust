@@ -13,7 +13,7 @@ import {
 } from "@/lib/api/reliability";
 import { getMyProfile, uploadAvatar, refreshAvatarSignedUrl, updateMyProfile } from "@/lib/api/profile";
 import { getMyKyc, KYC_LEVEL_LABEL } from "@/lib/api/kyc";
-import { getMySmsWallet, listMySmsOrders } from "@/lib/api/smsWallet";
+import { getMySmsWallet, listMySmsOrders, purchasedRemaining } from "@/lib/api/smsWallet";
 import { useEffect, useRef, useState } from "react";
 import { formatGNF } from "@/lib/format";
 import { PhoneInput, type PhoneInputValue } from "@/components/ui/PhoneInput";
