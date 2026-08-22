@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import { useEntitlements } from "@/hooks/useEntitlements";
 import type { Database } from "@/integrations/supabase/types";
+import { getMySmsWallet, purchasedRemaining, type SmsWallet } from "@/lib/api/smsWallet";
 
 type Plan = Database["public"]["Tables"]["subscription_plans"]["Row"];
 type PlanCode = Plan["code"];
@@ -21,10 +22,16 @@ export default function Subscription() {
   const [plans, setPlans] = useState<Plan[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<PlanCode | null>(null);
+  const [wallet, setWallet] = useState<SmsWallet | null>(null);
 
   useEffect(() => {
     if (user?.id) void refetch();
   }, [user?.id, refetch]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    void getMySmsWallet().then(setWallet).catch(() => setWallet(null));
+  }, [user?.id]);
 
   useEffect(() => {
     (async () => {
