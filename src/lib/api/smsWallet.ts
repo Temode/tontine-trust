@@ -3,7 +3,9 @@ import { supabase } from "@/integrations/supabase/client";
 export interface SmsWallet {
   user_id: string;
   balance_remaining: number;
+  included_remaining: number;
   total_purchased: number;
+  total_granted: number;
   total_consumed: number;
 }
 
@@ -41,11 +43,19 @@ export async function getMySmsWallet(): Promise<SmsWallet | null> {
   if (!u.user) return null;
   const { data, error } = await supabase
     .from("sms_wallets")
-    .select("user_id, balance_remaining, total_purchased, total_consumed")
+    .select(
+      "user_id, balance_remaining, included_remaining, total_purchased, total_granted, total_consumed",
+    )
     .eq("user_id", u.user.id)
     .maybeSingle();
   if (error) throw error;
   return (data as SmsWallet | null) ?? null;
+}
+
+/** Nombre de SMS achetés encore disponibles (hors quota inclus dans l'abonnement). */
+export function purchasedRemaining(w: SmsWallet | null | undefined): number {
+  if (!w) return 0;
+  return Math.max((w.balance_remaining ?? 0) - (w.included_remaining ?? 0), 0);
 }
 
 export async function getActiveSmsPricing(): Promise<SmsPricing | null> {

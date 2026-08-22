@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import {
-  getActiveSmsPricing, getMySmsWallet, initSmsOrderCheckout,
+  getActiveSmsPricing, getMySmsWallet, initSmsOrderCheckout, purchasedRemaining,
 } from "@/lib/api/smsWallet";
 
 function fmtGnf(n: number) { return new Intl.NumberFormat("fr-FR").format(n) + " GNF"; }
@@ -58,6 +58,8 @@ export function SmsRechargePanel({ groupId }: { groupId: string }) {
   };
 
   const balance = walletQ.data?.balance_remaining ?? 0;
+  const included = walletQ.data?.included_remaining ?? 0;
+  const purchased = purchasedRemaining(walletQ.data);
 
   return (
     <div className="mt-4 flex items-center justify-between gap-3 rounded-lg border border-hairline bg-card px-4 py-3">
@@ -69,6 +71,9 @@ export function SmsRechargePanel({ groupId }: { groupId: string }) {
           <p className="font-semibold text-foreground">Forfait SMS</p>
           <p className="text-xs text-muted-foreground">
             Solde : <span className="font-semibold text-foreground num">{balance}</span> SMS
+            {balance > 0 && (
+              <> · {included} inclus · {purchased} achetés</>
+            )}
           </p>
         </div>
       </div>

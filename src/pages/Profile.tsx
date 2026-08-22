@@ -13,7 +13,7 @@ import {
 } from "@/lib/api/reliability";
 import { getMyProfile, uploadAvatar, refreshAvatarSignedUrl, updateMyProfile } from "@/lib/api/profile";
 import { getMyKyc, KYC_LEVEL_LABEL } from "@/lib/api/kyc";
-import { getMySmsWallet, listMySmsOrders } from "@/lib/api/smsWallet";
+import { getMySmsWallet, listMySmsOrders, purchasedRemaining } from "@/lib/api/smsWallet";
 import { useEffect, useRef, useState } from "react";
 import { formatGNF } from "@/lib/format";
 import { PhoneInput, type PhoneInputValue } from "@/components/ui/PhoneInput";
@@ -340,7 +340,7 @@ export default function Profile() {
 
         <SectionCard
           title="Forfait SMS"
-          subtitle={`Solde : ${walletQ.data?.balance_remaining ?? 0} SMS · ${walletQ.data?.total_purchased ?? 0} achetés · ${walletQ.data?.total_consumed ?? 0} envoyés`}
+          subtitle={`Solde : ${walletQ.data?.balance_remaining ?? 0} SMS · ${walletQ.data?.included_remaining ?? 0} inclus dans l'abonnement · ${purchasedRemaining(walletQ.data)} achetés · ${walletQ.data?.total_consumed ?? 0} envoyés`}
           bare
         >
           {(smsOrdersQ.data ?? []).length === 0 ? (
