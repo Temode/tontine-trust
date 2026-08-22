@@ -76,7 +76,7 @@ BEGIN
 
   SELECT balance_remaining, included_remaining INTO v_bal, v_incl
     FROM public.sms_wallets WHERE user_id = v_user;
-  IF v_incl <> v_quota OR v_bal <> v_quota + 10 - 4 THEN
+  IF v_incl <> v_quota OR v_bal <> v_quota + 10 THEN
     RAISE EXCEPTION '(4) renouvellement incorrect : solde=% inclus=%', v_bal, v_incl;
   END IF;
 
