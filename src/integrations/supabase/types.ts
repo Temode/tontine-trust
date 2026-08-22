@@ -4433,7 +4433,9 @@ export type Database = {
         Row: {
           balance_remaining: number
           created_at: string
+          included_remaining: number
           total_consumed: number
+          total_granted: number
           total_purchased: number
           updated_at: string
           user_id: string
@@ -4441,7 +4443,9 @@ export type Database = {
         Insert: {
           balance_remaining?: number
           created_at?: string
+          included_remaining?: number
           total_consumed?: number
+          total_granted?: number
           total_purchased?: number
           updated_at?: string
           user_id: string
@@ -4449,7 +4453,9 @@ export type Database = {
         Update: {
           balance_remaining?: number
           created_at?: string
+          included_remaining?: number
           total_consumed?: number
+          total_granted?: number
           total_purchased?: number
           updated_at?: string
           user_id?: string
@@ -7587,7 +7593,7 @@ export type Database = {
       }
       apply_subscription_webhook: {
         Args: {
-          _djomy_ref: string
+          _djomy_ref?: string
           _new_status: string
           _subscription_id: string
         }
@@ -7642,6 +7648,13 @@ export type Database = {
         }[]
       }
       auto_close_turn: { Args: { _turn_id: string }; Returns: boolean }
+      backfill_subscription_sms: {
+        Args: never
+        Returns: {
+          credited: number
+          user_id: string
+        }[]
+      }
       block_user_withdrawals: {
         Args: { _finding_id?: string; _reason: string; _user_id: string }
         Returns: string
@@ -7883,6 +7896,7 @@ export type Database = {
       }
       get_my_affiliate_summary: { Args: never; Returns: Json }
       get_my_entitlements: { Args: never; Returns: Json }
+      get_my_sms_balance: { Args: never; Returns: Json }
       get_my_solo_group: {
         Args: { _group_id: string }
         Returns: {
@@ -7936,6 +7950,10 @@ export type Database = {
       grant_admin_permissions: {
         Args: { _group_id: string; _perms: Json; _user_id: string }
         Returns: undefined
+      }
+      grant_subscription_sms: {
+        Args: { _subscription_id: string }
+        Returns: number
       }
       group_edit_window: { Args: { _group_id: string }; Returns: string }
       group_is_started: { Args: { _group_id: string }; Returns: boolean }
@@ -8450,17 +8468,17 @@ export type Database = {
           _metadata?: Json
           _qty: number
           _reason: Database["public"]["Enums"]["sms_ledger_reason"]
-          _ref_id: string
+          _ref_id?: string
           _user_id: string
         }
         Returns: number
       }
       sms_wallet_debit: {
         Args: {
-          _metadata: Json
+          _metadata?: Json
           _qty: number
           _reason: Database["public"]["Enums"]["sms_ledger_reason"]
-          _ref_id: string
+          _ref_id?: string
           _user_id: string
         }
         Returns: number
