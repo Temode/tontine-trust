@@ -7652,7 +7652,7 @@ export type Database = {
         Args: never
         Returns: {
           credited: number
-          user_id: string
+          out_user_id: string
         }[]
       }
       block_user_withdrawals: {
