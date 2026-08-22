@@ -340,7 +340,7 @@ export default function Profile() {
 
         <SectionCard
           title="Forfait SMS"
-          subtitle={`Solde : ${walletQ.data?.balance_remaining ?? 0} SMS · ${walletQ.data?.total_purchased ?? 0} achetés · ${walletQ.data?.total_consumed ?? 0} envoyés`}
+          subtitle={`Solde : ${walletQ.data?.balance_remaining ?? 0} SMS · ${walletQ.data?.included_remaining ?? 0} inclus dans l'abonnement · ${purchasedRemaining(walletQ.data)} achetés · ${walletQ.data?.total_consumed ?? 0} envoyés`}
           bare
         >
           {(smsOrdersQ.data ?? []).length === 0 ? (
