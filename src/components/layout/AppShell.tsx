@@ -13,6 +13,7 @@ import { useTontineRealtime } from "@/hooks/useTontineRealtime";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { GuidedTourProvider } from "@/components/tour/GuidedTour";
 import { QuickActionsProvider } from "@/components/quick-actions/QuickActionsProvider";
+import { useNativeApp } from "@/hooks/useNativeApp";
 
 function RouteFallback() {
   return (
@@ -28,16 +29,17 @@ export function AppShell({ children }: { children: ReactNode }) {
   usePrimeCallChannel();
   useDjomyPaymentReconciler();
   useTontineRealtime();
+  useNativeApp();
   const location = useLocation();
   return (
     <GuidedTourProvider>
       <QuickActionsProvider>
         <IncomingCallsProvider>
         <CallProvider>
-        <div className="min-h-screen bg-background">
+        <div className="min-h-screen overflow-x-hidden bg-background">
           <DesktopSidebar />
           <div className="lg:pl-72">
-            <main className="pb-20 lg:pb-0">
+            <main className="pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-0">
               <ErrorBoundary
                 resetKey={location.pathname}
                 fallbackTitle="Cet écran a rencontré une erreur"

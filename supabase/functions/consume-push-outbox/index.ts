@@ -1,0 +1,56 @@
+import { createClient } from "npm:@supabase/supabase-js@2";
+import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
+
+const GATEWAY_URL = "https://connector-gateway.lovable.dev/firebase_messaging";
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  const json = (b: unknown, s = 200) =>
+    new Response(JSON.stringify(b), { status: s, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
+  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+  const FCM_KEY = Deno.env.get("FIREBASE_MESSAGING_API_KEY");
+  if (!LOVABLE_API_KEY || !FCM_KEY) return json({ skipped: "firebase_not_connected" });
+
+  const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+  const { data: jobs, error } = await sb.rpc("push_outbox_pop", { _limit: 50 });
+  if (error) return json({ error: error.message }, 500);
+
+  let sent = 0;
+  for (const job of jobs ?? []) {
+    const { data: tokens } = await sb.from("push_tokens").select("token").eq("user_id", job.user_id);
+    let ok = false;
+    let lastErr = "";
+    for (const { token } of tokens ?? []) {
+      const res = await fetch(`${GATEWAY_URL}/v1/projects/_/messages:send`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          "X-Connection-Api-Key": FCM_KEY,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          message: {
+            token,
+            notification: { title: job.title, body: job.body ?? "" },
+            data: Object.fromEntries(Object.entries(job.data ?? {}).map(([k, v]) => [k, String(v)])),
+            android: { priority: "HIGH", notification: { color: "#0D7377", sound: "default" } },
+            apns: { payload: { aps: { sound: "default" } } },
+          },
+        }),
+      });
+      if (res.ok) { ok = true; continue; }
+      const txt = await res.text();
+      lastErr = `[${res.status}] ${txt.slice(0, 300)}`;
+      if (res.status === 404 || (res.status === 400 && txt.includes("INVALID_ARGUMENT")) || txt.includes("UNREGISTERED")) {
+        await sb.from("push_tokens").delete().eq("token", token);
+      }
+    }
+    await sb.from("push_outbox").update(
+      ok ? { status: "sent", sent_at: new Date().toISOString(), last_error: null }
+         : { status: job.attempts >= 3 ? "failed" : "pending", last_error: lastErr || "no_token" },
+    ).eq("id", job.id);
+    if (ok) sent++;
+  }
+  return json({ processed: jobs?.length ?? 0, sent });
+});

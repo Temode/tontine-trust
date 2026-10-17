@@ -7993,6 +7993,7 @@ export type Database = {
         }[]
       }
       get_pending_penalty: { Args: { _group_id: string }; Returns: number }
+      get_push_enabled: { Args: never; Returns: boolean }
       get_user_default_history: {
         Args: { _user_id?: string }
         Returns: {
@@ -8501,6 +8502,7 @@ export type Database = {
         Args: { _member_id: string; _perms: Json }
         Returns: undefined
       }
+      set_push_enabled: { Args: { _enabled: boolean }; Returns: undefined }
       shares_group_with: {
         Args: { _me: string; _other: string }
         Returns: boolean
