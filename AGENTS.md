@@ -1,0 +1,1 @@
+- Push notifications: notifications INSERT trigger fills push_outbox; consume-push-outbox edge function (cron, FCM via connector gateway) sends — never HTTP from triggers. Native-only code lives in useNativeApp and is guarded by Capacitor.isNativePlatform().
