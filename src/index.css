@@ -204,3 +204,13 @@
     box-shadow: 0 1px 1px 0 hsl(200 30% 9% / 0.08), 0 1px 3px -1px hsl(200 30% 9% / 0.06);
   }
 }
+
+/* Confort mobile : zones sûres (encoches), pas de débordement horizontal, champs non zoomés sur iPhone. */
+@layer base {
+  html, body { overflow-x: hidden; -webkit-tap-highlight-color: transparent; }
+  body { padding-top: env(safe-area-inset-top); }
+  @media (max-width: 640px) {
+    input, select, textarea { font-size: 16px; }
+    [role="dialog"] { max-height: calc(100dvh - env(safe-area-inset-top) - 1rem); overflow-y: auto; }
+  }
+}

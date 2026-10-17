@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { TopBar } from "@/components/layout/TopBar";
 import { SectionCard } from "@/components/dashboard/SectionCard";
 import { Switch } from "@/components/ui/switch";
+import { PushToggle } from "@/components/notifications/PushToggle";
 import { KIND_LABEL, type NotificationKind } from "@/lib/api/notifications";
 import {
   CHANNEL_HINT,
@@ -109,7 +110,8 @@ export default function NotificationPreferences() {
         title="Préférences de notification"
         subtitle="Choisissez les canaux pour chaque type d'événement."
       />
-      <div className="space-y-5 px-5 py-6 lg:px-8 lg:py-8">
+      <div className="space-y-5 px-4 py-6 sm:px-5 lg:px-8 lg:py-8">
+        <PushToggle />
         <SectionCard
           title="Canaux"
           subtitle={CHANNELS.map((c) => CHANNEL_LABEL[c]).join(" · ")}

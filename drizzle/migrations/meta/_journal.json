@@ -8,6 +8,13 @@
       "when": 1792236448769,
       "tag": "0000_push_notifications",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1792237229499,
+      "tag": "0001_push_pref_rpc",
+      "breakpoints": true
     }
   ]
 }
