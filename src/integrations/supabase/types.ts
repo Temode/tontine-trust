@@ -2966,6 +2966,7 @@ export type Database = {
           channel: Database["public"]["Enums"]["notification_channel"]
           enabled: boolean
           notif_type: Database["public"]["Enums"]["notification_kind"]
+          push_enabled: boolean
           updated_at: string
           user_id: string
         }
@@ -2973,6 +2974,7 @@ export type Database = {
           channel: Database["public"]["Enums"]["notification_channel"]
           enabled?: boolean
           notif_type: Database["public"]["Enums"]["notification_kind"]
+          push_enabled?: boolean
           updated_at?: string
           user_id: string
         }
@@ -2980,6 +2982,7 @@ export type Database = {
           channel?: Database["public"]["Enums"]["notification_channel"]
           enabled?: boolean
           notif_type?: Database["public"]["Enums"]["notification_kind"]
+          push_enabled?: boolean
           updated_at?: string
           user_id?: string
         }
@@ -3846,6 +3849,72 @@ export type Database = {
           suspended_by?: string | null
           suspended_reason?: string | null
           updated_at?: string
+        }
+        Relationships: []
+      }
+      push_outbox: {
+        Row: {
+          attempts: number
+          body: string | null
+          created_at: string
+          data: Json
+          id: number
+          last_error: string | null
+          sent_at: string | null
+          status: string
+          title: string
+          user_id: string
+        }
+        Insert: {
+          attempts?: number
+          body?: string | null
+          created_at?: string
+          data?: Json
+          id?: number
+          last_error?: string | null
+          sent_at?: string | null
+          status?: string
+          title: string
+          user_id: string
+        }
+        Update: {
+          attempts?: number
+          body?: string | null
+          created_at?: string
+          data?: Json
+          id?: number
+          last_error?: string | null
+          sent_at?: string | null
+          status?: string
+          title?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      push_tokens: {
+        Row: {
+          created_at: string
+          id: string
+          last_seen: string
+          platform: string
+          token: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          last_seen?: string
+          platform: string
+          token: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          last_seen?: string
+          platform?: string
+          token?: string
+          user_id?: string
         }
         Relationships: []
       }
@@ -8196,6 +8265,27 @@ export type Database = {
       preview_group_by_code: { Args: { _code: string }; Returns: Json }
       purge_audit_log: { Args: never; Returns: number }
       purge_sms_dedupe_keys: { Args: never; Returns: number }
+      push_outbox_pop: {
+        Args: { _limit?: number }
+        Returns: {
+          attempts: number
+          body: string | null
+          created_at: string
+          data: Json
+          id: number
+          last_error: string | null
+          sent_at: string | null
+          status: string
+          title: string
+          user_id: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "push_outbox"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       raise_contribution_dispute: {
         Args: {
           _contribution_id: string
@@ -8270,6 +8360,10 @@ export type Database = {
           _user_id?: string
           _withdrawal_id?: string
         }
+        Returns: undefined
+      }
+      register_push_token: {
+        Args: { _platform: string; _token: string }
         Returns: undefined
       }
       register_referral: { Args: { _code: string }; Returns: string }
