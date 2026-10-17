@@ -20,8 +20,8 @@ const config: CapacitorConfig = {
   ios: { contentInset: 'never' },
   plugins: {
     SplashScreen: {
-      launchShowDuration: 1500,
-      launchAutoHide: false,
+      launchShowDuration: 2000,
+      launchAutoHide: true,
       backgroundColor: '#0B5559',
       showSpinner: false,
       androidScaleType: 'CENTER_CROP',

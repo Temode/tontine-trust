@@ -44,3 +44,13 @@ if (typeof window !== "undefined") {
 }
 
 createRoot(document.getElementById("root")!).render(<App />);
+
+// Masque le logo de démarrage natif dès que l'interface est montée (toutes pages).
+import("@capacitor/core")
+  .then(({ Capacitor }) => {
+    if (!Capacitor.isNativePlatform()) return;
+    return import("@capacitor/splash-screen").then(({ SplashScreen }) =>
+      SplashScreen.hide().catch(() => {}),
+    );
+  })
+  .catch(() => {});
