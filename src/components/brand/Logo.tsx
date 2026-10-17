@@ -15,13 +15,13 @@ export function Logo({ size = 32, className }: LogoProps) {
       role="img"
       aria-label="Tontine Digital"
     >
-      <circle cx="32" cy="32" r="28" fill="none" stroke="currentColor" strokeWidth="2" opacity="0.3" />
-      <circle cx="32" cy="12" r="6" fill="hsl(var(--accent-500))" />
-      <circle cx="49" cy="24" r="6" fill="currentColor" />
-      <circle cx="49" cy="44" r="6" fill="currentColor" />
-      <circle cx="32" cy="52" r="6" fill="currentColor" />
-      <circle cx="15" cy="44" r="6" fill="currentColor" />
-      <circle cx="15" cy="24" r="6" fill="currentColor" />
+      {/* Logo officiel : 5 membres sarcelle + bénéficiaire du tour (or) + caisse centrale (or) */}
+      <circle cx="32" cy="10.5" r="6.5" fill="hsl(var(--accent-500))" />
+      <circle cx="51.6" cy="21" r="6.5" fill="currentColor" />
+      <circle cx="51.6" cy="43" r="6.5" fill="currentColor" />
+      <circle cx="32" cy="54" r="6.5" fill="currentColor" />
+      <circle cx="12.4" cy="43" r="6.5" fill="currentColor" />
+      <circle cx="12.4" cy="21" r="6.5" fill="currentColor" />
       <circle cx="32" cy="32" r="10" fill="hsl(var(--accent-500))" />
     </svg>
   );
