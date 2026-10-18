@@ -7,7 +7,7 @@ const config: CapacitorConfig = {
   appId: 'com.tontinedigitale.app',
   appName: 'Tontine Digitale',
   webDir: 'dist',
-  backgroundColor: '#0B5559',
+  backgroundColor: '#FFFFFF',
   ...(liveReload
     ? {
         server: {
