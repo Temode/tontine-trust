@@ -25,9 +25,7 @@ export function DesktopSidebar() {
       {/* Brand */}
       <div className="border-b border-hairline px-6 py-5">
         <Link to="/dashboard" className="flex items-center gap-3" data-tour="brand">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-primary">
-            <Logo size={22} className="text-primary-foreground" />
-          </div>
+          <Logo size={40} />
           <div className="leading-tight">
             <p className="font-display text-lg font-bold text-foreground">
               Tontine <span className="text-primary">Digital</span>

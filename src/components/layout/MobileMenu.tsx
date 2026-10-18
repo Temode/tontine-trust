@@ -64,9 +64,7 @@ export function MobileMenu() {
         <SheetHeader className="border-b border-hairline px-5 py-4 text-left">
           <SheetTitle asChild>
             <Link to="/dashboard" onClick={() => setOpen(false)} className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-primary">
-                <Logo size={22} className="text-primary-foreground" />
-              </div>
+              <Logo size={40} />
               <div className="leading-tight">
                 <p className="font-display text-base font-bold text-foreground">
                   Tontine <span className="text-primary">Digital</span>
