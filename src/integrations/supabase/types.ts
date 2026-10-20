@@ -1275,6 +1275,55 @@ export type Database = {
           },
         ]
       }
+      group_assistant_messages: {
+        Row: {
+          content: string
+          created_at: string
+          group_id: string
+          id: string
+          role: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          group_id: string
+          id?: string
+          role: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          group_id?: string
+          id?: string
+          role?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_assistant_messages_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "admin_group_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_assistant_messages_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_assistant_messages_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "my_groups_overview"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       group_consent_log: {
         Row: {
           accepted_at: string
@@ -7677,6 +7726,7 @@ export type Database = {
         Args: { _group_id: string; _reason?: string }
         Returns: undefined
       }
+      assistant_context: { Args: { p_group_id: string }; Returns: Json }
       attach_deposit_djomy_reference: {
         Args: {
           _deposit_id: string
