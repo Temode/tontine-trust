@@ -15,6 +15,13 @@
       "when": 1792237229499,
       "tag": "0001_push_pref_rpc",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792498137655,
+      "tag": "0002_brand_name_tontine_digitale",
+      "breakpoints": true
     }
   ]
 }
