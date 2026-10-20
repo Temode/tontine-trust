@@ -13,6 +13,7 @@ import { useTontineRealtime } from "@/hooks/useTontineRealtime";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { GuidedTourProvider } from "@/components/tour/GuidedTour";
 import { QuickActionsProvider } from "@/components/quick-actions/QuickActionsProvider";
+import { OfflineBanner } from "@/components/OfflineBanner";
 import { useNativeApp } from "@/hooks/useNativeApp";
 
 function RouteFallback() {
@@ -39,6 +40,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div className="min-h-screen overflow-x-hidden bg-background">
           <DesktopSidebar />
           <div className="lg:pl-72">
+            <OfflineBanner />
             <main className="pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-0">
               <ErrorBoundary
                 resetKey={location.pathname}
