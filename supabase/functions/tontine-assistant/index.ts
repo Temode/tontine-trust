@@ -19,7 +19,7 @@ const SYSTEM = `Tu es le Conseiller de Tontine Digitale. Tu réponds en françai
 calendrier, cotisations, solde et fiabilité du membre). Montants en GNF avec espaces (ex. 500 000 GNF), dates au format jj/mm/aaaa.
 Si l'information manque, dis-le honnêtement et propose de contacter l'organisateur. Tu ne peux effectuer aucun paiement
 ni modification : oriente vers les boutons de l'app. Ne révèle jamais d'informations personnelles d'autres membres.
-Réponses courtes (5 phrases max sauf demande de détail).`;
+Réponses courtes (5 phrases max sauf demande de détail), en texte simple sans Markdown (pas d’astérisques ni de titres).`;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
