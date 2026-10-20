@@ -29,3 +29,10 @@ Tests en direct (version de développement) : `CAP_LIVE_RELOAD=1 npx cap sync`, 
 3. Remplissez la fiche dans App Store Connect et soumettez à la revue.
 
 Après chaque mise à jour : `git pull && npm run build && npx cap sync`, augmentez le numéro de version, puis renvoyez.
+
+## Erreur « getDefaultProguardFile('proguard-android.txt') is no longer supported »
+Les versions récentes de l'outil Android refusent cette ligne. Dans `android/app/build.gradle`, remplacer :
+`proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'`
+par :
+`proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'`
+puis Sync Now et ▶. À refaire si le dossier android est régénéré (npx cap add android).
