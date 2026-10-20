@@ -6,7 +6,7 @@ Identifiant de l'app : `com.tontinedigitale.app` — nom : « Tontine Digitale �
 1. « Export to GitHub », puis `git pull` sur votre ordinateur.
 2. `npm install`
 3. `npx cap add android` et/ou `npx cap add ios`
-4. `npx capacitor-assets generate --iconBackgroundColor '#FFFFFF' --splashBackgroundColor '#FFFFFF'` (icônes + écran de démarrage depuis `resources/`)
+4. `npx capacitor-assets generate --iconBackgroundColor '#0D7377' --splashBackgroundColor '#0D7377'` (icônes + écran de démarrage depuis `resources/`)
 5. `npm run build && npx cap sync`
 
 Tests en direct (version de développement) : `CAP_LIVE_RELOAD=1 npx cap sync`, puis `npx cap run android`. Sans cette variable, l'app embarque sa propre version (mode production).

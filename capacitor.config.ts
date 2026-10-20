@@ -7,7 +7,7 @@ const config: CapacitorConfig = {
   appId: 'com.tontinedigitale.app',
   appName: 'Tontine Digitale',
   webDir: 'dist',
-  backgroundColor: '#FFFFFF',
+  backgroundColor: '#0D7377',
   ...(liveReload
     ? {
         server: {
@@ -22,7 +22,7 @@ const config: CapacitorConfig = {
     SplashScreen: {
       launchShowDuration: 2000,
       launchAutoHide: true,
-      backgroundColor: '#FFFFFF',
+      backgroundColor: '#0D7377',
       showSpinner: false,
       androidScaleType: 'CENTER_CROP',
     },
