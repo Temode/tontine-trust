@@ -39,6 +39,7 @@ import type { DbGroup, DbGroupMember, DbNextTurn } from "@/lib/api/types";
 import { SectionCard } from "@/components/dashboard/SectionCard";
 import { InvitePanel, INVITE_PANEL_ID } from "@/components/groups/InvitePanel";
 import { GroupChat } from "@/components/group/GroupChat";
+import { GroupAssistant } from "@/components/group/GroupAssistant";
 import { PayoutHoldHistory } from "@/components/balance/PayoutHoldHistory";
 import { AnnouncementsPanel } from "@/components/group/AnnouncementsPanel";
 import { SmsRechargePanel } from "@/components/group/SmsRechargePanel";
@@ -74,6 +75,7 @@ type Section =
   | "auctions"
   | "reviews"
   | "chat"
+  | "assistant"
   | "audit";
 
 const FREQ_LABEL: Record<string, string> = {
@@ -325,6 +327,7 @@ export default function GroupDetail() {
     ...(grp.rotation_order_kind === "auction" ? [{ id: "auctions" as Section, label: "Enchères" }] : []),
     ...(grp.status === "completed" ? [{ id: "reviews" as Section, label: "Avis" }] : []),
     { id: "chat", label: "Discussion" },
+    { id: "assistant", label: "Assistant" },
     ...(isOrganizer ? [{ id: "audit" as Section, label: "Audit" }] : []),
   ];
 
@@ -770,6 +773,7 @@ export default function GroupDetail() {
             />
           )}
           {section === "chat" && <GroupChat groupId={grp.id} />}
+          {section === "assistant" && <GroupAssistant groupId={grp.id} />}
           {section === "invitations" && isOrganizer && (
             <InvitationsHistoryPanel groupId={grp.id} canManage={isOrganizer} />
           )}
