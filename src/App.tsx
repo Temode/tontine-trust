@@ -1,5 +1,7 @@
 import { lazy, Suspense } from "react";
-import { MutationCache, QueryCache, QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { MutationCache, QueryCache, QueryClient } from "@tanstack/react-query";
+import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
+import { offlinePersister, OFFLINE_MAX_AGE, shouldPersistQuery } from "@/lib/offline/persist";
 import { BrowserRouter, Outlet, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
@@ -82,9 +84,10 @@ const queryClient = new QueryClient({
       refetchOnWindowFocus: false,
       retry: 1,
       staleTime: 30_000,
-      gcTime: 5 * 60_000,
+      gcTime: OFFLINE_MAX_AGE,
+      networkMode: "offlineFirst",
     },
-    mutations: { retry: 0 },
+    mutations: { retry: 0, networkMode: "online" },
   },
   queryCache: new QueryCache({
     onError: (error, query) =>
@@ -110,7 +113,10 @@ function AppSuspense() {
 
 const App = () => (
   <ErrorBoundary fallbackTitle="Tontine Digitale a rencontré un problème">
-    <QueryClientProvider client={queryClient}>
+    <PersistQueryClientProvider
+      client={queryClient}
+      persistOptions={{ persister: offlinePersister, maxAge: OFFLINE_MAX_AGE, buster: "v1", dehydrateOptions: { shouldDehydrateQuery: shouldPersistQuery } }}
+    >
       <TooltipProvider>
         <Toaster />
         <Sonner position="top-center" />
@@ -242,7 +248,7 @@ const App = () => (
           </AuthProvider>
         </BrowserRouter>
       </TooltipProvider>
-    </QueryClientProvider>
+    </PersistQueryClientProvider>
   </ErrorBoundary>
 );
 

@@ -1,6 +1,7 @@
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
+import { registerOfflineSW } from "@/lib/offline/registerSW";
 import { logCrash } from "@/lib/diagnostics/crashLogger";
 
 if (typeof window !== "undefined") {
@@ -44,6 +45,7 @@ if (typeof window !== "undefined") {
 }
 
 createRoot(document.getElementById("root")!).render(<App />);
+registerOfflineSW();
 
 // Masque le logo de démarrage natif dès que l'interface est montée (toutes pages).
 import("@capacitor/core")
