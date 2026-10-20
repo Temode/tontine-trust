@@ -1,1 +1,3 @@
 - Push notifications: notifications INSERT trigger fills push_outbox; consume-push-outbox edge function (cron, FCM via connector gateway) sends — never HTTP from triggers. Native-only code lives in useNativeApp and is guarded by Capacitor.isNativePlatform().
+- Tontine AI assistant: edge function `tontine-assistant` builds context only via `assistant_context()` RPC (caller's own data) and gates on paid plan server-side — keeps other members' data out of the model.
+- Offline: React Query cache persisted to IndexedDB (whitelist in src/lib/offline/persist.ts, cleared on signOut); service worker registers only via src/lib/offline/registerSW.ts — never in preview/dev.
