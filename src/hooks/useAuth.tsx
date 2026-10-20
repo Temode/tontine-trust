@@ -1,3 +1,5 @@
+import { useQueryClient } from "@tanstack/react-query";
+import { clearOfflineCache } from "@/lib/offline/persist";
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
@@ -219,6 +221,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = async () => {
     await supabase.auth.signOut();
     setRoles([]);
+    queryClient.clear();
+    await clearOfflineCache();
   };
 
   return (
