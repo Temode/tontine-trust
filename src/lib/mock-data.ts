@@ -2246,7 +2246,7 @@ export const notifications: Notification[] = [
     title: "Mise à jour des conditions générales",
     description:
       "La version v3.2 des CGU intègre les évolutions de l'agrément BCG-2024-018. Lecture conseillée.",
-    source: "Tontine Digital",
+    source: "Tontine Digitale",
     timestamp: "02 Jan · 14:22",
     daysFromToday: -2,
     signature: "0xc811…9203",
@@ -2309,10 +2309,10 @@ export const notifications: Notification[] = [
     category: "system",
     severity: "info",
     status: "archived",
-    title: "Nouveau plan disponible · Tontine Digital Enterprise",
+    title: "Nouveau plan disponible · Tontine Digitale Enterprise",
     description:
       "Accès aux émissions premium, plafonds illimités et SLA dédié. Mise à niveau possible sans frais d'activation jusqu'au 31 janvier.",
-    source: "Tontine Digital",
+    source: "Tontine Digitale",
     timestamp: "28 Déc · 09:00",
     daysFromToday: -7,
     signature: "0x1145…6710",

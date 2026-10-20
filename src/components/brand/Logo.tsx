@@ -14,7 +14,7 @@ export function Logo({ size = 32, className, shadow }: LogoProps) {
       src={logoSeal}
       width={size}
       height={size}
-      alt="Tontine Digital"
+      alt="Tontine Digitale"
       className={cn("shrink-0 select-none", shadow && "drop-shadow-md", className)}
       draggable={false}
     />

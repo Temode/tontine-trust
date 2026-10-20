@@ -33,7 +33,7 @@ export default function Affiliation() {
   const share = async () => {
     if (!refLink) return;
     if (navigator.share) {
-      await navigator.share({ title: "Tontine Digital", text: "Rejoins-moi", url: refLink });
+      await navigator.share({ title: "Tontine Digitale", text: "Rejoins-moi", url: refLink });
     } else {
       copyLink();
     }

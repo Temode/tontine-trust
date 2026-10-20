@@ -1,4 +1,4 @@
-# Audit UX — Tontine Digital
+# Audit UX — Tontine Digitale
 
 _Date : 20 juin 2026 · Périmètre : application web complète (organisateur, membre, super-admin)._
 
@@ -38,7 +38,7 @@ L'application a accumulé **30+ routes** et **7 panneaux empilés dans la page G
 | 6 | **P1** | Doublons : `/cotisations`, `/recus`, `/paiements`, `Historique des paiements` (panneau in-group). | Personne ne sait où trouver son reçu |
 | 7 | **P1** | Le bouton "Payer" dans le bottom-nav mène à la liste de toutes les cotisations dues — pas directement à l'action attendue (régler **celle de maintenant**). | +2 clics |
 | 8 | **P1** | Pas d'indicateur "action requise" sur les entrées du menu. | L'organisateur rate ses approbations |
-| 9 | **P2** | Le menu admin (super-admin Tontine Digital) est dans la même app que l'usage normal — un super-admin organisateur voit 2 univers visuels différents. | Switching mental |
+| 9 | **P2** | Le menu admin (super-admin Tontine Digitale) est dans la même app que l'usage normal — un super-admin organisateur voit 2 univers visuels différents. | Switching mental |
 | 10 | **P2** | `Créer` apparaît à la fois dans la sidebar (Actions rapides) et dans le bottom-nav (FAB central). | Bruit |
 
 ---
@@ -82,7 +82,7 @@ ACTIONS RAPIDES
 
 ### Suppression "cycle vide" en 1 clic
 - `request_group_deletion` détecte automatiquement l'absence de paiement reçu et marque la demande `pending_admin` directement.
-- `DeletionPanel` affiche un bandeau ambré "Procédure rapide disponible" avec un bouton **« Demander à Tontine Digital »** qui saute le vote des membres.
+- `DeletionPanel` affiche un bandeau ambré "Procédure rapide disponible" avec un bouton **« Demander à Tontine Digitale »** qui saute le vote des membres.
 
 ### Vocabulaire : "Tontine" partout sur la nav (le mot "Groupe" reste sur le code/DB pour ne rien casser).
 

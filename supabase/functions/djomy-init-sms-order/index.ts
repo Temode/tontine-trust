@@ -54,7 +54,7 @@ Deno.serve(async (req) => {
         countryCode: "GN",
         payerNumber: phone,
         allowedPaymentMethods: ["OM", "MOMO", "CARD"],
-        description: `Recharge ${order.qty} SMS Tontine Digital`,
+        description: `Recharge ${order.qty} SMS Tontine Digitale`,
         merchantPaymentReference: order.id,
         returnUrl: body.returnUrl,
         cancelUrl: body.cancelUrl ?? body.returnUrl,

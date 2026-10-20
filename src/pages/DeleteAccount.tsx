@@ -74,7 +74,7 @@ export default function DeleteAccount() {
 
         <label className="flex items-start gap-3 text-sm text-foreground">
           <Checkbox checked={confirm} onCheckedChange={(v) => setConfirm(v === true)} />
-          <span>Je confirme vouloir supprimer définitivement mon compte Tontine Digital.</span>
+          <span>Je confirme vouloir supprimer définitivement mon compte Tontine Digitale.</span>
         </label>
         <label className="flex items-start gap-3 text-sm text-foreground">
           <Checkbox checked={understood} onCheckedChange={(v) => setUnderstood(v === true)} />

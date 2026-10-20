@@ -618,7 +618,7 @@ function CTA() {
     <section style={{ background: "#fff", padding: t ? "60px 16px" : "114px 65px" }}>
       <div style={{ maxWidth: 1310, margin: "0 auto", borderRadius: t ? 32 : 56, background: C.tealGrad, padding: t ? "48px 24px" : "68px 40px", textAlign: "center" }}>
         <h2 style={{ fontFamily: FONT, fontWeight: 700, fontSize: t ? 28 : 40, color: "#fff", marginBottom: 20 }}>Prêt à digitaliser vos tontines ?</h2>
-        <p style={{ fontFamily: FONT, fontWeight: 400, fontSize: t ? 18 : 22, lineHeight: 1.4, color: "rgb(204,242,244)", maxWidth: 900, margin: "0 auto 32px" }}>Rejoignez des milliers d'utilisateurs qui font déjà confiance à Tontine Digital pour gérer leurs épargnes collectives en toute sécurité.</p>
+        <p style={{ fontFamily: FONT, fontWeight: 400, fontSize: t ? 18 : 22, lineHeight: 1.4, color: "rgb(204,242,244)", maxWidth: 900, margin: "0 auto 32px" }}>Rejoignez des milliers d'utilisateurs qui font déjà confiance à Tontine Digitale pour gérer leurs épargnes collectives en toute sécurité.</p>
         <div style={{ display: "flex", gap: t ? 12 : 31, justifyContent: "center", flexWrap: "wrap" }}>
           <Link to={cta.href} style={{ textDecoration: "none", display: "inline-flex", alignItems: "center", justifyContent: "center", border: "none", cursor: "pointer", borderRadius: 16, padding: "20px 30px", background: "#fff", fontFamily: FONT, fontWeight: 600, fontSize: 20, color: C.slate500 }}>{cta.heroLabel}</Link>
           <a href="tel:+224" style={{ textDecoration: "none", cursor: "pointer", borderRadius: 16, padding: "20px 30px", background: "rgb(43,106,108)", border: "0.5px solid rgb(148,163,184)", fontFamily: FONT, fontWeight: 600, fontSize: 20, color: "rgb(230,243,243)", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
@@ -670,7 +670,7 @@ function Footer() {
         </div>
         <div style={{ height: 1, background: C.footerCard, margin: t ? "40px 0 24px" : "60px 0 40px" }} />
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 24 }}>
-          <span style={{ fontFamily: FONT, fontWeight: 600, fontSize: t ? 14 : 18, color: C.slate500 }}>© 2024 Tontine Digital. Tous droits réservés.</span>
+          <span style={{ fontFamily: FONT, fontWeight: 600, fontSize: t ? 14 : 18, color: C.slate500 }}>© 2024 Tontine Digitale. Tous droits réservés.</span>
           <div style={{ display: "flex", alignItems: "center", gap: t ? 12 : 28, flexWrap: "wrap" }}>
             <span style={{ fontFamily: FONT, fontWeight: 600, fontSize: t ? 14 : 18, color: C.slate500 }}>Paiements sécurisés via</span>
             <PayBadge label="OM" bg="rgb(249,155,91)" color="#000" />

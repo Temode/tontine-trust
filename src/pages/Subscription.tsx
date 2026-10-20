@@ -198,7 +198,7 @@ export default function Subscription() {
           {freePlan && (
             <PlanCard
               title={freePlan.label}
-              subtitle="Pour découvrir Tontine Digital"
+              subtitle="Pour découvrir Tontine Digitale"
               price={0}
               accent="secondary"
               current={currentPlan === "free"}

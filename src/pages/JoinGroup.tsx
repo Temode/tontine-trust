@@ -21,7 +21,7 @@ export default function JoinGroup() {
         <CodeEntryHero />
 
         <p className="text-[11px] text-muted-foreground">
-          Tontine Digital horodate chaque adhésion dans le registre du groupe. L'organisateur est
+          Tontine Digitale horodate chaque adhésion dans le registre du groupe. L'organisateur est
           notifié dès que vous rejoignez et peut révoquer un code à tout moment.
         </p>
       </div>

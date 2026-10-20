@@ -46,7 +46,7 @@ export function GroupProspectus({ group, onSubscribe, onDismiss }: GroupProspect
       <header className="border-b border-hairline bg-secondary/40 px-5 py-5 lg:px-7">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-            Tontine Digital · Prospectus de souscription
+            Tontine Digitale · Prospectus de souscription
           </p>
           <span className="inline-flex items-center gap-1 rounded-full bg-success/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-success">
             <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-success" />

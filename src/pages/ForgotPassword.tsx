@@ -30,7 +30,7 @@ export default function ForgotPassword() {
   const [rateLimited, setRateLimited] = useState(false);
 
   useEffect(() => {
-    document.title = "Mot de passe oublié · Tontine Digital";
+    document.title = "Mot de passe oublié · Tontine Digitale";
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {

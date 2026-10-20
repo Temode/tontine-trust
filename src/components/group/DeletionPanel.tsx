@@ -63,7 +63,7 @@ export function DeletionPanel({ groupId, isOrganizer, currentUserId }: Props) {
     onSuccess: () => {
       toast.success(
         fastTrackQ.data
-          ? "Demande envoyée à Tontine Digital"
+          ? "Demande envoyée à Tontine Digitale"
           : "Demande de suppression envoyée aux membres",
       );
       setReason("");
@@ -105,21 +105,21 @@ export function DeletionPanel({ groupId, isOrganizer, currentUserId }: Props) {
               </p>
               <p className="mt-1 text-amber-900/80 dark:text-amber-200/80">
                 Aucune cotisation n'a encore été reçue. Votre demande sera transmise
-                <strong> directement à l'équipe Tontine Digital</strong> pour décision, sans
+                <strong> directement à l'équipe Tontine Digitale</strong> pour décision, sans
                 vote ni délai de 14 jours.
               </p>
             </div>
           ) : (
             <p className="text-sm text-muted-foreground">
               La suppression nécessite l'accord des membres (14 jours pour s'opposer)
-              puis la validation de Tontine Digital. Pré-requis : aucun tour en cours,
+              puis la validation de Tontine Digitale. Pré-requis : aucun tour en cours,
               aucune cotisation en attente.
             </p>
           )}
           <Textarea
             placeholder={
               fastTrack
-                ? "Motif (visible par l'équipe Tontine Digital)"
+                ? "Motif (visible par l'équipe Tontine Digitale)"
                 : "Motif obligatoire (visible par les membres et Tontine)"
             }
             value={reason}
@@ -130,7 +130,7 @@ export function DeletionPanel({ groupId, isOrganizer, currentUserId }: Props) {
             <AlertDialogTrigger asChild>
               <Button variant="destructive" disabled={!reason.trim()}>
                 {fastTrack ? <Zap className="mr-2 h-4 w-4" /> : <Trash2 className="mr-2 h-4 w-4" />}
-                {fastTrack ? "Demander à Tontine Digital" : "Soumettre la demande"}
+                {fastTrack ? "Demander à Tontine Digitale" : "Soumettre la demande"}
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
@@ -138,7 +138,7 @@ export function DeletionPanel({ groupId, isOrganizer, currentUserId }: Props) {
                 <AlertDialogTitle>Confirmer la demande ?</AlertDialogTitle>
                 <AlertDialogDescription>
                   {fastTrack
-                    ? "Aucune cotisation n'ayant été reçue, votre demande part directement chez Tontine Digital. Vous recevrez une notification dès qu'elle sera traitée."
+                    ? "Aucune cotisation n'ayant été reçue, votre demande part directement chez Tontine Digitale. Vous recevrez une notification dès qu'elle sera traitée."
                     : "Tous les membres seront notifiés. Un seul refus annule la demande. Si personne ne s'oppose sous 14 jours, Tontine statuera."}
                 </AlertDialogDescription>
               </AlertDialogHeader>

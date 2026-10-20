@@ -84,7 +84,7 @@ export default function VerifyEmail() {
   }, [expiresInSec]);
 
   useEffect(() => {
-    document.title = "Vérification de l'email · Tontine Digital";
+    document.title = "Vérification de l'email · Tontine Digitale";
   }, []);
 
   useEffect(() => {
