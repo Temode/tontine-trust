@@ -52,7 +52,7 @@ Deno.serve(async (req) => {
 
     const sms = await sendMessage({
       to: phone,
-      body: `Tontine Digital: votre code de vérification est ${code}. Valable 10 minutes. Ne le partagez jamais.`,
+      body: `Tontine Digitale: votre code de vérification est ${code}. Valable 10 minutes. Ne le partagez jamais.`,
       logContext: { userId: user.id, kind: "kyc_phone_otp" },
     });
 

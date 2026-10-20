@@ -36,7 +36,7 @@ export function ShareSheet({
 
   const message = useMemo(() => {
     const parts = [
-      `Bonjour, je vous invite à rejoindre la tontine « ${groupName} » sur Tontine Digital.`,
+      `Bonjour, je vous invite à rejoindre la tontine « ${groupName} » sur Tontine Digitale.`,
     ];
     if (contribution && frequency) {
       parts.push(`Cotisation : ${formatGNF(contribution)} GNF · fréquence : ${frequency.toLowerCase()}.`);
@@ -143,7 +143,7 @@ export function ShareSheet({
       </div>
 
       <p className="text-[11px] text-muted-foreground">
-        Le destinataire doit créer un compte Tontine Digital pour valider son adhésion. L'organisateur reçoit
+        Le destinataire doit créer un compte Tontine Digitale pour valider son adhésion. L'organisateur reçoit
         une notification dès qu'une personne rejoint le groupe avec ce code.
       </p>
     </div>

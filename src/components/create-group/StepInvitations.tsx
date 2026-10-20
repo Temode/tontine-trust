@@ -31,7 +31,7 @@ const VISIBILITY_OPTIONS: Array<{
   {
     id: "directory",
     label: "Annuaire public",
-    description: "Le groupe apparaît dans la recherche Tontine Digital. Validation des candidats requise.",
+    description: "Le groupe apparaît dans la recherche Tontine Digitale. Validation des candidats requise.",
   },
 ];
 

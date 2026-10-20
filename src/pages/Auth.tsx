@@ -48,7 +48,7 @@ export default function Auth() {
   const [suPassword, setSuPassword] = useState("");
 
   useEffect(() => {
-    document.title = "Connexion · Tontine Digital";
+    document.title = "Connexion · Tontine Digitale";
   }, []);
 
   if (loading || (user && rolesLoading)) {

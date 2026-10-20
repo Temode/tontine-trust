@@ -36,7 +36,7 @@ const EMAIL_TEMPLATES: Record<string, React.ComponentType<any>> = {
 }
 
 // Configuration
-const SITE_NAME = "tontine-digitale"
+const SITE_NAME = "Tontine Digitale"
 const ROOT_DOMAIN = "tontinedigitale.com"
 const FROM_ADDRESS = `Tontine Digitale <noreply@${ROOT_DOMAIN}>`
 const RESEND_GATEWAY_URL = 'https://connector-gateway.lovable.dev/resend/emails'

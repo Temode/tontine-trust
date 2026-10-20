@@ -55,7 +55,7 @@ Deno.serve(async (req) => {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            source: "tontine-digitale",
+            source: "Tontine Digitale",
             alert_id: row.id,
             code: row.code,
             severity: row.severity,

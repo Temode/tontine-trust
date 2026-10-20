@@ -55,7 +55,7 @@ export default function ResetPassword() {
   const [done, setDone] = useState(false);
 
   useEffect(() => {
-    document.title = "Nouveau mot de passe · Tontine Digital";
+    document.title = "Nouveau mot de passe · Tontine Digitale";
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {

@@ -69,7 +69,7 @@ Deno.serve(async (req) => {
         countryCode: "GN",
         payerNumber,
         allowedPaymentMethods: ["OM", "MOMO", "CARD"],
-        description: `Abonnement Tontine Digital ${sub.plan_code} (${sub.id})`,
+        description: `Abonnement Tontine Digitale ${sub.plan_code} (${sub.id})`,
         merchantPaymentReference: sub.id,
         returnUrl: body.returnUrl,
         cancelUrl: body.cancelUrl ?? body.returnUrl,

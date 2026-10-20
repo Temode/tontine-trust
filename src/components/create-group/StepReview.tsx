@@ -156,7 +156,7 @@ export function StepReview({
             <p className="font-semibold text-foreground">J'émets ce groupe et j'en assume la responsabilité</p>
             <p className="mt-0.5 text-xs text-muted-foreground">
               Je confirme l'exactitude des termes ci-dessus et accepte qu'ils deviennent opposables
-              aux membres. Tontine Digital horodate l'émission et conserve une trace d'audit
+              aux membres. Tontine Digitale horodate l'émission et conserve une trace d'audit
               consultable à tout moment.
             </p>
           </div>

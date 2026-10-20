@@ -109,7 +109,7 @@ function AppSuspense() {
 }
 
 const App = () => (
-  <ErrorBoundary fallbackTitle="Tontine Digital a rencontré un problème">
+  <ErrorBoundary fallbackTitle="Tontine Digitale a rencontré un problème">
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <Toaster />

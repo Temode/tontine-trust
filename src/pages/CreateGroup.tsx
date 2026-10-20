@@ -213,7 +213,7 @@ export default function CreateGroup() {
         </ErrorBoundary>
 
         <p className="text-[11px] text-muted-foreground">
-          Chaque émission est horodatée dans Tontine Digital. La modification des termes devient
+          Chaque émission est horodatée dans Tontine Digitale. La modification des termes devient
           restreinte une fois le premier cycle démarré.
         </p>
       </div>
