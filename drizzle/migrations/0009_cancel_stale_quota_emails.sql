@@ -1,0 +1,2 @@
+UPDATE public.email_outbox SET status='failed', attempts=99, last_error='stale_not_resent:'||coalesce(last_error,'')
+ WHERE status='queued' AND last_error ILIKE '%daily_quota%' AND created_at < now() - interval '2 days';

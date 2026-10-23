@@ -1,5 +1,6 @@
-import { useQuery } from "@tanstack/react-query";
-import { Printer, ShieldCheck } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Mail, Printer, ShieldCheck } from "lucide-react";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { SectionCard } from "@/components/dashboard/SectionCard";
 import { formatGNF } from "@/lib/format";
@@ -50,6 +51,39 @@ export function PaymentReceiptsSection() {
     },
   });
 
+  const qc = useQueryClient();
+  const { data: emailStatus = {} } = useQuery({
+    queryKey: ["payment-receipts", "email-status"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("get_my_receipt_email_status");
+      if (error) throw error;
+      return Object.fromEntries((data ?? []).map((s) => [s.receipt_id, s])) as Record<string, { status: string; sent_at: string | null }>;
+    },
+  });
+
+  const resend = async (r: PaymentReceipt) => {
+    const { error } = await supabase.rpc("resend_my_receipt", { _receipt_id: r.id });
+    if (error) {
+      const m = error.message.includes("too_soon")
+        ? "Ce reçu vient d'être envoyé. Réessayez dans 10 minutes."
+        : error.message.includes("no_email_on_file")
+          ? "Aucune adresse email n'est associée à votre compte."
+          : "Le renvoi n'a pas pu être lancé. Réessayez.";
+      toast.error(m);
+      return;
+    }
+    toast.success(`Le reçu ${r.receipt_number} va être renvoyé par email.`);
+    qc.invalidateQueries({ queryKey: ["payment-receipts", "email-status"] });
+  };
+
+  const emailLine = (id: string) => {
+    const s = emailStatus[id];
+    if (!s || s.status === "none") return null;
+    if (s.status === "sent" && s.sent_at) return `Envoyé par email le ${new Date(s.sent_at).toLocaleDateString("fr-FR")}`;
+    if (s.status === "failed") return "Envoi par email échoué";
+    return "Envoi par email en attente";
+  };
+
   return (
     <SectionCard
       title="Reçus de mes paiements"
@@ -70,8 +104,20 @@ export function PaymentReceiptsSection() {
                 <p className="text-xs text-muted-foreground">
                   {r.receipt_number} · {new Date(r.issued_at).toLocaleDateString("fr-FR")}
                 </p>
+                {emailLine(r.id) && <p className="text-xs text-muted-foreground">{emailLine(r.id)}</p>}
               </div>
               <span className="num text-sm font-semibold">{formatGNF(r.amount)}</span>
+              {emailStatus[r.id] && emailStatus[r.id].status !== "none" && (
+                <button
+                  type="button"
+                  onClick={() => resend(r)}
+                  aria-label={`Renvoyer le reçu ${r.receipt_number} par email`}
+                  title="Renvoyer par email"
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-hairline text-muted-foreground hover:text-foreground"
+                >
+                  <Mail className="h-4 w-4" />
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => printReceipt(r)}

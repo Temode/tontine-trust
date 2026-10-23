@@ -7829,6 +7829,7 @@ export type Database = {
       cancel_my_bid: { Args: { _turn_id: string }; Returns: undefined }
       cancel_turn_swap: { Args: { _request_id: string }; Returns: undefined }
       check_email_outbox_health: { Args: never; Returns: Json }
+      check_unsent_receipts: { Args: never; Returns: undefined }
       claim_sms_dedupe: { Args: { _key: string }; Returns: boolean }
       close_auction: { Args: { _turn_id: string }; Returns: string }
       compute_hold_until: { Args: { _turn_id: string }; Returns: string }
@@ -8065,6 +8066,14 @@ export type Database = {
       }
       get_my_affiliate_summary: { Args: never; Returns: Json }
       get_my_entitlements: { Args: never; Returns: Json }
+      get_my_receipt_email_status: {
+        Args: never
+        Returns: {
+          receipt_id: string
+          sent_at: string
+          status: string
+        }[]
+      }
       get_my_referrer: { Args: never; Returns: Json }
       get_my_sms_balance: { Args: never; Returns: Json }
       get_my_solo_group: {
@@ -8554,6 +8563,7 @@ export type Database = {
         }
         Returns: string
       }
+      resend_my_receipt: { Args: { _receipt_id: string }; Returns: string }
       resolve_contribution_dispute: {
         Args: { _dispute_id: string; _response?: string; _status: string }
         Returns: undefined
