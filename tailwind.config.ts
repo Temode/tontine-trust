@@ -18,6 +18,19 @@ export default {
         display: ["DM Sans", "Inter", "system-ui", "sans-serif"],
         serif: ["'Playfair Display'", "Georgia", "serif"],
       },
+      fontSize: {
+        "display-lg": ["2.25rem", { lineHeight: "1.1", letterSpacing: "-0.025em", fontWeight: "700" }],
+        "display": ["1.875rem", { lineHeight: "1.15", letterSpacing: "-0.02em", fontWeight: "700" }],
+        "title": ["1.5rem", { lineHeight: "1.25", letterSpacing: "-0.015em", fontWeight: "700" }],
+        "subtitle": ["1.25rem", { lineHeight: "1.3", letterSpacing: "-0.01em", fontWeight: "600" }],
+        "amount-lg": ["2rem", { lineHeight: "1.1", letterSpacing: "-0.02em", fontWeight: "700" }],
+        "amount": ["1.5rem", { lineHeight: "1.15", letterSpacing: "-0.015em", fontWeight: "700" }],
+        "body": ["1rem", { lineHeight: "1.55" }],
+        "body-sm": ["0.875rem", { lineHeight: "1.5" }],
+        "caption": ["0.8125rem", { lineHeight: "1.45" }],
+        "label": ["0.75rem", { lineHeight: "1.2", letterSpacing: "0.08em", fontWeight: "600" }],
+      },
+
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
