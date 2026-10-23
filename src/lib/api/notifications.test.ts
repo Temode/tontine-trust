@@ -10,6 +10,9 @@ describe("resolveNotificationLink", () => {
 
   const gid = "00000000-0000-0000-0000-000000000abc";
   const cases: Array<[string, string | null, string]> = [
+    ["chat_message", gid, `/discussions/${gid}`],
+    ["call_missed", gid, `/discussions/${gid}`],
+    ["call_incoming", gid, `/discussions/${gid}`],
     ["invitation_accepted", gid, `/groupes/${gid}/membres`],
     ["invitation_accepted", null, "/groupes"],
     ["member_joined", gid, `/groupes/${gid}/membres`],
@@ -20,6 +23,7 @@ describe("resolveNotificationLink", () => {
     ["turn_paid", gid, `/groupes/${gid}`],
     ["announcement", gid, `/groupes/${gid}`],
     ["group_completed", gid, `/groupes/${gid}`],
+    ["contribution_due", gid, `/groupes/${gid}`],
     ["contribution_due", null, "/cotisations"],
     ["contribution_received", null, "/cotisations"],
     ["contribution_confirmed", null, "/cotisations"],
@@ -32,5 +36,17 @@ describe("resolveNotificationLink", () => {
 
   it.each(cases)("kind=%s (group_id=%s) → %s", (kind, group_id, expected) => {
     expect(resolveNotificationLink({ kind, link: null, group_id })).toBe(expected);
+  });
+
+  it("incoming call opens the call screen", () => {
+    expect(resolveNotificationLink({ kind: "call_incoming", group_id: gid, data: { call_id: "c1" } })).toBe("/appel/c1");
+  });
+
+  it("late contribution goes to the tontine even if an old link points elsewhere", () => {
+    expect(resolveNotificationLink({ kind: "contribution_late", link: "/solde", group_id: gid })).toBe(`/groupes/${gid}`);
+  });
+
+  it("new message ignores a stale link", () => {
+    expect(resolveNotificationLink({ kind: "chat_message", link: "/notifications", group_id: gid })).toBe(`/discussions/${gid}`);
   });
 });

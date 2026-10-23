@@ -36,9 +36,12 @@ Deno.serve(async (req) => {
             data: Object.fromEntries(Object.entries(job.data ?? {}).map(([k, v]) => [k, String(v)])),
             android: {
               priority: "HIGH",
+              ...(job.data?.collapse_key ? { collapse_key: String(job.data.collapse_key).slice(0, 60) } : {}),
+              ...(job.data?.kind === "call_incoming" ? { ttl: "60s" } : {}),
               notification: {
                 channel_id: "tontine_alerts",
                 color: "#0D7377",
+                ...(job.data?.collapse_key ? { tag: String(job.data.collapse_key).slice(0, 60) } : {}),
                 sound: "default",
                 default_sound: true,
                 default_vibrate_timings: true,

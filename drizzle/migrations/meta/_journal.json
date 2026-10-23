@@ -71,6 +71,20 @@
       "when": 1792791944297,
       "tag": "0009_cancel_stale_quota_emails",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1792794298987,
+      "tag": "0010_notif_kinds_chat_call",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1792794330972,
+      "tag": "0011_notification_target_and_chat_call_push",
+      "breakpoints": true
     }
   ]
 }

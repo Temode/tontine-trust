@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
-import { subscribeToMyNotifications } from "@/lib/api/notifications";
+import { KINDS_WITH_OWN_IN_APP_ALERT, subscribeToMyNotifications } from "@/lib/api/notifications";
 import { supabase } from "@/integrations/supabase/client";
 
 /**
@@ -17,6 +17,7 @@ export function useNotificationsRealtime() {
     if (!user) return;
     const channel = subscribeToMyNotifications(user.id, (n) => {
       qc.invalidateQueries({ queryKey: ["notifications"] });
+      if (KINDS_WITH_OWN_IN_APP_ALERT.has(n.kind)) return;
       toast(n.title, { description: n.body ?? undefined });
     });
     return () => {

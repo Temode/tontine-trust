@@ -8344,6 +8344,10 @@ export type Database = {
         Args: { _kind: Database["public"]["Enums"]["notification_kind"] }
         Returns: boolean
       }
+      notification_target: {
+        Args: { _data: Json; _group_id: string; _kind: string; _link: string }
+        Returns: string
+      }
       notify: {
         Args: {
           _body?: string
@@ -8999,6 +9003,9 @@ export type Database = {
         | "sms_order_failed"
         | "sms_order_cancelled"
         | "penalty_share_received"
+        | "chat_message"
+        | "call_incoming"
+        | "call_missed"
       payment_method_external:
         | "cash"
         | "bank_transfer"
@@ -9322,6 +9329,9 @@ export const Constants = {
         "sms_order_failed",
         "sms_order_cancelled",
         "penalty_share_received",
+        "chat_message",
+        "call_incoming",
+        "call_missed",
       ],
       payment_method_external: [
         "cash",

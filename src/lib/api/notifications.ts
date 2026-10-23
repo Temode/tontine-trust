@@ -98,41 +98,58 @@ export const KIND_LABEL: Record<NotificationKind, string> = {
 } as Record<NotificationKind, string>;
 
 /**
- * Retourne un lien de destination pour une notification.
- * Si `n.link` est défini, on l'utilise tel quel.
- * Sinon on dérive un fallback à partir du `kind` (+ `group_id`).
+ * Écran de destination d'une notification — miroir exact de la fonction SQL
+ * `notification_target` (utilisée pour le push). Toute modification doit être
+ * faite des deux côtés.
  */
 export function resolveNotificationLink(n: {
   kind: string;
   link?: string | null;
   group_id?: string | null;
+  data?: Record<string, unknown> | null;
 }): string {
-  if (n.link) return n.link;
   const gid = n.group_id;
+  switch (n.kind) {
+    case "chat_message":
+    case "call_missed":
+      return gid ? `/discussions/${gid}` : "/discussions";
+    case "call_incoming": {
+      const callId = n.data?.call_id;
+      if (typeof callId === "string" && callId) return `/appel/${callId}`;
+      return gid ? `/discussions/${gid}` : "/discussions";
+    }
+    case "contribution_due":
+    case "contribution_late":
+    case "manual_reminder":
+      return gid ? `/groupes/${gid}` : "/cotisations";
+  }
+  if (n.link && n.link.startsWith("/")) return n.link;
   switch (n.kind) {
     case "invitation_accepted":
     case "member_joined":
       return gid ? `/groupes/${gid}/membres` : "/groupes";
     case "invitation_received":
       return "/rejoindre";
-    case "cycle_started":
-    case "cycle_completed":
-    case "turn_started":
-    case "turn_paid":
-    case "announcement":
-    case "group_completed":
-      return gid ? `/groupes/${gid}` : "/groupes";
-    case "contribution_due":
     case "contribution_received":
     case "contribution_confirmed":
       return "/cotisations";
     case "payout_released":
+    case "penalty_share_received":
+    case "withdrawal_requested":
+    case "withdrawal_processing":
+    case "withdrawal_paid":
+    case "withdrawal_failed":
+    case "withdrawal_cancelled":
+    case "payout_hold_released":
       return "/solde";
     case "receipt_ready":
       return "/recus";
     case "reliability_changed":
       return "/profil";
     default:
-      return "/notifications";
+      return gid ? `/groupes/${gid}` : "/notifications";
   }
 }
+
+/** Ces notifications ont déjà leur propre alerte dans l'app (toast de discussion, écran d'appel). */
+export const KINDS_WITH_OWN_IN_APP_ALERT = new Set(["chat_message", "call_incoming"]);
