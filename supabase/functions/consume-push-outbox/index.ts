@@ -29,7 +29,23 @@ Deno.serve(async (req) => {
           "X-Connection-Api-Key": FCM_KEY,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
+        body: JSON.stringify(
+          // Appels : message "data only" pour que l'app Android affiche l'écran
+          // d'appel plein écran avec sonnerie continue (CallMessagingService natif).
+          job.data?.kind === "call_incoming" || job.data?.kind === "call_cancel"
+            ? {
+                message: {
+                  token,
+                  data: {
+                    ...Object.fromEntries(Object.entries(job.data ?? {}).map(([k, v]) => [k, String(v)])),
+                    title: job.title ?? "",
+                    body: job.body ?? "",
+                  },
+                  android: { priority: "HIGH", ttl: job.data?.kind === "call_incoming" ? "45s" : "120s" },
+                  apns: { headers: { "apns-priority": "10" }, payload: { aps: { sound: "default", alert: { title: job.title, body: job.body ?? "" } } } },
+                },
+              }
+            : {
           message: {
             token,
             notification: { title: job.title, body: job.body ?? "" },
@@ -37,7 +53,6 @@ Deno.serve(async (req) => {
             android: {
               priority: "HIGH",
               ...(job.data?.collapse_key ? { collapse_key: String(job.data.collapse_key).slice(0, 60) } : {}),
-              ...(job.data?.kind === "call_incoming" ? { ttl: "60s" } : {}),
               notification: {
                 channel_id: "tontine_alerts",
                 color: "#0D7377",
