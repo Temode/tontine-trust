@@ -4,7 +4,7 @@
 - Design tokens: toute couleur, rayon et ombre vient des variables CSS de src/index.css via les classes sémantiques Tailwind; jamais de hex, de hsl() ni de valeur arbitraire [#...] dans un composant.
 - Typographie: utiliser les rôles nommés de tailwind.config fontSize (display-lg, display, title, subtitle, amount-lg, amount, body, body-sm, caption, label). Ne pas poser text-2xl/text-3xl au jugé; si un rôle manque, l'ajouter à l'échelle plutôt que choisir une taille brute.
 - Accent or (--accent): fond uniquement, avec --accent-foreground. Jamais en texte ni en icône sur surface claire, le contraste y est d'environ 2,1:1 contre 4,5:1 requis.
-- Sarcelle: --primary est la valeur de marque, --primary-700 la variante sombre. Ne pas introduire une troisième sarcelle.
+- Sarcelle: la rampe --primary-50…900 de src/index.css est le seul jeu de sarcelles autorisé, --primary étant la valeur de marque. Ne jamais poser une sarcelle hors rampe. Dérive connue à résorber: --sidebar-primary et la teinte de shadow-primary valent 187 75% 19%, hors rampe; ne pas la corriger sans arbitrage explicite.
 - Montants: toujours tabular-nums (classe .num), format "10 000 GNF", espace fine insécable, devise après le nombre.
 - Lexique: "tontine" est le terme utilisateur pour un groupe d'épargne. Ne pas alterner avec "groupe" dans les libellés d'interface. Les URLs peuvent rester en /groupes.
 - Les sous-titres d'en-tête ne doivent jamais être tronqués; si le texte ne tient pas, raccourcir le texte et non le conteneur.
