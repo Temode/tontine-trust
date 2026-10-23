@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Loader2, PhoneOff } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useCall } from "@/hooks/CallContext";
+import { respondCallRequest } from "@/lib/api/calls";
 
 export default function CallJoin() {
   const { callId } = useParams<{ callId: string }>();
+  const [search] = useSearchParams();
+  const declining = search.get("action") === "decline";
   const navigate = useNavigate();
   const { startCall } = useCall();
   const [error, setError] = useState<string | null>(null);
@@ -31,6 +34,11 @@ export default function CallJoin() {
         setError("Cet appel est terminé.");
         return;
       }
+      if (declining) {
+        try { await respondCallRequest(data.id, "declined"); } catch { /* déjà traité */ }
+        navigate(`/discussions/${data.group_id}`, { replace: true });
+        return;
+      }
       const groupName = (data as { group?: { name?: string } | null }).group?.name;
       startCall({
         callId: data.id,
@@ -44,7 +52,7 @@ export default function CallJoin() {
     return () => {
       cancelled = true;
     };
-  }, [callId, navigate, startCall]);
+  }, [callId, declining, navigate, startCall]);
 
   return (
     <div className="flex min-h-[60vh] flex-col items-center justify-center gap-3 px-4 text-center">
@@ -63,7 +71,7 @@ export default function CallJoin() {
       ) : (
         <>
           <Loader2 className="h-6 w-6 animate-spin text-primary" />
-          <p className="text-sm text-muted-foreground">Connexion à l'appel…</p>
+          <p className="text-sm text-muted-foreground">{declining ? "Refus de l'appel…" : "Connexion à l'appel…"}</p>
         </>
       )}
     </div>

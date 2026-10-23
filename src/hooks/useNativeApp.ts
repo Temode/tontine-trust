@@ -28,7 +28,15 @@ export function useNativeApp() {
         if (p === "/dashboard" || p === "/" || !canGoBack) App.exitApp();
         else window.history.back();
       });
-      cleanup = () => h.remove();
+      // Ouverture depuis l'écran d'appel natif : com.tontinedigitale.app://appel/<id>[?action=decline]
+      const u = await App.addListener("appUrlOpen", ({ url }) => {
+        try {
+          const parsed = new URL(url);
+          const path = `/${parsed.host}${parsed.pathname}`.replace(/\/+$/, "") + parsed.search;
+          if (path.startsWith("/appel/")) navigate(path);
+        } catch { /* noop */ }
+      });
+      cleanup = () => { h.remove(); u.remove(); };
     })();
     return () => cleanup?.();
   }, []);
