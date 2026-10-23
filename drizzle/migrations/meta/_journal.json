@@ -64,6 +64,13 @@
       "when": 1792791884255,
       "tag": "0008_receipt_ready_no_duplicate_email",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1792791944297,
+      "tag": "0009_cancel_stale_quota_emails",
+      "breakpoints": true
     }
   ]
 }
