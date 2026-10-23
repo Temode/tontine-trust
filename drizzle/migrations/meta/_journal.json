@@ -43,6 +43,13 @@
       "when": 1792789663466,
       "tag": "0005_referral_commission_wallet_credit",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1792791197504,
+      "tag": "0006_affiliation_actifs_et_nom_parrain",
+      "breakpoints": true
     }
   ]
 }

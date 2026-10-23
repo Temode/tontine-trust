@@ -8477,6 +8477,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      referral_is_paying: {
+        Args: { _referred: string; _referrer: string }
+        Returns: boolean
+      }
       register_push_token: {
         Args: { _platform: string; _token: string }
         Returns: undefined
