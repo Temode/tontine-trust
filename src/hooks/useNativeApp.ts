@@ -39,6 +39,20 @@ export function useNativeApp() {
     const handles: { remove: () => void }[] = [];
     (async () => {
       const { PushNotifications } = await import("@capacitor/push-notifications");
+      if (Capacitor.getPlatform() === "android") {
+        // Canal prioritaire : son, vibration, bannière et écran verrouillé (comme une messagerie).
+        await PushNotifications.createChannel({
+          id: "tontine_alerts",
+          name: "Alertes Tontine Digitale",
+          description: "Cotisations, tours, paiements, reçus et messages",
+          importance: 5,
+          visibility: 1,
+          sound: "default",
+          vibration: true,
+          lights: true,
+          lightColor: "#0D7377",
+        }).catch(() => {});
+      }
       let perm = await PushNotifications.checkPermissions();
       if (perm.receive === "prompt") perm = await PushNotifications.requestPermissions();
       if (perm.receive !== "granted" || removed) return;

@@ -34,8 +34,19 @@ Deno.serve(async (req) => {
             token,
             notification: { title: job.title, body: job.body ?? "" },
             data: Object.fromEntries(Object.entries(job.data ?? {}).map(([k, v]) => [k, String(v)])),
-            android: { priority: "HIGH", notification: { color: "#0D7377", sound: "default" } },
-            apns: { payload: { aps: { sound: "default" } } },
+            android: {
+              priority: "HIGH",
+              notification: {
+                channel_id: "tontine_alerts",
+                color: "#0D7377",
+                sound: "default",
+                default_sound: true,
+                default_vibrate_timings: true,
+                notification_priority: "PRIORITY_HIGH",
+                visibility: "PUBLIC",
+              },
+            },
+            apns: { headers: { "apns-priority": "10" }, payload: { aps: { sound: "default" } } },
           },
         }),
       });
