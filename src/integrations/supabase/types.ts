@@ -8344,6 +8344,10 @@ export type Database = {
         Args: { _kind: Database["public"]["Enums"]["notification_kind"] }
         Returns: boolean
       }
+      notification_target: {
+        Args: { _data: Json; _group_id: string; _kind: string; _link: string }
+        Returns: string
+      }
       notify: {
         Args: {
           _body?: string
