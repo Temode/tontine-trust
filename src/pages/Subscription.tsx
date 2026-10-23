@@ -136,7 +136,7 @@ export default function Subscription() {
                 {maxGroups === -1
                   ? "Illimité avec votre plan actuel."
                   : groupsRemaining === 0
-                    ? "Quota atteint — upgrade requis pour créer un nouveau groupe."
+                    ? "Limite atteinte : passez à Premium pour créer un groupe."
                     : `${groupsRemaining} groupe${groupsRemaining > 1 ? "s" : ""} restant${groupsRemaining > 1 ? "s" : ""}.`}
               </p>
             </div>
@@ -152,7 +152,7 @@ export default function Subscription() {
                 {maxMembers === -1
                   ? "Illimité avec votre plan actuel."
                   : membersRemaining === 0
-                    ? "Quota atteint — upgrade requis pour ajouter un membre supplémentaire."
+                    ? "Limite atteinte : passez à Premium pour ajouter un membre."
                     : `${membersRemaining} membre${membersRemaining > 1 ? "s" : ""} restant${membersRemaining > 1 ? "s" : ""} par groupe.`}
                 {" "}Total actifs : <strong>{entitlements.usage.members_total}</strong>.
               </p>
@@ -187,7 +187,9 @@ export default function Subscription() {
             </div>
             <div className="text-right text-xs text-muted-foreground">
               {entitlements.current_period_end
-                ? <>Prochaine échéance : <strong>{new Date(entitlements.current_period_end).toLocaleDateString("fr-FR")}</strong></>
+                ? (new Date(entitlements.current_period_end).getTime() < Date.now()
+                    ? <strong>Expiré le {new Date(entitlements.current_period_end).toLocaleDateString("fr-FR")}</strong>
+                    : <>Expire le <strong>{new Date(entitlements.current_period_end).toLocaleDateString("fr-FR")}</strong></>)
                 : "Aucune échéance"}
             </div>
           </div>
