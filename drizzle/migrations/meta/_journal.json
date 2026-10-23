@@ -57,6 +57,13 @@
       "when": 1792791871636,
       "tag": "0007_receipt_email_reliability",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1792791884255,
+      "tag": "0008_receipt_ready_no_duplicate_email",
+      "breakpoints": true
     }
   ]
 }
