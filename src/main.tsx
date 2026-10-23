@@ -3,8 +3,10 @@ import App from "./App.tsx";
 import "./index.css";
 import { registerOfflineSW } from "@/lib/offline/registerSW";
 import { logCrash } from "@/lib/diagnostics/crashLogger";
+import { captureReferralFromUrl } from "@/lib/referral";
 
 if (typeof window !== "undefined") {
+  captureReferralFromUrl();
   // Réduit les mutations DOM faites par Chrome/Google Translate qui
   // provoquent des crashes "insertBefore/removeChild" sur React.
   try {
