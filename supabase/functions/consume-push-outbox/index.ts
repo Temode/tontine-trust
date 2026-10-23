@@ -41,7 +41,7 @@ Deno.serve(async (req) => {
                     title: job.title ?? "",
                     body: job.body ?? "",
                   },
-                  android: { priority: "HIGH", ttl: job.data?.kind === "call_incoming" ? "45s" : "120s" },
+                  android: { priority: "HIGH", ttl: job.data?.kind === "call_incoming" ? "60s" : "120s" },
                   apns: { headers: { "apns-priority": "10" }, payload: { aps: { sound: "default", alert: { title: job.title, body: job.body ?? "" } } } },
                 },
               }

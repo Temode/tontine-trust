@@ -24,7 +24,7 @@ import java.util.Map;
 public class CallMessagingService extends MessagingService {
 
     private static final String CHANNEL_ID = "tontine_calls";
-    private static final long RING_MS = 45_000L;
+    private static final long RING_MS = 60_000L;
 
     @Override
     public void onMessageReceived(RemoteMessage msg) {
