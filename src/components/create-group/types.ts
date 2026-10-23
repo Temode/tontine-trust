@@ -29,6 +29,11 @@ export interface GroupDraft {
   inviteCode: string;
   visibility: Visibility;
   coOrganizerPhones: string;
+
+  /** Sécurité nouveaux membres (Chantier 2) */
+  newMemberLockLastThird: boolean;
+  depositRequired: boolean;
+  depositMonths: 0 | 1 | 2;
 }
 
 export const DEFAULT_DRAFT: GroupDraft = {
@@ -45,6 +50,9 @@ export const DEFAULT_DRAFT: GroupDraft = {
   inviteCode: generateInviteCode(),
   visibility: "private",
   coOrganizerPhones: "",
+  newMemberLockLastThird: false,
+  depositRequired: false,
+  depositMonths: 0,
 };
 
 export function generateInviteCode(): string {
@@ -57,10 +65,40 @@ export function generateInviteCode(): string {
 }
 
 export const FREQUENCY_DAYS: Record<Frequency, number> = {
+  Quotidienne: 1,
   Hebdomadaire: 7,
   Quinzaine: 14,
   Mensuelle: 30,
 };
+
+export interface SchedulePreview {
+  startDate: Date;
+  nextDueDates: Date[];
+  cycleEndDate: Date;
+}
+
+/**
+ * Calendrier prévisionnel basé sur la fréquence et le nombre de membres.
+ * Hypothèse : le cycle démarre le jour même de la création (indicatif).
+ */
+export function computeSchedulePreview(draft: GroupDraft, refDate: Date = new Date()): SchedulePreview {
+  const days = FREQUENCY_DAYS[draft.frequency] ?? 30;
+  const members = Math.max(1, Math.min(50, draft.members || 1));
+  const start = new Date(refDate);
+  start.setHours(0, 0, 0, 0);
+
+  const nextDueDates: Date[] = [];
+  for (let i = 1; i <= Math.min(3, members); i++) {
+    const d = new Date(start);
+    d.setDate(d.getDate() + days * i);
+    nextDueDates.push(d);
+  }
+
+  const end = new Date(start);
+  end.setDate(end.getDate() + days * members);
+
+  return { startDate: start, nextDueDates, cycleEndDate: end };
+}
 
 export interface DraftDerived {
   cagnotte: number;
@@ -72,18 +110,20 @@ export interface DraftDerived {
 }
 
 export function deriveFromDraft(draft: GroupDraft): DraftDerived {
-  const cagnotte = draft.contribution * draft.members;
-  const cycleDays = draft.members * FREQUENCY_DAYS[draft.frequency];
+  const safeContribution = Number.isFinite(draft.contribution) ? Math.max(0, draft.contribution) : 0;
+  const safeMembers = Number.isFinite(draft.members) ? Math.max(1, Math.min(50, draft.members)) : 1;
+  const cagnotte = safeContribution * safeMembers;
+  const cycleDays = safeMembers * FREQUENCY_DAYS[draft.frequency];
   const cycleLabel =
     cycleDays >= 365
       ? `${(cycleDays / 365).toFixed(1)} an${cycleDays >= 365 * 2 ? "s" : ""}`
       : cycleDays >= 30
       ? `${Math.round(cycleDays / 30)} mois`
       : `${cycleDays} jours`;
-  const cyclesPerYear = +(365 / cycleDays).toFixed(2);
+  const cyclesPerYear = cycleDays > 0 ? +(365 / cycleDays).toFixed(2) : 0;
 
   const earliestDays = FREQUENCY_DAYS[draft.frequency];
-  const latestDays = (draft.members - 1) * FREQUENCY_DAYS[draft.frequency];
+  const latestDays = Math.max(0, safeMembers - 1) * FREQUENCY_DAYS[draft.frequency];
 
   return {
     cagnotte,

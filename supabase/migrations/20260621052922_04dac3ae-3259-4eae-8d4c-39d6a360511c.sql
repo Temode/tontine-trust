@@ -1,0 +1,1 @@
+ALTER VIEW public.my_contributions_due SET (security_invoker = true);

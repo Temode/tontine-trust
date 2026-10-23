@@ -1,18 +1,22 @@
+import { TIER_LABEL, type ReliabilityTier } from "@/lib/api/reliability";
+
 interface ReliabilityCardProps {
   score: number;
+  tier?: ReliabilityTier;
   onTime: { current: number; total: number };
   late: number;
+  avgDelay?: number;
   memberSince: string;
 }
 
-export function ReliabilityCard({ score, onTime, late, memberSince }: ReliabilityCardProps) {
+export function ReliabilityCard({
+  score, tier, onTime, late, avgDelay, memberSince,
+}: ReliabilityCardProps) {
   const radius = 38;
   const circumference = 2 * Math.PI * radius;
   const offset = circumference - (score / 100) * circumference;
 
-  let label = "Excellent";
-  if (score < 90) label = "Bon";
-  if (score < 75) label = "À améliorer";
+  const label = tier ? TIER_LABEL[tier] : score >= 85 ? "Excellent" : score >= 70 ? "Bon" : "À améliorer";
 
   return (
     <article className="rounded-xl border border-hairline bg-card p-6">
@@ -60,6 +64,9 @@ export function ReliabilityCard({ score, onTime, late, memberSince }: Reliabilit
       <dl className="mt-5 space-y-2 text-sm">
         <Row label="Paiements à temps" value={`${onTime.current}/${onTime.total}`} valueClass="text-success" />
         <Row label="Retards" value={String(late)} />
+        {typeof avgDelay === "number" && (
+          <Row label="Retard moyen" value={avgDelay > 0 ? `${avgDelay.toFixed(1)} j` : "—"} />
+        )}
         <Row label="Membre depuis" value={memberSince} />
       </dl>
     </article>
