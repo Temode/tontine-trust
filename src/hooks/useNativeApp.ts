@@ -47,7 +47,6 @@ export function useNativeApp() {
           description: "Cotisations, tours, paiements, reçus et messages",
           importance: 5,
           visibility: 1,
-          sound: "default",
           vibration: true,
           lights: true,
           lightColor: "#0D7377",
