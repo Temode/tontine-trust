@@ -85,6 +85,13 @@
       "when": 1792794330972,
       "tag": "0011_notification_target_and_chat_call_push",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1792795090049,
+      "tag": "0012_notif_sender_display_name",
+      "breakpoints": true
     }
   ]
 }

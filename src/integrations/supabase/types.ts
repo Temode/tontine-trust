@@ -8332,6 +8332,7 @@ export type Database = {
         Args: { _flag: string; _group: string; _user: string }
         Returns: boolean
       }
+      member_display_name: { Args: { _name: string }; Returns: string }
       my_withdrawal_block: {
         Args: never
         Returns: {
