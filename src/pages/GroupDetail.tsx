@@ -17,6 +17,7 @@ import {
   Wallet,
   X,
   Lock,
+  Sparkles,
 } from "lucide-react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -738,7 +739,7 @@ export default function GroupDetail() {
 
         <SmsRechargePanel groupId={grp.id} />
 
-        <div className="mt-6 inline-flex items-center gap-1 rounded-lg border border-hairline bg-card p-1" role="tablist" aria-label="Sections du groupe">
+        <div id="group-tabs" className="mt-6 inline-flex max-w-full scroll-mt-24 items-center gap-1 overflow-x-auto rounded-lg border border-hairline bg-card p-1" role="tablist" aria-label="Sections du groupe">
           {tabs.map((tab) => (
             <button
               key={tab.id}
