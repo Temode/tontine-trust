@@ -8999,6 +8999,9 @@ export type Database = {
         | "sms_order_failed"
         | "sms_order_cancelled"
         | "penalty_share_received"
+        | "chat_message"
+        | "call_incoming"
+        | "call_missed"
       payment_method_external:
         | "cash"
         | "bank_transfer"
@@ -9322,6 +9325,9 @@ export const Constants = {
         "sms_order_failed",
         "sms_order_cancelled",
         "penalty_share_received",
+        "chat_message",
+        "call_incoming",
+        "call_missed",
       ],
       payment_method_external: [
         "cash",
