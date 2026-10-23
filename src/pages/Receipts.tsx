@@ -267,7 +267,7 @@ export function ReceiptCard({ receipt }: { receipt: DbReceipt }) {
       <header className="flex items-start justify-between border-b border-hairline pb-4">
         <div>
           <p className="font-display text-lg font-bold text-foreground">
-            Tontine <span className="text-primary">Digital</span>
+            Tontine <span className="text-primary">Digitale</span>
           </p>
           <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
             Reçu de versement

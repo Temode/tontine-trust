@@ -33,7 +33,13 @@ export default function Auth() {
   const location = useLocation() as { state?: { from?: string } };
   const fromPath =
     location.state?.from && location.state.from !== "/auth" ? location.state.from : null;
-  const defaultPath = roles.includes("super_admin") ? "/admin/overview" : "/dashboard";
+  const hasPendingReferral = (() => {
+    try { return !!localStorage.getItem("pending_referral_code") || new URLSearchParams(window.location.search).has("ref"); }
+    catch { return false; }
+  })();
+  const defaultPath = hasPendingReferral
+    ? "/affiliation"
+    : roles.includes("super_admin") ? "/admin/overview" : "/dashboard";
   const redirectTo = fromPath ?? defaultPath;
 
   const [tab, setTab] = useState<"signin" | "signup">("signin");
@@ -123,7 +129,7 @@ export default function Auth() {
       if (fromIsAdmin && !isAdmin) dest = "/dashboard";
       else dest = fromPath;
     } else {
-      dest = isAdmin ? "/admin/overview" : "/dashboard";
+      dest = hasPendingReferral ? "/affiliation" : isAdmin ? "/admin/overview" : "/dashboard";
     }
     toast.success("Connexion réussie");
     navigate(dest, { replace: true });

@@ -7877,6 +7877,10 @@ export type Database = {
             }
             Returns: Json
           }
+      credit_referral_earning: {
+        Args: { _earning_id: string }
+        Returns: undefined
+      }
       current_terms_version: {
         Args: never
         Returns: {
