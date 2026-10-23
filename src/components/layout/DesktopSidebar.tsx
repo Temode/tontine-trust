@@ -28,7 +28,7 @@ export function DesktopSidebar() {
           <Logo size={40} />
           <div className="leading-tight">
             <p className="font-display text-lg font-bold text-foreground">
-              Tontine <span className="text-primary">Digital</span>
+              Tontine <span className="text-primary">Digitale</span>
             </p>
             <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
               Infrastructure financière
