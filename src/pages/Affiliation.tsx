@@ -74,6 +74,18 @@ export default function Affiliation() {
         </p>
       </header>
 
+      {referrer && (
+        <Card>
+          <CardContent className="flex items-center gap-3 p-4">
+            <UserCheck className="h-5 w-5 text-primary" />
+            <p className="text-sm">
+              Vous avez été parrainé par <span className="font-semibold">{referrer.full_name ?? "un membre"}</span>
+              {" "}depuis le {new Date(referrer.since).toLocaleDateString("fr-FR")}.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
       {sLoading ? (
         <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
       ) : summary && (
