@@ -112,7 +112,7 @@ export default function Affiliation() {
 
           <div className="grid gap-3 md:grid-cols-4">
             <StatCard icon={<Users className="h-4 w-4" />} label="Filleuls" value={summary.referrals_count.toString()} />
-            <StatCard icon={<TrendingUp className="h-4 w-4" />} <StatCard icon={<TrendingUp className="h-4 w-4" />} label="Abonnés actifs" value={summary.active_count.toString()} /> value={summary.active_count.toString()} />
+            <StatCard icon={<TrendingUp className="h-4 w-4" />} label="Abonnés actifs" value={summary.active_count.toString()} />
             <StatCard icon={<Wallet className="h-4 w-4" />} label="En attente" value={xof(summary.pending)} />
             <StatCard icon={<Wallet className="h-4 w-4" />} label="Payé" value={xof(summary.paid)} />
           </div>
