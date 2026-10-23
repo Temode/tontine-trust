@@ -5,6 +5,7 @@ import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import { invokeAuthOtp, mapAuthOtpError } from "@/lib/authOtp";
+import { claimPendingReferral } from "@/lib/referral";
 
 export type AppRole = Database["public"]["Enums"]["app_role"];
 import { setAuthSnapshot } from "@/lib/diagnostics/crashLogger";
@@ -125,18 +126,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // pendant la fenêtre où loadRoles n'est pas encore parti (setTimeout 0).
         setRolesLoading(true);
         setTimeout(() => loadRoles(uid), 0);
-        // M8: enregistre le parrainage capturé sur la landing (?ref=CODE), si présent.
-        try {
-          const code = localStorage.getItem("pending_referral_code");
-          if (code) {
-            void (async () => {
-              try {
-                await supabase.rpc("register_referral", { _code: code });
-              } catch { /* ignore */ }
-              localStorage.removeItem("pending_referral_code");
-            })();
-          }
-        } catch { /* localStorage unavailable */ }
+        // Parrainage : code capturé au chargement (?ref=CODE), connecté ou non.
+        setTimeout(() => { void claimPendingReferral().catch(() => {}); }, 0);
       } else if (!uid) {
         lastUserId = null;
         setRoles([]);

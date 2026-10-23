@@ -3442,6 +3442,51 @@ export type Database = {
           },
         ]
       }
+      payment_receipts: {
+        Row: {
+          amount: number
+          group_id: string | null
+          hash: string
+          id: string
+          issued_at: string
+          kind: string
+          label: string
+          payment_method: string | null
+          provider: string | null
+          receipt_number: string
+          source_id: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          group_id?: string | null
+          hash: string
+          id?: string
+          issued_at?: string
+          kind: string
+          label: string
+          payment_method?: string | null
+          provider?: string | null
+          receipt_number: string
+          source_id: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          group_id?: string | null
+          hash?: string
+          id?: string
+          issued_at?: string
+          kind?: string
+          label?: string
+          payment_method?: string | null
+          provider?: string | null
+          receipt_number?: string
+          source_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       payments: {
         Row: {
           amount: number
@@ -7942,6 +7987,7 @@ export type Database = {
         Returns: undefined
       }
       expire_stale_call_requests: { Args: never; Returns: number }
+      expire_subscriptions: { Args: never; Returns: Json }
       explain_contribution: {
         Args: { _contribution_id: string }
         Returns: Json
@@ -8015,6 +8061,7 @@ export type Database = {
       }
       get_my_affiliate_summary: { Args: never; Returns: Json }
       get_my_entitlements: { Args: never; Returns: Json }
+      get_my_referrer: { Args: never; Returns: Json }
       get_my_sms_balance: { Args: never; Returns: Json }
       get_my_solo_group: {
         Args: { _group_id: string }
@@ -8107,6 +8154,19 @@ export type Database = {
       is_rpc_context: { Args: never; Returns: boolean }
       is_super_admin: { Args: { _uid: string }; Returns: boolean }
       is_withdrawal_blocked: { Args: { _uid: string }; Returns: boolean }
+      issue_payment_receipt: {
+        Args: {
+          _amount: number
+          _group: string
+          _kind: string
+          _label: string
+          _method: string
+          _provider: string
+          _source: string
+          _user: string
+        }
+        Returns: string
+      }
       join_call: { Args: { p_call_id: string }; Returns: undefined }
       join_group_with_code: {
         Args: {

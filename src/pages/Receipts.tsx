@@ -8,6 +8,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { formatGNF } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { getReceiptById, listMyReceipts, type DbReceipt } from "@/lib/api/payouts";
+import { PaymentReceiptsSection } from "@/components/receipts/PaymentReceiptsSection";
 
 export default function Receipts() {
   const { id } = useParams<{ id?: string }>();
@@ -72,10 +73,11 @@ function ReceiptList() {
 
   return (
     <div className="animate-fade-in">
-      <TopBar title="Reçus" subtitle="Vos reçus de versement émis par la tontine." />
+      <TopBar title="Historique & reçus" subtitle="Reçus de vos paiements et de vos versements reçus." />
       <div className="space-y-6 px-5 py-6 lg:px-8 lg:py-8">
+        <PaymentReceiptsSection />
         <SectionCard
-          title="Mes reçus"
+          title="Reçus de versement reçus"
           subtitle={
             isLoading
               ? "Chargement…"

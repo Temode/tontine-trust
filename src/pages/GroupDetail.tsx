@@ -17,6 +17,7 @@ import {
   Wallet,
   X,
   Lock,
+  Sparkles,
 } from "lucide-react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -320,6 +321,7 @@ export default function GroupDetail() {
 
   const tabs: Array<{ id: Section; label: string }> = [
     { id: "overview", label: "Aperçu" },
+    { id: "assistant", label: "Assistant IA" },
     { id: "members", label: "Membres" },
     { id: "rotation", label: "Rotation" },
     ...(isOrganizer ? [{ id: "invitations" as Section, label: "Invitations" }] : []),
@@ -327,7 +329,6 @@ export default function GroupDetail() {
     ...(grp.rotation_order_kind === "auction" ? [{ id: "auctions" as Section, label: "Enchères" }] : []),
     ...(grp.status === "completed" ? [{ id: "reviews" as Section, label: "Avis" }] : []),
     { id: "chat", label: "Discussion" },
-    { id: "assistant", label: "Assistant" },
     ...(isOrganizer ? [{ id: "audit" as Section, label: "Audit" }] : []),
   ];
 
@@ -347,6 +348,18 @@ export default function GroupDetail() {
             <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Groupe de tontine</p>
             <h1 className="truncate font-display text-xl font-bold text-foreground lg:text-2xl">{grp.name}</h1>
           </div>
+          <button
+            type="button"
+            onClick={() => {
+              setSection("assistant");
+              setTimeout(() => document.getElementById("group-tabs")?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+            }}
+            className="inline-flex h-10 items-center gap-1.5 rounded-lg bg-primary px-3 text-xs font-semibold text-primary-foreground transition hover:bg-primary/90"
+          >
+            <Sparkles className="h-4 w-4" />
+            <span className="hidden sm:inline">Poser une question</span>
+            <span className="sm:hidden">Assistant</span>
+          </button>
           {isOrganizer && (
             <button
               type="button"
@@ -726,7 +739,7 @@ export default function GroupDetail() {
 
         <SmsRechargePanel groupId={grp.id} />
 
-        <div className="mt-6 inline-flex items-center gap-1 rounded-lg border border-hairline bg-card p-1" role="tablist" aria-label="Sections du groupe">
+        <div id="group-tabs" className="mt-6 inline-flex max-w-full scroll-mt-24 items-center gap-1 overflow-x-auto rounded-lg border border-hairline bg-card p-1" role="tablist" aria-label="Sections du groupe">
           {tabs.map((tab) => (
             <button
               key={tab.id}

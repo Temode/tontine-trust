@@ -1,16 +1,20 @@
-import { useQuery } from "@tanstack/react-query";
-import { Copy, Loader2, Share2, TrendingUp, Users, Wallet } from "lucide-react";
+import { useEffect } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Copy, Loader2, Share2, TrendingUp, UserCheck, Users, Wallet } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { getMyAffiliateSummary, listMyAffiliateEarnings } from "@/lib/api/business";
+import { supabase } from "@/integrations/supabase/client";
+import { claimPendingReferral, REFERRAL_MESSAGES, REFERRAL_RESULT_KEY, type ReferralClaimResult } from "@/lib/referral";
 
 function xof(n: number) {
-  return new Intl.NumberFormat("fr-FR").format(n) + " XOF";
+  return new Intl.NumberFormat("fr-FR").format(n) + " GNF";
 }
 
 export default function Affiliation() {
+  const qc = useQueryClient();
   const { data: summary, isLoading: sLoading } = useQuery({
     queryKey: ["affiliate-summary"],
     queryFn: getMyAffiliateSummary,
@@ -19,9 +23,31 @@ export default function Affiliation() {
     queryKey: ["affiliate-earnings"],
     queryFn: listMyAffiliateEarnings,
   });
+  const { data: referrer } = useQuery({
+    queryKey: ["my-referrer"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("get_my_referrer");
+      if (error) throw error;
+      return data as { full_name: string | null; since: string } | null;
+    },
+  });
+
+  useEffect(() => {
+    const show = (r: ReferralClaimResult) => {
+      (r === "ok" ? toast.success : toast.info)(REFERRAL_MESSAGES[r]);
+      try { sessionStorage.removeItem(REFERRAL_RESULT_KEY); } catch { /* ignore */ }
+      qc.invalidateQueries({ queryKey: ["my-referrer"] });
+    };
+    const prev = sessionStorage.getItem(REFERRAL_RESULT_KEY) as ReferralClaimResult | null;
+    if (prev) show(prev);
+    else void claimPendingReferral().catch(() => {});
+    const onClaim = (e: Event) => show((e as CustomEvent<ReferralClaimResult>).detail);
+    window.addEventListener("referral-claimed", onClaim);
+    return () => window.removeEventListener("referral-claimed", onClaim);
+  }, [qc]);
 
   const refLink = summary?.referral_code
-    ? `${window.location.origin}/?ref=${summary.referral_code}`
+    ? `${window.location.origin}/auth?ref=${summary.referral_code}`
     : "";
 
   const copyLink = async () => {
@@ -47,6 +73,18 @@ export default function Affiliation() {
           Partagez votre lien et gagnez une commission à chaque abonnement de vos filleuls.
         </p>
       </header>
+
+      {referrer && (
+        <Card>
+          <CardContent className="flex items-center gap-3 p-4">
+            <UserCheck className="h-5 w-5 text-primary" />
+            <p className="text-sm">
+              Vous avez été parrainé par <span className="font-semibold">{referrer.full_name ?? "un membre"}</span>
+              {" "}depuis le {new Date(referrer.since).toLocaleDateString("fr-FR")}.
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       {sLoading ? (
         <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
