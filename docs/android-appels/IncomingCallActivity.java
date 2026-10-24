@@ -168,12 +168,14 @@ public class IncomingCallActivity extends Activity {
         if (Settings.Global.getFloat(getContentResolver(), Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f) {
             return;
         }
-        ObjectAnimator x = ObjectAnimator.ofFloat(accept, View.SCALE_X, 1f, 1.06f, 1f);
-        ObjectAnimator y = ObjectAnimator.ofFloat(accept, View.SCALE_Y, 1f, 1.06f, 1f);
-        ObjectAnimator alpha = ObjectAnimator.ofFloat(accept, View.ALPHA, 0.85f, 1f, 0.85f);
+        ObjectAnimator x = ObjectAnimator.ofFloat(accept, View.SCALE_X, 1f, 1.06f);
+        ObjectAnimator y = ObjectAnimator.ofFloat(accept, View.SCALE_Y, 1f, 1.06f);
+        ObjectAnimator alpha = ObjectAnimator.ofFloat(accept, View.ALPHA, 0.85f, 1f);
         for (ObjectAnimator animator : new ObjectAnimator[]{x, y, alpha}) {
-            animator.setDuration(1800L);
+            // CSS ease-in-out sur chaque demi-cycle : 900ms aller + 900ms retour.
+            animator.setDuration(900L);
             animator.setRepeatCount(ValueAnimator.INFINITE);
+            animator.setRepeatMode(ValueAnimator.REVERSE);
             animator.setInterpolator(new PathInterpolator(0.42f, 0f, 0.58f, 1f));
         }
         acceptAnimation = new AnimatorSet();
