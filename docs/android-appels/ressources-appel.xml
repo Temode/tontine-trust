@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  1) Créez ces 4 fichiers dans app/src/main/res/drawable/ (un cercle de couleur chacun) :
+     call_circle_teal.xml  -> couleur #0D7377
+     call_circle_red.xml   -> couleur #E5484D
+     call_circle_green.xml -> couleur #1FA855
+     call_circle_grey.xml  -> couleur #2A3F41
+     Contenu (changer seulement la couleur) :
+
+     <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="oval">
+         <solid android:color="#0D7377" />
+     </shape>
+
+  2) Collez les 3 styles ci-dessous dans app/src/main/res/values/styles.xml, avant </resources>.
+-->
+<resources>
+    <style name="CallBtnColumn">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:gravity">center_horizontal</item>
+        <item name="android:orientation">vertical</item>
+    </style>
+    <style name="CallBtn">
+        <item name="android:layout_width">76dp</item>
+        <item name="android:layout_height">76dp</item>
+        <item name="android:scaleType">center</item>
+        <item name="android:tint">#FFFFFF</item>
+    </style>
+    <style name="CallBtnLabel">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginTop">10dp</item>
+        <item name="android:textColor">#FFFFFF</item>
+        <item name="android:textSize">15sp</item>
+    </style>
+    <style name="IncomingCallTheme" parent="Theme.AppCompat.NoActionBar">
+        <item name="android:windowBackground">#0B2E30</item>
+        <item name="android:statusBarColor">#0B2E30</item>
+        <item name="android:navigationBarColor">#0B2E30</item>
+    </style>
+</resources>
+
+<!--
+  3) AndroidManifest.xml, dans <application>, à côté du service :
+
+  <activity
+      android:name=".IncomingCallActivity"
+      android:exported="false"
+      android:launchMode="singleInstance"
+      android:excludeFromRecents="true"
+      android:showWhenLocked="true"
+      android:turnScreenOn="true"
+      android:screenOrientation="portrait"
+      android:theme="@style/IncomingCallTheme" />
+-->

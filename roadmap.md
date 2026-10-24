@@ -1,0 +1,3 @@
+- [x] Écran d'appel plein écran Android (fichiers natifs dans docs/android-appels/, à copier par l'utilisateur)
+- [ ] Écran d'appel iPhone (CallKit + PushKit) — bloqué : Mac + compte Apple Developer
+- [ ] Notifications iPhone : test réel — bloqué : clé APNs .p8 dans Firebase + iPhone

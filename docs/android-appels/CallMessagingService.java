@@ -32,11 +32,14 @@ public class CallMessagingService extends MessagingService {
         String kind = d.get("kind");
         String callId = d.get("call_id");
         if ("call_incoming".equals(kind) && callId != null) {
-            showIncomingCall(callId, d.get("title"), d.get("body"));
+            showIncomingCall(callId, d);
             return;
         }
         if ("call_cancel".equals(kind) && callId != null) {
             NotificationManagerCompat.from(this).cancel(callId.hashCode());
+            Intent close = new Intent(IncomingCallActivity.ACTION_CLOSE).setPackage(getPackageName());
+            close.putExtra("call_id", callId);
+            sendBroadcast(close);
             return;
         }
         super.onMessageReceived(msg);
@@ -50,7 +53,20 @@ public class CallMessagingService extends MessagingService {
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
     }
 
-    private void showIncomingCall(String callId, String title, String body) {
+    private PendingIntent fullScreen(String callId, Map<String, String> d, int req) {
+        Intent i = new Intent(this, IncomingCallActivity.class);
+        i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_NO_USER_ACTION);
+        i.putExtra("call_id", callId);
+        for (String k : new String[]{"group_id", "group_name", "caller_name", "caller_avatar_url"}) i.putExtra(k, d.get(k));
+        return PendingIntent.getActivity(this, req, i,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+    }
+
+    private void showIncomingCall(String callId, Map<String, String> d) {
+        String caller = d.get("caller_name");
+        String group = d.get("group_name");
+        String title = caller != null && !caller.isEmpty() ? caller : d.get("title");
+        String body = group != null && !group.isEmpty() ? "Appel audio · Tontine " + group : d.get("body");
         Uri ringtone = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE);
         NotificationManager nm = getSystemService(NotificationManager.class);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && nm.getNotificationChannel(CHANNEL_ID) == null) {
@@ -82,7 +98,7 @@ public class CallMessagingService extends MessagingService {
                 .setAutoCancel(true)
                 .setTimeoutAfter(RING_MS)
                 .setContentIntent(answer)
-                .setFullScreenIntent(answer, true)
+                .setFullScreenIntent(fullScreen(callId, d, id + 2), true)
                 .addAction(0, "Refuser", decline)
                 .addAction(0, "Décrocher", answer);
 
