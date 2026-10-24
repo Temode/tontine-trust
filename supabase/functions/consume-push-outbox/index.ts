@@ -26,12 +26,12 @@ Deno.serve(async (req) => {
         .eq("id", job.data.call_id).maybeSingle();
       if (c) {
         const { data: p } = await sb.from("profiles").select("full_name, avatar_url").eq("id", c.requested_by).maybeSingle();
-        const { data: dn } = await sb.rpc("member_display_name", { _user_id: c.requested_by }).then((r) => r, () => ({ data: null }));
+        const { data: dn } = await sb.rpc("member_display_name", { _name: p?.full_name ?? "" });
         job.data = {
           ...job.data,
           group_id: c.group_id,
           group_name: (c as { group?: { name?: string } }).group?.name ?? "",
-          caller_name: (typeof dn === "string" && dn) || p?.full_name || "Un membre",
+          caller_name: (typeof dn === "string" && dn) || "Un membre",
           caller_avatar_url: p?.avatar_url ?? "",
         };
       }
