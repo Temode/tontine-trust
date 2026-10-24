@@ -90,7 +90,7 @@ public class IncomingCallActivity extends Activity {
 
         ContextCompat.registerReceiver(this, closeReceiver, new IntentFilter(ACTION_CLOSE),
                 ContextCompat.RECEIVER_NOT_EXPORTED);
-        startRinging();
+        // La sonnerie et la vibration viennent de la notification d'appel (une seule source).
         handler.postDelayed(this::finishCall, RING_MS);
     }
 
