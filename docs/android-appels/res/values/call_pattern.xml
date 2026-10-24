@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- CSS px → Android dp (unités logiques indépendantes de la densité). -->
+    <dimen name="call_pattern_tile">28dp</dimen>
+    <dimen name="call_pattern_offset">14dp</dimen>
+    <dimen name="call_pattern_radius">1dp</dimen>
+    <dimen name="call_pattern_fade_radius">1.2dp</dimen>
+    <fraction name="call_pattern_first_opacity">7%</fraction>
+    <fraction name="call_pattern_second_opacity">5%</fraction>
+</resources>

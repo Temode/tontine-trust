@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Copie des tokens :root de src/index.css. Conversion HSL → sRGB, arrondie sur 8 bits. -->
+<resources>
+    <color name="call_background">#032B30</color><!-- primary-900 -->
+    <color name="call_pattern">#436D70</color><!-- chat-pattern -->
+    <color name="call_avatar">#0D7277</color><!-- primary -->
+    <color name="call_foreground">#F8F6F2</color><!-- primary-foreground -->
+    <color name="call_secondary">#ACD3D8</color><!-- primary-200 -->
+    <color name="call_accept">#197654</color><!-- success -->
+    <color name="call_decline">#B1252A</color><!-- destructive -->
+    <color name="call_message">#053D42</color><!-- primary-800 -->
+    <color name="call_accept_foreground">#FFFFFF</color><!-- success-foreground -->
+    <color name="call_decline_foreground">#FFFFFF</color><!-- destructive-foreground -->
+</resources>
