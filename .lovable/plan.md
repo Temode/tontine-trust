@@ -18,6 +18,11 @@ iPhone
 - Prérequis de votre côté : un Mac avec Xcode et un compte Apple Developer (99 $/an), pour créer le certificat d'appel Apple. Je vous guide pas à pas.
 - Tant que ce n'est pas fait, l'iPhone garde la notification d'appel actuelle.
 
+Notifications classiques sur iPhone (messages, cotisations, reçus…)
+- L'envoi est déjà préparé pour l'iPhone, avec son, et toucher la notification ouvre le même bon écran que sur Android.
+- Pas encore testé : il faut, une seule fois, déposer la clé de notifications Apple (fichier .p8 du compte Apple Developer) dans Firebase, et activer « Push Notifications » dans Xcode. Je vous guide.
+- Test ensuite : notification test vers un iPhone connecté au compte B, écran verrouillé, avec son.
+
 Ordre de livraison
 1. Android d'abord (votre TECNO est prêt pour tester tout de suite).
 2. iPhone dès que vous avez le Mac et le compte Apple Developer.
