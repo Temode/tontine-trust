@@ -1,22 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- À placer dans app/src/main/res/layout/activity_incoming_call.xml -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/call_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#0B2E30"
+    android:background="@color/call_background"
     android:gravity="center_horizontal"
     android:orientation="vertical"
-    android:paddingTop="96dp"
-    android:paddingBottom="48dp">
+    android:paddingTop="72dp"
+    android:paddingBottom="40dp">
 
     <TextView
         android:id="@+id/call_name"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:ellipsize="end"
-        android:maxLines="1"
+        android:gravity="center"
         android:paddingHorizontal="24dp"
-        android:textColor="#FFFFFF"
+        android:textColor="@color/call_foreground"
         android:textSize="30sp"
         android:textStyle="bold" />
 
@@ -24,14 +24,20 @@
         android:id="@+id/call_group"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:textColor="#B8D4D5"
+        android:layout_marginTop="6dp"
+        android:paddingHorizontal="24dp"
+        android:gravity="center"
+        android:textColor="@color/call_secondary"
         android:textSize="16sp" />
 
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+
     <FrameLayout
-        android:layout_width="180dp"
-        android:layout_height="180dp"
-        android:layout_marginTop="72dp">
+        android:layout_width="200dp"
+        android:layout_height="200dp">
 
         <TextView
             android:id="@+id/call_initials"
@@ -39,7 +45,7 @@
             android:layout_height="match_parent"
             android:background="@drawable/call_circle_teal"
             android:gravity="center"
-            android:textColor="#FFFFFF"
+            android:textColor="@color/call_foreground"
             android:textSize="56sp"
             android:textStyle="bold" />
 
@@ -56,18 +62,20 @@
     <View
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1" />
+        android:layout_weight="1.15" />
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal">
+        android:orientation="horizontal"
+        android:baselineAligned="false">
 
         <LinearLayout style="@style/CallBtnColumn">
             <ImageButton
                 android:id="@+id/btn_decline"
                 style="@style/CallBtn"
                 android:background="@drawable/call_circle_red"
+                android:tint="@color/call_decline_foreground"
                 android:contentDescription="Refuser"
                 android:rotation="135"
                 android:src="@android:drawable/sym_action_call" />
@@ -79,6 +87,7 @@
                 android:id="@+id/btn_accept"
                 style="@style/CallBtn"
                 android:background="@drawable/call_circle_green"
+                android:tint="@color/call_accept_foreground"
                 android:contentDescription="Décrocher"
                 android:src="@android:drawable/sym_action_call" />
             <TextView style="@style/CallBtnLabel" android:text="Décrocher" />
@@ -89,6 +98,7 @@
                 android:id="@+id/btn_message"
                 style="@style/CallBtn"
                 android:background="@drawable/call_circle_grey"
+                android:tint="@color/call_foreground"
                 android:contentDescription="Message"
                 android:src="@android:drawable/sym_action_chat" />
             <TextView style="@style/CallBtnLabel" android:text="Message" />

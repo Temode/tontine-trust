@@ -1,6 +1,9 @@
 package com.tontinedigitale.app;
 
 import android.app.Activity;
+import android.animation.AnimatorSet;
+import android.animation.ObjectAnimator;
+import android.animation.ValueAnimator;
 import android.app.KeyguardManager;
 import android.content.BroadcastReceiver;
 import android.content.Context;
@@ -18,7 +21,10 @@ import android.os.Handler;
 import android.os.Looper;
 import android.os.VibrationEffect;
 import android.os.Vibrator;
+import android.provider.Settings;
+import android.view.View;
 import android.view.WindowManager;
+import android.view.animation.PathInterpolator;
 import android.widget.ImageView;
 import android.widget.TextView;
 
@@ -39,6 +45,7 @@ public class IncomingCallActivity extends Activity {
     private String groupId;
     private Ringtone ringtone;
     private Vibrator vibrator;
+    private AnimatorSet acceptAnimation;
     private final Handler handler = new Handler(Looper.getMainLooper());
 
     private final BroadcastReceiver closeReceiver = new BroadcastReceiver() {
@@ -61,6 +68,7 @@ public class IncomingCallActivity extends Activity {
                 | WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
                 | WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         setContentView(R.layout.activity_incoming_call);
+        findViewById(R.id.call_root).setBackground(new CallWallpaperDrawable(this));
 
         Intent in = getIntent();
         callId = in.getStringExtra("call_id");
@@ -68,14 +76,12 @@ public class IncomingCallActivity extends Activity {
         String name = in.getStringExtra("caller_name");
         String group = in.getStringExtra("group_name");
         String avatar = in.getStringExtra("caller_avatar_url");
-        if (name == null || name.isEmpty()) name = "Un membre";
-
-        ((TextView) findViewById(R.id.call_name)).setText(name);
-        ((TextView) findViewById(R.id.call_group)).setText(
-                group != null && !group.isEmpty() ? "Tontine " + group + " · Appel audio" : "Appel audio Tontine Digitale");
+        CallIdentity identity = CallIdentity.from(name, group);
+        ((TextView) findViewById(R.id.call_name)).setText(identity.title);
+        ((TextView) findViewById(R.id.call_group)).setText(identity.subtitle);
         TextView initials = findViewById(R.id.call_initials);
-        initials.setText(initialsOf(name));
-        loadAvatar(avatar);
+        initials.setText(identity.initials);
+        if (identity.callerKnown) loadAvatar(avatar);
 
         findViewById(R.id.btn_decline).setOnClickListener(v -> openApp("?action=decline", true));
         findViewById(R.id.btn_accept).setOnClickListener(v -> openApp("", true));
@@ -145,6 +151,7 @@ public class IncomingCallActivity extends Activity {
                 Bitmap bmp = BitmapFactory.decodeStream(is);
                 is.close();
                 if (bmp != null) handler.post(() -> {
+                    if (isFinishing() || isDestroyed()) return;
                     ImageView iv = findViewById(R.id.call_avatar);
                     iv.setImageBitmap(bmp);
                     iv.setVisibility(android.view.View.VISIBLE);
@@ -154,18 +161,52 @@ public class IncomingCallActivity extends Activity {
         }).start();
     }
 
-    private static String initialsOf(String name) {
-        String[] parts = name.trim().split("\\s+");
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < parts.length && sb.length() < 2; i++)
-            if (!parts[i].isEmpty()) sb.append(Character.toUpperCase(parts[i].charAt(0)));
-        return sb.toString();
+    @Override protected void onResume() {
+        super.onResume();
+        View accept = findViewById(R.id.btn_accept);
+        // Équivalent natif de prefers-reduced-motion. Recontrôlé à chaque reprise.
+        if (Settings.Global.getFloat(getContentResolver(), Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f) {
+            return;
+        }
+        ObjectAnimator x = ObjectAnimator.ofFloat(accept, View.SCALE_X, 1f, 1.06f);
+        ObjectAnimator y = ObjectAnimator.ofFloat(accept, View.SCALE_Y, 1f, 1.06f);
+        ObjectAnimator alpha = ObjectAnimator.ofFloat(accept, View.ALPHA, 0.85f, 1f);
+        for (ObjectAnimator animator : new ObjectAnimator[]{x, y, alpha}) {
+            // CSS ease-in-out sur chaque demi-cycle : 900ms aller + 900ms retour.
+            animator.setDuration(900L);
+            animator.setRepeatCount(ValueAnimator.INFINITE);
+            animator.setRepeatMode(ValueAnimator.REVERSE);
+            animator.setInterpolator(new PathInterpolator(0.42f, 0f, 0.58f, 1f));
+        }
+        acceptAnimation = new AnimatorSet();
+        acceptAnimation.playTogether(x, y, alpha);
+        acceptAnimation.start();
+    }
+
+    @Override protected void onPause() {
+        stopAcceptAnimation();
+        super.onPause();
+    }
+
+    private void stopAcceptAnimation() {
+        if (acceptAnimation != null) {
+            acceptAnimation.cancel();
+            acceptAnimation = null;
+        }
+        View accept = findViewById(R.id.btn_accept);
+        if (accept != null) {
+            accept.setScaleX(1f);
+            accept.setScaleY(1f);
+            accept.setAlpha(1f);
+        }
     }
 
     @Override public void onBackPressed() { /* on ne ferme pas un appel avec Retour */ }
 
     @Override
     protected void onDestroy() {
+        stopAcceptAnimation();
+        handler.removeCallbacksAndMessages(null);
         stopRinging();
         try { unregisterReceiver(closeReceiver); } catch (Exception ignored) { }
         super.onDestroy();

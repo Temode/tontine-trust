@@ -31,7 +31,8 @@ Deno.serve(async (req) => {
           ...job.data,
           group_id: c.group_id,
           group_name: (c as { group?: { name?: string } }).group?.name ?? "",
-          caller_name: (typeof dn === "string" && dn) || "Un membre",
+          // L'écran natif utilise la tontine si l'identité n'est pas connue.
+          caller_name: typeof dn === "string" && dn.trim() && dn.trim().toLowerCase() !== "un membre" ? dn.trim() : "",
           caller_avatar_url: p?.avatar_url ?? "",
         };
       }
