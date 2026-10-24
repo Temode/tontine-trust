@@ -9,4 +9,4 @@
 - Lexique: "tontine" est le terme utilisateur pour un groupe d'épargne. Ne pas alterner avec "groupe" dans les libellés d'interface. Les URLs peuvent rester en /groupes.
 - Les sous-titres d'en-tête ne doivent jamais être tronqués; si le texte ne tient pas, raccourcir le texte et non le conteneur.
 - Tout compteur affiché sur deux écrans doit venir d'une seule source de vérité.
-- Incoming calls on Android: call_incoming/call_cancel are sent as FCM data-only messages handled by native CallMessagingService (source in docs/android-appels/, copied by hand into the user's android project) — full-screen ringing needs native code.
+- Incoming calls on Android: call_incoming/call_cancel are sent as FCM data-only messages handled by native CallMessagingService, whose full-screen intent opens native IncomingCallActivity (source in docs/android-appels/, copied by hand into the user's android project) — full-screen ringing needs native code.
