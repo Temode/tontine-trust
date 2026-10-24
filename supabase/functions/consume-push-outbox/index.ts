@@ -19,6 +19,23 @@ Deno.serve(async (req) => {
   let sent = 0;
   for (const job of jobs ?? []) {
     const { data: tokens } = await sb.from("push_tokens").select("token").eq("user_id", job.user_id);
+    // Écran d'appel natif : nom, photo et tontine de l'appelant.
+    if (job.data?.kind === "call_incoming" && job.data?.call_id) {
+      const { data: c } = await sb.from("call_requests")
+        .select("group_id, requested_by, group:groups!call_requests_group_id_fkey(name)")
+        .eq("id", job.data.call_id).maybeSingle();
+      if (c) {
+        const { data: p } = await sb.from("profiles").select("full_name, avatar_url").eq("id", c.requested_by).maybeSingle();
+        const { data: dn } = await sb.rpc("member_display_name", { _user_id: c.requested_by }).then((r) => r, () => ({ data: null }));
+        job.data = {
+          ...job.data,
+          group_id: c.group_id,
+          group_name: (c as { group?: { name?: string } }).group?.name ?? "",
+          caller_name: (typeof dn === "string" && dn) || p?.full_name || "Un membre",
+          caller_avatar_url: p?.avatar_url ?? "",
+        };
+      }
+    }
     let ok = false;
     let lastErr = "";
     for (const { token } of tokens ?? []) {
