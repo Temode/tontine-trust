@@ -1,36 +1,36 @@
-Écran d'appel entrant plein écran façon WhatsApp (Android)
+Écran d'appel entrant plein écran façon WhatsApp (Android et iPhone)
 
 Ce que vous verrez
-- Téléphone en veille : l'écran s'allume directement sur un grand écran d'appel Tontine Digitale, sans passer par une notification.
-- En haut : nom de l'appelant, puis la tontine en dessous ; au centre : sa photo ronde (ou ses initiales sur fond sarcelle).
-- En bas : « Refuser » (rouge) et « Décrocher » (vert), grandes cibles tactiles. Un 3e bouton « Message » ouvre la discussion de la tontine.
-- Ça sonne et vibre en continu jusqu'à 60 s, puis « Appel manqué ».
-- Décrocher : l'app s'ouvre directement dans l'appel en cours (haut-parleur, micro, terminer), sans écran de connexion entre les deux.
+- Téléphone en veille : l'écran s'allume directement sur un grand écran d'appel, sans passer par une notification.
+- Nom de l'appelant, tontine en dessous, photo ronde (ou initiales sur fond sarcelle).
+- Boutons « Refuser » et « Décrocher » ; sonnerie et vibration continues jusqu'à 60 s, puis « Appel manqué ».
+- Décrocher : l'app s'ouvre directement dans l'appel en cours.
 - Si l'appelant raccroche avant : l'écran se ferme tout seul.
-- Rien à régler pour vos clients : tout est prévu dans l'app.
+- Rien à régler pour vos clients.
 
-Pourquoi ça ne marchait pas
-- Aujourd'hui, l'appel ouvre l'app normale (la page de l'appel web). Sur un téléphone verrouillé, Android préfère un écran dédié, léger, prévu pour l'appel : c'est ce que fait WhatsApp.
+Android
+- Écran d'appel dédié à Tontine Digitale (comme WhatsApp sur votre capture), avec un bouton « Message » qui ouvre la discussion de la tontine.
+- Vous ajoutez 2 fichiers dans Android Studio, remplacez CallMessagingService.java, collez 1 bloc dans AndroidManifest.xml. Je vous guide pas à pas.
 
-Ce que vous aurez à faire (une seule fois)
-- Ajouter 2 fichiers dans Android Studio (l'écran d'appel et sa mise en page), remplacer CallMessagingService.java, coller 1 bloc dans AndroidManifest.xml. Je vous guide pas à pas comme avant.
-- Puis Run, verrouiller, et je relance l'appel.
+iPhone
+- Apple impose son propre écran d'appel (le même que pour un appel téléphonique ou WhatsApp sur iPhone) : nom de l'appelant, « Tontine Digitale Audio », Refuser / Accepter, sonnerie même téléphone verrouillé. C'est la seule façon autorisée par Apple, et c'est ce que fait WhatsApp.
+- L'appel apparaît aussi dans l'historique « Récents » de l'iPhone.
+- Prérequis de votre côté : un Mac avec Xcode et un compte Apple Developer (99 $/an), pour créer le certificat d'appel Apple. Je vous guide pas à pas.
+- Tant que ce n'est pas fait, l'iPhone garde la notification d'appel actuelle.
 
-Test
-1. Téléphone en veille : l'écran d'appel s'affiche-t-il ?
+Ordre de livraison
+1. Android d'abord (votre TECNO est prêt pour tester tout de suite).
+2. iPhone dès que vous avez le Mac et le compte Apple Developer.
+
+Test (sur chaque téléphone)
+1. En veille : l'écran d'appel s'affiche-t-il ?
 2. Refuser : la sonnerie s'arrête et le compte A voit « refusé ».
-3. Décrocher : vous êtes dans l'appel, et on s'entend.
+3. Décrocher : vous êtes dans l'appel et on s'entend.
 4. Sans réponse : arrêt après 60 s et « Appel manqué ».
 
-Limites
-- Android uniquement ; iPhone demandera l'écran d'appel Apple au moment de la publication App Store.
-- Android 14 et plus : l'autorisation plein écran est accordée d'office aux apps d'appel ; si le Play Store la refuse à notre catégorie, l'app vous la demandera une seule fois en un toucher.
-
 Détails techniques
-- Nouvelle IncomingCallActivity native (showWhenLocked, turnScreenOn, excludeFromRecents, launchMode singleInstance, thème sombre plein écran) cible du setFullScreenIntent ; layout XML avec avatar, nom, tontine, boutons.
-- consume-push-outbox : ajouter caller_name, caller_avatar_url, group_name, group_id dans le payload data de call_incoming.
-- Avatar téléchargé dans l'Activity (HttpURLConnection, timeout 3 s), initiales sinon.
-- Sonnerie gérée par l'Activity (Ringtone + Vibrator) quand elle est visible ; la notification reste en secours.
-- Refuser : appel direct à respond_call_request avec la session stockée côté web impossible en natif → l'Activity ouvre l'app en arrière-plan via le deep link ?action=decline puis se ferme ; Décrocher → deep link /appel/:id?action=accept, CallJoin rejoint automatiquement.
-- call_cancel ferme l'Activity via broadcast local.
-- Fichiers de référence dans docs/android-appels/ (IncomingCallActivity.java, activity_incoming_call.xml, manifeste).
+- Android : IncomingCallActivity native (showWhenLocked, turnScreenOn, singleInstance) cible du setFullScreenIntent ; layout XML ; sonnerie Ringtone + Vibrator ; call_cancel ferme l'Activity par broadcast local ; Décrocher → deep link /appel/:id?action=accept, Refuser → ?action=decline.
+- iOS : PushKit (VoIP push) + CallKit via un plugin Capacitor (ex. capacitor-voip / plugin maison dans docs/ios-appels/). Enregistrement du token VoIP dans push_tokens (platform "ios_voip"). Apple exige d'appeler reportNewIncomingCall à chaque push VoIP. Réponse/refus CallKit → deep link vers /appel/:id.
+- Serveur : consume-push-outbox ajoute caller_name, caller_avatar_url, group_name, group_id au payload call_incoming ; pour les tokens ios_voip, envoi APNs VoIP (apns-push-type voip, topic <bundle>.voip) via le certificat/clé APNs à fournir en secret ; call_cancel termine l'appel CallKit.
+- CallJoin : gestion de ?action=accept (rejoint automatiquement).
+- Fichiers natifs de référence dans docs/android-appels/ et docs/ios-appels/.
