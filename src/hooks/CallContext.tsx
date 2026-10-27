@@ -13,6 +13,7 @@ import {
   LiveKitRoom,
   RoomAudioRenderer,
   useConnectionState,
+  useParticipants,
 } from "@livekit/components-react";
 import { ConnectionState } from "livekit-client";
 import { Loader2, PhoneCall, ShieldAlert, WifiOff } from "lucide-react";
@@ -21,6 +22,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useCallTimer } from "@/hooks/useCallTimer";
 import { CallStage, usePictureInPicture } from "@/components/messages/CallOverlay";
+import { AudioCallStage } from "@/components/messages/AudioCallStage";
 import { CallMiniPlayer } from "@/components/messages/CallMiniPlayer";
 import { AudioOutputControl } from "@/components/messages/AudioOutputControl";
 import type { PreCallDevicePrefs } from "@/components/messages/MicPermissionGate";
@@ -358,7 +360,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
         createPortal(
           <div ref={containerRef}>
             {mode === "full" && (loading || error) && (
-              <div className="fixed inset-0 z-[80] flex flex-col items-center justify-center gap-3 bg-[#0b0d10] p-6 text-center">
+              <div className="call-surface fixed inset-0 z-[80] flex flex-col items-center justify-center gap-3 p-6 text-center">
                 {error ? (
                   <>
                     <ShieldAlert className="h-8 w-8 text-destructive" />
@@ -417,11 +419,13 @@ export function CallProvider({ children }: { children: ReactNode }) {
                   />
                 )}
                 {mode === "full" ? (
-                  <div className="fixed inset-0 z-[80] bg-[#0b0d10]">
-                    <CallStage
+                  <div className="call-surface fixed inset-0 z-[80]">
+                    <FullCallStage
                       callId={session.callId}
                       isHost={tokenData.isHost}
+                      groupId={session.groupId}
                       groupName={session.groupName}
+                      connectedAt={connectedAt}
                       onMinimize={() => setMode("mini")}
                       onHangup={hangup}
                       onTogglePip={() => void togglePipWithFallback()}
@@ -452,6 +456,62 @@ export function CallProvider({ children }: { children: ReactNode }) {
           document.body,
         )}
     </Ctx.Provider>
+  );
+}
+
+/**
+ * Aiguillage plein écran : audio par défaut, grille visioconférence (CallStage)
+ * dès qu'au moins un participant a réellement la caméra activée.
+ * La bascule est dynamique et ne démonte jamais <LiveKitRoom>.
+ */
+function FullCallStage({
+  callId,
+  isHost,
+  groupId,
+  groupName,
+  connectedAt,
+  onMinimize,
+  onHangup,
+  onTogglePip,
+  pipSupported,
+  pipActive,
+}: {
+  callId: string;
+  isHost: boolean;
+  groupId?: string;
+  groupName?: string;
+  connectedAt: string | null;
+  onMinimize: () => void;
+  onHangup: () => void;
+  onTogglePip: () => void;
+  pipSupported: boolean;
+  pipActive: boolean;
+}) {
+  const participants = useParticipants();
+  const anyCameraOn = participants.some((p) => p.isCameraEnabled);
+
+  if (!anyCameraOn) {
+    return (
+      <AudioCallStage
+        groupId={groupId}
+        groupName={groupName}
+        connectedAt={connectedAt}
+        onMinimize={onMinimize}
+        onHangup={onHangup}
+      />
+    );
+  }
+  return (
+    <CallStage
+      callId={callId}
+      isHost={isHost}
+      groupName={groupName}
+      onMinimize={onMinimize}
+      onHangup={onHangup}
+      onTogglePip={onTogglePip}
+      pipSupported={pipSupported}
+      pipActive={pipActive}
+    />
   );
 }
 
