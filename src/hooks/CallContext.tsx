@@ -21,6 +21,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useCallTimer } from "@/hooks/useCallTimer";
 import { CallStage, usePictureInPicture } from "@/components/messages/CallOverlay";
+import { AudioCallStage } from "@/components/messages/AudioCallStage";
 import { CallMiniPlayer } from "@/components/messages/CallMiniPlayer";
 import { AudioOutputControl } from "@/components/messages/AudioOutputControl";
 import type { PreCallDevicePrefs } from "@/components/messages/MicPermissionGate";
@@ -358,7 +359,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
         createPortal(
           <div ref={containerRef}>
             {mode === "full" && (loading || error) && (
-              <div className="fixed inset-0 z-[80] flex flex-col items-center justify-center gap-3 bg-[#0b0d10] p-6 text-center">
+              <div className="call-surface fixed inset-0 z-[80] flex flex-col items-center justify-center gap-3 p-6 text-center">
                 {error ? (
                   <>
                     <ShieldAlert className="h-8 w-8 text-destructive" />
@@ -417,11 +418,13 @@ export function CallProvider({ children }: { children: ReactNode }) {
                   />
                 )}
                 {mode === "full" ? (
-                  <div className="fixed inset-0 z-[80] bg-[#0b0d10]">
-                    <CallStage
+                  <div className="call-surface fixed inset-0 z-[80]">
+                    <FullCallStage
                       callId={session.callId}
                       isHost={tokenData.isHost}
+                      groupId={session.groupId}
                       groupName={session.groupName}
+                      connectedAt={connectedAt}
                       onMinimize={() => setMode("mini")}
                       onHangup={hangup}
                       onTogglePip={() => void togglePipWithFallback()}
