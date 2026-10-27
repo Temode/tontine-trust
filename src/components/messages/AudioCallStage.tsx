@@ -193,7 +193,7 @@ export function AudioCallStage({
         {speaker && (
           <div
             className="relative flex h-[158px] w-[158px] items-center justify-center rounded-full bg-primary"
-            style={{ boxShadow: speaker.isSpeaking ? SPEAKING_RING : undefined }}
+            style={{ boxShadow: holdsFloor ? SPEAKING_RING : undefined }}
           >
             <span className="font-display text-[50px] font-bold text-primary-foreground">
               {getInitials(displayName(speaker))}
@@ -205,7 +205,8 @@ export function AudioCallStage({
           {speaker ? displayName(speaker) : groupName ?? "Appel"}
         </p>
         <p className="mt-1 text-body-sm text-primary-200">
-          {speaker?.isSpeaking ? "parle" : "en écoute"}
+          {/* La ligne est réservée quand personne n'a la parole : rien ne bouge. */}
+          {holdsFloor ? "parle" : "\u00A0"}
         </p>
 
         {/* Bandeau des autres participants */}
