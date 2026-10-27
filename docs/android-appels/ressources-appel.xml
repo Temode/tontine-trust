@@ -1,32 +1,38 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Copiez res/values/colors.xml, res/values/call_pattern.xml et res/drawable/ dans
-  app/src/main/res/ en conservant leur arborescence.
-  Copiez activity_incoming_call.xml dans app/src/main/res/layout/.
-  Copiez IncomingCallActivity.java, CallIdentity.java et CallWallpaperDrawable.java
-  dans le même dossier Java que MainActivity.
-  Collez les styles ci-dessous dans app/src/main/res/values/styles.xml, avant </resources>.
-  Ne supprimez pas les autres styles de votre application.
+  1) Copiez res/values/colors.xml, res/values/call_pattern.xml et tout res/drawable/ dans
+     app/src/main/res/ en conservant leur arborescence (remplacez les fichiers existants).
+     Nouveaux drawables : call_avatar_unknown, call_circle_message, call_ring_1, call_ring_2,
+     ic_call_person, ic_call_message.
+     Supprimez res/drawable/call_circle_grey.xml de votre projet : il n'est plus utilisé.
+  2) Copiez activity_incoming_call.xml dans app/src/main/res/layout/.
+     Copiez IncomingCallActivity.java, CallIdentity.java, CallMessagingService.java et
+     CallWallpaperDrawable.java dans le même dossier Java que MainActivity.
+     Remplacez dans app/src/main/res/values/styles.xml les anciens styles CallBtnColumn,
+     CallBtn et CallBtnLabel par ceux ci-dessous (CallBtn est supprimé), avant </resources>.
+     Ne supprimez pas les autres styles de votre application.
 -->
 <resources>
     <style name="CallBtnColumn">
-        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_width">wrap_content</item>
         <item name="android:layout_height">wrap_content</item>
-        <item name="android:layout_weight">1</item>
+        <item name="android:clipChildren">false</item>
         <item name="android:gravity">center_horizontal</item>
         <item name="android:orientation">vertical</item>
     </style>
-    <style name="CallBtn">
-        <item name="android:layout_width">76dp</item>
-        <item name="android:layout_height">76dp</item>
-        <item name="android:scaleType">center</item>
+    <!-- Refuser et Message : cercle 68dp, icône 27dp → marge intérieure (68 − 27) / 2 -->
+    <style name="CallBtnSecondary">
+        <item name="android:layout_width">68dp</item>
+        <item name="android:layout_height">68dp</item>
+        <item name="android:padding">20.5dp</item>
+        <item name="android:scaleType">fitCenter</item>
     </style>
     <style name="CallBtnLabel">
         <item name="android:layout_width">wrap_content</item>
         <item name="android:layout_height">wrap_content</item>
-        <item name="android:layout_marginTop">10dp</item>
-        <item name="android:textColor">@color/call_foreground</item>
-        <item name="android:textSize">16sp</item>
+        <item name="android:layout_marginTop">11dp</item>
+        <item name="android:textColor">@color/call_secondary</item>
+        <item name="android:textSize">14sp</item>
     </style>
     <style name="IncomingCallTheme" parent="Theme.AppCompat.NoActionBar">
         <item name="android:windowBackground">@color/call_background</item>
