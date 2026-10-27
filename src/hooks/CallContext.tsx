@@ -13,6 +13,7 @@ import {
   LiveKitRoom,
   RoomAudioRenderer,
   useConnectionState,
+  useParticipants,
 } from "@livekit/components-react";
 import { ConnectionState } from "livekit-client";
 import { Loader2, PhoneCall, ShieldAlert, WifiOff } from "lucide-react";
