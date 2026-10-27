@@ -44,7 +44,10 @@ export default function CallJoin() {
         callId: data.id,
         groupId: data.group_id,
         groupName,
-        prefs: { micMuted: false, camOff: false, screenShare: false },
+        // Décrochage depuis une notification ou un lien profond : c'est un
+        // appel audio. La vidéo ne s'allume que si l'utilisateur appuie sur
+        // Vidéo dans le dock, et l'aiguillage bascule alors vers la grille.
+        prefs: { micMuted: false, camOff: true, screenShare: false },
       });
       navigate(`/discussions/${data.group_id}`, { replace: true });
     })();
