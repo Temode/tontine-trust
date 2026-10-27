@@ -17,4 +17,8 @@
     <color name="call_hairline">#1AFFFFFF</color><!-- blanc à 10 % -->
     <color name="call_accept_ring_1">#73197654</color><!-- success à 45 % -->
     <color name="call_accept_ring_2">#33197654</color><!-- success à 20 % -->
+    <!-- Écran d'autorisation plein écran (thème clair de l'app) -->
+    <color name="app_background">#F9F8F6</color><!-- background 40 22% 97% -->
+    <color name="app_foreground">#0F1A1F</color><!-- foreground 200 35% 9% -->
+    <color name="app_muted_foreground">#58646A</color><!-- muted-foreground 200 9% 38% -->
 </resources>
