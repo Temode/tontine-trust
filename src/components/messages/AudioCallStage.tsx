@@ -33,6 +33,9 @@ const SPEAKING_RING =
 const BENEFICIARY_RING =
   "0 0 0 3px hsl(var(--primary-900)), 0 0 0 5px hsl(var(--accent))";
 
+/** Maintien de la désignation après le dernier mot détecté. */
+const FLOOR_HOLD_MS = 1500;
+
 function displayName(p: Participant): string {
   return p.name || p.identity;
 }
@@ -69,7 +72,8 @@ export function AudioCallStage({
   const [turn, setTurn] = useState<TurnFacts | null>(null);
   const [membersOpen, setMembersOpen] = useState(false);
   const [confirming, setConfirming] = useState(false);
-  const lastSpeakerRef = useRef<string | null>(null);
+  const [designatedId, setDesignatedId] = useState<string | null>(null);
+  const silenceTimerRef = useRef<number | null>(null);
 
   // Tour en cours et cagnotte — source : vue next_turn_per_group
   useEffect(() => {
