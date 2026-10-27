@@ -321,9 +321,9 @@ export function AudioCallStage({
         />
         <DockButton
           label="Micro"
-          active={micEnabled}
+          active={!micEnabled}
           onClick={() => void localParticipant?.setMicrophoneEnabled(!micEnabled)}
-          icon={<Mic className="h-[25px] w-[25px]" />}
+          icon={micEnabled ? <Mic className="h-[25px] w-[25px]" /> : <MicOff className="h-[25px] w-[25px]" />}
         />
         <DockButton
           label="Membres"
