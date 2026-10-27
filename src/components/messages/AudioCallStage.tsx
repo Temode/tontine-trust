@@ -33,6 +33,9 @@ const SPEAKING_RING =
 const BENEFICIARY_RING =
   "0 0 0 3px hsl(var(--primary-900)), 0 0 0 5px hsl(var(--accent))";
 
+/** Maintien de la désignation après le dernier mot détecté. */
+const FLOOR_HOLD_MS = 1500;
+
 function displayName(p: Participant): string {
   return p.name || p.identity;
 }
@@ -69,7 +72,8 @@ export function AudioCallStage({
   const [turn, setTurn] = useState<TurnFacts | null>(null);
   const [membersOpen, setMembersOpen] = useState(false);
   const [confirming, setConfirming] = useState(false);
-  const lastSpeakerRef = useRef<string | null>(null);
+  const [designatedId, setDesignatedId] = useState<string | null>(null);
+  const silenceTimerRef = useRef<number | null>(null);
 
   // Tour en cours et cagnotte — source : vue next_turn_per_group
   useEffect(() => {
@@ -88,16 +92,45 @@ export function AudioCallStage({
     };
   }, [groupId]);
 
-  // Qui parle : le dernier participant détecté en train de parler,
-  // sinon le premier participant distant, sinon soi-même.
-  const speakingNow = participants.find((p) => p.isSpeaking);
-  if (speakingNow) lastSpeakerRef.current = speakingNow.identity;
+  // Qui a la parole : un participant est désigné dès qu'il parle et le
+  // reste 1,5 s après son dernier mot, pour que l'anneau ne clignote pas
+  // sur les silences d'une phrase.
+  useEffect(() => {
+    const speakingNow = participants.find((p) => p.isSpeaking);
+    if (speakingNow) {
+      if (silenceTimerRef.current !== null) {
+        window.clearTimeout(silenceTimerRef.current);
+        silenceTimerRef.current = null;
+      }
+      setDesignatedId((prev) =>
+        prev === speakingNow.identity ? prev : speakingNow.identity,
+      );
+      return;
+    }
+    if (designatedId === null || silenceTimerRef.current !== null) return;
+    silenceTimerRef.current = window.setTimeout(() => {
+      silenceTimerRef.current = null;
+      setDesignatedId(null);
+    }, FLOOR_HOLD_MS);
+  }, [participants, designatedId]);
+
+  // Le minuteur de maintien ne survit pas à la fermeture de l'écran.
+  useEffect(
+    () => () => {
+      if (silenceTimerRef.current !== null) {
+        window.clearTimeout(silenceTimerRef.current);
+      }
+    },
+    [],
+  );
+
   const remotes = participants.filter((p) => p.identity !== localParticipant?.identity);
   const speaker =
-    participants.find((p) => p.identity === lastSpeakerRef.current) ??
+    participants.find((p) => p.identity === designatedId) ??
     remotes[0] ??
     localParticipant ??
     null;
+  const holdsFloor = speaker !== null && speaker.identity === designatedId;
 
   const beneficiaryId = turn?.beneficiary_user_id ?? null;
   const beneficiaryFirstName = firstName(turn?.beneficiary_name);
@@ -160,7 +193,7 @@ export function AudioCallStage({
         {speaker && (
           <div
             className="relative flex h-[158px] w-[158px] items-center justify-center rounded-full bg-primary"
-            style={{ boxShadow: speaker.isSpeaking ? SPEAKING_RING : undefined }}
+            style={{ boxShadow: holdsFloor ? SPEAKING_RING : undefined }}
           >
             <span className="font-display text-[50px] font-bold text-primary-foreground">
               {getInitials(displayName(speaker))}
@@ -172,7 +205,8 @@ export function AudioCallStage({
           {speaker ? displayName(speaker) : groupName ?? "Appel"}
         </p>
         <p className="mt-1 text-body-sm text-primary-200">
-          {speaker?.isSpeaking ? "parle" : "en écoute"}
+          {/* La ligne est réservée quand personne n'a la parole : rien ne bouge. */}
+          {holdsFloor ? "parle" : "\u00A0"}
         </p>
 
         {/* Bandeau des autres participants */}
@@ -287,9 +321,9 @@ export function AudioCallStage({
         />
         <DockButton
           label="Micro"
-          active={micEnabled}
+          active={!micEnabled}
           onClick={() => void localParticipant?.setMicrophoneEnabled(!micEnabled)}
-          icon={<Mic className="h-[25px] w-[25px]" />}
+          icon={micEnabled ? <Mic className="h-[25px] w-[25px]" /> : <MicOff className="h-[25px] w-[25px]" />}
         />
         <DockButton
           label="Membres"
