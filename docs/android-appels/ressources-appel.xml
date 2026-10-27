@@ -56,6 +56,16 @@
       android:screenOrientation="portrait"
       android:theme="@style/IncomingCallTheme" />
 
+  <activity
+      android:name=".CallPermissionActivity"
+      android:exported="false"
+      android:excludeFromRecents="true"
+      android:screenOrientation="portrait"
+      android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
+
+  2bis) Copiez activity_call_permission.xml dans app/src/main/res/layout/ et
+        res/drawable/app_button_primary.xml dans app/src/main/res/drawable/.
+
   4) AndroidManifest.xml, avant <application> :
 
   <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
@@ -65,5 +75,6 @@
 
   5) Fichiers Java du lot (tous dans java/com/tontinedigitale/app, remplacer en entier) :
      MainActivity, CallChannels, CallRinger, CallMessagingService,
-     IncomingCallActivity, CallIdentity, CallWallpaperDrawable.
+     IncomingCallActivity, CallIdentity, CallWallpaperDrawable, CallPermissionActivity.
+     CallStyle exige androidx.core 1.9 ou plus (déjà fourni par Capacitor 6/7).
 -->
