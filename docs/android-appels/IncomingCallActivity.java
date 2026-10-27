@@ -11,17 +11,19 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
-import android.media.AudioAttributes;
+import android.graphics.Typeface;
 import android.media.Ringtone;
-import android.media.RingtoneManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
-import android.os.VibrationEffect;
 import android.os.Vibrator;
 import android.provider.Settings;
+import android.text.SpannableString;
+import android.text.Spanned;
+import android.text.style.ForegroundColorSpan;
+import android.text.style.StyleSpan;
 import android.view.View;
 import android.view.WindowManager;
 import android.view.animation.PathInterpolator;
@@ -113,25 +115,6 @@ public class IncomingCallActivity extends Activity {
         i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
         startActivity(i);
         if (close) finishCall();
-    }
-
-    private void startRinging() {
-        try {
-            ringtone = RingtoneManager.getRingtone(this, RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE));
-            if (ringtone != null) {
-                ringtone.setAudioAttributes(new AudioAttributes.Builder()
-                        .setUsage(AudioAttributes.USAGE_NOTIFICATION_RINGTONE).build());
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) ringtone.setLooping(true);
-                ringtone.play();
-            }
-        } catch (Exception ignored) { }
-        vibrator = (Vibrator) getSystemService(VIBRATOR_SERVICE);
-        if (vibrator != null) {
-            long[] pattern = {0, 1000, 800};
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
-                vibrator.vibrate(VibrationEffect.createWaveform(pattern, 0));
-            else vibrator.vibrate(pattern, 0);
-        }
     }
 
     private void stopRinging() {
