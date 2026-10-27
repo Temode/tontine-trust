@@ -279,20 +279,18 @@ export function AudioCallStage({
           onClick={() => void toggleSpeaker()}
           icon={<Volume2 className="h-[25px] w-[25px]" />}
         />
-        <TrackToggle source={Track.Source.Camera} showIcon={false} asChild>
-          <DockButton
-            label="Vidéo"
-            active={camEnabled}
-            icon={<Video className="h-[25px] w-[25px]" />}
-          />
-        </TrackToggle>
-        <TrackToggle source={Track.Source.Microphone} showIcon={false} asChild>
-          <DockButton
-            label="Micro"
-            active={micEnabled}
-            icon={<Mic className="h-[25px] w-[25px]" />}
-          />
-        </TrackToggle>
+        <DockButton
+          label="Vidéo"
+          active={camEnabled}
+          onClick={() => void localParticipant?.setCameraEnabled(!camEnabled)}
+          icon={<Video className="h-[25px] w-[25px]" />}
+        />
+        <DockButton
+          label="Micro"
+          active={micEnabled}
+          onClick={() => void localParticipant?.setMicrophoneEnabled(!micEnabled)}
+          icon={<Mic className="h-[25px] w-[25px]" />}
+        />
         <DockButton
           label="Membres"
           active={membersOpen}
