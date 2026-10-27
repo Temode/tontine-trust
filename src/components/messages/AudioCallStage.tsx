@@ -92,16 +92,45 @@ export function AudioCallStage({
     };
   }, [groupId]);
 
-  // Qui parle : le dernier participant détecté en train de parler,
-  // sinon le premier participant distant, sinon soi-même.
-  const speakingNow = participants.find((p) => p.isSpeaking);
-  if (speakingNow) lastSpeakerRef.current = speakingNow.identity;
+  // Qui a la parole : un participant est désigné dès qu'il parle et le
+  // reste 1,5 s après son dernier mot, pour que l'anneau ne clignote pas
+  // sur les silences d'une phrase.
+  useEffect(() => {
+    const speakingNow = participants.find((p) => p.isSpeaking);
+    if (speakingNow) {
+      if (silenceTimerRef.current !== null) {
+        window.clearTimeout(silenceTimerRef.current);
+        silenceTimerRef.current = null;
+      }
+      setDesignatedId((prev) =>
+        prev === speakingNow.identity ? prev : speakingNow.identity,
+      );
+      return;
+    }
+    if (designatedId === null || silenceTimerRef.current !== null) return;
+    silenceTimerRef.current = window.setTimeout(() => {
+      silenceTimerRef.current = null;
+      setDesignatedId(null);
+    }, FLOOR_HOLD_MS);
+  }, [participants, designatedId]);
+
+  // Le minuteur de maintien ne survit pas à la fermeture de l'écran.
+  useEffect(
+    () => () => {
+      if (silenceTimerRef.current !== null) {
+        window.clearTimeout(silenceTimerRef.current);
+      }
+    },
+    [],
+  );
+
   const remotes = participants.filter((p) => p.identity !== localParticipant?.identity);
   const speaker =
-    participants.find((p) => p.identity === lastSpeakerRef.current) ??
+    participants.find((p) => p.identity === designatedId) ??
     remotes[0] ??
     localParticipant ??
     null;
+  const holdsFloor = speaker !== null && speaker.identity === designatedId;
 
   const beneficiaryId = turn?.beneficiary_user_id ?? null;
   const beneficiaryFirstName = firstName(turn?.beneficiary_name);
