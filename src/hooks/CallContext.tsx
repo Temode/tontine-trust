@@ -460,6 +460,62 @@ export function CallProvider({ children }: { children: ReactNode }) {
 }
 
 /**
+ * Aiguillage plein écran : audio par défaut, grille visioconférence (CallStage)
+ * dès qu'au moins un participant a réellement la caméra activée.
+ * La bascule est dynamique et ne démonte jamais <LiveKitRoom>.
+ */
+function FullCallStage({
+  callId,
+  isHost,
+  groupId,
+  groupName,
+  connectedAt,
+  onMinimize,
+  onHangup,
+  onTogglePip,
+  pipSupported,
+  pipActive,
+}: {
+  callId: string;
+  isHost: boolean;
+  groupId?: string;
+  groupName?: string;
+  connectedAt: string | null;
+  onMinimize: () => void;
+  onHangup: () => void;
+  onTogglePip: () => void;
+  pipSupported: boolean;
+  pipActive: boolean;
+}) {
+  const participants = useParticipants();
+  const anyCameraOn = participants.some((p) => p.isCameraEnabled);
+
+  if (!anyCameraOn) {
+    return (
+      <AudioCallStage
+        groupId={groupId}
+        groupName={groupName}
+        connectedAt={connectedAt}
+        onMinimize={onMinimize}
+        onHangup={onHangup}
+      />
+    );
+  }
+  return (
+    <CallStage
+      callId={callId}
+      isHost={isHost}
+      groupName={groupName}
+      onMinimize={onMinimize}
+      onHangup={onHangup}
+      onTogglePip={onTogglePip}
+      pipSupported={pipSupported}
+      pipActive={pipActive}
+    />
+  );
+}
+
+/**
  * Sonde de cycle de vie : compte les montages du sous-arbre <LiveKitRoom>.
  * Sert aux tests E2E à prouver que la salle n'est jamais démontée.
  */
