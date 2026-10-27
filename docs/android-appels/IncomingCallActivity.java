@@ -80,8 +80,14 @@ public class IncomingCallActivity extends Activity {
         ((TextView) findViewById(R.id.call_name)).setText(identity.title);
         ((TextView) findViewById(R.id.call_group)).setText(identity.subtitle);
         TextView initials = findViewById(R.id.call_initials);
-        initials.setText(identity.initials);
-        if (identity.callerKnown) loadAvatar(avatar);
+        if (identity.callerKnown) {
+            initials.setText(identity.initials);
+            loadAvatar(avatar);
+        } else {
+            initials.setVisibility(View.GONE);
+            findViewById(R.id.call_unknown).setVisibility(View.VISIBLE);
+        }
+        bindTurn(in.getStringExtra("turn_beneficiary_name"), in.getStringExtra("turn_payout_amount"));
 
         findViewById(R.id.btn_decline).setOnClickListener(v -> openApp("?action=decline", true));
         findViewById(R.id.btn_accept).setOnClickListener(v -> openApp("", true));
@@ -154,33 +160,65 @@ public class IncomingCallActivity extends Activity {
                     if (isFinishing() || isDestroyed()) return;
                     ImageView iv = findViewById(R.id.call_avatar);
                     iv.setImageBitmap(bmp);
-                    iv.setVisibility(android.view.View.VISIBLE);
-                    findViewById(R.id.call_initials).setVisibility(android.view.View.GONE);
+                    iv.setVisibility(View.VISIBLE);
+                    findViewById(R.id.call_initials).setVisibility(View.GONE);
                 });
             } catch (Exception ignored) { }
         }).start();
     }
 
+    /** « Tour d'Alpha · cagnotte 2 400 000 GNF » ; ligne masquée si une donnée manque. */
+    private void bindTurn(String beneficiary, String rawAmount) {
+        TextView line = findViewById(R.id.call_turn);
+        String first = CallIdentity.firstName(beneficiary);
+        String amount = CallIdentity.formatAmount(rawAmount);
+        if (first.isEmpty() || amount.isEmpty()) {
+            line.setVisibility(View.GONE);
+            return;
+        }
+        String prefix = CallIdentity.turnPrefix(first);
+        String middle = " · cagnotte ";
+        SpannableString s = new SpannableString(prefix + first + middle + amount);
+        int fStart = prefix.length(), fEnd = fStart + first.length();
+        int aStart = fEnd + middle.length(), aEnd = s.length();
+        int turnColor = ContextCompat.getColor(this, R.color.call_turn);
+        int fgColor = ContextCompat.getColor(this, R.color.call_foreground);
+        s.setSpan(new ForegroundColorSpan(turnColor), fStart, fEnd, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        s.setSpan(new StyleSpan(Typeface.BOLD), fStart, fEnd, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        s.setSpan(new ForegroundColorSpan(fgColor), aStart, aEnd, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        s.setSpan(new StyleSpan(Typeface.BOLD), aStart, aEnd, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        line.setText(s);
+        line.setVisibility(View.VISIBLE);
+    }
+
     @Override protected void onResume() {
         super.onResume();
-        View accept = findViewById(R.id.btn_accept);
         // Équivalent natif de prefers-reduced-motion. Recontrôlé à chaque reprise.
         if (Settings.Global.getFloat(getContentResolver(), Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f) {
             return;
         }
-        ObjectAnimator x = ObjectAnimator.ofFloat(accept, View.SCALE_X, 1f, 1.06f);
-        ObjectAnimator y = ObjectAnimator.ofFloat(accept, View.SCALE_Y, 1f, 1.06f);
-        ObjectAnimator alpha = ObjectAnimator.ofFloat(accept, View.ALPHA, 0.85f, 1f);
+        // La respiration est portée par les deux anneaux ; le bouton reste fixe pour être visé.
+        acceptAnimation = new AnimatorSet();
+        acceptAnimation.playTogether(breathe(findViewById(R.id.accept_ring_1), 0L),
+                breathe(findViewById(R.id.accept_ring_2), 300L));
+        acceptAnimation.start();
+    }
+
+    private AnimatorSet breathe(View ring, long delay) {
+        ObjectAnimator x = ObjectAnimator.ofFloat(ring, View.SCALE_X, 1f, 1.06f);
+        ObjectAnimator y = ObjectAnimator.ofFloat(ring, View.SCALE_Y, 1f, 1.06f);
+        ObjectAnimator alpha = ObjectAnimator.ofFloat(ring, View.ALPHA, 1f, 0.55f);
         for (ObjectAnimator animator : new ObjectAnimator[]{x, y, alpha}) {
             // CSS ease-in-out sur chaque demi-cycle : 900ms aller + 900ms retour.
             animator.setDuration(900L);
+            animator.setStartDelay(delay);
             animator.setRepeatCount(ValueAnimator.INFINITE);
             animator.setRepeatMode(ValueAnimator.REVERSE);
             animator.setInterpolator(new PathInterpolator(0.42f, 0f, 0.58f, 1f));
         }
-        acceptAnimation = new AnimatorSet();
-        acceptAnimation.playTogether(x, y, alpha);
-        acceptAnimation.start();
+        AnimatorSet set = new AnimatorSet();
+        set.playTogether(x, y, alpha);
+        return set;
     }
 
     @Override protected void onPause() {
@@ -193,11 +231,13 @@ public class IncomingCallActivity extends Activity {
             acceptAnimation.cancel();
             acceptAnimation = null;
         }
-        View accept = findViewById(R.id.btn_accept);
-        if (accept != null) {
-            accept.setScaleX(1f);
-            accept.setScaleY(1f);
-            accept.setAlpha(1f);
+        for (int id : new int[]{R.id.accept_ring_1, R.id.accept_ring_2}) {
+            View ring = findViewById(id);
+            if (ring != null) {
+                ring.setScaleX(1f);
+                ring.setScaleY(1f);
+                ring.setAlpha(1f);
+            }
         }
     }
 
