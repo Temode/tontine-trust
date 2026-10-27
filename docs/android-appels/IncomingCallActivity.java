@@ -12,13 +12,11 @@ import android.content.IntentFilter;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Typeface;
-import android.media.Ringtone;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
-import android.os.Vibrator;
 import android.provider.Settings;
 import android.text.SpannableString;
 import android.text.Spanned;
@@ -45,8 +43,6 @@ public class IncomingCallActivity extends Activity {
 
     private String callId;
     private String groupId;
-    private Ringtone ringtone;
-    private Vibrator vibrator;
     private AnimatorSet acceptAnimation;
     private final Handler handler = new Handler(Looper.getMainLooper());
 
@@ -104,7 +100,7 @@ public class IncomingCallActivity extends Activity {
 
         ContextCompat.registerReceiver(this, closeReceiver, new IntentFilter(ACTION_CLOSE),
                 ContextCompat.RECEIVER_NOT_EXPORTED);
-        // La sonnerie et la vibration viennent de la notification d'appel (une seule source).
+        // La sonnerie et la vibration viennent de CallRinger (une seule source).
         handler.postDelayed(this::finishCall, RING_MS);
     }
 
@@ -118,8 +114,7 @@ public class IncomingCallActivity extends Activity {
     }
 
     private void stopRinging() {
-        try { if (ringtone != null) ringtone.stop(); } catch (Exception ignored) { }
-        if (vibrator != null) vibrator.cancel();
+        CallRinger.stop();
     }
 
     private void finishCall() {
