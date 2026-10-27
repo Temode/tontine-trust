@@ -7,6 +7,7 @@ import android.net.Uri;
 
 import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
+import androidx.core.app.Person;
 
 import com.capacitorjs.plugins.pushnotifications.MessagingService;
 import com.google.firebase.messaging.RemoteMessage;
@@ -43,6 +44,13 @@ public class CallMessagingService extends MessagingService {
         super.onMessageReceived(msg);
     }
 
+    @Override
+    public void onNewToken(String token) {
+        // Le jeton n'est demandé qu'après connexion (useNativeApp) : repère pour l'écran d'autorisation.
+        getSharedPreferences(MainActivity.PREFS, MODE_PRIVATE).edit().putBoolean("push_ready", true).apply();
+        super.onNewToken(token);
+    }
+
     private PendingIntent open(String callId, boolean decline, int req) {
         String url = "com.tontinedigitale.app://appel/" + callId + (decline ? "?action=decline" : "");
         Intent i = new Intent(Intent.ACTION_VIEW, Uri.parse(url), this, MainActivity.class);
@@ -72,20 +80,25 @@ public class CallMessagingService extends MessagingService {
         PendingIntent full = PendingIntent.getActivity(this, id + 2, screen,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
+        // CallStyle.forIncomingCall : Android reconnaît un appel (boutons système Refuser/Répondre,
+        // priorité d'appel). Il exige un fullScreenIntent ou un service de premier plan : on garde le premier.
+        Person person = new Person.Builder()
+                .setName(title != null && !title.isEmpty() ? title : "Appel entrant")
+                .setImportant(true)
+                .build();
         Notification n = new NotificationCompat.Builder(this, CallChannels.CALLS)
                 .setSmallIcon(getApplicationInfo().icon)
-                .setContentTitle(title != null && !title.isEmpty() ? title : "Appel entrant")
                 .setContentText("Appel entrant")
                 .setCategory(NotificationCompat.CATEGORY_CALL)
                 .setPriority(NotificationCompat.PRIORITY_MAX)
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
                 .setOngoing(true)
-                .setAutoCancel(true)
                 .setTimeoutAfter(RING_MS)
                 .setContentIntent(full)
                 .setFullScreenIntent(full, true)
-                .addAction(0, "Refuser", open(callId, true, id + 1))
-                .addAction(0, "Décrocher", open(callId, false, id))
+                .setStyle(NotificationCompat.CallStyle.forIncomingCall(
+                        person, open(callId, true, id + 1), open(callId, false, id)))
+                .addPerson(person)
                 .build();
         try {
             NotificationManagerCompat.from(this).notify(id, n);
