@@ -27,6 +27,16 @@ Deno.serve(async (req) => {
       if (c) {
         const { data: p } = await sb.from("profiles").select("full_name, avatar_url").eq("id", c.requested_by).maybeSingle();
         const { data: dn } = await sb.rpc("member_display_name", { _name: p?.full_name ?? "" });
+        const { data: turn } = await sb.from("next_turn_per_group")
+          .select("beneficiary_name, payout_amount")
+          .eq("group_id", c.group_id).maybeSingle();
+        // Prénom seul ; jamais d'email. Sans tour exploitable, les champs sont omis et le natif masque la ligne.
+        const first = typeof turn?.beneficiary_name === "string" && !turn.beneficiary_name.includes("@")
+          ? turn.beneficiary_name.trim().split(/\s+/)[0] ?? "" : "";
+        const amount = turn?.payout_amount;
+        const turnFields = first && amount != null && Number(amount) > 0
+          ? { turn_beneficiary_name: first, turn_payout_amount: String(amount) }
+          : {};
         job.data = {
           ...job.data,
           group_id: c.group_id,
@@ -34,6 +44,7 @@ Deno.serve(async (req) => {
           // L'écran natif utilise la tontine si l'identité n'est pas connue.
           caller_name: typeof dn === "string" && dn.trim() && dn.trim().toLowerCase() !== "un membre" ? dn.trim() : "",
           caller_avatar_url: p?.avatar_url ?? "",
+          ...turnFields,
         };
       }
     }

@@ -57,7 +57,8 @@ public class CallMessagingService extends MessagingService {
         Intent i = new Intent(this, IncomingCallActivity.class);
         i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_NO_USER_ACTION);
         i.putExtra("call_id", callId);
-        for (String k : new String[]{"group_id", "group_name", "caller_name", "caller_avatar_url"}) i.putExtra(k, d.get(k));
+        for (String k : new String[]{"group_id", "group_name", "caller_name", "caller_avatar_url",
+                "turn_beneficiary_name", "turn_payout_amount"}) i.putExtra(k, d.get(k));
         return PendingIntent.getActivity(this, req, i,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
     }
