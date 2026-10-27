@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Copie des tokens :root de src/index.css. Conversion HSL → sRGB, arrondie sur 8 bits. -->
+<!-- Copie des tokens :root de src/index.css. Conversion HSL → sRGB, arrondie sur 8 bits.
+     Les couleurs translucides sont en #AARRGGBB (alpha = arrondi(opacité × 255)). -->
 <resources>
     <color name="call_background">#032B30</color><!-- primary-900 -->
     <color name="call_pattern">#436D70</color><!-- chat-pattern -->
@@ -11,4 +12,9 @@
     <color name="call_message">#053D42</color><!-- primary-800 -->
     <color name="call_accept_foreground">#FFFFFF</color><!-- success-foreground -->
     <color name="call_decline_foreground">#FFFFFF</color><!-- destructive-foreground -->
+    <color name="call_turn">#EBAE14</color><!-- accent 43 84% 50% -->
+    <color name="call_seat">#42ACD3D8</color><!-- primary-200 à 26 % -->
+    <color name="call_hairline">#1AFFFFFF</color><!-- blanc à 10 % -->
+    <color name="call_accept_ring_1">#73197654</color><!-- success à 45 % -->
+    <color name="call_accept_ring_2">#33197654</color><!-- success à 20 % -->
 </resources>
