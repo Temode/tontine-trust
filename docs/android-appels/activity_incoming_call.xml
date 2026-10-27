@@ -20,7 +20,20 @@
 
     <FrameLayout
         android:layout_width="168dp"
-        android:layout_height="168dp">
+        android:layout_height="168dp"
+        android:clipChildren="false">
+
+        <!-- Nappe de lumière : 430dp centrée sur l'avatar, déborde du cadre, non cliquable.
+             alpha 0.34 = opacité au centre ; le dégradé s'éteint à 66 % du rayon. -->
+        <View
+            android:layout_width="430dp"
+            android:layout_height="430dp"
+            android:layout_gravity="center"
+            android:alpha="0.34"
+            android:background="@drawable/call_halo"
+            android:clickable="false"
+            android:focusable="false"
+            android:importantForAccessibility="no" />
 
         <!-- Appelant connu : initiales -->
         <TextView
@@ -115,7 +128,7 @@
                 android:background="@drawable/call_circle_red"
                 android:contentDescription="Refuser"
                 android:rotation="135"
-                android:src="@android:drawable/sym_action_call"
+                android:src="@drawable/ic_call_phone"
                 android:tint="@color/call_decline_foreground" />
             <TextView style="@style/CallBtnLabel" android:text="Refuser" />
         </LinearLayout>
@@ -152,7 +165,7 @@
                     android:contentDescription="Décrocher"
                     android:padding="26dp"
                     android:scaleType="fitCenter"
-                    android:src="@android:drawable/sym_action_call"
+                    android:src="@drawable/ic_call_phone"
                     android:tint="@color/call_accept_foreground" />
             </FrameLayout>
 
