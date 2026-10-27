@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Nappe de lumière derrière l'avatar. Le rayon 33 % se rapporte au côté de la vue
+     (430dp) : 33 % de 430 = 66 % du rayon de 215dp. L'opacité 34 % est portée par
+     android:alpha sur la vue. La fin en transparent fait chuter couleur et alpha
+     ensemble : l'intensité décroît au carré et s'annule sans pente, donc sans bord. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="oval">
+    <gradient
+        android:type="radial"
+        android:centerX="0.5"
+        android:centerY="0.5"
+        android:gradientRadius="33%"
+        android:startColor="@color/call_avatar"
+        android:endColor="@android:color/transparent" />
+</shape>
