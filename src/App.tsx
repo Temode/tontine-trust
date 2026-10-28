@@ -8,6 +8,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppShell } from "@/components/layout/AppShell";
 import { AuthProvider } from "@/hooks/useAuth";
+import { NativeDeepLinkBridge } from "@/components/NativeDeepLinkBridge";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { RouteBoundary } from "@/components/RouteBoundary";
@@ -122,6 +123,7 @@ const App = () => (
         <Sonner position="top-center" />
         <BrowserRouter>
           <AuthProvider>
+            <NativeDeepLinkBridge />
             <Suspense fallback={<AppSuspense />}>
               <Routes>
                 <Route
