@@ -28,15 +28,8 @@ export function useNativeApp() {
         if (p === "/dashboard" || p === "/" || !canGoBack) App.exitApp();
         else window.history.back();
       });
-      // Ouverture depuis l'écran d'appel natif : com.tontinedigitale.app://appel/<id>[?action=decline]
-      const u = await App.addListener("appUrlOpen", ({ url }) => {
-        try {
-          const parsed = new URL(url);
-          const path = `/${parsed.host}${parsed.pathname}`.replace(/\/+$/, "") + parsed.search;
-          if (path.startsWith("/appel/")) navigate(path);
-        } catch { /* noop */ }
-      });
-      cleanup = () => { h.remove(); u.remove(); };
+      // Les liens profonds d'appel sont gérés par NativeDeepLinkBridge (racine).
+      cleanup = () => { h.remove(); };
     })();
     return () => cleanup?.();
   }, []);

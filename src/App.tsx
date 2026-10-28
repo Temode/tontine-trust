@@ -122,6 +122,7 @@ const App = () => (
         <Sonner position="top-center" />
         <BrowserRouter>
           <AuthProvider>
+            <NativeDeepLinkBridge />
             <Suspense fallback={<AppSuspense />}>
               <Routes>
                 <Route
