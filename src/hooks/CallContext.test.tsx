@@ -20,6 +20,7 @@ vi.mock("@/components/messages/CallOverlay", () => ({ CallStage: () => null, use
 vi.mock("@/components/messages/AudioCallStage", () => ({ AudioCallStage: () => <div>Test room</div> }));
 vi.mock("@/components/messages/CallMiniPlayer", () => ({ CallMiniPlayer: () => null }));
 vi.mock("@/components/messages/AudioOutputControl", () => ({ AudioOutputControl: () => null }));
+vi.mock("@/components/messages/CallDiagnosticProbe", () => ({ CallDiagnosticProbe: () => null }));
 
 function Driver() {
   const { startCall, hangup } = useCall();

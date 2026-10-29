@@ -139,7 +139,7 @@ export function CallMiniPlayer({
           : undefined
       }
       className={cn(
-        "fixed z-[85] w-[min(46vw,200px)] touch-none overflow-hidden rounded-2xl border border-white/10 bg-[#0b0d10] shadow-elegant",
+        "fixed z-call w-[min(46vw,200px)] touch-none overflow-hidden rounded-2xl border border-white/10 bg-[#0b0d10] shadow-elegant",
         "animate-in fade-in zoom-in-95 duration-200 transition-[left,top] ease-out",
         !pos &&
           "bottom-[calc(5.5rem+env(safe-area-inset-bottom))] right-4 lg:bottom-6 lg:right-6",

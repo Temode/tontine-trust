@@ -72,7 +72,7 @@ export function AudioOutputControl({ variant = "full" }: { variant?: Variant }) 
           </button>
         </DropdownMenuTrigger>
       </div>
-      <DropdownMenuContent align="end" className="z-[95] w-64">
+      <DropdownMenuContent data-call-owned align="end" className="z-call-control w-64">
         <DropdownMenuLabel>Sortie audio</DropdownMenuLabel>
         <DropdownMenuSeparator />
         {devices.map((d) => (
