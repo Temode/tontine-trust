@@ -1,0 +1,2 @@
+-- lovable-cron-fallback-reviewed: Persisting missed must trigger cancellation and missed-call notifications even when both apps are closed; a timestamp-only display cannot do this. Check 90-second eligibility every 15 seconds, at most 15 seconds additional delay.
+SELECT cron.schedule('expire-stale-call-requests', '15 seconds', 'SELECT public.expire_stale_call_requests();');
