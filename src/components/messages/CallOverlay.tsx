@@ -352,7 +352,7 @@ function CallHeader({
                 <MoreVertical className="h-4 w-4" />
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuContent data-call-owned align="end" className="z-call-control w-56">
               <DropdownMenuLabel>Actions d'hôte</DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem

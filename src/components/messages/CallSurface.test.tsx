@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { CallSurface } from "./CallSurface";
 import { registerCallPriority } from "@/lib/callPriority";
 import { GuidedTourProvider } from "@/components/tour/GuidedTour";
+import { TOUR_DONE_KEY } from "@/components/tour/steps";
 
 describe("call interrupts without destroying work", () => {
   it("retains the exact contribution draft, mount count and focused input", async () => {
@@ -50,6 +51,6 @@ describe("call interrupts without destroying work", () => {
     expect(document.querySelector("#tour-title")).toBeNull();
     act(() => release());
     expect(document.querySelector("#tour-title")?.textContent).toBe(title);
-    expect(localStorage.getItem("tontine:tour:done")).toBeNull();
+    expect(localStorage.getItem(TOUR_DONE_KEY)).toBeNull();
   });
 });
