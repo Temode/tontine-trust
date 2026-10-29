@@ -4,6 +4,8 @@ import { Loader2, PhoneOff } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useCall } from "@/hooks/CallContext";
 import { respondCallRequest } from "@/lib/api/calls";
+import { Capacitor } from "@capacitor/core";
+import { getMicState, incomingMicMuted } from "@/lib/micPermission";
 
 export default function CallJoin() {
   const { callId } = useParams<{ callId: string }>();
@@ -47,7 +49,13 @@ export default function CallJoin() {
         // Décrochage depuis une notification ou un lien profond : c'est un
         // appel audio. La vidéo ne s'allume que si l'utilisateur appuie sur
         // Vidéo dans le dock, et l'aiguillage bascule alors vers la grille.
-        prefs: { micMuted: false, camOff: true, screenShare: false },
+        // Micro non accordé : on rejoint micro coupé, aucune boîte système
+        // ne s'ouvre pendant un appel entrant.
+        prefs: {
+          micMuted: incomingMicMuted(Capacitor.isNativePlatform(), getMicState()),
+          camOff: true,
+          screenShare: false,
+        },
       });
       navigate(`/discussions/${data.group_id}`, { replace: true });
     })();

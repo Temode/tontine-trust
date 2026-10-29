@@ -9,6 +9,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppShell } from "@/components/layout/AppShell";
 import { AuthProvider } from "@/hooks/useAuth";
 import { NativeDeepLinkBridge } from "@/components/NativeDeepLinkBridge";
+import { MicPermissionPrompt } from "@/components/MicPermissionPrompt";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { RouteBoundary } from "@/components/RouteBoundary";
@@ -124,6 +125,7 @@ const App = () => (
         <BrowserRouter>
           <AuthProvider>
             <NativeDeepLinkBridge />
+            <MicPermissionPrompt />
             <Suspense fallback={<AppSuspense />}>
               <Routes>
                 <Route
