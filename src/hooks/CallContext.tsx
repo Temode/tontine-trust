@@ -449,7 +449,8 @@ export function CallProvider({ children }: { children: ReactNode }) {
                   });
                 }}
                 onError={(e) => {
-                  recordCallTrace("room-error", { name: e?.name ?? "Error", code: typeof (e as { code?: unknown }).code === "number" ? (e as { code: number }).code : null });
+                  const code = (e as Error & { code?: unknown }).code;
+                  recordCallTrace("room-error", { name: e?.name ?? "Error", code: typeof code === "number" ? code : null });
                   if (stub) return;
                   const isDeviceError =
                     /NotAllowed|NotFound|NotReadable|Permission|device|getUserMedia/i.test(
