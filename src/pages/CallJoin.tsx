@@ -46,6 +46,7 @@ export default function CallJoin() {
         callId: data.id,
         groupId: data.group_id,
         groupName,
+        manageLifecycle: true,
         // Décrochage depuis une notification ou un lien profond : c'est un
         // appel audio. La vidéo ne s'allume que si l'utilisateur appuie sur
         // Vidéo dans le dock, et l'aiguillage bascule alors vers la grille.
