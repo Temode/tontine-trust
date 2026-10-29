@@ -1,3 +1,4 @@
 - [x] Écran d'appel plein écran Android (fichiers natifs dans docs/android-appels/, à copier par l'utilisateur)
+- [ ] Sécuriser les statuts d'appel concurrents, gérer la fin de sonnerie côté appelant à 60 s et le filet à 90 s ; vérifier le micro refusé.
 - [ ] Écran d'appel iPhone (CallKit + PushKit) — bloqué : Mac + compte Apple Developer
 - [ ] Notifications iPhone : test réel — bloqué : clé APNs .p8 dans Firebase + iPhone
