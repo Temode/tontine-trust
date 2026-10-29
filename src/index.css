@@ -2,8 +2,19 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Preserve every suspended subtree, including uncontrolled form inputs. */
+[data-call-suspended] { visibility: hidden !important; pointer-events: none !important; }
+body[data-call-priority] [data-radix-popper-content-wrapper]:not(:has([data-call-owned])) {
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+[data-sonner-toaster] { z-index: var(--layer-notice) !important; }
+
 @layer base {
   :root {
+    --layer-notice: 100;
+    --layer-call: 120;
+    --layer-call-control: 130;
     /* Surfaces */
     --background: 40 22% 97%;          /* warm ivory  #F9F8F6 */
     --foreground: 200 35% 9%;          /* deep ink    #0F1A1F */

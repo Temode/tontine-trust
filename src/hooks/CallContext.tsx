@@ -27,6 +27,8 @@ import { CallMiniPlayer } from "@/components/messages/CallMiniPlayer";
 import { AudioOutputControl } from "@/components/messages/AudioOutputControl";
 import type { PreCallDevicePrefs } from "@/components/messages/MicPermissionGate";
 import { scheduleOutgoingRingExpiry } from "@/lib/callLifecycle";
+import { useRegisterCallPriority } from "@/lib/callPriority";
+import { CallSurface } from "@/components/messages/CallSurface";
 
 export interface StartCallArgs {
   callId: string;
@@ -93,6 +95,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
   const intentionalRef = useRef(false);
   const [netState, setNetState] = useState<NetState>("online");
   const [reconnectAttempt, setReconnectAttempt] = useState(0);
+  useRegisterCallPriority(!!session, !!session && mode === "full");
 
   const displayName = useMemo(() => {
     const meta = (user?.user_metadata ?? {}) as Record<string, unknown>;
@@ -395,9 +398,10 @@ export function CallProvider({ children }: { children: ReactNode }) {
       {typeof document !== "undefined" &&
         session &&
         createPortal(
+          <CallSurface full={mode === "full"}>
           <div ref={containerRef}>
             {mode === "full" && (loading || error) && (
-              <div className="call-surface fixed inset-0 z-[80] flex flex-col items-center justify-center gap-3 p-6 text-center">
+              <div className="call-surface fixed inset-0 z-call flex flex-col items-center justify-center gap-3 p-6 text-center">
                 {error ? (
                   <>
                     <ShieldAlert className="h-8 w-8 text-destructive" />
@@ -477,7 +481,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
                   />
                 )}
                 {mode === "full" ? (
-                  <div className="call-surface fixed inset-0 z-[80]">
+                  <div className="call-surface fixed inset-0 z-call">
                     <FullCallStage
                       callId={session.callId}
                       isHost={tokenData.isHost}
@@ -510,7 +514,8 @@ export function CallProvider({ children }: { children: ReactNode }) {
                 )}
               </LiveKitRoom>
             )}
-          </div>,
+          </div>
+          </CallSurface>,
           document.body,
         )}
     </Ctx.Provider>
@@ -617,7 +622,7 @@ function ReconnectBanner({
   return (
     <div
       data-testid="call-reconnect-banner"
-      className="fixed inset-x-0 top-0 z-[90] flex flex-wrap items-center justify-center gap-2 bg-destructive px-3 py-2 pt-[max(0.5rem,env(safe-area-inset-top))] text-[11px] font-semibold text-destructive-foreground sm:text-xs"
+      className="fixed inset-x-0 top-0 z-call-control flex flex-wrap items-center justify-center gap-2 bg-destructive px-3 py-2 pt-[max(0.5rem,env(safe-area-inset-top))] text-[11px] font-semibold text-destructive-foreground sm:text-xs"
     >
       {netState === "reconnecting" ? (
         <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
@@ -691,7 +696,7 @@ function CallActiveBanner({
   return (
     <div
       data-testid="call-active-banner"
-      className="fixed inset-x-0 top-0 z-[84] flex min-h-8 w-full items-center justify-center gap-2 bg-primary px-3 pt-[env(safe-area-inset-top)] text-[11px] font-semibold text-primary-foreground shadow-primary sm:text-xs"
+      className="fixed inset-x-0 top-0 z-call flex min-h-8 w-full items-center justify-center gap-2 bg-primary px-3 pt-[env(safe-area-inset-top)] text-[11px] font-semibold text-primary-foreground shadow-primary sm:text-xs"
     >
       <button
         type="button"

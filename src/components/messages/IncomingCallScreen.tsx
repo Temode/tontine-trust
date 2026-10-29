@@ -9,6 +9,8 @@ import { respondCallRequest } from "@/lib/api/calls";
 import { useRingtone } from "@/hooks/useRingtone";
 import { useDocumentTitleFlash } from "@/hooks/useDocumentTitleFlash";
 import { useCall } from "@/hooks/CallContext";
+import { useRegisterCallPriority } from "@/lib/callPriority";
+import { CallSurface } from "./CallSurface";
 
 function initials(name: string): string {
   return name
@@ -43,6 +45,7 @@ export function IncomingCallScreen() {
   // Dans l'app mobile, la sonnerie est gérée exclusivement par l'écran natif :
   // l'écran web ne doit jamais s'afficher en doublon (ni après avoir raccroché).
   const ringing = !Capacitor.isNativePlatform() && !!current && !joined && !activeCallId;
+  useRegisterCallPriority(!!current && !joined && !activeCallId, ringing);
 
   useEffect(() => {
     if (!activeCallId) setJoined(false);
@@ -93,11 +96,12 @@ export function IncomingCallScreen() {
     <>
       {ringing && current
         ? createPortal(
+            <CallSurface>
             <div
               role="dialog"
               aria-modal="true"
               aria-label="Appel entrant"
-              className="fixed inset-0 z-[100] flex min-h-[100dvh] flex-col items-center justify-between overflow-hidden px-6 pt-[max(2rem,env(safe-area-inset-top))] pb-[max(2rem,env(safe-area-inset-bottom))] sm:pt-14 sm:pb-14"
+              className="fixed inset-0 z-call flex min-h-[100dvh] flex-col items-center justify-between overflow-hidden px-6 pt-[max(2rem,env(safe-area-inset-top))] pb-[max(2rem,env(safe-area-inset-bottom))] sm:pt-14 sm:pb-14"
               style={{
                 background:
                   "radial-gradient(120% 80% at 50% 10%, hsl(var(--primary) / 0.55) 0%, hsl(var(--primary-900)) 55%, #04161a 100%)",
@@ -219,7 +223,8 @@ export function IncomingCallScreen() {
                   </span>
                 </button>
               </div>
-            </div>,
+            </div>
+            </CallSurface>,
             document.body,
           )
         : null}

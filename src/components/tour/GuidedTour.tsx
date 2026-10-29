@@ -4,6 +4,7 @@ import { X, ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { TOUR_DONE_KEY, TOUR_STEPS, type TourStep } from "./steps";
 import { TourContext } from "./useTour";
+import { useCallPriority } from "@/lib/callPriority";
 
 interface Rect {
   top: number;
@@ -70,8 +71,11 @@ function computePopoverPos(
   };
 }
 
-function TourOverlay({ onClose }: { onClose: () => void }) {
-  const [stepIndex, setStepIndex] = useState(0);
+function TourOverlay({ onClose, stepIndex, setStepIndex }: {
+  onClose: () => void;
+  stepIndex: number;
+  setStepIndex: React.Dispatch<React.SetStateAction<number>>;
+}) {
   const [tick, setTick] = useState(0);
 
   // re-measure on resize/scroll
@@ -128,7 +132,7 @@ function TourOverlay({ onClose }: { onClose: () => void }) {
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[100]"
+      className="fixed inset-0 z-notice"
       role="dialog"
       aria-modal="true"
       aria-labelledby="tour-title"
@@ -270,6 +274,8 @@ function TourOverlay({ onClose }: { onClose: () => void }) {
 
 export function GuidedTourProvider({ children }: { children: ReactNode }) {
   const [active, setActive] = useState(false);
+  const [stepIndex, setStepIndex] = useState(0);
+  const { busy } = useCallPriority();
 
   // Auto-start once per user (localStorage flag)
   useEffect(() => {
@@ -287,7 +293,7 @@ export function GuidedTourProvider({ children }: { children: ReactNode }) {
   const value = useMemo(
     () => ({
       active,
-      start: () => setActive(true),
+      start: () => { setStepIndex(0); setActive(true); },
       stop: () => setActive(false),
     }),
     [active],
@@ -296,7 +302,7 @@ export function GuidedTourProvider({ children }: { children: ReactNode }) {
   return (
     <TourContext.Provider value={value}>
       {children}
-      {active && <TourOverlay onClose={() => setActive(false)} />}
+      {active && !busy && <TourOverlay stepIndex={stepIndex} setStepIndex={setStepIndex} onClose={() => setActive(false)} />}
     </TourContext.Provider>
   );
 }

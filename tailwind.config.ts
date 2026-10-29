@@ -13,6 +13,11 @@ export default {
       },
     },
     extend: {
+      zIndex: {
+        notice: "var(--layer-notice)",
+        call: "var(--layer-call)",
+        "call-control": "var(--layer-call-control)",
+      },
       fontFamily: {
         sans: ["Inter", "system-ui", "-apple-system", "Segoe UI", "sans-serif"],
         display: ["DM Sans", "Inter", "system-ui", "sans-serif"],

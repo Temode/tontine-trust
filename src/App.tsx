@@ -10,6 +10,7 @@ import { AppShell } from "@/components/layout/AppShell";
 import { AuthProvider } from "@/hooks/useAuth";
 import { NativeDeepLinkBridge } from "@/components/NativeDeepLinkBridge";
 import { MicPermissionPrompt } from "@/components/MicPermissionPrompt";
+import { CallPriorityObserver } from "@/components/messages/CallSurface";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { RouteBoundary } from "@/components/RouteBoundary";
@@ -120,6 +121,7 @@ const App = () => (
       persistOptions={{ persister: offlinePersister, maxAge: OFFLINE_MAX_AGE, buster: "v1", dehydrateOptions: { shouldDehydrateQuery: shouldPersistQuery } }}
     >
       <TooltipProvider>
+        <CallPriorityObserver />
         <Toaster />
         <Sonner position="top-center" />
         <BrowserRouter>

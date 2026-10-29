@@ -6,6 +6,9 @@ import { useCall } from "@/hooks/CallContext";
 import { respondCallRequest } from "@/lib/api/calls";
 import { Capacitor } from "@capacitor/core";
 import { getMicState, incomingMicMuted } from "@/lib/micPermission";
+import { createPortal } from "react-dom";
+import { useRegisterCallPriority } from "@/lib/callPriority";
+import { CallSurface } from "@/components/messages/CallSurface";
 
 export default function CallJoin() {
   const { callId } = useParams<{ callId: string }>();
@@ -15,6 +18,7 @@ export default function CallJoin() {
   const { startCall } = useCall();
   const [error, setError] = useState<string | null>(null);
   const startedRef = useRef(false);
+  useRegisterCallPriority(!error, !error);
 
   useEffect(() => {
     if (!callId || startedRef.current) return;
@@ -69,13 +73,15 @@ export default function CallJoin() {
   if (!error) {
     // Même surface sombre que l'écran d'appel : aucune page ne transparaît
     // entre le décrochage et l'ouverture de la communication.
-    return (
-      <div className="call-surface fixed inset-0 z-[90] flex flex-col items-center justify-center gap-3 px-4 text-center">
+    return createPortal(
+      <CallSurface>
+      <div className="call-surface fixed inset-0 z-call flex flex-col items-center justify-center gap-3 px-4 text-center">
         <Loader2 className="h-6 w-6 animate-spin text-primary-300" />
         <p className="text-body-sm text-primary-foreground/80">
           {declining ? "Refus de l'appel…" : "Connexion à l'appel…"}
         </p>
       </div>
+      </CallSurface>, document.body
     );
   }
 
