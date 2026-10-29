@@ -390,9 +390,30 @@ export function CallProvider({ children }: { children: ReactNode }) {
                 audio={startAudio}
                 video={startVideo}
                 onConnected={handleConnected}
-                onDisconnected={handleDisconnected}
+                onDisconnected={(reason?: unknown) => {
+                  console.warn("[call] disconnected", { reason, connected: hasConnectedRef.current });
+                  handleDisconnected();
+                }}
+                onMediaDeviceFailure={(failure?: unknown) => {
+                  // Micro/caméra refusés ou indisponibles : on garde l'appel ouvert.
+                  console.warn("[call] media device failure", failure);
+                  toast("Micro indisponible", {
+                    description: "Autorisez l'accès au micro pour parler.",
+                  });
+                }}
                 onError={(e) => {
+                  console.warn("[call] room error", e?.name, e?.message);
                   if (stub) return;
+                  const isDeviceError =
+                    /NotAllowed|NotFound|NotReadable|Permission|device|getUserMedia/i.test(
+                      `${e?.name ?? ""} ${e?.message ?? ""}`,
+                    );
+                  if (isDeviceError) {
+                    toast("Micro indisponible", {
+                      description: "Autorisez l'accès au micro pour parler.",
+                    });
+                    return;
+                  }
                   if (hasConnectedRef.current) {
                     handleDisconnected();
                   } else {
