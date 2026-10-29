@@ -1,7 +1,7 @@
 // Autorisation micro dans l'app mobile.
 // Règle : une seule demande, au premier lancement après connexion, jamais
-// pendant un appel entrant. Si refusée, le micro est redemandé à la première
-// tentative d'appel sortant (LiveKit le demande en ouvrant le micro).
+// spontanément pendant un appel entrant. Après refus, un toucher explicite
+// sur Micro peut le redemander (LiveKit le demande en ouvrant le micro).
 
 const ASKED_KEY = "td_mic_asked_v1";
 const STATE_KEY = "td_mic_state_v1";
