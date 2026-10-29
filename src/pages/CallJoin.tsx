@@ -57,26 +57,30 @@ export default function CallJoin() {
     };
   }, [callId, declining, navigate, startCall]);
 
+  if (!error) {
+    // Même surface sombre que l'écran d'appel : aucune page ne transparaît
+    // entre le décrochage et l'ouverture de la communication.
+    return (
+      <div className="call-surface fixed inset-0 z-[90] flex flex-col items-center justify-center gap-3 px-4 text-center">
+        <Loader2 className="h-6 w-6 animate-spin text-primary-300" />
+        <p className="text-body-sm text-primary-foreground/80">
+          {declining ? "Refus de l'appel…" : "Connexion à l'appel…"}
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="flex min-h-[60vh] flex-col items-center justify-center gap-3 px-4 text-center">
-      {error ? (
-        <>
-          <PhoneOff className="h-8 w-8 text-muted-foreground" />
-          <p className="text-sm font-semibold text-foreground">{error}</p>
-          <button
-            type="button"
-            onClick={() => navigate("/discussions", { replace: true })}
-            className="h-10 rounded-full bg-primary px-4 text-xs font-semibold text-primary-foreground hover:bg-primary-700"
-          >
-            Retour aux discussions
-          </button>
-        </>
-      ) : (
-        <>
-          <Loader2 className="h-6 w-6 animate-spin text-primary" />
-          <p className="text-sm text-muted-foreground">{declining ? "Refus de l'appel…" : "Connexion à l'appel…"}</p>
-        </>
-      )}
+      <PhoneOff className="h-8 w-8 text-muted-foreground" />
+      <p className="text-sm font-semibold text-foreground">{error}</p>
+      <button
+        type="button"
+        onClick={() => navigate("/discussions", { replace: true })}
+        className="h-10 rounded-full bg-primary px-4 text-xs font-semibold text-primary-foreground hover:bg-primary-700"
+      >
+        Retour aux discussions
+      </button>
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Capacitor } from "@capacitor/core";
 import { createPortal } from "react-dom";
 import { useMutation } from "@tanstack/react-query";
 import { Phone, PhoneOff } from "lucide-react";
@@ -39,7 +40,9 @@ export function IncomingCallScreen() {
   const { startCall, callId: activeCallId } = useCall();
   const [joined, setJoined] = useState(false);
 
-  const ringing = !!current && !joined && !activeCallId;
+  // Dans l'app mobile, la sonnerie est gérée exclusivement par l'écran natif :
+  // l'écran web ne doit jamais s'afficher en doublon (ni après avoir raccroché).
+  const ringing = !Capacitor.isNativePlatform() && !!current && !joined && !activeCallId;
 
   useEffect(() => {
     if (!activeCallId) setJoined(false);
