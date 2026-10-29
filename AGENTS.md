@@ -10,3 +10,4 @@
 - Les sous-titres d'en-tête ne doivent jamais être tronqués; si le texte ne tient pas, raccourcir le texte et non le conteneur.
 - Tout compteur affiché sur deux écrans doit venir d'une seule source de vérité.
 - Incoming calls on Android: call_incoming/call_cancel are sent as FCM data-only messages handled by native CallMessagingService, whose full-screen intent opens native IncomingCallActivity (source in docs/android-appels/, copied by hand into the user's android project) — full-screen ringing needs native code.
+- Call lifecycle is managed in CallProvider and guarded atomically by respond_call_request: only a recipient acknowledges an answer, terminal states never reopen, and caller expiration stays in the authenticated web layer rather than Android network code.

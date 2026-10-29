@@ -26,6 +26,7 @@ import { AudioCallStage } from "@/components/messages/AudioCallStage";
 import { CallMiniPlayer } from "@/components/messages/CallMiniPlayer";
 import { AudioOutputControl } from "@/components/messages/AudioOutputControl";
 import type { PreCallDevicePrefs } from "@/components/messages/MicPermissionGate";
+import { scheduleOutgoingRingExpiry } from "@/lib/callLifecycle";
 
 export interface StartCallArgs {
   callId: string;
@@ -184,6 +185,42 @@ export function CallProvider({ children }: { children: ReactNode }) {
     },
     [session, teardown],
   );
+
+  // Only the caller expires ringing. The SQL guard arbitrates an answer
+  // racing with the timeout; opening the caller's room is not an answer.
+  useEffect(() => {
+    if (!session?.manageLifecycle || !user || isStubCall(session.callId)) return;
+    let cancelled = false;
+    let stop: (() => void) | undefined;
+    const callId = session.callId;
+    void (async () => {
+      const { data, error } = await supabase.from("call_requests")
+        .select("requested_by, created_at, scheduled_at, status")
+        .eq("id", callId).maybeSingle();
+      if (error) throw error;
+      if (cancelled || !data || data.requested_by !== user.id || data.status !== "pending") return;
+      stop = scheduleOutgoingRingExpiry({
+        createdAt: data.scheduled_at ?? data.created_at,
+        expire: async () => {
+          const { error: writeError } = await supabase.rpc("respond_call_request", {
+            p_id: callId, p_status: "missed",
+          });
+          if (writeError) throw writeError;
+          const { data: result, error: readError } = await supabase.from("call_requests")
+            .select("status").eq("id", callId).maybeSingle();
+          if (readError) throw readError;
+          return result?.status === "missed";
+        },
+        onExpired: () => {
+          if (cancelled) return;
+          toast("Aucune réponse", { description: "L'appel est terminé." });
+          teardown("hangup");
+        },
+        onError: (err) => console.warn("[call] ring expiration failed", err),
+      });
+    })().catch((err) => console.warn("[call] ring expiration setup failed", err));
+    return () => { cancelled = true; stop?.(); };
+  }, [session, user, teardown]);
 
   // Récupération du token LiveKit
   useEffect(() => {
