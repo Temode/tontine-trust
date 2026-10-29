@@ -8,7 +8,7 @@ DECLARE
 BEGIN
   SELECT a.group_id, a.user_id, b.user_id INTO g, caller, recipient
   FROM public.group_members a JOIN public.group_members b ON b.group_id = a.group_id
-  JOIN public.profiles pa ON pa.id = a.user_id JOIN public.profiles pb ON pb.id = b.user_id
+  JOIN auth.users pa ON pa.id = a.user_id JOIN auth.users pb ON pb.id = b.user_id
   WHERE a.status = 'active' AND b.status = 'active'
     AND pa.email = 'comptea@yopmail.com' AND pb.email = 'compteb@yopmail.com' LIMIT 1;
   ASSERT g IS NOT NULL, 'test accounts must share an active tontine';
