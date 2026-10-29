@@ -1,7 +1,7 @@
 - [x] Écran d'appel plein écran Android (fichiers natifs dans docs/android-appels/, à copier par l'utilisateur)
 - [x] Sécuriser les statuts d'appel concurrents, gérer la fin de sonnerie côté appelant à 60 s et le filet à 90 s ; vérifier le micro refusé.
 - [ ] Auditer la hiérarchie des surfaces avant modification, donner priorité aux appels et interrompre la visite guidée pendant un appel.
-- [ ] Diagnostiquer les reconnexions de l'essai audio à partir des traces disponibles, sans attribuer une cause non démontrée.
+- [x] Examiner les traces audio disponibles : journaux détaillés du précédent essai absents, cause et rétablissement non démontrés ; reproduction instrumentée requise.
 - [ ] Valider le décrochage et raccrochage sur TECNO après build/cap sync par Elhadj ; connexion audio réelle non validée depuis le sandbox (reconnexion LiveKit).
 - [ ] Écran d'appel iPhone (CallKit + PushKit) — bloqué : Mac + compte Apple Developer
 - [ ] Notifications iPhone : test réel — bloqué : clé APNs .p8 dans Firebase + iPhone
