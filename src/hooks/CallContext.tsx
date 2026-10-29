@@ -29,6 +29,8 @@ import type { PreCallDevicePrefs } from "@/components/messages/MicPermissionGate
 import { scheduleOutgoingRingExpiry } from "@/lib/callLifecycle";
 import { useRegisterCallPriority } from "@/lib/callPriority";
 import { CallSurface } from "@/components/messages/CallSurface";
+import { CallDiagnosticProbe } from "@/components/messages/CallDiagnosticProbe";
+import { recordCallTrace } from "@/lib/diagnostics/callTrace";
 
 export interface StartCallArgs {
   callId: string;
@@ -242,12 +244,14 @@ export function CallProvider({ children }: { children: ReactNode }) {
     }
     setLoading(true);
     setError(null);
+    recordCallTrace("access-request", { attempt: reconnectAttempt });
     supabase.functions
       .invoke<TokenResponse>("livekit-token", {
         body: { callId: session.callId, displayName },
       })
       .then(({ data, error: err }) => {
         if (cancelled) return;
+        recordCallTrace("access-result", { ok: !!data?.token && !err, attempt: reconnectAttempt, errorType: err?.name ?? null });
         if (err || !data?.token) {
           setTokenData(null);
           if (hasConnectedRef.current && reconnectAttempt < MAX_RECONNECT_ATTEMPTS) {
@@ -291,6 +295,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
   }, [netState, session]);
 
   const handleDisconnected = useCallback(() => {
+    recordCallTrace("recovery-decision", { intentional: intentionalRef.current, connected: hasConnectedRef.current, attempt: reconnectAttempt });
     if (intentionalRef.current || !hasConnectedRef.current) {
       teardown("hangup");
       return;
@@ -349,6 +354,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
   }, [session, togglePipWithFallback]);
 
   const handleConnected = () => {
+    recordCallTrace("connected");
     hasConnectedRef.current = true;
     setConnectedAt(new Date().toISOString());
     if (session?.manageLifecycle) {
@@ -432,18 +438,18 @@ export function CallProvider({ children }: { children: ReactNode }) {
                 video={startVideo}
                 onConnected={handleConnected}
                 onDisconnected={(reason?: unknown) => {
-                  console.warn("[call] disconnected", { reason, connected: hasConnectedRef.current });
+                  recordCallTrace("room-disconnected", { reason: typeof reason === "number" ? reason : null, connected: hasConnectedRef.current });
                   handleDisconnected();
                 }}
                 onMediaDeviceFailure={(failure?: unknown) => {
                   // Micro/caméra refusés ou indisponibles : on garde l'appel ouvert.
-                  console.warn("[call] media device failure", failure);
+                  recordCallTrace("media-device-failure", { failure: typeof failure === "string" ? failure : "unavailable" });
                   toast("Micro indisponible", {
                     description: "Autorisez l'accès au micro pour parler.",
                   });
                 }}
                 onError={(e) => {
-                  console.warn("[call] room error", e?.name, e?.message);
+                  recordCallTrace("room-error", { name: e?.name ?? "Error", code: typeof (e as { code?: unknown }).code === "number" ? (e as { code: number }).code : null });
                   if (stub) return;
                   const isDeviceError =
                     /NotAllowed|NotFound|NotReadable|Permission|device|getUserMedia/i.test(
@@ -465,6 +471,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
               >
                 <RoomAudioRenderer />
                 <RoomMountProbe />
+                <CallDiagnosticProbe />
                 <ConnectionWatcher
                   onReconnecting={() => setNetState("reconnecting")}
                   onRestored={() => {
