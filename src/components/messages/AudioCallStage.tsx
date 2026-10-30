@@ -1,8 +1,10 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   useLocalParticipant,
   useParticipants,
   useRoomContext,
+  useTracks,
+  VideoTrack,
 } from "@livekit/components-react";
 import { Track } from "livekit-client";
 import type { Participant } from "livekit-client";
@@ -11,9 +13,14 @@ import {
   Mic,
   MicOff,
   Minimize2,
+  Maximize2,
   Phone,
+  ScreenShare,
+  ScreenShareOff,
+  User,
   Users,
   Video,
+  VideoOff,
   Volume2,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -36,8 +43,23 @@ const BENEFICIARY_RING =
 /** Maintien de la désignation après le dernier mot détecté. */
 const FLOOR_HOLD_MS = 1500;
 
+/**
+ * Nom affichable d'un participant, aligné sur member_display_name : jamais
+ * d'adresse e-mail ni d'identifiant technique. `null` = membre sans nom.
+ */
+function nameOf(p: Participant): string | null {
+  const n = (p.name ?? "").trim();
+  if (!n || n.includes("@") || n === "Un membre") return null;
+  return n;
+}
+
 function displayName(p: Participant): string {
-  return p.name || p.identity;
+  return nameOf(p) ?? "Un membre";
+}
+
+/** « Tour d'Alpha » / « Tour de Mariama ». */
+function turnPrefix(name: string): string {
+  return /^[aeiouyhàâäéèêëîïôöùûü]/i.test(name) ? "Tour d\u2019" : "Tour de ";
 }
 
 function firstName(full: string | null | undefined): string | null {
@@ -135,8 +157,28 @@ export function AudioCallStage({
   const beneficiaryId = turn?.beneficiary_user_id ?? null;
   const beneficiaryFirstName = firstName(turn?.beneficiary_name);
 
-  const visibleOthers = remotes.slice(0, 4);
-  const hiddenCount = Math.max(0, remotes.length - visibleOthers.length);
+  // La bande n'apparaît qu'à partir de trois participants : à deux, elle
+  // répéterait la personne déjà mise en avant.
+  const showStrip = participants.length >= 3;
+  const others = participants.filter((p) => p.identity !== speaker?.identity);
+  const visibleOthers = others.slice(0, 4);
+  const hiddenCount = Math.max(0, others.length - visibleOthers.length);
+  const speakerName = speaker ? nameOf(speaker) : null;
+  const ringing = connectedAt === null;
+  const stateLine = confirming
+    ? "Appuyez encore pour raccrocher"
+    : ringing
+      ? "Sonnerie en cours"
+      : `En conversation · ${elapsed}`;
+
+  // Partage d'écran : celui d'un autre devient l'objet principal ; le mien
+  // efface le panneau (desktop) pour laisser l'application lisible.
+  const shareTracks = useTracks([Track.Source.ScreenShare], { onlySubscribed: false });
+  const remoteShare =
+    shareTracks.find((t) => t.participant.identity !== localParticipant?.identity) ?? null;
+  const selfSharing = localParticipant?.isScreenShareEnabled ?? false;
+  const toggleShare = () =>
+    void localParticipant?.setScreenShareEnabled(!selfSharing).catch(() => {});
 
   // La confirmation de raccrochage retombe d'elle-même après 4 s
   useEffect(() => {
@@ -155,11 +197,13 @@ export function AudioCallStage({
   };
 
   const micEnabled = localParticipant?.isMicrophoneEnabled ?? false;
+  const toggleMic = () => void localParticipant?.setMicrophoneEnabled(!micEnabled);
   const camEnabled = localParticipant?.isCameraEnabled ?? false;
   const speakerOn = currentKind === "speaker";
 
   return (
-    <div className="call-surface flex h-full flex-col text-primary-foreground">
+    <>
+    <div className="call-surface flex h-full flex-col text-primary-foreground md:hidden">
       {/* Barre haute */}
       <header className="flex h-[60px] items-center justify-between px-[18px]">
         <button
@@ -195,22 +239,32 @@ export function AudioCallStage({
             className="relative flex h-[158px] w-[158px] items-center justify-center rounded-full bg-primary"
             style={{ boxShadow: holdsFloor ? SPEAKING_RING : undefined }}
           >
-            <span className="font-display text-[50px] font-bold text-primary-foreground">
-              {getInitials(displayName(speaker))}
-            </span>
+            {speakerName ? (
+              <span className="font-display text-[50px] font-bold text-primary-foreground">
+                {getInitials(speakerName)}
+              </span>
+            ) : (
+              <User className="h-[66px] w-[66px] text-primary-200" />
+            )}
           </div>
         )}
 
         <p className="mt-5 font-display text-title font-bold">
-          {speaker ? displayName(speaker) : groupName ?? "Appel"}
+          {speakerName ?? groupName ?? "Appel"}
         </p>
         <p className="mt-1 text-body-sm text-primary-200">
           {/* La ligne est réservée quand personne n'a la parole : rien ne bouge. */}
-          {holdsFloor ? "parle" : "\u00A0"}
+          {speaker && !speakerName
+            ? holdsFloor
+              ? "Un membre · parle"
+              : "Un membre"
+            : holdsFloor
+              ? "parle"
+              : "\u00A0"}
         </p>
 
         {/* Bandeau des autres participants */}
-        {remotes.length > 0 && (
+        {showStrip && (
           <div className="mt-[34px] flex gap-4">
             {visibleOthers.map((p) => {
               const micMuted =
@@ -231,7 +285,7 @@ export function AudioCallStage({
                         micMuted && "text-primary-foreground/55",
                       )}
                     >
-                      {getInitials(displayName(p))}
+                      {nameOf(p) ? getInitials(nameOf(p) as string) : <User className="h-[22px] w-[22px]" />}
                     </span>
                     {micMuted && (
                       <span className="absolute -bottom-0.5 -right-0.5 flex h-[22px] w-[22px] items-center justify-center rounded-full bg-primary-900 ring-2 ring-primary-900">
@@ -245,7 +299,7 @@ export function AudioCallStage({
                       isBeneficiary && "font-semibold text-accent",
                     )}
                   >
-                    {firstName(displayName(p))}
+                    {p.identity === localParticipant?.identity ? "Vous" : firstName(displayName(p)) === "Un" ? "Un membre" : firstName(displayName(p))}
                   </span>
                 </div>
               );
@@ -265,11 +319,11 @@ export function AudioCallStage({
         {/* Bloc de faits */}
         <div className="mt-9 text-center">
           <p className="num text-body-sm text-primary-200">
-            {groupName ?? "Appel"} · {elapsed}
+            {groupName ?? "Appel"} · {ringing ? "Sonnerie en cours" : elapsed}
           </p>
           {beneficiaryFirstName && turn?.payout_amount != null && (
             <p className="mt-[3px] text-body-sm text-primary-200">
-              Tour de <span className="font-semibold text-accent">{beneficiaryFirstName}</span>
+              {turnPrefix(beneficiaryFirstName)}<span className="font-semibold text-accent">{beneficiaryFirstName}</span>
               {" · "}cagnotte{" "}
               <span className="num font-semibold text-primary-foreground">
                 {formatGNF(turn.payout_amount, { withCurrency: true })}
@@ -322,7 +376,7 @@ export function AudioCallStage({
         <DockButton
           label="Micro"
           active={!micEnabled}
-          onClick={() => void localParticipant?.setMicrophoneEnabled(!micEnabled)}
+          onClick={toggleMic}
           icon={micEnabled ? <Mic className="h-[25px] w-[25px]" /> : <MicOff className="h-[25px] w-[25px]" />}
         />
         <DockButton
