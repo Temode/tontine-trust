@@ -13,6 +13,7 @@ import {
   LiveKitRoom,
   RoomAudioRenderer,
   useConnectionState,
+  useLocalParticipant,
   useParticipants,
 } from "@livekit/components-react";
 import { ConnectionState } from "livekit-client";
@@ -31,6 +32,7 @@ import { useRegisterCallPriority } from "@/lib/callPriority";
 import { CallSurface } from "@/components/messages/CallSurface";
 import { CallDiagnosticProbe } from "@/components/messages/CallDiagnosticProbe";
 import { recordCallTrace } from "@/lib/diagnostics/callTrace";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 export interface StartCallArgs {
   callId: string;
@@ -97,16 +99,21 @@ export function CallProvider({ children }: { children: ReactNode }) {
   const intentionalRef = useRef(false);
   const [netState, setNetState] = useState<NetState>("online");
   const [reconnectAttempt, setReconnectAttempt] = useState(0);
-  useRegisterCallPriority(!!session, !!session && mode === "full");
+  const [selfSharing, setSelfSharing] = useState(false);
+  const isMobile = useIsMobile();
+  // Sur ordinateur, quand je partage mon écran, l'application doit rester
+  // utilisable : l'appel se réduit à une barre et ne suspend plus le reste.
+  const surfaceFull = mode === "full" && !(selfSharing && !isMobile);
+  useRegisterCallPriority(!!session, !!session && surfaceFull);
 
   const displayName = useMemo(() => {
     const meta = (user?.user_metadata ?? {}) as Record<string, unknown>;
-    return (
-      (typeof meta.full_name === "string" && meta.full_name) ||
-      (typeof meta.name === "string" && meta.name) ||
-      user?.email ||
-      "Participant"
-    );
+    // Aligné sur member_display_name : jamais d'adresse e-mail dans l'identité d'appel.
+    const raw =
+      (typeof meta.full_name === "string" && meta.full_name.trim()) ||
+      (typeof meta.name === "string" && meta.name.trim()) ||
+      "";
+    return raw && !raw.includes("@") ? raw : "Un membre";
   }, [user]);
 
   const pip = usePictureInPicture(
@@ -356,7 +363,6 @@ export function CallProvider({ children }: { children: ReactNode }) {
   const handleConnected = () => {
     recordCallTrace("connected");
     hasConnectedRef.current = true;
-    setConnectedAt(new Date().toISOString());
     if (session?.manageLifecycle) {
       updateCallStatusBestEffort(session.callId, "accepted");
     }
@@ -404,7 +410,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
       {typeof document !== "undefined" &&
         session &&
         createPortal(
-          <CallSurface full={mode === "full"}>
+          <CallSurface full={surfaceFull}>
           <div ref={containerRef}>
             {mode === "full" && (loading || error) && (
               <div className="call-surface fixed inset-0 z-call flex flex-col items-center justify-center gap-3 p-6 text-center">
@@ -472,6 +478,12 @@ export function CallProvider({ children }: { children: ReactNode }) {
               >
                 <RoomAudioRenderer />
                 <RoomMountProbe />
+                <RemoteJoinWatcher
+                  onFirstRemote={() =>
+                    setConnectedAt((prev) => prev ?? new Date().toISOString())
+                  }
+                  onSelfShareChange={setSelfSharing}
+                />
                 <CallDiagnosticProbe />
                 <ConnectionWatcher
                   onReconnecting={() => setNetState("reconnecting")}
@@ -489,7 +501,6 @@ export function CallProvider({ children }: { children: ReactNode }) {
                   />
                 )}
                 {mode === "full" ? (
-                  <div className="call-surface fixed inset-0 z-call">
                     <FullCallStage
                       callId={session.callId}
                       isHost={tokenData.isHost}
@@ -502,7 +513,6 @@ export function CallProvider({ children }: { children: ReactNode }) {
                       pipSupported={pip.supported}
                       pipActive={pip.active}
                     />
-                  </div>
                 ) : (
                   <>
                     <CallActiveBanner
@@ -561,8 +571,11 @@ function FullCallStage({
   const participants = useParticipants();
   const anyCameraOn = participants.some((p) => p.isCameraEnabled);
 
+  // Caméra active quelque part → grille visio. Sinon, partage d'écran ou non,
+  // on reste sur l'écran audio, qui affiche lui-même la surface partagée.
   if (!anyCameraOn) {
     return (
+      <div className="fixed inset-0 z-call">
       <AudioCallStage
         groupId={groupId}
         groupName={groupName}
@@ -570,9 +583,11 @@ function FullCallStage({
         onMinimize={onMinimize}
         onHangup={onHangup}
       />
+      </div>
     );
   }
   return (
+    <div className="call-surface fixed inset-0 z-call">
     <CallStage
       callId={callId}
       isHost={isHost}
@@ -583,7 +598,34 @@ function FullCallStage({
       pipSupported={pipSupported}
       pipActive={pipActive}
     />
+    </div>
   );
+}
+
+/**
+ * La durée de l'appel part de l'arrivée du premier participant distant, pas de
+ * notre propre connexion à la salle : tant que personne n'a rejoint, on sonne.
+ * Remonte aussi l'état « je partage mon écran ».
+ */
+function RemoteJoinWatcher({
+  onFirstRemote,
+  onSelfShareChange,
+}: {
+  onFirstRemote: () => void;
+  onSelfShareChange: (sharing: boolean) => void;
+}) {
+  const participants = useParticipants();
+  const { localParticipant } = useLocalParticipant();
+  const hasRemote = participants.some((p) => p.identity !== localParticipant?.identity);
+  const sharing = localParticipant?.isScreenShareEnabled ?? false;
+  useEffect(() => {
+    if (hasRemote) onFirstRemote();
+  }, [hasRemote, onFirstRemote]);
+  useEffect(() => {
+    onSelfShareChange(sharing);
+    return () => onSelfShareChange(false);
+  }, [sharing, onSelfShareChange]);
+  return null;
 }
 
 /**
@@ -713,7 +755,9 @@ function CallActiveBanner({
       >
         <PhoneCall className="h-3.5 w-3.5 shrink-0" />
         <span className="truncate">
-          Appel en cours{groupName ? ` — ${groupName}` : ""} · {elapsed}
+          {connectedAt
+            ? `Appel en cours${groupName ? ` — ${groupName}` : ""} · ${elapsed}`
+            : `Sonnerie en cours${groupName ? ` — ${groupName}` : ""}`}
         </span>
         <span className="shrink-0 underline underline-offset-2">Revenir</span>
       </button>
