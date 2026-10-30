@@ -13,16 +13,37 @@ export default {
       },
     },
     extend: {
+      zIndex: {
+        notice: "var(--layer-notice)",
+        call: "var(--layer-call)",
+        "call-control": "var(--layer-call-control)",
+      },
       fontFamily: {
         sans: ["Inter", "system-ui", "-apple-system", "Segoe UI", "sans-serif"],
         display: ["DM Sans", "Inter", "system-ui", "sans-serif"],
+        serif: ["'Playfair Display'", "Georgia", "serif"],
       },
+      fontSize: {
+        "display-lg": ["2.25rem", { lineHeight: "1.1", letterSpacing: "-0.025em", fontWeight: "700" }],
+        "display": ["1.875rem", { lineHeight: "1.15", letterSpacing: "-0.02em", fontWeight: "700" }],
+        "title": ["1.5rem", { lineHeight: "1.25", letterSpacing: "-0.015em", fontWeight: "700" }],
+        "subtitle": ["1.25rem", { lineHeight: "1.3", letterSpacing: "-0.01em", fontWeight: "600" }],
+        "amount-lg": ["2rem", { lineHeight: "1.1", letterSpacing: "-0.02em", fontWeight: "700" }],
+        "amount": ["1.5rem", { lineHeight: "1.15", letterSpacing: "-0.015em", fontWeight: "700" }],
+        "body": ["1rem", { lineHeight: "1.55" }],
+        "body-sm": ["0.875rem", { lineHeight: "1.5" }],
+        "caption": ["0.8125rem", { lineHeight: "1.45" }],
+        "label": ["0.75rem", { lineHeight: "1.2", letterSpacing: "0.08em", fontWeight: "600" }],
+      },
+
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
+        "call-active": "hsl(var(--call-active))",
+        "call-scrim": "hsl(var(--call-scrim) / 0.8)",
 
         primary: {
           DEFAULT: "hsl(var(--primary))",
@@ -30,6 +51,7 @@ export default {
           50: "hsl(var(--primary-50))",
           100: "hsl(var(--primary-100))",
           200: "hsl(var(--primary-200))",
+          300: "hsl(var(--primary-300))",
           400: "hsl(var(--primary-400))",
           500: "hsl(var(--primary-500))",
           600: "hsl(var(--primary-600))",
@@ -75,6 +97,14 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        chat: {
+          surface: "hsl(var(--chat-surface))",
+          in: "hsl(var(--chat-bubble-in))",
+          "in-foreground": "hsl(var(--chat-bubble-in-foreground))",
+          out: "hsl(var(--chat-bubble-out))",
+          "out-foreground": "hsl(var(--chat-bubble-out-foreground))",
+          receipt: "hsl(var(--chat-receipt))",
+        },
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
           foreground: "hsl(var(--sidebar-foreground))",
@@ -92,6 +122,8 @@ export default {
         sm: "calc(var(--radius) - 8px)",
       },
       boxShadow: {
+        "call-panel": "0 26px 70px hsl(0 0% 0% / 0.42)",
+        "call-bar": "0 16px 40px hsl(0 0% 0% / 0.34)",
         "ring-soft": "inset 0 0 0 1px hsl(var(--border))",
         soft: "0 1px 2px 0 hsl(200 30% 9% / 0.04), 0 1px 1px 0 hsl(200 30% 9% / 0.02)",
         card: "0 1px 2px 0 hsl(200 30% 9% / 0.04), 0 8px 24px -12px hsl(200 30% 9% / 0.08)",

@@ -1,6 +1,6 @@
 export type GroupStatus = "active" | "your-turn" | "completed" | "pending";
 
-export type Frequency = "Hebdomadaire" | "Quinzaine" | "Mensuelle";
+export type Frequency = "Quotidienne" | "Hebdomadaire" | "Quinzaine" | "Mensuelle";
 
 export type GroupRole = "organizer" | "participant";
 

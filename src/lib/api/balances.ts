@@ -1,0 +1,97 @@
+import { supabase } from "@/integrations/supabase/client";
+
+export interface DbMyBalance {
+  id: string;
+  user_id: string;
+  group_id: string;
+  group_name: string;
+  available_amount: number;
+  total_credited: number;
+  total_withdrawn: number;
+  updated_at: string;
+}
+
+export type WithdrawalMethod = "OM" | "MOMO" | "CARD" | "BANK" | "CASH";
+export type WithdrawalStatus =
+  | "pending"
+  | "processing"
+  | "paid"
+  | "failed"
+  | "cancelled";
+
+export interface DbWithdrawalRequest {
+  id: string;
+  user_id: string;
+  group_id: string;
+  amount: number;
+  method: WithdrawalMethod;
+  destination: string | null;
+  status: WithdrawalStatus;
+  djomy_payout_ref: string | null;
+  notes: string | null;
+  processed_at: string | null;
+  created_at: string;
+}
+
+export async function listMyBalances(): Promise<DbMyBalance[]> {
+  const { data, error } = await supabase
+    .from("my_balances")
+    .select("*")
+    .order("updated_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as DbMyBalance[];
+}
+
+export async function listMyWithdrawals(): Promise<DbWithdrawalRequest[]> {
+  const { data, error } = await supabase
+    .from("withdrawal_requests")
+    .select("*")
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as DbWithdrawalRequest[];
+}
+
+export async function getPendingPenalty(groupId: string): Promise<number> {
+  const { data, error } = await supabase.rpc("get_pending_penalty", { _group_id: groupId });
+  if (error) throw error;
+  return Number(data ?? 0);
+}
+
+export async function requestWithdrawal(args: {
+  groupId: string;
+  amount: number;
+  method: WithdrawalMethod;
+  destination?: string | null;
+}): Promise<string> {
+  const { data, error } = await supabase.rpc("request_withdrawal", {
+    _group_id: args.groupId,
+    _amount: args.amount,
+    _method: args.method,
+    _destination: args.destination ?? null,
+  });
+  if (error) {
+    if (/DEPOSIT_REQUIRED/.test(error.message)) {
+      throw new Error(
+        "Caution requise : déposez votre caution avant de pouvoir retirer des fonds.",
+      );
+    }
+    if (/PAYOUT_LOCKED_UNTIL/.test(error.message)) {
+      const raw = error.message.match(/PAYOUT_LOCKED_UNTIL:([^\s]+)/)?.[1];
+      const date = raw
+        ? new Date(raw).toLocaleDateString("fr-FR", {
+            day: "2-digit",
+            month: "long",
+            year: "numeric",
+          })
+        : "date inconnue";
+      throw new Error(
+        `Payout verrouillé jusqu'au ${date} suite à un retard de cotisation dans ce cycle.`,
+      );
+    }
+    if (/INSUFFICIENT_BALANCE/.test(error.message)) {
+      throw new Error("Solde disponible insuffisant.");
+    }
+    throw error;
+  }
+  return data as string;
+}

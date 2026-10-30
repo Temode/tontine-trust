@@ -1,5 +1,13 @@
-import { Download, LayoutGrid, List, Search } from "lucide-react";
+import { ArrowUpDown, Check, Download, LayoutGrid, List, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { SORT_OPTIONS, STATUS_FILTERS, type GroupsFilter, type SortKey, type ViewMode } from "./types";
 
 interface GroupsToolbarProps {
@@ -27,42 +35,56 @@ export function GroupsToolbar({
   onViewChange,
   onExport,
 }: GroupsToolbarProps) {
+  const activeSortLabel = SORT_OPTIONS.find((o) => o.id === sort)?.label ?? "Trier";
   return (
-    <div className="rounded-xl border border-hairline bg-card">
-      {/* Search + actions */}
-      <div className="flex flex-col gap-3 border-b border-hairline px-4 py-3 lg:flex-row lg:items-center lg:px-5">
-        <div className="relative flex-1">
+    <div className="rounded-2xl border border-hairline bg-card shadow-sm">
+      {/* Row 1 — search + cluster */}
+      <div className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:px-5">
+        <div className="relative w-full max-w-md flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <input
             type="search"
             aria-label="Rechercher un groupe"
             value={query}
             onChange={(e) => onQueryChange(e.target.value)}
-            placeholder="Rechercher par nom, membre ou bénéficiaire..."
-            className="h-10 w-full rounded-lg border border-hairline bg-secondary/40 pl-9 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:bg-card focus:outline-none focus:ring-2 focus:ring-primary/15"
+            placeholder="Rechercher un groupe, un membre…"
+            className="h-9 w-full rounded-lg border border-hairline bg-secondary/50 pl-9 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:bg-card focus:outline-none focus:ring-2 focus:ring-primary/15"
           />
         </div>
 
-        <div className="flex items-center gap-2">
-          <label className="hidden items-center gap-2 rounded-lg border border-hairline bg-card px-2 py-1.5 text-sm sm:flex">
-            <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Trier</span>
-            <select
+        <div className="flex items-center justify-end gap-3 sm:ml-auto">
+          <DropdownMenu>
+            <DropdownMenuTrigger
               aria-label="Trier les groupes"
-              value={sort}
-              onChange={(e) => onSortChange(e.target.value as SortKey)}
-              className="h-7 bg-transparent pr-1 text-xs font-medium text-foreground focus:outline-none"
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-hairline bg-card px-3 text-xs font-medium text-foreground transition hover:bg-secondary"
             >
+              <ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground" />
+              <span className="hidden sm:inline">Trier&nbsp;:</span>
+              <span className="truncate">{activeSortLabel}</span>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuLabel className="text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                Trier par
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
               {SORT_OPTIONS.map((o) => (
-                <option key={o.id} value={o.id}>
-                  {o.label}
-                </option>
+                <DropdownMenuItem
+                  key={o.id}
+                  onClick={() => onSortChange(o.id)}
+                  className="flex items-center justify-between text-sm"
+                >
+                  <span>{o.label}</span>
+                  {sort === o.id && <Check className="h-3.5 w-3.5 text-primary" />}
+                </DropdownMenuItem>
               ))}
-            </select>
-          </label>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <div className="h-6 w-px bg-border" aria-hidden />
 
           <div className="flex items-center gap-0.5 rounded-lg border border-hairline bg-card p-0.5" role="tablist" aria-label="Vue">
-            <ViewToggleButton current={view} target="table" onClick={onViewChange} icon={List} label="Liste" />
             <ViewToggleButton current={view} target="grid" onClick={onViewChange} icon={LayoutGrid} label="Grille" />
+            <ViewToggleButton current={view} target="table" onClick={onViewChange} icon={List} label="Liste" />
           </div>
 
           {onExport && (
@@ -72,15 +94,15 @@ export function GroupsToolbar({
               aria-label="Exporter en CSV"
               className="hidden h-9 items-center gap-1.5 rounded-lg border border-hairline px-3 text-xs font-medium text-muted-foreground transition hover:bg-secondary hover:text-foreground sm:inline-flex"
             >
-              <Download className="h-4 w-4" />
+              <Download className="h-3.5 w-3.5" />
               Exporter
             </button>
           )}
         </div>
       </div>
 
-      {/* Filter chips */}
-      <div className="flex items-center gap-1 overflow-x-auto px-4 py-2.5 scrollbar-thin lg:px-5">
+      {/* Row 2 — filter chips */}
+      <div className="flex items-center gap-1 overflow-x-auto border-t border-hairline px-4 py-2.5 scrollbar-thin sm:px-5">
         {STATUS_FILTERS.map((f) => {
           const active = filter === f.id;
           const count = counts[f.id];
@@ -100,7 +122,7 @@ export function GroupsToolbar({
               <span>{f.label}</span>
               <span
                 className={cn(
-                  "rounded-full px-1.5 text-[10px] font-semibold",
+                  "rounded-full px-1.5 text-[10px] font-semibold num",
                   active ? "bg-primary-foreground/20 text-primary-foreground" : "bg-secondary text-muted-foreground",
                 )}
               >

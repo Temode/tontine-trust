@@ -83,11 +83,19 @@ export function GroupRow({ group }: GroupRowProps) {
               Recevoir
             </span>
           </>
-        ) : (
+        ) : group.yourTurn > 0 ? (
           <>
             <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Votre tour</p>
             <p className="mt-1 font-display text-lg font-bold text-foreground num">#{group.yourTurn}</p>
             <p className="mt-1 text-[11px] text-muted-foreground">{group.nextPaymentDate}</p>
+          </>
+        ) : (
+          <>
+            <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Cotisation</p>
+            <p className="mt-1 font-display text-lg font-bold text-foreground num">
+              {formatGNF(group.contribution, { withCurrency: true })}
+            </p>
+            <p className="mt-1 text-[11px] text-muted-foreground">{group.frequency}</p>
           </>
         )}
       </div>

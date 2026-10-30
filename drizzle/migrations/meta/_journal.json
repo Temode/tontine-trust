@@ -1,0 +1,118 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1792236448769,
+      "tag": "0000_push_notifications",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1792237229499,
+      "tag": "0001_push_pref_rpc",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792498137655,
+      "tag": "0002_brand_name_tontine_digitale",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1792501360632,
+      "tag": "0003_group_assistant",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1792784921172,
+      "tag": "0004_payment_receipts_expiry_referrer",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1792789663466,
+      "tag": "0005_referral_commission_wallet_credit",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1792791197504,
+      "tag": "0006_affiliation_actifs_et_nom_parrain",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1792791871636,
+      "tag": "0007_receipt_email_reliability",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1792791884255,
+      "tag": "0008_receipt_ready_no_duplicate_email",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1792791944297,
+      "tag": "0009_cancel_stale_quota_emails",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1792794298987,
+      "tag": "0010_notif_kinds_chat_call",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1792794330972,
+      "tag": "0011_notification_target_and_chat_call_push",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1792795090049,
+      "tag": "0012_notif_sender_display_name",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1792795355315,
+      "tag": "0013_push_call_ring_and_cancel",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1793290619851,
+      "tag": "0014_guard_call_status_and_expire_after_90_seconds",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1793290736001,
+      "tag": "0015_schedule_stale_call_expiration_safety_net",
+      "breakpoints": true
+    }
+  ]
+}
