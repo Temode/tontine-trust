@@ -299,7 +299,7 @@ export function AudioCallStage({
                       isBeneficiary && "font-semibold text-accent",
                     )}
                   >
-                    {p.identity === localParticipant?.identity ? "Vous" : firstName(displayName(p)) === "Un" ? "Un membre" : firstName(displayName(p))}
+                    {p.identity === localParticipant?.identity ? "Vous" : firstName(nameOf(p)) ?? "Un membre"}
                   </span>
                 </div>
               );
@@ -396,6 +396,437 @@ export function AudioCallStage({
           onClick={onHangupClick}
           icon={<Phone className="h-[25px] w-[25px] rotate-[135deg]" />}
         />
+      </div>
+    </div>
+
+    {/* ===== Desktop (≥ md) : panneau centré, jamais étiré ===== */}
+    {selfSharing ? (
+      <SelfShareBar
+        micEnabled={micEnabled}
+        onToggleMic={toggleMic}
+        onStop={toggleShare}
+        membersOpen={membersOpen}
+        onToggleMembers={() => setMembersOpen((v) => !v)}
+        members={<MembersList participants={participants} localId={localParticipant?.identity} />}
+        onHangup={onHangupClick}
+        confirming={confirming}
+      />
+    ) : (
+      <div className="hidden h-full place-items-center bg-call-scrim p-10 text-primary-foreground md:grid">
+        <div
+          className={cn(
+            "call-surface relative flex flex-col overflow-hidden rounded-[22px] shadow-call-panel",
+            remoteShare
+              ? "w-[520px] px-[18px] pb-[18px] pt-4 min-[800px]:w-[max(720px,min(1120px,calc(100vw-80px)))]"
+              : "w-[520px] items-center px-[34px] pb-[30px] pt-[38px]",
+          )}
+        >
+          {remoteShare ? (
+            <>
+              <div className="flex items-center gap-[11px] px-0.5 pb-3 pt-0.5">
+                <span className="flex h-[30px] w-[30px] flex-none items-center justify-center rounded-full bg-primary font-display text-[12px] font-bold">
+                  {nameOf(remoteShare.participant) ? (
+                    getInitials(nameOf(remoteShare.participant) as string)
+                  ) : (
+                    <User className="h-4 w-4 text-primary-200" />
+                  )}
+                </span>
+                <p className="truncate text-[14.5px]">
+                  <span className="font-semibold">{displayName(remoteShare.participant)}</span>{" "}
+                  partage son écran
+                </p>
+                <span className="flex-1" />
+                <ParticipantsChip
+                  count={participants.length}
+                  open={membersOpen}
+                  onClick={() => setMembersOpen((v) => !v)}
+                />
+                <MiniButton
+                  label="Plein écran"
+                  onClick={() => {
+                    const el = document.querySelector<HTMLElement>("[data-shared-screen]");
+                    void el?.requestFullscreen?.().catch(() => {});
+                  }}
+                >
+                  <Maximize2 className="h-4 w-4" />
+                </MiniButton>
+                <MiniButton label="Réduire l'appel" onClick={onMinimize}>
+                  <ChevronDown className="h-4 w-4" />
+                </MiniButton>
+              </div>
+              {membersOpen && (
+                <div className="absolute right-[18px] top-[58px] z-10 w-64">
+                  <MembersList participants={participants} localId={localParticipant?.identity} />
+                </div>
+              )}
+              <div
+                data-shared-screen
+                className="aspect-video max-h-[498px] w-full overflow-hidden rounded-[12px] border border-white/[0.08] bg-primary-800"
+              >
+                <VideoTrack trackRef={remoteShare} className="h-full w-full object-contain" />
+              </div>
+              <div className="mt-3.5 flex flex-col items-center gap-4 min-[800px]:flex-row">
+                <div className="min-w-0 flex-1 text-center text-body-sm text-primary-200 min-[800px]:text-left">
+                  <TurnFacts name={beneficiaryFirstName} amount={turn?.payout_amount ?? null} />
+                  <p className="num mt-[7px] text-caption text-primary-200/75">{stateLine}</p>
+                </div>
+                <DesktopDock
+                  speakerOn={speakerOn}
+                  speakerSupported={audioOutSupported}
+                  onSpeaker={() => void toggleSpeaker()}
+                  camEnabled={camEnabled}
+                  onCam={() => void localParticipant?.setCameraEnabled(!camEnabled)}
+                  micEnabled={micEnabled}
+                  onMic={toggleMic}
+                  sharing={selfSharing}
+                  onShare={toggleShare}
+                  onMinimize={onMinimize}
+                  onHangup={onHangupClick}
+                  confirming={confirming}
+                />
+              </div>
+            </>
+          ) : (
+            <>
+              <div
+                aria-hidden
+                className="pointer-events-none absolute left-1/2 top-0 h-[360px] w-[360px] rounded-full"
+                style={{
+                  transform: "translate(-50%, -34%)",
+                  background:
+                    "radial-gradient(circle, hsl(var(--primary) / 0.40) 0%, transparent 68%)",
+                }}
+              />
+              <div className="absolute left-4 right-4 top-4 z-10 flex items-center justify-between">
+                <MiniButton label="Réduire l'appel" onClick={onMinimize}>
+                  <ChevronDown className="h-4 w-4" />
+                </MiniButton>
+                <ParticipantsChip
+                  count={participants.length}
+                  open={membersOpen}
+                  onClick={() => setMembersOpen((v) => !v)}
+                />
+              </div>
+              {membersOpen && (
+                <div className="absolute right-4 top-[54px] z-20 w-64">
+                  <MembersList participants={participants} localId={localParticipant?.identity} />
+                </div>
+              )}
+              <div className="relative z-[1] flex w-full flex-col items-center">
+                <div
+                  className={cn(
+                    "flex h-[136px] w-[136px] items-center justify-center rounded-full",
+                    speakerName ? "bg-primary" : "bg-primary-800 shadow-[inset_0_0_0_1px_hsl(var(--primary-200)/0.24)]",
+                  )}
+                  style={{ boxShadow: holdsFloor ? SPEAKING_RING : undefined }}
+                >
+                  {speakerName ? (
+                    <span className="font-display text-[44px] font-bold leading-none">
+                      {getInitials(speakerName)}
+                    </span>
+                  ) : (
+                    <User className="h-[58px] w-[58px] text-primary-200" />
+                  )}
+                </div>
+                <p className="mt-[22px] text-center font-display text-[25px] font-bold leading-[1.15] tracking-[-0.02em]">
+                  {speakerName ?? groupName ?? "Appel"}
+                </p>
+                <p className="mt-1.5 text-center text-body-sm leading-normal text-primary-200">
+                  {speakerName
+                    ? `${groupName ?? "Appel"} · ${holdsFloor ? "parle" : "Appel audio"}`
+                    : `Un membre · ${holdsFloor ? "parle" : "Appel audio"}`}
+                </p>
+
+                {showStrip && (
+                  <div className="mt-6 flex justify-center gap-1">
+                    {visibleOthers.map((p) => {
+                      const n = nameOf(p);
+                      const isBeneficiary = beneficiaryId !== null && p.identity === beneficiaryId;
+                      return (
+                        <div key={p.identity} className="flex w-[60px] flex-col items-center gap-[7px]">
+                          <div
+                            className={cn(
+                              "flex h-12 w-12 items-center justify-center rounded-full",
+                              n ? "bg-primary" : "bg-primary-800",
+                            )}
+                            style={{ boxShadow: isBeneficiary ? BENEFICIARY_RING : undefined }}
+                          >
+                            {n ? (
+                              <span className="font-display text-base font-bold">{getInitials(n)}</span>
+                            ) : (
+                              <User className="h-5 w-5 text-primary-200" />
+                            )}
+                          </div>
+                          <span
+                            className={cn(
+                              "max-w-[60px] truncate text-[11.5px] text-primary-200",
+                              isBeneficiary && "font-semibold text-accent",
+                            )}
+                          >
+                            {p.identity === localParticipant?.identity ? "Vous" : firstName(n) ?? "Un membre"}
+                          </span>
+                        </div>
+                      );
+                    })}
+                    {hiddenCount > 0 && (
+                      <div className="flex w-[60px] flex-col items-center gap-[7px]">
+                        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary-800 shadow-[inset_0_0_0_1px_hsl(0_0%_100%/0.10)]">
+                          <span className="num font-display text-body-sm font-bold text-primary-200">
+                            +{hiddenCount}
+                          </span>
+                        </div>
+                        <span className="text-[11.5px]">{"\u00A0"}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {beneficiaryFirstName && turn?.payout_amount != null ? (
+                  <>
+                    <div className="mt-6 text-center text-body-sm text-primary-200">
+                      <TurnFacts name={beneficiaryFirstName} amount={turn.payout_amount} />
+                    </div>
+                    <p className="num mt-[7px] text-center text-caption text-primary-200/75">{stateLine}</p>
+                  </>
+                ) : (
+                  <p className="num mt-6 text-center text-caption text-primary-200/75">{stateLine}</p>
+                )}
+
+                <div className="mt-7">
+                  <DesktopDock
+                    speakerOn={speakerOn}
+                    speakerSupported={audioOutSupported}
+                    onSpeaker={() => void toggleSpeaker()}
+                    camEnabled={camEnabled}
+                    onCam={() => void localParticipant?.setCameraEnabled(!camEnabled)}
+                    micEnabled={micEnabled}
+                    onMic={toggleMic}
+                    sharing={selfSharing}
+                    onShare={toggleShare}
+                    onMinimize={onMinimize}
+                    onHangup={onHangupClick}
+                    confirming={confirming}
+                  />
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    )}
+    </>
+  );
+}
+
+/** Combiné de raccrochage, tracé lucide « phone » rempli, grille 24. */
+function HangupGlyph({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden className={cn("rotate-[135deg]", className)}>
+      <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92" />
+    </svg>
+  );
+}
+
+function TurnFacts({ name, amount }: { name: string | null; amount: number | null }) {
+  if (!name || amount == null) return null;
+  return (
+    <p className="leading-normal">
+      {turnPrefix(name)}
+      <span className="font-semibold text-accent">{name}</span>
+      {" · "}cagnotte{" "}
+      <span className="num font-semibold text-primary-foreground">
+        {formatGNF(amount, { withCurrency: true })}
+      </span>
+    </p>
+  );
+}
+
+function MiniButton({ label, onClick, children }: { label: string; onClick: () => void; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      title={label}
+      className="flex h-[30px] w-[30px] items-center justify-center rounded-full bg-white/[0.07] text-primary-200"
+    >
+      {children}
+    </button>
+  );
+}
+
+function ParticipantsChip({ count, open, onClick }: { count: number; open: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-expanded={open}
+      aria-label={`Participants : ${count}`}
+      className="flex items-center gap-1.5 rounded-full bg-white/[0.07] px-[11px] py-1.5 text-[12.5px] text-primary-200"
+    >
+      <Users className="h-3.5 w-3.5" />
+      <span className="num">{count}</span>
+    </button>
+  );
+}
+
+function MembersList({ participants, localId }: { participants: Participant[]; localId?: string }) {
+  return (
+    <div className="max-h-56 overflow-y-auto rounded-2xl border border-white/10 bg-primary-800 p-2 text-left">
+      {participants.map((p) => {
+        const micMuted = p.getTrackPublication(Track.Source.Microphone)?.isMuted ?? false;
+        return (
+          <div key={p.identity} className="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5">
+            <span className="truncate text-body-sm text-primary-foreground">
+              {p.identity === localId ? "Vous" : displayName(p)}
+            </span>
+            {micMuted ? (
+              <MicOff className="h-3.5 w-3.5 shrink-0 text-primary-200" />
+            ) : (
+              <Mic className="h-3.5 w-3.5 shrink-0 text-primary-200" />
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function DeskKey({
+  label,
+  onClick,
+  state = "normal",
+  disabled = false,
+  size = "md",
+  children,
+}: {
+  label: string;
+  onClick: () => void;
+  state?: "normal" | "on" | "off";
+  disabled?: boolean;
+  size?: "md" | "sm";
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={label}
+      aria-pressed={state === "on"}
+      title={label}
+      className={cn(
+        "flex flex-none items-center justify-center rounded-full disabled:opacity-40",
+        size === "md" ? "h-[50px] w-[50px] [&_svg]:h-5 [&_svg]:w-5" : "h-11 w-11 [&_svg]:h-[18px] [&_svg]:w-[18px]",
+        state === "on" ? "bg-call-active text-primary-900" : "bg-white/[0.07]",
+        state === "off" && "text-primary-foreground/55",
+        state === "normal" && "text-primary-foreground",
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
+function DesktopDock(props: {
+  speakerOn: boolean;
+  speakerSupported: boolean;
+  onSpeaker: () => void;
+  camEnabled: boolean;
+  onCam: () => void;
+  micEnabled: boolean;
+  onMic: () => void;
+  sharing: boolean;
+  onShare: () => void;
+  onMinimize: () => void;
+  onHangup: () => void;
+  confirming: boolean;
+}) {
+  return (
+    <div className="flex flex-none items-center gap-3.5 rounded-[27px] border border-white/10 bg-primary-800 px-[17px] py-[13px]">
+      <DeskKey label="Haut-parleur" state={props.speakerOn ? "on" : "normal"} disabled={!props.speakerSupported} onClick={props.onSpeaker}>
+        <Volume2 />
+      </DeskKey>
+      <DeskKey label={props.camEnabled ? "Couper la caméra" : "Activer la caméra"} state={props.camEnabled ? "normal" : "off"} onClick={props.onCam}>
+        {props.camEnabled ? <Video /> : <VideoOff />}
+      </DeskKey>
+      <DeskKey label={props.micEnabled ? "Couper le micro" : "Activer le micro"} state={props.micEnabled ? "normal" : "on"} onClick={props.onMic}>
+        {props.micEnabled ? <Mic /> : <MicOff />}
+      </DeskKey>
+      <DeskKey label={props.sharing ? "Arrêter le partage" : "Partager l'écran"} state={props.sharing ? "on" : "normal"} onClick={props.onShare}>
+        <ScreenShare />
+      </DeskKey>
+      <DeskKey label="Réduire" onClick={props.onMinimize}>
+        <Minimize2 />
+      </DeskKey>
+      <button
+        type="button"
+        onClick={props.onHangup}
+        aria-label={props.confirming ? "Confirmer le raccrochage" : "Raccrocher"}
+        title={props.confirming ? "Confirmer le raccrochage" : "Raccrocher"}
+        className="ml-[5px] flex h-[50px] w-14 flex-none items-center justify-center rounded-[25px] bg-destructive text-destructive-foreground"
+      >
+        <HangupGlyph className="h-5 w-5" />
+      </button>
+    </div>
+  );
+}
+
+/**
+ * Je partage mon écran : le panneau s'efface, l'application reste lisible et
+ * utilisable. Aucun cadre dans la page — il serait vu par tous.
+ */
+function SelfShareBar({
+  micEnabled,
+  onToggleMic,
+  onStop,
+  membersOpen,
+  onToggleMembers,
+  members,
+  onHangup,
+  confirming,
+}: {
+  micEnabled: boolean;
+  onToggleMic: () => void;
+  onStop: () => void;
+  membersOpen: boolean;
+  onToggleMembers: () => void;
+  members: ReactNode;
+  onHangup: () => void;
+  confirming: boolean;
+}) {
+  return (
+    <div className="pointer-events-none hidden h-full md:block">
+      <div className="pointer-events-auto absolute bottom-[26px] left-1/2 flex -translate-x-1/2 items-center gap-3 rounded-[17px] bg-primary-900 py-[11px] pl-[19px] pr-[13px] text-primary-foreground shadow-call-bar">
+        {membersOpen && <div className="absolute bottom-full right-0 mb-2 w-64">{members}</div>}
+        <span className="flex items-center gap-[9px] whitespace-nowrap text-body-sm">
+          <span className="block h-[9px] w-[9px] rounded-full bg-primary-300 shadow-[0_0_0_4px_hsl(var(--primary-300)/0.20)]" />
+          Vous partagez votre écran
+        </span>
+        <button
+          type="button"
+          onClick={onStop}
+          className="flex items-center gap-2 rounded-[12px] bg-call-active px-[15px] py-2.5 text-[13.5px] font-semibold text-primary-900"
+        >
+          <ScreenShareOff className="h-4 w-4" />
+          Arrêter
+        </button>
+        <span className="mx-0.5 h-[26px] w-px bg-white/[0.14]" />
+        <DeskKey size="sm" label={micEnabled ? "Couper le micro" : "Activer le micro"} state={micEnabled ? "normal" : "on"} onClick={onToggleMic}>
+          {micEnabled ? <Mic /> : <MicOff />}
+        </DeskKey>
+        <DeskKey size="sm" label="Participants" state={membersOpen ? "on" : "normal"} onClick={onToggleMembers}>
+          <Users />
+        </DeskKey>
+        <button
+          type="button"
+          onClick={onHangup}
+          aria-label={confirming ? "Confirmer le raccrochage" : "Raccrocher"}
+          title={confirming ? "Confirmer le raccrochage" : "Raccrocher"}
+          className="flex h-11 w-[50px] flex-none items-center justify-center rounded-[22px] bg-destructive text-destructive-foreground"
+        >
+          <HangupGlyph className="h-[18px] w-[18px]" />
+        </button>
       </div>
     </div>
   );
