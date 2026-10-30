@@ -4,6 +4,8 @@
 
 /* Preserve every suspended subtree, including uncontrolled form inputs. */
 [data-call-suspended] { visibility: hidden !important; pointer-events: none !important; }
+/* À partir de md, l'appel est un panneau posé devant l'application assombrie : elle reste visible, mais inerte. */
+@media (min-width: 768px) { [data-call-suspended] { visibility: visible !important; } }
 body[data-call-priority] [data-radix-popper-content-wrapper]:not(:has([data-call-owned])) {
   visibility: hidden !important;
   pointer-events: none !important;
@@ -85,6 +87,10 @@ body[data-call-priority] [data-radix-popper-content-wrapper]:not(:has([data-call
     --chat-bubble-out-foreground: 40 30% 96%;
     --chat-pattern: 183 25% 35%;
     --chat-receipt: 199 89% 55%;
+
+    /* Appel — état actif d'un bouton (#BDE3E7) et voile derrière le panneau desktop (rgba(4,26,29,.80)). */
+    --call-active: 185.7 46.7% 82.4%;
+    --call-scrim: 187.2 75.8% 6.5%;
   }
 
   .dark {
