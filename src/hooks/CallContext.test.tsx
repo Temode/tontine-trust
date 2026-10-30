@@ -14,7 +14,7 @@ vi.mock("@/integrations/supabase/client", () => ({ supabase: {
 } }));
 vi.mock("@livekit/components-react", () => ({
   LiveKitRoom: (props: { children: React.ReactNode; onConnected: () => void; audio: boolean }) => { mocks.roomProps = props; return props.children; },
-  RoomAudioRenderer: () => null, useParticipants: () => [], useConnectionState: () => "disconnected",
+  RoomAudioRenderer: () => null, useParticipants: () => [], useConnectionState: () => "disconnected", useLocalParticipant: () => ({ localParticipant: undefined }),
 }));
 vi.mock("@/components/messages/CallOverlay", () => ({ CallStage: () => null, usePictureInPicture: () => ({ toggle: async () => false, active: false, supported: false }) }));
 vi.mock("@/components/messages/AudioCallStage", () => ({ AudioCallStage: () => <div>Test room</div> }));
