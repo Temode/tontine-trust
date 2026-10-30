@@ -42,6 +42,8 @@ export default {
         ring: "hsl(var(--ring))",
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
+        "call-active": "hsl(var(--call-active))",
+        "call-scrim": "hsl(var(--call-scrim) / 0.8)",
 
         primary: {
           DEFAULT: "hsl(var(--primary))",
@@ -120,6 +122,8 @@ export default {
         sm: "calc(var(--radius) - 8px)",
       },
       boxShadow: {
+        "call-panel": "0 26px 70px hsl(0 0% 0% / 0.42)",
+        "call-bar": "0 16px 40px hsl(0 0% 0% / 0.34)",
         "ring-soft": "inset 0 0 0 1px hsl(var(--border))",
         soft: "0 1px 2px 0 hsl(200 30% 9% / 0.04), 0 1px 1px 0 hsl(200 30% 9% / 0.02)",
         card: "0 1px 2px 0 hsl(200 30% 9% / 0.04), 0 8px 24px -12px hsl(200 30% 9% / 0.08)",
