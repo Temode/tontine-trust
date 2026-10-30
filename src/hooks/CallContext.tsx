@@ -724,7 +724,7 @@ function MiniPlayerWithTimer({
   return (
     <CallMiniPlayer
       groupName={groupName}
-      elapsed={elapsed}
+      elapsed={connectedAt ? elapsed : "Sonnerie…"}
       onExpand={onExpand}
       onHangup={onHangup}
       onTogglePip={onTogglePip}
