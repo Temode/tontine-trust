@@ -28,6 +28,8 @@ import { useAudioOutput } from "@/hooks/useAudioOutput";
 import { useCallTimer } from "@/hooks/useCallTimer";
 import { formatGNF, getInitials } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { useCallRecipients } from "@/hooks/useCallRecipients";
+import { buildStrip, RECIPIENT_LABEL, type StripEntry } from "@/lib/callRecipients";
 
 interface TurnFacts {
   beneficiary_user_id: string | null;
@@ -73,12 +75,14 @@ function firstName(full: string | null | undefined): string | null {
  * (CallStage) reprend la main dès qu'une caméra s'allume.
  */
 export function AudioCallStage({
+  callId,
   groupId,
   groupName,
   connectedAt,
   onMinimize,
   onHangup,
 }: {
+  callId?: string;
   groupId?: string;
   groupName?: string;
   connectedAt: string | null;
@@ -147,22 +151,30 @@ export function AudioCallStage({
   );
 
   const remotes = participants.filter((p) => p.identity !== localParticipant?.identity);
+  // Tant que personne n'a décroché, la grande place porte la tontine, jamais moi.
   const speaker =
-    participants.find((p) => p.identity === designatedId) ??
-    remotes[0] ??
-    localParticipant ??
-    null;
+    remotes.length === 0
+      ? null
+      : participants.find((p) => p.identity === designatedId) ?? remotes[0];
   const holdsFloor = speaker !== null && speaker.identity === designatedId;
 
   const beneficiaryId = turn?.beneficiary_user_id ?? null;
   const beneficiaryFirstName = firstName(turn?.beneficiary_name);
 
-  // La bande n'apparaît qu'à partir de trois participants : à deux, elle
-  // répéterait la personne déjà mise en avant.
-  const showStrip = participants.length >= 3;
-  const others = participants.filter((p) => p.identity !== speaker?.identity);
-  const visibleOthers = others.slice(0, 4);
-  const hiddenCount = Math.max(0, others.length - visibleOthers.length);
+  // La bande est le tableau de bord de l'appel : tous les membres appelés,
+  // complétés par la présence dans la salle. Toujours affichée.
+  const recipients = useCallRecipients(callId);
+  const strip = buildStrip(
+    recipients,
+    remotes.map((p) => ({
+      identity: p.identity,
+      name: nameOf(p),
+      micMuted: p.getTrackPublication(Track.Source.Microphone)?.isMuted ?? false,
+    })),
+    localParticipant?.identity,
+  );
+  const showStrip = strip.length > 0;
+  const calledCount = recipients.filter((r) => r.user_id !== localParticipant?.identity).length;
   const speakerName = speaker ? nameOf(speaker) : null;
   const ringing = connectedAt === null;
   const stateLine = confirming
@@ -344,7 +356,7 @@ export function AudioCallStage({
         onStop={toggleShare}
         membersOpen={membersOpen}
         onToggleMembers={() => setMembersOpen((v) => !v)}
-        members={<MembersList participants={participants} localId={localParticipant?.identity} />}
+        members={<MembersList entries={strip} />}
         onHangup={onHangupClick}
         confirming={confirming}
       />
@@ -393,7 +405,7 @@ export function AudioCallStage({
               </div>
               {membersOpen && (
                 <div className="absolute right-[18px] top-[58px] z-10 w-64">
-                  <MembersList participants={participants} localId={localParticipant?.identity} />
+                  <MembersList entries={strip} />
                 </div>
               )}
               <div
@@ -446,7 +458,7 @@ export function AudioCallStage({
               </div>
               {membersOpen && (
                 <div className="absolute right-4 top-[54px] z-20 w-64">
-                  <MembersList participants={participants} localId={localParticipant?.identity} />
+                  <MembersList entries={strip} />
                 </div>
               )}
               <div className="relative z-[1] flex w-full flex-col items-center">
@@ -475,46 +487,8 @@ export function AudioCallStage({
                 </p>
 
                 {showStrip && (
-                  <div className="mt-6 flex justify-center gap-1">
-                    {visibleOthers.map((p) => {
-                      const n = nameOf(p);
-                      const isBeneficiary = beneficiaryId !== null && p.identity === beneficiaryId;
-                      return (
-                        <div key={p.identity} className="flex w-[60px] flex-col items-center gap-[7px]">
-                          <div
-                            className={cn(
-                              "flex h-12 w-12 items-center justify-center rounded-full",
-                              n ? "bg-primary" : "bg-primary-800",
-                            )}
-                            style={{ boxShadow: isBeneficiary ? BENEFICIARY_RING : undefined }}
-                          >
-                            {n ? (
-                              <span className="font-display text-base font-bold">{getInitials(n)}</span>
-                            ) : (
-                              <User className="h-5 w-5 text-primary-200" />
-                            )}
-                          </div>
-                          <span
-                            className={cn(
-                              "max-w-[60px] truncate text-[11.5px] text-primary-200",
-                              isBeneficiary && "font-semibold text-accent",
-                            )}
-                          >
-                            {p.identity === localParticipant?.identity ? "Vous" : firstName(n) ?? "Un membre"}
-                          </span>
-                        </div>
-                      );
-                    })}
-                    {hiddenCount > 0 && (
-                      <div className="flex w-[60px] flex-col items-center gap-[7px]">
-                        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary-800 shadow-[inset_0_0_0_1px_hsl(0_0%_100%/0.10)]">
-                          <span className="num font-display text-body-sm font-bold text-primary-200">
-                            +{hiddenCount}
-                          </span>
-                        </div>
-                        <span className="text-[11.5px]">{"\u00A0"}</span>
-                      </div>
-                    )}
+                  <div className="mt-6">
+                    <MemberStrip entries={strip} beneficiaryId={beneficiaryId} variant="desk" />
                   </div>
                 )}
 
