@@ -16,7 +16,7 @@ export function DistributionChannels({
   onOpenCompose,
 }: DistributionChannelsProps) {
   const link = `https://tontine.digital/join/${inviteCode.replace(/-/g, "")}`;
-  const shareText = `Rejoignez la tontine ${groupName} sur Tontine Digital · code ${inviteCode}`;
+  const shareText = `Rejoignez la tontine ${groupName} sur Tontine Digitale · code ${inviteCode}`;
 
   const copyText = (text: string, label: string) => {
     navigator.clipboard?.writeText(text).catch(() => undefined);
@@ -38,7 +38,7 @@ export function DistributionChannels({
     }
     if (typeof navigator !== "undefined" && "share" in navigator) {
       try {
-        await navigator.share({ title: `Tontine Digital · ${groupName}`, text: shareText, url: link });
+        await navigator.share({ title: `Tontine Digitale · ${groupName}`, text: shareText, url: link });
       } catch {
         /* user cancelled */
       }
@@ -140,7 +140,7 @@ export function DistributionChannels({
           <ChannelHeader
             icon={<QrCode className="h-4 w-4" />}
             title="QR Code"
-            hint="À afficher en boutique ou sur une affiche. Scannable depuis l'application Tontine Digital."
+            hint="À afficher en boutique ou sur une affiche. Scannable depuis l'application Tontine Digitale."
           />
           <div className="mt-4 flex flex-col items-center gap-3 rounded-lg border border-hairline bg-secondary/30 p-4 sm:flex-row sm:items-start">
             <div className="rounded-md border border-hairline bg-card p-2">
@@ -177,7 +177,7 @@ export function DistributionChannels({
           <div className="mt-4 rounded-lg border border-hairline bg-secondary/30 p-4 text-xs text-foreground">
             <p>
               Bonjour, je vous invite à rejoindre la tontine{" "}
-              <span className="font-semibold">« {groupName} »</span> sur Tontine Digital.
+              <span className="font-semibold">« {groupName} »</span> sur Tontine Digitale.
             </p>
             <p className="mt-2 font-mono">Code : {inviteCode}</p>
             <p className="mt-1 font-mono">{link}</p>

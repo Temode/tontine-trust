@@ -1,4 +1,4 @@
-import { ArrowUpDown, ChevronDown, ChevronUp, MoreHorizontal, Users } from "lucide-react";
+import { ArrowUpDown, ChevronDown, ChevronUp, Crown, MoreHorizontal, Users } from "lucide-react";
 import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { formatGNF, formatRelativeDays } from "@/lib/format";
@@ -36,7 +36,7 @@ const columns: Column[] = [
 export function GroupsTable({ groups, sort, sortDir, onSortChange }: GroupsTableProps) {
   return (
     <div className="overflow-x-auto rounded-xl border border-hairline bg-card">
-      <table className="w-full text-sm">
+      <table className="w-full min-w-[680px] text-sm">
         <thead className="bg-secondary/40">
           <tr className="text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
             {columns.map((col) => {
@@ -109,10 +109,15 @@ function GroupsTableRow({ group }: { group: TontineGroup }) {
               <StatusBadge status={group.status} />
             </div>
             <p className="mt-0.5 truncate text-xs text-muted-foreground">
-              <span className="rounded bg-secondary px-1 py-0.5 text-[10px] font-medium uppercase tracking-wider">
+              <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+                {group.role === "organizer" ? (
+                  <Crown className="h-3 w-3" />
+                ) : (
+                  <Users className="h-3 w-3" />
+                )}
                 {group.role === "organizer" ? "Organisateur" : "Participant"}
               </span>
-              <span className="ml-2">{group.frequency}</span>
+              <span className="ml-2">· {group.frequency}</span>
               <span className="mx-1.5">·</span>
               <span>Démarré {group.startedOn}</span>
             </p>

@@ -1,0 +1,1 @@
+delete from auth.users where email = 'qa-check-otp@tontinedigitale.com';

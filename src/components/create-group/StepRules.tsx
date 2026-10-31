@@ -1,4 +1,4 @@
-import { ArrowRightLeft, ClipboardList, ShieldAlert, Shuffle, Users } from "lucide-react";
+import { ArrowRightLeft, ClipboardList, ShieldAlert, Shuffle, Users, Lock, Banknote } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { type GroupDraft, type RotationOrder, type SwapPolicy } from "./types";
@@ -82,13 +82,15 @@ export function StepRules({ draft, onChange, onBack, onContinue, index, total }:
                   onClick={() => onChange({ rotationOrder: opt.id })}
                   aria-pressed={active}
                   className={cn(
-                    "flex items-start gap-3 rounded-lg border px-4 py-3 text-left transition",
-                    active ? "border-primary bg-primary-50/40 ring-1 ring-primary/20" : "border-hairline hover:bg-secondary/40",
+                    "flex flex-col rounded-lg p-5 text-left transition-all",
+                    active
+                      ? "border-2 border-primary bg-primary-50/40"
+                      : "border border-border hover:border-muted-foreground/30",
                   )}
                 >
                   <span
                     className={cn(
-                      "flex h-9 w-9 shrink-0 items-center justify-center rounded-md",
+                      "mb-3 flex h-8 w-8 items-center justify-center rounded-full",
                       active ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground",
                     )}
                   >
@@ -96,7 +98,7 @@ export function StepRules({ draft, onChange, onBack, onContinue, index, total }:
                   </span>
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-foreground">{opt.label}</p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">{opt.description}</p>
+                    <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{opt.description}</p>
                   </div>
                 </button>
               );
@@ -108,7 +110,7 @@ export function StepRules({ draft, onChange, onBack, onContinue, index, total }:
           <Header title="Pénalité de retard" hint="Pourcentage prélevé en plus de la cotisation après expiration du délai de grâce." />
           <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
-              <label htmlFor="cg-penalty" className="text-xs uppercase tracking-wider text-muted-foreground">
+              <label htmlFor="cg-penalty" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                 Pourcentage
               </label>
               <div className="mt-1.5 flex items-stretch">
@@ -120,9 +122,9 @@ export function StepRules({ draft, onChange, onBack, onContinue, index, total }:
                   step={1}
                   value={draft.latePenaltyPercent}
                   onChange={(e) => onChange({ latePenaltyPercent: Math.max(0, Math.min(50, Number(e.target.value))) })}
-                  className="h-11 w-full rounded-l-md border border-r-0 border-hairline bg-card px-3 text-base font-semibold text-foreground num focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15"
+                  className="h-11 w-full rounded-l-md border border-r-0 border-border bg-card px-3 text-base font-semibold text-foreground num focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                 />
-                <span className="inline-flex h-11 items-center rounded-r-md border border-hairline bg-secondary px-3 text-sm font-semibold text-muted-foreground">
+                <span className="inline-flex h-11 items-center rounded-r-md border border-border bg-secondary px-3 text-sm font-semibold text-muted-foreground">
                   %
                 </span>
               </div>
@@ -134,10 +136,10 @@ export function StepRules({ draft, onChange, onBack, onContinue, index, total }:
                     onClick={() => onChange({ latePenaltyPercent: p })}
                     aria-pressed={draft.latePenaltyPercent === p}
                     className={cn(
-                      "rounded-md border px-2.5 py-1 text-xs font-medium transition num",
+                      "rounded-md border px-3 py-1.5 text-xs font-semibold transition num",
                       draft.latePenaltyPercent === p
                         ? "border-primary bg-primary-50 text-primary"
-                        : "border-hairline text-muted-foreground hover:bg-secondary",
+                        : "border-border text-muted-foreground hover:border-muted-foreground/30",
                     )}
                   >
                     {p === 0 ? "Aucune" : `${p}%`}
@@ -147,7 +149,7 @@ export function StepRules({ draft, onChange, onBack, onContinue, index, total }:
             </div>
 
             <div>
-              <label htmlFor="cg-grace" className="text-xs uppercase tracking-wider text-muted-foreground">
+              <label htmlFor="cg-grace" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                 Délai de grâce
               </label>
               <div className="mt-1.5 flex items-stretch">
@@ -159,9 +161,9 @@ export function StepRules({ draft, onChange, onBack, onContinue, index, total }:
                   step={1}
                   value={draft.latePenaltyAfterDays}
                   onChange={(e) => onChange({ latePenaltyAfterDays: Math.max(0, Math.min(14, Number(e.target.value))) })}
-                  className="h-11 w-full rounded-l-md border border-r-0 border-hairline bg-card px-3 text-base font-semibold text-foreground num focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15"
+                  className="h-11 w-full rounded-l-md border border-r-0 border-border bg-card px-3 text-base font-semibold text-foreground num focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                 />
-                <span className="inline-flex h-11 items-center rounded-r-md border border-hairline bg-secondary px-3 text-sm font-semibold text-muted-foreground">
+                <span className="inline-flex h-11 items-center rounded-r-md border border-border bg-secondary px-3 text-sm font-semibold text-muted-foreground">
                   jours
                 </span>
               </div>
@@ -187,15 +189,117 @@ export function StepRules({ draft, onChange, onBack, onContinue, index, total }:
                   onClick={() => onChange({ swapPolicy: opt.id })}
                   aria-pressed={active}
                   className={cn(
-                    "rounded-lg border px-4 py-3 text-left transition",
-                    active ? "border-primary bg-primary-50/40 ring-1 ring-primary/20" : "border-hairline hover:bg-secondary/40",
+                    "rounded-lg p-5 text-left transition-all",
+                    active
+                      ? "border-2 border-primary bg-primary-50/40"
+                      : "border border-border hover:border-muted-foreground/30",
                   )}
                 >
                   <p className="text-sm font-semibold text-foreground">{opt.label}</p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">{opt.description}</p>
+                  <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{opt.description}</p>
                 </button>
               );
             })}
+          </div>
+        </section>
+
+        <section>
+          <Header
+            title="Sécurité des nouveaux membres"
+            hint="Protégez le groupe lorsqu'un membre rejoint après le démarrage du cycle."
+          />
+          <div className="mt-3 space-y-3">
+            <label
+              className={cn(
+                "flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition",
+                draft.newMemberLockLastThird
+                  ? "border-primary bg-primary-50/40"
+                  : "border-border hover:border-muted-foreground/30",
+              )}
+            >
+              <input
+                type="checkbox"
+                checked={draft.newMemberLockLastThird}
+                onChange={(e) => onChange({ newMemberLockLastThird: e.target.checked })}
+                className="mt-0.5 h-4 w-4 accent-primary"
+              />
+              <div className="flex-1">
+                <p className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                  <Lock className="h-3.5 w-3.5 text-primary" />
+                  Placer les nouveaux membres dans le dernier tiers
+                </p>
+                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                  Un membre rejoignant après le démarrage du cycle reçoit automatiquement
+                  une position dans le dernier tiers de la rotation. Le temps que sa
+                  fiabilité se construise.
+                </p>
+              </div>
+            </label>
+
+            <label
+              className={cn(
+                "flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition",
+                draft.depositRequired
+                  ? "border-primary bg-primary-50/40"
+                  : "border-border hover:border-muted-foreground/30",
+              )}
+            >
+              <input
+                type="checkbox"
+                checked={draft.depositRequired}
+                onChange={(e) =>
+                  onChange({
+                    depositRequired: e.target.checked,
+                    depositMonths: e.target.checked
+                      ? draft.depositMonths > 0
+                        ? draft.depositMonths
+                        : 1
+                      : 0,
+                  })
+                }
+                className="mt-0.5 h-4 w-4 accent-primary"
+              />
+              <div className="flex-1">
+                <p className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                  <Banknote className="h-3.5 w-3.5 text-primary" />
+                  Exiger une caution des nouveaux membres
+                </p>
+                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                  Un dépôt remboursable est exigé avant la participation aux tours. Il
+                  est libéré à la fin du cycle si le membre a honoré ses engagements,
+                  sinon retenu pour couvrir un défaut.
+                </p>
+                {draft.depositRequired && (
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <span className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                      Montant
+                    </span>
+                    {[1, 2].map((m) => {
+                      const active = draft.depositMonths === m;
+                      return (
+                        <button
+                          key={m}
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            onChange({ depositMonths: m as 1 | 2 });
+                          }}
+                          aria-pressed={active}
+                          className={cn(
+                            "rounded-md border px-3 py-1.5 text-xs font-semibold transition",
+                            active
+                              ? "border-primary bg-primary text-primary-foreground"
+                              : "border-border text-foreground hover:bg-secondary",
+                          )}
+                        >
+                          {m} mois de cotisation
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </label>
           </div>
         </section>
       </div>
@@ -206,8 +310,8 @@ export function StepRules({ draft, onChange, onBack, onContinue, index, total }:
 function Header({ title, hint }: { title: string; hint: string }) {
   return (
     <header>
-      <h3 className="text-sm font-semibold text-foreground">{title}</h3>
-      <p className="mt-1 text-xs text-muted-foreground">{hint}</p>
+      <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{title}</h3>
+      <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">{hint}</p>
     </header>
   );
 }

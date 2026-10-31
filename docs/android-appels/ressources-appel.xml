@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  1) Copiez res/values/colors.xml, res/values/call_pattern.xml et tout res/drawable/ dans
+     app/src/main/res/ en conservant leur arborescence (remplacez les fichiers existants).
+     Nouveaux drawables : call_avatar_unknown, call_circle_message, call_ring_1, call_ring_2,
+     ic_call_person, ic_call_message.
+     Supprimez res/drawable/call_circle_grey.xml de votre projet : il n'est plus utilisé.
+  2) Copiez activity_incoming_call.xml dans app/src/main/res/layout/.
+     Copiez IncomingCallActivity.java, CallIdentity.java, CallMessagingService.java et
+     CallWallpaperDrawable.java dans le même dossier Java que MainActivity.
+     Remplacez dans app/src/main/res/values/styles.xml les anciens styles CallBtnColumn,
+     CallBtn et CallBtnLabel par ceux ci-dessous (CallBtn est supprimé), avant </resources>.
+     Ne supprimez pas les autres styles de votre application.
+-->
+<resources>
+    <style name="CallBtnColumn">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:clipChildren">false</item>
+        <item name="android:gravity">center_horizontal</item>
+        <item name="android:orientation">vertical</item>
+    </style>
+    <!-- Refuser et Message : cercle 68dp, icône 27dp → marge intérieure (68 − 27) / 2 -->
+    <style name="CallBtnSecondary">
+        <item name="android:layout_width">68dp</item>
+        <item name="android:layout_height">68dp</item>
+        <item name="android:padding">20.5dp</item>
+        <item name="android:scaleType">fitCenter</item>
+    </style>
+    <style name="CallBtnLabel">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginTop">11dp</item>
+        <item name="android:textColor">@color/call_secondary</item>
+        <item name="android:textSize">14sp</item>
+    </style>
+    <style name="IncomingCallTheme" parent="Theme.AppCompat.NoActionBar">
+        <item name="android:windowBackground">@color/call_background</item>
+        <item name="android:statusBarColor">@color/call_background</item>
+        <item name="android:navigationBarColor">@color/call_background</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+</resources>
+
+<!--
+  3) AndroidManifest.xml, dans <application>, à côté du service :
+
+  <activity
+      android:name=".IncomingCallActivity"
+      android:exported="false"
+      android:launchMode="singleInstance"
+      android:excludeFromRecents="true"
+      android:showWhenLocked="true"
+      android:turnScreenOn="true"
+      android:screenOrientation="portrait"
+      android:theme="@style/IncomingCallTheme" />
+
+  <activity
+      android:name=".CallPermissionActivity"
+      android:exported="false"
+      android:excludeFromRecents="true"
+      android:screenOrientation="portrait"
+      android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
+
+  2bis) Copiez activity_call_permission.xml dans app/src/main/res/layout/ et
+        res/drawable/app_button_primary.xml dans app/src/main/res/drawable/.
+
+  4) AndroidManifest.xml, avant <application> :
+
+  <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+  <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+  <uses-permission android:name="android.permission.WAKE_LOCK" />
+  <uses-permission android:name="android.permission.VIBRATE" />
+
+  5) Fichiers Java du lot (tous dans java/com/tontinedigitale/app, remplacer en entier) :
+     MainActivity, CallChannels, CallRinger, CallMessagingService,
+     IncomingCallActivity, CallIdentity, CallWallpaperDrawable, CallPermissionActivity.
+     CallStyle exige androidx.core 1.9 ou plus (déjà fourni par Capacitor 6/7).
+-->

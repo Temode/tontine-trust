@@ -32,7 +32,7 @@ export function StepIdentity({ draft, onChange, onBack, onContinue, index, total
       index={index}
       total={total}
       title="Identité du groupe"
-      description="Donnez à votre tontine une identité claire. Le nom apparaîtra sur les reçus, les notifications et le registre."
+      description="Définissez le cadre institutionnel de votre tontine. Ces informations figureront sur l'ensemble des registres officiels."
       canContinue={canContinue}
       onBack={onBack}
       onContinue={onContinue}
@@ -41,7 +41,6 @@ export function StepIdentity({ draft, onChange, onBack, onContinue, index, total
         <Field
           id="cg-name"
           label="Nom du groupe"
-          hint="Visible par tous les membres et imprimé sur les reçus."
         >
           <input
             id="cg-name"
@@ -50,35 +49,31 @@ export function StepIdentity({ draft, onChange, onBack, onContinue, index, total
             onChange={(e) => onChange({ name: e.target.value })}
             placeholder="Ex. Tontine Famille Diallo"
             maxLength={64}
-            className="h-11 w-full rounded-md border border-hairline bg-card px-3 text-base font-medium text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15"
+            className="w-full rounded-md border border-border bg-card px-4 py-3 text-base font-medium text-foreground placeholder:text-muted-foreground/60 transition-colors focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
           />
-          <p className="mt-1.5 text-[11px] text-muted-foreground num">
+          <p className="mt-1.5 text-right text-[11px] text-muted-foreground num">
             {draft.name.length}/64 caractères {draft.name.trim().length < 3 && draft.name.length > 0 && "· minimum 3"}
           </p>
         </Field>
 
         <Field
           id="cg-description"
-          label="Description (facultatif)"
-          hint="Une phrase courte qui explique l'objet du groupe à vos futurs membres."
+          label="Description (Objet social)"
         >
           <textarea
             id="cg-description"
             value={draft.description}
             onChange={(e) => onChange({ description: e.target.value })}
-            placeholder="Ex. Tontine mensuelle pour financer les projets familiaux et les imprévus."
+            placeholder="Définissez l'objet social de votre groupe…"
             rows={3}
             maxLength={280}
-            className="w-full rounded-md border border-hairline bg-card px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15"
+            className="w-full resize-none rounded-md border border-border bg-card px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground/60 transition-colors focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
           />
-          <p className="mt-1.5 text-[11px] text-muted-foreground num">{draft.description.length}/280</p>
+          <p className="mt-1.5 text-right text-[11px] text-muted-foreground num">{draft.description.length}/280</p>
         </Field>
 
         <fieldset>
-          <legend className="text-sm font-semibold text-foreground">Catégorie</legend>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Aide à classer votre groupe et à proposer des règles par défaut adaptées.
-          </p>
+          <legend className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Secteur d'activité</legend>
 
           <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
             {CATEGORIES.map((cat) => {
@@ -91,13 +86,15 @@ export function StepIdentity({ draft, onChange, onBack, onContinue, index, total
                   onClick={() => onChange({ category: cat.id })}
                   aria-pressed={active}
                   className={cn(
-                    "flex items-start gap-3 rounded-lg border px-4 py-3 text-left transition",
-                    active ? "border-primary bg-primary-50/40 ring-1 ring-primary/20" : "border-hairline hover:bg-secondary/40",
+                    "flex flex-col rounded-lg border p-5 text-left transition-all",
+                    active
+                      ? "border-2 border-primary bg-primary-50/40"
+                      : "border border-border hover:border-muted-foreground/30",
                   )}
                 >
                   <span
                     className={cn(
-                      "flex h-9 w-9 shrink-0 items-center justify-center rounded-md",
+                      "mb-3 flex h-8 w-8 items-center justify-center rounded-full",
                       active ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground",
                     )}
                   >
@@ -105,7 +102,7 @@ export function StepIdentity({ draft, onChange, onBack, onContinue, index, total
                   </span>
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-foreground">{CATEGORY_LABEL[cat.id]}</p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">{cat.description}</p>
+                    <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{cat.description}</p>
                   </div>
                 </button>
               );
@@ -126,12 +123,12 @@ interface FieldProps {
 
 function Field({ id, label, hint, children }: FieldProps) {
   return (
-    <div>
-      <label htmlFor={id} className="text-sm font-semibold text-foreground">
+    <div className="space-y-2">
+      <label htmlFor={id} className="block text-xs font-bold uppercase tracking-wider text-muted-foreground">
         {label}
       </label>
-      {hint && <p className="mt-1 text-xs text-muted-foreground">{hint}</p>}
-      <div className="mt-2">{children}</div>
+      {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
+      <div>{children}</div>
     </div>
   );
 }

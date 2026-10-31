@@ -56,7 +56,7 @@ export function ComposeDialog({
   const link = `https://tontine.digital/join/${inviteCode.replace(/-/g, "")}`;
   const fullMessage =
     message ||
-    `Bonjour, je vous invite à rejoindre la tontine « ${groupName} » sur Tontine Digital. Code ${inviteCode} — ${link}`;
+    `Bonjour, je vous invite à rejoindre la tontine « ${groupName} » sur Tontine Digitale. Code ${inviteCode} — ${link}`;
 
   const handleSend = () => {
     if (recipients.length === 0) return;

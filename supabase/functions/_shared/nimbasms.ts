@@ -1,0 +1,428 @@
+/**
+ * Nimba SMS service — Deno Edge Functions (Tontine Digitale)
+ *
+ * Envoie des SMS via l'API REST Nimba SMS v1.
+ * Auth: HTTP Basic base64(service_id:secret_token)
+ *
+ * Env vars requises:
+ *   NIMBA_SERVICE_ID      — Service ID (onglet API KEYS)
+ *   NIMBA_SECRET_TOKEN    — Secret Token (onglet API KEYS)
+ *
+ * Env vars optionnelles:
+ *   NIMBA_SENDER_NAME     — Nom d'expéditeur enregistré (défaut: "Tontine")
+ *   SMS_ENABLED           — "false" pour désactiver tous les envois
+ *
+ * Formats de numéro acceptés:
+ *   6XXXXXXXX / 224XXXXXXXXX / +224XXXXXXXXX
+ *   (utiliser normalizeGNPhone() ci-dessous avant l'envoi)
+ */
+
+const NIMBA_API_BASE = "https://api.nimbasms.com/v1";
+const MAX_RETRIES = 3;
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+// ─── Garde-fous globaux (kill-switch + solde Nimba) ────────────────────────
+// Cache module-scope (60 s) pour éviter de saturer Supabase REST / API Nimba.
+interface SmsGuardCache {
+  fetchedAt: number;
+  paused: boolean;
+  minBalance: number;
+  balance: number | null;
+}
+let _guardCache: SmsGuardCache | null = null;
+const GUARD_TTL_MS = 60_000;
+
+async function loadInternalConfig(): Promise<{ paused: boolean; minBalance: number }> {
+  const url = Deno.env.get("SUPABASE_URL");
+  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  const out = { paused: false, minBalance: 0 };
+  if (!url || !key) return out;
+  try {
+    const res = await fetch(
+      `${url}/rest/v1/internal_config?key=in.(sms_paused,sms_min_balance)&select=key,value`,
+      { headers: { apikey: key, Authorization: `Bearer ${key}` } },
+    );
+    if (!res.ok) return out;
+    const rows = await res.json() as Array<{ key: string; value: string }>;
+    for (const r of rows) {
+      if (r.key === "sms_paused") out.paused = String(r.value).toLowerCase() === "true";
+      if (r.key === "sms_min_balance") out.minBalance = Number(r.value) || 0;
+    }
+  } catch (e) {
+    console.error("[NimbaSMS] loadInternalConfig failed:", e);
+  }
+  return out;
+}
+
+async function fetchNimbaBalance(): Promise<number | null> {
+  const serviceId = Deno.env.get("NIMBA_SERVICE_ID");
+  const secretToken = Deno.env.get("NIMBA_SECRET_TOKEN");
+  if (!serviceId || !secretToken) return null;
+  try {
+    const auth = btoa(`${serviceId}:${secretToken}`);
+    const res = await fetch(`${NIMBA_API_BASE}/accounts/balance`, {
+      headers: { Authorization: `Basic ${auth}` },
+    });
+    if (!res.ok) return null;
+    const data = await res.json().catch(() => null) as any;
+    const b = data?.balance ?? data?.sms_balance ?? data?.amount;
+    return typeof b === "number" ? b : Number(b ?? NaN);
+  } catch (e) {
+    console.error("[NimbaSMS] fetchNimbaBalance failed:", e);
+    return null;
+  }
+}
+
+async function notifyAdminsLowBalance(balance: number, minBalance: number) {
+  const url = Deno.env.get("SUPABASE_URL");
+  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!url || !key) return;
+  try {
+    // Charge les admins
+    const r = await fetch(
+      `${url}/rest/v1/user_roles?role=eq.admin&select=user_id`,
+      { headers: { apikey: key, Authorization: `Bearer ${key}` } },
+    );
+    if (!r.ok) return;
+    const rows = await r.json() as Array<{ user_id: string }>;
+    if (rows.length === 0) return;
+    const payload = rows.map((row) => ({
+      user_id: row.user_id,
+      kind: "nimba_balance_low",
+      title: "Solde SMS Nimba faible",
+      body: `Solde actuel ${balance} (seuil ${minBalance}). Envois SMS suspendus jusqu'à recharge.`,
+      link: "/admin/sms-logs",
+    }));
+    await fetch(`${url}/rest/v1/notifications`, {
+      method: "POST",
+      headers: {
+        apikey: key,
+        Authorization: `Bearer ${key}`,
+        "Content-Type": "application/json",
+        Prefer: "return=minimal",
+      },
+      body: JSON.stringify(payload),
+    });
+  } catch (e) {
+    console.error("[NimbaSMS] notifyAdminsLowBalance failed:", e);
+  }
+}
+
+/**
+ * Vérifie kill-switch (`sms_paused`) et solde Nimba (>= `sms_min_balance`).
+ * Retourne { allowed: false, reason } si l'envoi doit être bloqué.
+ * Résultat mémoïsé 60 s par instance d'edge function.
+ */
+async function checkSmsGuards(): Promise<{ allowed: boolean; reason?: string; balance: number | null }> {
+  const now = Date.now();
+  if (_guardCache && now - _guardCache.fetchedAt < GUARD_TTL_MS) {
+    if (_guardCache.paused) return { allowed: false, reason: "kill_switch", balance: _guardCache.balance };
+    if (_guardCache.balance !== null && _guardCache.balance < _guardCache.minBalance) {
+      return { allowed: false, reason: "low_balance", balance: _guardCache.balance };
+    }
+    return { allowed: true, balance: _guardCache.balance };
+  }
+  const cfg = await loadInternalConfig();
+  let balance: number | null = null;
+  if (!cfg.paused) {
+    balance = await fetchNimbaBalance();
+  }
+  _guardCache = { fetchedAt: now, paused: cfg.paused, minBalance: cfg.minBalance, balance };
+  if (cfg.paused) return { allowed: false, reason: "kill_switch", balance };
+  if (balance !== null && balance < cfg.minBalance) {
+    // Notifie les admins (best-effort, asynchrone)
+    notifyAdminsLowBalance(balance, cfg.minBalance).catch(() => {});
+    return { allowed: false, reason: "low_balance", balance };
+  }
+  return { allowed: true, balance };
+}
+
+/** Formateur de montant pour SMS (ex: 1500000 → "1 500 000"). */
+export function fmtSms(n: number): string {
+  return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, "\u00A0");
+}
+
+/**
+ * Indicatifs pays supportés (doit rester aligné avec src/lib/phone.ts).
+ */
+const KNOWN_DIAL_CODES = [
+  "224", "225", "221", "223", "226", "227", "228", "229",
+  "33", "32", "1",
+];
+
+/**
+ * Normalise un numéro pour Nimba au format international sans "+".
+ *
+ * - "+224611599395" / "00224611599395" / "224611599395" → "224611599395"
+ * - "611599395" (fallback GN 9 chiffres commençant par 6) → "224611599395"
+ * - Tout numéro déjà E.164 plausible (8–15 chiffres, indicatif connu) est accepté.
+ *
+ * Renvoie `null` uniquement si le numéro n'a pas de forme téléphonique exploitable.
+ */
+export function normalizeGNPhone(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  let digits = String(raw).replace(/[\s\-().+]/g, "");
+  if (!digits) return null;
+  if (digits.startsWith("00")) digits = digits.slice(2);
+  // Fallback historique : numéro guinéen local
+  if (/^6\d{8}$/.test(digits)) return `224${digits}`;
+  // Longueur E.164 raisonnable
+  if (digits.length < 8 || digits.length > 15) return null;
+  // Si l'indicatif est connu, on retourne tel quel
+  const knownStart = KNOWN_DIAL_CODES
+    .sort((a, b) => b.length - a.length)
+    .find((d) => digits.startsWith(d));
+  if (knownStart) return digits;
+  // Numéro plausible mais indicatif inconnu — on laisse passer pour ne pas bloquer.
+  return digits;
+}
+
+export type NimbaChannel = "sms" | "whatsapp" | "email";
+
+export interface SendMessageParams {
+  /** Numéro(s) destinataire(s) — jusqu'à 30 par requête. */
+  to: string | string[];
+  /** Contenu du message (≤ 160 chars = 1 SMS, max 665 chars = 5 SMS). */
+  body: string;
+  /** Canal d'envoi (défaut: 'sms'). */
+  channel?: NimbaChannel;
+  /** Surcharge le NIMBA_SENDER_NAME pour ce message. */
+  senderName?: string;
+  /** Contexte de traçabilité, journalisé dans `sms_logs` si présent. */
+  logContext?: {
+    userId?: string | null;
+    groupId?: string | null;
+    turnId?: string | null;
+    kind?: string;
+    triggeredBy?: string | null;
+  };
+}
+
+export interface MessageResult {
+  success: boolean;
+  messageId?: string;
+  messageCost?: number;
+  error?: string;
+}
+
+export async function logSmsAttempt(
+  ctx: NonNullable<SendMessageParams["logContext"]>,
+  recipientsRaw: string[],
+  recipients: string[],
+  body: string,
+  result: { status: "sent" | "failed" | "skipped"; error?: string; messageId?: string; cost?: number },
+) {
+  const url = Deno.env.get("SUPABASE_URL");
+  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!url || !key) return;
+  try {
+    const rows = recipientsRaw.map((raw, i) => ({
+      user_id: ctx.userId ?? null,
+      group_id: ctx.groupId ?? null,
+      turn_id: ctx.turnId ?? null,
+      triggered_by: ctx.triggeredBy ?? null,
+      kind: ctx.kind ?? "manual",
+      recipient: raw,
+      recipient_normalized: recipients[i] ?? null,
+      body,
+      status: result.status,
+      provider: "nimba",
+      provider_message_id: result.messageId ?? null,
+      provider_cost: result.cost ?? null,
+      error: result.error ?? null,
+    }));
+    await fetch(`${url}/rest/v1/sms_logs`, {
+      method: "POST",
+      headers: {
+        apikey: key,
+        Authorization: `Bearer ${key}`,
+        "Content-Type": "application/json",
+        Prefer: "return=minimal",
+      },
+      body: JSON.stringify(rows),
+    });
+  } catch (e) {
+    console.error("[NimbaSMS] sms_logs insert failed:", e);
+  }
+}
+
+/**
+ * Envoie un message via Nimba SMS.
+ * Ne lance jamais d'exception — retourne toujours { success, error? }.
+ */
+export async function sendMessage(params: SendMessageParams): Promise<MessageResult> {
+  if (Deno.env.get("SMS_ENABLED") === "false") {
+    console.log("[NimbaSMS] Désactivé via SMS_ENABLED=false");
+    if (params.logContext) {
+      const raw = Array.isArray(params.to) ? params.to : [params.to];
+      await logSmsAttempt(params.logContext, raw, raw, params.body, {
+        status: "skipped",
+        error: "SMS_ENABLED=false",
+      });
+    }
+    return { success: true };
+  }
+
+  // Garde-fous : kill-switch + solde Nimba minimum
+  const guard = await checkSmsGuards();
+  if (!guard.allowed) {
+    console.warn(`[NimbaSMS] Envoi bloqué (${guard.reason}) balance=${guard.balance}`);
+    if (params.logContext) {
+      const raw = Array.isArray(params.to) ? params.to : [params.to];
+      await logSmsAttempt(params.logContext, raw, raw, params.body, {
+        status: "skipped",
+        error: guard.reason,
+      });
+    }
+    return { success: false, error: guard.reason };
+  }
+
+  const serviceId = Deno.env.get("NIMBA_SERVICE_ID");
+  const secretToken = Deno.env.get("NIMBA_SECRET_TOKEN");
+  // Sender name approuvé Nimba — fallback sur "Tontine".
+  const senderName =
+    params.senderName ?? Deno.env.get("NIMBA_SENDER_NAME") ?? "Tontine";
+  const channel: NimbaChannel = params.channel ?? "sms";
+
+  if (!serviceId || !secretToken) {
+    console.error(
+      "[NimbaSMS] Credentials manquants. " +
+        "Configurez NIMBA_SERVICE_ID et NIMBA_SECRET_TOKEN dans les Supabase Secrets.",
+    );
+    if (params.logContext) {
+      const raw = Array.isArray(params.to) ? params.to : [params.to];
+      await logSmsAttempt(params.logContext, raw, raw, params.body, {
+        status: "failed",
+        error: "credentials_missing",
+      });
+    }
+    return { success: false, error: "Nimba SMS credentials not configured" };
+  }
+
+  const raw = Array.isArray(params.to) ? params.to : [params.to];
+  const recipients = raw
+    .map((n) => normalizeGNPhone(n) ?? n.replace(/[\s\-().]/g, ""))
+    .filter(Boolean);
+
+  if (recipients.length === 0) {
+    return { success: false, error: "Aucun destinataire fourni" };
+  }
+  if (recipients.length > 30) {
+    console.warn(`[NimbaSMS] ${recipients.length} destinataires > 30 — tronqué à 30`);
+    recipients.splice(30);
+    raw.splice(30);
+  }
+
+  const basicAuth = btoa(`${serviceId}:${secretToken}`);
+  const url = `${NIMBA_API_BASE}/messages`;
+
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: {
+          Authorization: `Basic ${basicAuth}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          sender_name: senderName,
+          to: recipients,
+          message: params.body,
+          channel,
+        }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (res.status === 201) {
+        console.log(
+          `[NimbaSMS] Envoyé (tentative ${attempt}) → to=${recipients.join(",")} ` +
+            `id=${data.messageid} coût=${data.message_cost} SMS`,
+        );
+        if (params.logContext) {
+          await logSmsAttempt(params.logContext, raw, recipients, params.body, {
+            status: "sent",
+            messageId: data.messageid,
+            cost: data.message_cost,
+          });
+        }
+        return {
+          success: true,
+          messageId: data.messageid,
+          messageCost: data.message_cost,
+        };
+      }
+
+      if (res.status === 420 || res.status === 429) {
+        console.warn(`[NimbaSMS] Rate limit (${res.status}), tentative ${attempt}/${MAX_RETRIES}`);
+        if (attempt < MAX_RETRIES) {
+          await sleep(attempt * 2_000);
+          continue;
+        }
+        return { success: false, error: "Nimba SMS rate limit dépassé" };
+      }
+
+      const errDetail = Array.isArray(data)
+        ? data[0]?.detail
+        : (data?.detail ?? JSON.stringify(data));
+      console.error(`[NimbaSMS] Erreur API (${res.status}): ${errDetail}`, `to=${recipients}`);
+      if (res.status < 500) {
+        if (params.logContext) {
+          await logSmsAttempt(params.logContext, raw, recipients, params.body, {
+            status: "failed",
+            error: `NimbaSMS ${res.status}: ${errDetail}`,
+          });
+        }
+        return { success: false, error: `NimbaSMS ${res.status}: ${errDetail}` };
+      }
+
+      if (attempt < MAX_RETRIES) {
+        await sleep(attempt * 1_500);
+        continue;
+      }
+      if (params.logContext) {
+        await logSmsAttempt(params.logContext, raw, recipients, params.body, {
+          status: "failed",
+          error: `NimbaSMS ${res.status}: ${errDetail}`,
+        });
+      }
+      return { success: false, error: `NimbaSMS ${res.status}: ${errDetail}` };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`[NimbaSMS] Erreur réseau (tentative ${attempt}):`, msg);
+      if (attempt === MAX_RETRIES) {
+        if (params.logContext) {
+          await logSmsAttempt(params.logContext, raw, recipients, params.body, {
+            status: "failed",
+            error: msg,
+          });
+        }
+        return { success: false, error: msg };
+      }
+      await sleep(attempt * 1_000);
+    }
+  }
+
+  if (params.logContext) {
+    await logSmsAttempt(params.logContext, raw, recipients, params.body, {
+      status: "failed",
+      error: "max retries dépassé",
+    });
+  }
+  return { success: false, error: "NimbaSMS: max retries dépassé" };
+}
+
+/** Envoi en arrière-plan (fire-and-forget). */
+export function sendMessageBg(params: SendMessageParams): void {
+  sendMessage(params)
+    .then((result) => {
+      if (!result.success) {
+        const dest = Array.isArray(params.to) ? params.to.join(",") : params.to;
+        console.error(`[NimbaSMS] Envoi BG échoué to=${dest}:`, result.error);
+      }
+    })
+    .catch((err) => {
+      console.error("[NimbaSMS] Envoi BG exception:", err);
+    });
+}

@@ -1,28 +1,22 @@
 import { cn } from "@/lib/utils";
+import logoSeal from "@/assets/logo-seal.svg";
 
 interface LogoProps {
   size?: number;
   className?: string;
+  shadow?: boolean;
 }
 
-export function Logo({ size = 32, className }: LogoProps) {
+/** Logo officiel Tontine Digitale (sceau bleu sarcelle). */
+export function Logo({ size = 32, className, shadow }: LogoProps) {
   return (
-    <svg
+    <img
+      src={logoSeal}
       width={size}
       height={size}
-      viewBox="0 0 64 64"
-      className={cn("text-current", className)}
-      role="img"
-      aria-label="Tontine Digital"
-    >
-      <circle cx="32" cy="32" r="28" fill="none" stroke="currentColor" strokeWidth="2" opacity="0.3" />
-      <circle cx="32" cy="12" r="6" fill="hsl(var(--accent-500))" />
-      <circle cx="49" cy="24" r="6" fill="currentColor" />
-      <circle cx="49" cy="44" r="6" fill="currentColor" />
-      <circle cx="32" cy="52" r="6" fill="currentColor" />
-      <circle cx="15" cy="44" r="6" fill="currentColor" />
-      <circle cx="15" cy="24" r="6" fill="currentColor" />
-      <circle cx="32" cy="32" r="10" fill="hsl(var(--accent-500))" />
-    </svg>
+      alt="Tontine Digitale"
+      className={cn("shrink-0 select-none", shadow && "drop-shadow-md", className)}
+      draggable={false}
+    />
   );
 }

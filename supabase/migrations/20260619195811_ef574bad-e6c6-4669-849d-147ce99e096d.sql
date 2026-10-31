@@ -1,0 +1,1 @@
+ALTER TYPE public.group_frequency ADD VALUE IF NOT EXISTS 'quotidienne';

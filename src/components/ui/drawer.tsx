@@ -2,6 +2,7 @@ import * as React from "react";
 import { Drawer as DrawerPrimitive } from "vaul";
 
 import { cn } from "@/lib/utils";
+import { preventSuspendedModalDismiss } from "@/components/messages/CallSurface";
 
 const Drawer = ({ shouldScaleBackground = true, ...props }: React.ComponentProps<typeof DrawerPrimitive.Root>) => (
   <DrawerPrimitive.Root shouldScaleBackground={shouldScaleBackground} {...props} />
@@ -35,6 +36,8 @@ const DrawerContent = React.forwardRef<
         className,
       )}
       {...props}
+      onEscapeKeyDown={(event) => { preventSuspendedModalDismiss(event); if (!event.defaultPrevented) props.onEscapeKeyDown?.(event); }}
+      onInteractOutside={(event) => { preventSuspendedModalDismiss(event); if (!event.defaultPrevented) props.onInteractOutside?.(event); }}
     >
       <div className="mx-auto mt-4 h-2 w-[100px] rounded-full bg-muted" />
       {children}

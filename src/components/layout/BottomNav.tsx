@@ -1,4 +1,4 @@
-import { Clock, Home, Plus, User, Users } from "lucide-react";
+import { Bell, Home, MessageCircle, Plus, Users } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 
@@ -11,10 +11,10 @@ type NavItem = {
 
 const items: NavItem[] = [
   { to: "/dashboard", label: "Accueil", icon: Home },
-  { to: "/groupes", label: "Groupes", icon: Users },
+  { to: "/groupes", label: "Tontines", icon: Users },
   { to: "/nouveau", label: "Créer", icon: Plus, isMain: true },
-  { to: "/historique", label: "Historique", icon: Clock },
-  { to: "/profil", label: "Profil", icon: User },
+  { to: "/discussions", label: "Messages", icon: MessageCircle },
+  { to: "/notifications", label: "Alertes", icon: Bell },
 ];
 
 export function BottomNav() {
@@ -23,22 +23,25 @@ export function BottomNav() {
   return (
     <nav
       aria-label="Navigation principale"
-      className="fixed inset-x-0 bottom-0 z-40 border-t border-hairline bg-card/95 px-3 pb-[max(env(safe-area-inset-bottom),0.5rem)] pt-2 backdrop-blur lg:hidden"
+      className="fixed inset-x-0 bottom-0 z-40 border-t border-hairline bg-card/95 px-1 pb-[max(env(safe-area-inset-bottom),0.5rem)] pt-1.5 backdrop-blur lg:hidden"
     >
-      <ul className="mx-auto flex max-w-md items-end justify-around">
+      <ul className="mx-auto grid max-w-md grid-cols-5 items-end">
         {items.map((item) => {
           const Icon = item.icon;
-          const active = pathname === item.to || (item.to === "/dashboard" && pathname === "/");
+          const active =
+            pathname === item.to ||
+            (item.to !== "/dashboard" && pathname.startsWith(item.to + "/")) ||
+            (item.to === "/dashboard" && pathname === "/");
 
           if (item.isMain) {
             return (
-              <li key={item.to}>
+              <li key={item.to} className="flex justify-center">
                 <Link
                   to={item.to}
                   aria-label={item.label}
-                  className="-mt-5 flex h-11 w-11 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-primary transition active:scale-95"
+                  className="-mt-5 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-primary transition active:scale-95"
                 >
-                  <Icon className="h-5 w-5" strokeWidth={2.25} />
+                  <Icon className="h-6 w-6" strokeWidth={2.25} />
                 </Link>
               </li>
             );
@@ -50,12 +53,12 @@ export function BottomNav() {
                 to={item.to}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "flex flex-col items-center gap-0.5 rounded-md px-3 py-1.5 text-[10px] font-medium transition",
+                  "flex min-h-[48px] flex-col items-center justify-center gap-0.5 rounded-md text-[11px] font-medium transition active:scale-95",
                   active ? "text-primary" : "text-muted-foreground hover:text-foreground",
                 )}
               >
-                <Icon className="h-[18px] w-[18px]" />
-                {item.label}
+                <Icon className="h-5 w-5" strokeWidth={active ? 2.4 : 2} />
+                <span className="truncate">{item.label}</span>
               </Link>
             </li>
           );

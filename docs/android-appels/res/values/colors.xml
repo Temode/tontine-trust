@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Copie des tokens :root de src/index.css. Conversion HSL → sRGB, arrondie sur 8 bits.
+     Les couleurs translucides sont en #AARRGGBB (alpha = arrondi(opacité × 255)). -->
+<resources>
+    <color name="call_background">#032B30</color><!-- primary-900 -->
+    <color name="call_pattern">#436D70</color><!-- chat-pattern -->
+    <color name="call_avatar">#0D7277</color><!-- primary -->
+    <color name="call_foreground">#F8F6F2</color><!-- primary-foreground -->
+    <color name="call_secondary">#ACD3D8</color><!-- primary-200 -->
+    <color name="call_accept">#197654</color><!-- success -->
+    <color name="call_decline">#B1252A</color><!-- destructive -->
+    <color name="call_message">#053D42</color><!-- primary-800 -->
+    <color name="call_accept_foreground">#FFFFFF</color><!-- success-foreground -->
+    <color name="call_decline_foreground">#FFFFFF</color><!-- destructive-foreground -->
+    <color name="call_turn">#EBAE14</color><!-- accent 43 84% 50% -->
+    <color name="call_seat">#42ACD3D8</color><!-- primary-200 à 26 % -->
+    <color name="call_hairline">#1AFFFFFF</color><!-- blanc à 10 % -->
+    <color name="call_accept_ring_1">#73197654</color><!-- success à 45 % -->
+    <color name="call_accept_ring_2">#33197654</color><!-- success à 20 % -->
+    <!-- Écran d'autorisation plein écran (thème clair de l'app) -->
+    <color name="app_background">#F9F8F6</color><!-- background 40 22% 97% -->
+    <color name="app_foreground">#0F1A1F</color><!-- foreground 200 35% 9% -->
+    <color name="app_muted_foreground">#58646A</color><!-- muted-foreground 200 9% 38% -->
+</resources>

@@ -3,6 +3,7 @@ import * as AlertDialogPrimitive from "@radix-ui/react-alert-dialog";
 
 import { cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button";
+import { preventSuspendedModalDismiss } from "@/components/messages/CallSurface";
 
 const AlertDialog = AlertDialogPrimitive.Root;
 
@@ -38,6 +39,7 @@ const AlertDialogContent = React.forwardRef<
         className,
       )}
       {...props}
+      onEscapeKeyDown={(event) => { preventSuspendedModalDismiss(event); if (!event.defaultPrevented) props.onEscapeKeyDown?.(event); }}
     />
   </AlertDialogPortal>
 ));

@@ -3,6 +3,7 @@ import * as DropdownMenuPrimitive from "@radix-ui/react-dropdown-menu";
 import { Check, ChevronRight, Circle } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { preventSuspendedModalDismiss } from "@/components/messages/CallSurface";
 
 const DropdownMenu = DropdownMenuPrimitive.Root;
 
@@ -65,6 +66,14 @@ const DropdownMenuContent = React.forwardRef<
         className,
       )}
       {...props}
+      onEscapeKeyDown={(event) => {
+        if (!("data-call-owned" in props)) preventSuspendedModalDismiss(event);
+        if (!event.defaultPrevented) props.onEscapeKeyDown?.(event);
+      }}
+      onInteractOutside={(event) => {
+        if (!("data-call-owned" in props)) preventSuspendedModalDismiss(event);
+        if (!event.defaultPrevented) props.onInteractOutside?.(event);
+      }}
     />
   </DropdownMenuPrimitive.Portal>
 ));
