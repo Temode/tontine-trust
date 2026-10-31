@@ -1,5 +1,6 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
+import { signCallToken } from "../_shared/callToken.ts";
 
 const GATEWAY_URL = "https://connector-gateway.lovable.dev/firebase_messaging";
 
@@ -46,6 +47,12 @@ Deno.serve(async (req) => {
           caller_avatar_url: p?.avatar_url ?? "",
           ...turnFields,
         };
+        // Jeton de réponse propre à ce destinataire : accusé, refus, décroché sans session.
+        const respSecret = Deno.env.get("CALL_RESPONSE_SECRET");
+        if (respSecret) {
+          job.data.respond_token = await signCallToken(respSecret, String(job.data.call_id), String(job.user_id));
+          job.data.respond_url = `${Deno.env.get("SUPABASE_URL")}/functions/v1/call-respond`;
+        }
       }
     }
     let ok = false;
