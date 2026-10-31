@@ -245,34 +245,38 @@ export function AudioCallStage({
           }}
         />
 
-        {/* Avatar de celui qui parle */}
-        {speaker && (
-          <div
-            className="relative flex h-[158px] w-[158px] items-center justify-center rounded-full bg-primary"
-            style={{ boxShadow: holdsFloor ? SPEAKING_RING : undefined }}
-          >
-            {speakerName ? (
-              <span className="font-display text-[50px] font-bold text-primary-foreground">
-                {getInitials(speakerName)}
-              </span>
-            ) : (
-              <User className="h-[66px] w-[66px] text-primary-200" />
-            )}
-          </div>
-        )}
+        {/* Grande place : celui qui parle ; la tontine tant que personne n'a décroché */}
+        <div
+          className="relative flex h-[158px] w-[158px] items-center justify-center rounded-full bg-primary"
+          style={{ boxShadow: holdsFloor ? SPEAKING_RING : undefined }}
+        >
+          {!speaker ? (
+            <span className="font-display text-[50px] font-bold text-primary-foreground">
+              {getInitials(groupName ?? "Tontine")}
+            </span>
+          ) : speakerName ? (
+            <span className="font-display text-[50px] font-bold text-primary-foreground">
+              {getInitials(speakerName)}
+            </span>
+          ) : (
+            <User className="h-[66px] w-[66px] text-primary-200" />
+          )}
+        </div>
 
         <p className="mt-5 font-display text-title font-bold">
-          {speakerName ?? groupName ?? "Appel"}
+          {speaker ? speakerName ?? groupName ?? "Appel" : groupName ?? "Appel"}
         </p>
         <p className="mt-1 text-body-sm text-primary-200">
           {/* La ligne est réservée quand personne n'a la parole : rien ne bouge. */}
-          {speaker && !speakerName
-            ? holdsFloor
-              ? "Un membre · parle"
-              : "Un membre"
-            : holdsFloor
-              ? "parle"
-              : "\u00A0"}
+          {!speaker
+            ? calledCount > 0 ? calledLine(calledCount) : "\u00A0"
+            : !speakerName
+              ? holdsFloor
+                ? "Un membre · parle"
+                : "Un membre"
+              : holdsFloor
+                ? "parle"
+                : "\u00A0"}
         </p>
 
         {/* Tableau de bord de l'appel : chaque membre appelé et son état */}
@@ -465,11 +469,15 @@ export function AudioCallStage({
                 <div
                   className={cn(
                     "flex h-[136px] w-[136px] items-center justify-center rounded-full",
-                    speakerName ? "bg-primary" : "bg-primary-800 shadow-[inset_0_0_0_1px_hsl(var(--primary-200)/0.24)]",
+                    speakerName || !speaker ? "bg-primary" : "bg-primary-800 shadow-[inset_0_0_0_1px_hsl(var(--primary-200)/0.24)]",
                   )}
                   style={{ boxShadow: holdsFloor ? SPEAKING_RING : undefined }}
                 >
-                  {speakerName ? (
+                  {!speaker ? (
+                    <span className="font-display text-[44px] font-bold leading-none">
+                      {getInitials(groupName ?? "Tontine")}
+                    </span>
+                  ) : speakerName ? (
                     <span className="font-display text-[44px] font-bold leading-none">
                       {getInitials(speakerName)}
                     </span>
@@ -478,12 +486,14 @@ export function AudioCallStage({
                   )}
                 </div>
                 <p className="mt-[22px] text-center font-display text-[25px] font-bold leading-[1.15] tracking-[-0.02em]">
-                  {speakerName ?? groupName ?? "Appel"}
+                  {speaker ? speakerName ?? groupName ?? "Appel" : groupName ?? "Appel"}
                 </p>
                 <p className="mt-1.5 text-center text-body-sm leading-normal text-primary-200">
-                  {speakerName
-                    ? `${groupName ?? "Appel"} · ${holdsFloor ? "parle" : "Appel audio"}`
-                    : `Un membre · ${holdsFloor ? "parle" : "Appel audio"}`}
+                  {!speaker
+                    ? calledCount > 0 ? calledLine(calledCount) : "Appel audio"
+                    : speakerName
+                      ? `${groupName ?? "Appel"} · ${holdsFloor ? "parle" : "Appel audio"}`
+                      : `Un membre · ${holdsFloor ? "parle" : "Appel audio"}`}
                 </p>
 
                 {showStrip && (
@@ -581,24 +591,113 @@ function ParticipantsChip({ count, open, onClick }: { count: number; open: boole
   );
 }
 
-function MembersList({ participants, localId }: { participants: Participant[]; localId?: string }) {
+function calledLine(n: number): string {
+  return n === 1 ? "1 membre appelé" : `${n} membres appelés`;
+}
+
+/** Statuts éteints : le membre n'est pas, ou plus, dans l'appel. */
+const DIMMED = new Set(["declined", "missed", "left", "unreachable"]);
+
+function MembersList({ entries }: { entries: StripEntry[] }) {
   return (
     <div className="max-h-56 overflow-y-auto rounded-2xl border border-white/10 bg-primary-800 p-2 text-left">
-      {participants.map((p) => {
-        const micMuted = p.getTrackPublication(Track.Source.Microphone)?.isMuted ?? false;
-        return (
-          <div key={p.identity} className="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5">
-            <span className="truncate text-body-sm text-primary-foreground">
-              {p.identity === localId ? "Vous" : displayName(p)}
-            </span>
-            {micMuted ? (
-              <MicOff className="h-3.5 w-3.5 shrink-0 text-primary-200" />
+      <div className="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5">
+        <span className="truncate text-body-sm text-primary-foreground">Vous</span>
+      </div>
+      {entries.map((e) => (
+        <div key={e.id} className="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5">
+          <span className="truncate text-body-sm text-primary-foreground">{e.name ?? "Un membre"}</span>
+          {e.inRoom ? (
+            e.micMuted ? (
+              <MicOff className="h-3.5 w-3.5 shrink-0 text-primary-200" aria-label="Micro coupé" />
             ) : (
-              <Mic className="h-3.5 w-3.5 shrink-0 text-primary-200" />
-            )}
+              <Mic className="h-3.5 w-3.5 shrink-0 text-primary-200" aria-label="Micro actif" />
+            )
+          ) : (
+            <span className="shrink-0 text-caption text-primary-200">{RECIPIENT_LABEL[e.status]}</span>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** Bande des membres appelés : avatar, prénom et état réel de chacun. */
+function MemberStrip({
+  entries,
+  beneficiaryId,
+  variant,
+}: {
+  entries: StripEntry[];
+  beneficiaryId: string | null;
+  variant: "phone" | "desk";
+}) {
+  const visible = entries.slice(0, 4);
+  const hidden = Math.max(0, entries.length - visible.length);
+  const phone = variant === "phone";
+  return (
+    <div className={cn("flex justify-center", phone ? "gap-4" : "gap-1")}>
+      {visible.map((e) => {
+        const isBeneficiary = beneficiaryId !== null && e.id === beneficiaryId;
+        const dim = DIMMED.has(e.status) || e.micMuted;
+        return (
+          <div key={e.id} className={cn("flex flex-col items-center", phone ? "w-[62px]" : "w-[60px] gap-[7px]")}>
+            <div
+              className={cn(
+                "relative flex items-center justify-center rounded-full",
+                phone ? "h-14 w-14" : "h-12 w-12",
+                e.name ? "bg-primary" : "bg-primary-800",
+                dim && "bg-primary/55",
+              )}
+              style={{ boxShadow: isBeneficiary ? BENEFICIARY_RING : undefined }}
+            >
+              {e.name ? (
+                <span
+                  className={cn(
+                    "font-display font-bold text-primary-foreground",
+                    phone ? "text-[19px]" : "text-base",
+                    dim && "text-primary-foreground/55",
+                  )}
+                >
+                  {getInitials(e.name)}
+                </span>
+              ) : (
+                <User className={cn("text-primary-200", phone ? "h-[22px] w-[22px]" : "h-5 w-5")} />
+              )}
+              {e.inRoom && e.micMuted && (
+                <span className="absolute -bottom-0.5 -right-0.5 flex h-[22px] w-[22px] items-center justify-center rounded-full bg-primary-900 ring-2 ring-primary-900">
+                  <MicOff className="h-[13px] w-[13px] text-primary-200" />
+                </span>
+              )}
+            </div>
+            <span
+              className={cn(
+                "w-full truncate text-center text-primary-200",
+                phone ? "mt-2 text-caption" : "text-[11.5px]",
+                isBeneficiary && "font-semibold text-accent",
+              )}
+            >
+              {firstName(e.name) ?? "Un membre"}
+            </span>
+            {/* Ligne d'état toujours réservée : la bande ne saute pas quand l'état change. */}
+            <span className="w-full truncate text-center text-[11px] leading-tight text-primary-200/75">
+              {e.inRoom ? "\u00A0" : RECIPIENT_LABEL[e.status]}
+            </span>
           </div>
         );
       })}
+      {hidden > 0 && (
+        <div className={cn("flex flex-col items-center", phone ? "w-[62px]" : "w-[60px] gap-[7px]")}>
+          <div
+            className={cn(
+              "flex items-center justify-center rounded-full border-[1.5px] border-primary-200/30",
+              phone ? "h-14 w-14" : "h-12 w-12",
+            )}
+          >
+            <span className="num text-base font-semibold text-primary-200">+{hidden}</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
