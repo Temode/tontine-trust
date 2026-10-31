@@ -43,6 +43,8 @@ public class IncomingCallActivity extends Activity {
 
     private String callId;
     private String groupId;
+    private String respondUrl;
+    private String respondToken;
     private AnimatorSet acceptAnimation;
     private final Handler handler = new Handler(Looper.getMainLooper());
 
@@ -87,9 +89,19 @@ public class IncomingCallActivity extends Activity {
         }
         bindTurn(in.getStringExtra("turn_beneficiary_name"), in.getStringExtra("turn_payout_amount"));
 
-        findViewById(R.id.btn_decline).setOnClickListener(v -> openApp("?action=decline", true));
-        findViewById(R.id.btn_accept).setOnClickListener(v -> openApp("", true));
+        respondUrl = in.getStringExtra("respond_url");
+        respondToken = in.getStringExtra("respond_token");
+        // Refuser : écrit directement côté serveur, sans déverrouiller ni ouvrir l'application.
+        findViewById(R.id.btn_decline).setOnClickListener(v -> {
+            CallResponder.send(respondUrl, respondToken, "declined");
+            finishCall();
+        });
+        findViewById(R.id.btn_accept).setOnClickListener(v -> {
+            CallResponder.send(respondUrl, respondToken, "accepted");
+            openApp("", true);
+        });
         findViewById(R.id.btn_message).setOnClickListener(v -> {
+            CallResponder.send(respondUrl, respondToken, "declined");
             stopRinging();
             Intent i = new Intent(Intent.ACTION_VIEW,
                     Uri.parse("com.tontinedigitale.app://appel/" + callId + "?action=decline"), this, MainActivity.class);

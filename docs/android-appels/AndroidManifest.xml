@@ -49,6 +49,11 @@
             <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/file_paths" />
         </provider>
 
+        <!-- Refus depuis la notification, sans ouvrir l'application -->
+        <receiver
+            android:name=".CallDeclineReceiver"
+            android:exported="false" />
+
         <service
             android:name=".CallMessagingService"
             android:exported="false">
