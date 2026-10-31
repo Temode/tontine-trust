@@ -1,29 +1,40 @@
-# Suivi par membre des appels de tontine
+# Suivi par membre des appels de tontine (révision 2)
 
 ## Objectif
-Pendant un appel, l'appelant voit sous chaque membre appelé son état réel : Sonne, Refusé, Indisponible, En ligne, Parti. Cela règle aussi l'appelant qui ne sait pas qu'on a refusé (aujourd'hui il reste sur « Sonnerie en cours » jusqu'à 90 s).
+Pendant un appel, l'appelant voit sous chaque membre appelé son état réel. La bande des membres devient le tableau de bord de l'appel.
 
-## État constaté
-- `call_requests` ne porte que `group_id`, `requested_by` et un `status` global. Aucune liste de destinataires n'est enregistrée.
-- `call_participants` (call_id, user_id, joined_at, left_at, is_muted) existe, mais l'app n'appelle jamais `join_call` ni `leave_call`.
-- L'appelant ne s'abonne à aucun changement de statut.
+## Réponses aux quatre points
 
-## Ce qui sera construit
+### 1. Écriture du refus téléphone verrouillé
+Constat : le code natif n'a aujourd'hui aucun accès à la session. Le jeton de connexion vit dans la page web, qui ne tourne pas quand le téléphone est verrouillé. Le seul appel réseau natif existant sert à charger l'avatar. Il faut donc une requête réseau depuis le Java.
 
-1. **Liste des appelés figée au lancement.** Une table `call_recipients` (call_id, user_id, status, rang_at, responded_at, reason). `request_group_call` y insère un instantané des membres actifs de la tontine, sans l'appelant.
-2. **États par membre** : `ringing` (sonne), `delivered` (le push est arrivé sur l'appareil, quand on peut le savoir), `declined` (refusé), `accepted` (a décroché), `missed` (pas de réponse à 60 s), `unreachable` (aucun appareil enregistré), `left` (a quitté).
-3. **Une seule écriture.** `respond_call_request` met à jour la ligne du membre qui répond, depuis l'écran web comme depuis l'écran Android natif. Le statut global de l'appel en découle : refusé seulement si tout le monde a refusé, et l'appel reste en cours tant qu'une personne sonne encore ou est en ligne. Une fois terminé, un état ne peut plus être rouvert (règle déjà en place).
-4. **Présence dans l'appel.** On branche `join_call` et `leave_call` à la connexion et à la déconnexion de l'appel. `accepted` passe ensuite à `left` au départ.
-5. **Temps réel côté appelant.** L'appelant s'abonne aux lignes de son appel. Écran audio : un état sous chaque vignette (« Sonne… », « A refusé », « Indisponible »). Appel à deux : un refus ferme l'écran et affiche « <Prénom> a refusé l'appel ». Le panneau Membres liste tous les appelés avec leur état.
-6. **Confidentialité.** Seuls l'appelant et les membres actifs de la tontine lisent les lignes d'un appel. Chacun ne peut modifier que sa propre ligne, et uniquement via les fonctions prévues.
+Les trois options :
+- **Session stockée côté natif : écartée.** Il faudrait recopier un jeton longue durée hors de la page web et le rafraîchir en Java. Une fuite donnerait accès à tout le compte.
+- **Secret serveur partagé dans l'app : écartée.** Le secret serait le même pour tous les utilisateurs et se lit dans l'APK. Une seule fuite permettrait de répondre à la place de n'importe qui.
+- **Recommandée : un jeton court par destinataire, envoyé dans la notification.** Au moment de l'envoi, `consume-push-outbox` signe pour chaque destinataire un jeton {call_id, user_id, exp = 90 s}. Ce jeton part dans le message FCM data, qui n'est remis qu'à notre application. Une nouvelle fonction serveur `call-respond` vérifie la signature et l'expiration, puis applique la même règle que `respond_call_request`. Cette fonction ne fait que trois choses : accuser réception, refuser, accepter.
 
-## Hors périmètre (à arbitrer séparément)
-- Délai de 26 à 31 s avant la sonnerie du téléphone (envoi des push par lot chaque minute) : à corriger dans un autre chantier.
-- Bouton « accepter en vidéo » : il n'existe pas aujourd'hui.
+Risques de la solution recommandée et parades :
+- Rejeu : le jeton expire en 90 s, ne vaut que pour cet appel et ce membre, et un état terminé ne se rouvre jamais.
+- Vol du jeton : il donne au pire le droit de refuser un seul appel pendant 90 s. Il ne donne accès à aucune donnée.
+- Réseau absent au moment du refus : la requête est retentée 3 fois en 10 s. Si elle échoue quand même, la ligne passe en `missed` à 60 s. L'appelant voit alors « Pas de réponse », jamais un faux « A refusé ».
+- La clé de signature est un secret serveur nouveau. Elle n'existe que côté serveur, jamais dans l'app.
+
+### 2. État `delivered`
+Il est conservé, mais avec un sens strict : **l'appareil a confirmé avoir reçu l'appel**. `CallMessagingService` envoie cet accusé réception avec le même jeton dès qu'il reçoit le message FCM. Sans accusé, le membre reste à « Appel envoyé », et rien n'est affiché à l'appelant qui ne soit prouvé. Libellés : `ringing` = « Appel envoyé », `delivered` = « Sonne ». Le web obtient le même accusé quand l'écran d'appel entrant s'affiche.
+
+### 3. Corrections d'affichage
+- La bande se construit sur `call_recipients`, complétée par la présence LiveKit (parle, micro coupé). Elle s'affiche dès qu'il y a un destinataire, donc toujours. Le seuil de trois participants est retiré.
+- Tant que personne n'a décroché, la grande place affiche la tontine (nom et initiale), jamais l'appelant. Le repli vers le participant local est retiré pendant la sonnerie.
+
+### 4. Arrivée hors instantané
+C'est réalisable, et le côté serveur s'y prête bien. `livekit-token` est obligatoirement appelé pour entrer dans un appel, et il vérifie déjà que la personne est membre de la tontine. On y ajoute un insert/upsert dans `call_recipients` en `accepted` (avec `joined_late = true`) quand la ligne n'existe pas. Le cas est donc couvert quel que soit le chemin d'entrée (Rejoindre depuis la discussion, membre ajouté pendant l'appel), sans dépendre du client.
+
+## États (sept, tous prouvés)
+`ringing` Appel envoyé · `delivered` Sonne · `declined` A refusé · `accepted` En ligne · `missed` Pas de réponse · `unreachable` Aucun appareil · `left` Parti.
 
 ## Détails techniques
-- Migration : `CREATE TABLE public.call_recipients` + GRANT (authenticated select ; service_role all) + RLS + index (call_id). Ajout à la publication `supabase_realtime`.
-- Mise à jour de `request_group_call`, `respond_call_request` et de l'expiration à 60 s / 90 s. `unreachable` est posé à l'insertion quand le membre n'a aucun `push_tokens` et aucune présence web.
-- Front : `CallContext.tsx` (abonnement à canal unique dans un useEffect, join/leave), `AudioCallStage.tsx` (libellé d'état, mêmes tokens et rôles typographiques), panneau Membres.
-- Tests : SQL dans `db/tests/call_recipients.test.sql` (un refus sur trois laisse l'appel en cours ; trois refus le passent à refusé ; un état terminé n'est jamais rouvert ; un non-membre ne lit rien) et mise à jour de `CallContext.test.tsx`.
-- `AGENTS.md` : règle « l'état par destinataire vit dans call_recipients ; le statut global en dérive ».
+- Migration `call_recipients` (call_id, user_id, status, delivered_at, responded_at, joined_late), avec GRANT, RLS et temps réel. Instantané inséré par `request_group_call`. Statut global dérivé des lignes.
+- Fonctions : `call-respond` (nouvelle, sans session, avec jeton HMAC), `consume-push-outbox` (signe le jeton et l'ajoute à la charge utile), `livekit-token` (upsert accepted).
+- Natif (`docs/android-appels/`) : accusé réception dans `CallMessagingService`. Refus et acceptation dans `IncomingCallActivity` via `call-respond`, avant l'ouverture de l'app. À recopier à la main.
+- Web : `CallContext.tsx` (abonnement, join/leave), `AudioCallStage.tsx` (bande toujours affichée, grande place réservée à la tontine pendant la sonnerie).
+- Tests SQL et `CallContext.test.tsx` : jeton expiré refusé ; un refus sur trois laisse l'appel en cours ; arrivée tardive créée en accepted ; état terminé jamais rouvert.
