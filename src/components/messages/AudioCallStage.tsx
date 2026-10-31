@@ -263,56 +263,10 @@ export function AudioCallStage({
               : "\u00A0"}
         </p>
 
-        {/* Bandeau des autres participants */}
+        {/* Tableau de bord de l'appel : chaque membre appelé et son état */}
         {showStrip && (
-          <div className="mt-[34px] flex gap-4">
-            {visibleOthers.map((p) => {
-              const micMuted =
-                p.getTrackPublication(Track.Source.Microphone)?.isMuted ?? false;
-              const isBeneficiary = beneficiaryId !== null && p.identity === beneficiaryId;
-              return (
-                <div key={p.identity} className="flex w-[62px] flex-col items-center">
-                  <div
-                    className={cn(
-                      "relative flex h-14 w-14 items-center justify-center rounded-full bg-primary",
-                      micMuted && "bg-primary/55",
-                    )}
-                    style={{ boxShadow: isBeneficiary ? BENEFICIARY_RING : undefined }}
-                  >
-                    <span
-                      className={cn(
-                        "font-display text-[19px] font-bold text-primary-foreground",
-                        micMuted && "text-primary-foreground/55",
-                      )}
-                    >
-                      {nameOf(p) ? getInitials(nameOf(p) as string) : <User className="h-[22px] w-[22px]" />}
-                    </span>
-                    {micMuted && (
-                      <span className="absolute -bottom-0.5 -right-0.5 flex h-[22px] w-[22px] items-center justify-center rounded-full bg-primary-900 ring-2 ring-primary-900">
-                        <MicOff className="h-[13px] w-[13px] text-primary-200" />
-                      </span>
-                    )}
-                  </div>
-                  <span
-                    className={cn(
-                      "mt-2 w-[62px] truncate text-center text-caption text-primary-200",
-                      isBeneficiary && "font-semibold text-accent",
-                    )}
-                  >
-                    {p.identity === localParticipant?.identity ? "Vous" : firstName(nameOf(p)) ?? "Un membre"}
-                  </span>
-                </div>
-              );
-            })}
-            {hiddenCount > 0 && (
-              <div className="flex w-[62px] flex-col items-center">
-                <div className="flex h-14 w-14 items-center justify-center rounded-full border-[1.5px] border-primary-200/30">
-                  <span className="num text-base font-semibold text-primary-200">
-                    +{hiddenCount}
-                  </span>
-                </div>
-              </div>
-            )}
+          <div className="mt-[34px]">
+            <MemberStrip entries={strip} beneficiaryId={beneficiaryId} variant="phone" />
           </div>
         )}
 
@@ -335,28 +289,11 @@ export function AudioCallStage({
 
       {/* Liste des membres (bouton Membres) */}
       {membersOpen && (
-        <div className="mx-4 mb-3 max-h-40 overflow-y-auto rounded-2xl border border-white/10 bg-primary-800 p-2">
-          {participants.map((p) => {
-            const micMuted =
-              p.getTrackPublication(Track.Source.Microphone)?.isMuted ?? false;
-            return (
-              <div
-                key={p.identity}
-                className="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5"
-              >
-                <span className="truncate text-body-sm text-primary-foreground">
-                  {p.identity === localParticipant?.identity ? "Vous" : displayName(p)}
-                </span>
-                {micMuted ? (
-                  <MicOff className="h-3.5 w-3.5 shrink-0 text-primary-200" />
-                ) : (
-                  <Mic className="h-3.5 w-3.5 shrink-0 text-primary-200" />
-                )}
-              </div>
-            );
-          })}
+        <div className="mx-4 mb-3">
+          <MembersList entries={strip} />
         </div>
       )}
+
 
       {/* Dock */}
       <div className="mx-4 mb-[22px] grid grid-cols-3 gap-y-4 rounded-[28px] border border-white/10 bg-primary-800 px-3.5 py-5">
