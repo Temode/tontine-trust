@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/compone
 import { toast } from "sonner";
 import { useIncomingCallsContext } from "@/hooks/IncomingCallsContext";
 import { respondCallRequest } from "@/lib/api/calls";
+import { supabase } from "@/integrations/supabase/client";
 import { useCall } from "@/hooks/CallContext";
 import { useRingtone } from "@/hooks/useRingtone";
 
@@ -21,6 +22,12 @@ export function IncomingCallSheet() {
   useEffect(() => {
     if (!activeCallId) setJoined(false);
   }, [activeCallId]);
+
+  // Accusé de réception : l'écran d'appel entrant est réellement affiché.
+  const shownCallId = !!current && !joined && !activeCallId ? current?.id ?? null : null;
+  useEffect(() => {
+    if (shownCallId) void supabase.rpc("ack_call_delivered", { p_call_id: shownCallId }).then(() => {}, () => {});
+  }, [shownCallId]);
 
   const decline = useMutation({
     mutationFn: (id: string) => respondCallRequest(id, "declined"),
