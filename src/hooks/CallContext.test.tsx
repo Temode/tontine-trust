@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/hooks/useAuth", () => ({ useAuth: () => ({ user: { id: "recipient", user_metadata: {} } }) }));
 vi.mock("@/integrations/supabase/client", () => ({ supabase: {
   rpc: mocks.rpc, functions: { invoke: mocks.invoke },
+  channel: () => { const ch = { on: () => ch, subscribe: () => ch }; return ch; }, removeChannel: async () => {},
   from: () => ({ select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { requested_by: "caller", status: "pending" } }) }) }) }),
 } }));
 vi.mock("@livekit/components-react", () => ({

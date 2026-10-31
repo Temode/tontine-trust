@@ -107,6 +107,15 @@ Deno.serve(async (req) => {
       })
     }
 
+    // Entrée dans l'appel : la ligne du destinataire passe en accepted, créée si absente.
+    {
+      const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
+      const { error: recErr } = await admin.rpc('_call_recipient_set', {
+        p_call_id: callId, p_user_id: userId, p_status: 'accepted',
+      })
+      if (recErr) console.error('call_recipient accepted failed', recErr.message)
+    }
+
     const roomName = `call_${callId}`
     const now = Math.floor(Date.now() / 1000)
     const ttlSeconds = 60 * 60 * 4 // 4h

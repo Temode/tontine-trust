@@ -9,3 +9,4 @@
 <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
 ```
 Sans RECORD_AUDIO, le WebView refuse le micro et l'appel ne peut pas transmettre la voix.
+- CallResponder posts delivered/declined/accepted to call-respond with the respond_token/respond_url carried in the call push; decline never opens MainActivity, so a locked phone can refuse without unlocking.

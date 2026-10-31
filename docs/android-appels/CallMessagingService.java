@@ -51,11 +51,21 @@ public class CallMessagingService extends MessagingService {
         super.onNewToken(token);
     }
 
-    private PendingIntent open(String callId, boolean decline, int req) {
-        String url = "com.tontinedigitale.app://appel/" + callId + (decline ? "?action=decline" : "");
+    private PendingIntent open(String callId, int req) {
+        String url = "com.tontinedigitale.app://appel/" + callId;
         Intent i = new Intent(Intent.ACTION_VIEW, Uri.parse(url), this, MainActivity.class);
         i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
         return PendingIntent.getActivity(this, req, i,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+    }
+
+    /** Refus depuis la notification : écrit côté serveur sans ouvrir l'application. */
+    private PendingIntent declineAction(String callId, Map<String, String> d, int req) {
+        Intent i = new Intent(this, CallDeclineReceiver.class);
+        i.putExtra("call_id", callId);
+        i.putExtra("respond_url", d.get("respond_url"));
+        i.putExtra("respond_token", d.get("respond_token"));
+        return PendingIntent.getBroadcast(this, req, i,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
     }
 
@@ -64,13 +74,15 @@ public class CallMessagingService extends MessagingService {
         i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_NO_USER_ACTION);
         i.putExtra("call_id", callId);
         for (String k : new String[]{"group_id", "group_name", "caller_name", "caller_avatar_url",
-                "turn_beneficiary_name", "turn_payout_amount"}) i.putExtra(k, d.get(k));
+                "turn_beneficiary_name", "turn_payout_amount", "respond_url", "respond_token"}) i.putExtra(k, d.get(k));
         return i;
     }
 
     private void showIncomingCall(String callId, Map<String, String> d) {
         CallChannels.ensure(this);
         CallRinger.start(this);
+        // Accusé de réception : l'appareil a bien reçu l'appel (état « Sonne » chez l'appelant).
+        CallResponder.send(d.get("respond_url"), d.get("respond_token"), "delivered");
 
         String caller = d.get("caller_name");
         String group = d.get("group_name");
@@ -97,7 +109,7 @@ public class CallMessagingService extends MessagingService {
                 .setContentIntent(full)
                 .setFullScreenIntent(full, true)
                 .setStyle(NotificationCompat.CallStyle.forIncomingCall(
-                        person, open(callId, true, id + 1), open(callId, false, id)))
+                        person, declineAction(callId, d, id + 1), open(callId, id)))
                 .addPerson(person)
                 .build();
         try {
