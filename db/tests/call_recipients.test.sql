@@ -29,7 +29,6 @@ BEGIN
     ASSERT st = 'pending', 'one decline out of several keeps the call ringing';
 
     -- 3. Dernier refus : l'appel passe à refusé, et ne se rouvre jamais.
-    UPDATE public.call_recipients SET status = 'declined' WHERE call_id = cid AND user_id = ghost;
     DELETE FROM public.call_recipients WHERE call_id = cid AND user_id = ghost;
     UPDATE public.call_recipients SET status = 'ringing' WHERE call_id = cid AND user_id = recipient;
     PERFORM public._call_recipient_set(cid, recipient, 'declined');
