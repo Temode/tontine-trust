@@ -33,6 +33,7 @@ import { CallSurface } from "@/components/messages/CallSurface";
 import { CallDiagnosticProbe } from "@/components/messages/CallDiagnosticProbe";
 import { recordCallTrace } from "@/lib/diagnostics/callTrace";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { declineMessage, type RecipientRow } from "@/lib/callRecipients";
 
 export interface StartCallArgs {
   callId: string;
@@ -143,6 +144,9 @@ export function CallProvider({ children }: { children: ReactNode }) {
     (reason: "hangup" | "error") => {
       const s = session;
       if (s) {
+        if (hasConnectedRef.current && !isStubCall(s.callId)) {
+          void supabase.rpc("leave_call", { p_call_id: s.callId }).then(() => {}, () => {});
+        }
         if (s.manageLifecycle && hasConnectedRef.current) {
           updateCallStatusBestEffort(s.callId, "ended");
         } else if (
@@ -232,6 +236,35 @@ export function CallProvider({ children }: { children: ReactNode }) {
       });
     })().catch((err) => console.warn("[call] ring expiration setup failed", err));
     return () => { cancelled = true; stop?.(); };
+  }, [session, user, teardown]);
+
+  // L'appelant apprend le refus : le statut global passe à « declined » quand
+  // tous les membres appelés ont refusé, depuis le web comme depuis le natif.
+  useEffect(() => {
+    if (!session?.manageLifecycle || !user || isStubCall(session.callId)) return;
+    const callId = session.callId;
+    let done = false;
+    const onDeclined = async () => {
+      if (done) return;
+      done = true;
+      const { data: rows } = await supabase.from("call_recipients").select("user_id, status").eq("call_id", callId);
+      let recips: RecipientRow[] = (rows ?? []).map((r) => ({ user_id: r.user_id, status: r.status as RecipientRow["status"], name: null }));
+      if (recips.length === 1) {
+        const { data: prof } = await supabase.from("profiles").select("full_name").eq("id", recips[0].user_id).maybeSingle();
+        recips = [{ ...recips[0], name: prof?.full_name ?? null }];
+      }
+      toast(declineMessage(recips), { description: "L\u2019appel est terminé." });
+      teardown("hangup");
+    };
+    const channel = supabase
+      .channel(`call-status:${callId}:${Math.random().toString(36).slice(2)}`)
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "call_requests", filter: `id=eq.${callId}` },
+        (payload) => {
+          const row = payload.new as { requested_by?: string; status?: string };
+          if (row.requested_by === user.id && row.status === "declined") void onDeclined();
+        })
+      .subscribe();
+    return () => { done = true; void supabase.removeChannel(channel); };
   }, [session, user, teardown]);
 
   // Récupération du token LiveKit
@@ -363,6 +396,9 @@ export function CallProvider({ children }: { children: ReactNode }) {
   const handleConnected = () => {
     recordCallTrace("connected");
     hasConnectedRef.current = true;
+    if (session && !isStubCall(session.callId)) {
+      void supabase.rpc("join_call", { p_call_id: session.callId }).then(() => {}, () => {});
+    }
     if (session?.manageLifecycle) {
       updateCallStatusBestEffort(session.callId, "accepted");
     }
@@ -577,6 +613,7 @@ function FullCallStage({
     return (
       <div className="fixed inset-0 z-call">
       <AudioCallStage
+        callId={callId}
         groupId={groupId}
         groupName={groupName}
         connectedAt={connectedAt}
