@@ -357,6 +357,47 @@ export type Database = {
           },
         ]
       }
+      call_recipients: {
+        Row: {
+          call_id: string
+          created_at: string
+          delivered_at: string | null
+          joined_late: boolean
+          responded_at: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          call_id: string
+          created_at?: string
+          delivered_at?: string | null
+          joined_late?: boolean
+          responded_at?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          call_id?: string
+          created_at?: string
+          delivered_at?: string | null
+          joined_late?: boolean
+          responded_at?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "call_recipients_call_id_fkey"
+            columns: ["call_id"]
+            isOneToOne: false
+            referencedRelation: "call_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       call_requests: {
         Row: {
           created_at: string
@@ -7224,12 +7265,17 @@ export type Database = {
     }
     Functions: {
       _audit_confirm_test_user: { Args: { _email: string }; Returns: undefined }
+      _call_recipient_set: {
+        Args: { p_call_id: string; p_status: string; p_user_id: string }
+        Returns: string
+      }
       _generate_invite_code: { Args: never; Returns: string }
       accept_group_terms: { Args: { _group_id: string }; Returns: string }
       accrue_referral_earning: {
         Args: { _period: string; _subscription_id: string }
         Returns: string
       }
+      ack_call_delivered: { Args: { p_call_id: string }; Returns: undefined }
       adjust_penalty: {
         Args: {
           _contribution_id: string
@@ -7825,6 +7871,10 @@ export type Database = {
       }
       can_join_call: { Args: { p_call_id: string }; Returns: boolean }
       can_moderate_call: { Args: { p_call_id: string }; Returns: boolean }
+      can_view_call: {
+        Args: { _call_id: string; _uid: string }
+        Returns: boolean
+      }
       cancel_cycle_renewal: { Args: { _cycle_id: string }; Returns: undefined }
       cancel_my_bid: { Args: { _turn_id: string }; Returns: undefined }
       cancel_turn_swap: { Args: { _request_id: string }; Returns: undefined }
