@@ -51,8 +51,8 @@ public class CallMessagingService extends MessagingService {
         super.onNewToken(token);
     }
 
-    private PendingIntent open(String callId, boolean decline, int req) {
-        String url = "com.tontinedigitale.app://appel/" + callId + (decline ? "?action=decline" : "");
+    private PendingIntent open(String callId, int req) {
+        String url = "com.tontinedigitale.app://appel/" + callId;
         Intent i = new Intent(Intent.ACTION_VIEW, Uri.parse(url), this, MainActivity.class);
         i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
         return PendingIntent.getActivity(this, req, i,
@@ -109,7 +109,7 @@ public class CallMessagingService extends MessagingService {
                 .setContentIntent(full)
                 .setFullScreenIntent(full, true)
                 .setStyle(NotificationCompat.CallStyle.forIncomingCall(
-                        person, declineAction(callId, d, id + 1), open(callId, false, id)))
+                        person, declineAction(callId, d, id + 1), open(callId, id)))
                 .addPerson(person)
                 .build();
         try {
